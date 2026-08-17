@@ -12,7 +12,10 @@ android {
 
     defaultConfig {
         applicationId = "dev.digitalducktape.openride"
-        minSdk = 30
+        // Android 10 (API 29). The reference tablet runs Android 11, but some Gen 2 bikes are
+        // still on an Android 10 firmware and cannot be updated. Nothing in the app calls an
+        // API above 29 — see the audit note in docs/DEVICE.md.
+        minSdk = 29
         targetSdk = 34
         versionCode = 3
         versionName = "0.3.0"

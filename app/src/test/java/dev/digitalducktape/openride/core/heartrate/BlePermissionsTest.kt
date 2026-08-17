@@ -28,6 +28,12 @@ class BlePermissionsTest {
     }
 
     @Test
+    fun `Android 10 (the oldest supported bike firmware) also needs ACCESS_FINE_LOCATION`() {
+        val permissions = requiredBlePermissions(Build.VERSION_CODES.Q)
+        assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION), permissions.toList())
+    }
+
+    @Test
     fun `all permissions granted reduces to Granted`() {
         val state = reduceBlePermissionState(
             permissions = arrayOf("A", "B"),

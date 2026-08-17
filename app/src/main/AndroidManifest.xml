@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Required for the Classes content layer (PRD P0-6, T9/T10): fetching per-channel
          YouTube RSS feeds and loading thumbnails via Coil both need network access. -->
@@ -8,8 +9,8 @@
     <!-- BLE heart-rate strap pairing/connection (PRD P1-4, T17). Two permission sets, split by
          API level (see core/heartrate/BlePermissions.kt):
 
-         - API <=30 (this project's actual target hardware, the Bike Gen 2 tablet on Android
-           11): BLUETOOTH/BLUETOOTH_ADMIN are install-time "normal" permissions here (never
+         - API 29..30 (this project's actual target hardware, the Bike Gen 2 tablet on Android
+           10 or 11): BLUETOOTH/BLUETOOTH_ADMIN are install-time "normal" permissions here (never
            requested at runtime); ACCESS_FINE_LOCATION is the runtime permission BLE scanning
            needs on these levels. maxSdkVersion="30" keeps them out of the merged manifest on
            API 31+, where they're superseded by the two permissions below.
@@ -19,9 +20,14 @@
            results — and lets a user on 12+ grant it without also granting location. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- CoarseFineLocation is suppressed because the check does not apply here: it warns that
+         Android 12+ requires COARSE alongside FINE, but maxSdkVersion="30" already keeps FINE
+         out of the merged manifest on 31+, where BLUETOOTH_SCAN with neverForLocation is used
+         instead. Adding COARSE would request a permission this app never uses. -->
     <uses-permission
         android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
+        android:maxSdkVersion="30"
+        tools:ignore="CoarseFineLocation" />
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />

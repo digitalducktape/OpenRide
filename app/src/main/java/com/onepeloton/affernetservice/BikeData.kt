@@ -107,7 +107,7 @@ class BikeData() : Parcelable {
             parcel.readInt()                             // 55 mPZAFMaxResistanceSetPoint
             parcel.readInt()                             // 56 mPZAFMinUpdateRPM
             @Suppress("DEPRECATION")                     // readParcelable(ClassLoader) — the
-            // typed overload needs API 33; minSdk here is 30, so the older form is required.
+            // typed overload needs API 33; minSdk here is 29, so the older form is required.
             run {
                 v3BikeData = parcel.readParcelable(      // 57 mV3BikeData
                     V3BikeData::class.java.classLoader,

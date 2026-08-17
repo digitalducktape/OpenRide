@@ -1,6 +1,7 @@
-# Installing OpenRide on the Peloton Bike (Gen 2) tablet
+# Installing OpenRide on the Peloton Bike (Gen 2 / Bike+) tablet
 
-This covers sideloading OpenRide onto the bike's stock Android 11 tablet via
+This covers sideloading OpenRide onto the bike's stock tablet (Android 11 on the
+Gen 2, Android 10 on the Bike+) via
 [OpenPelo](https://github.com/doudar/Openpelo), enabling it as the tablet's home-screen
 launcher, blocking OTA updates (so a firmware push can't undo any of this), and reverting
 back to stock if you ever need to.

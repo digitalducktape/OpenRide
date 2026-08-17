@@ -10,7 +10,7 @@ import android.os.Build
  * - Android 12+ (API 31+) introduced the dedicated `BLUETOOTH_SCAN`/`BLUETOOTH_CONNECT`
  *   runtime permissions.
  * - Everything before that — including this project's actual target hardware, the Bike Gen 2
- *   tablet on Android 11/API 30 — instead needs the legacy `ACCESS_FINE_LOCATION` runtime
+ *   tablet on Android 10/API 29 or Android 11/API 30 — needs the legacy `ACCESS_FINE_LOCATION` runtime
  *   permission (BLE scans can reveal location on these API levels); `BLUETOOTH`/
  *   `BLUETOOTH_ADMIN` are also required there but are install-time "normal" permissions
  *   (declared in the manifest with `maxSdkVersion="30"`, never requested at runtime).
