@@ -9,7 +9,9 @@ import android.provider.MediaStore
 /**
  * [AutoBackupStore] backed by shared storage: `Download/OpenRide/` via
  * [MediaStore.Downloads] (the scoped-storage-sanctioned way to write there on the tablet's
- * Android 11 — no storage permission needed for the app's own files).
+ * Android 10/11 — no storage permission needed for the app's own files). MediaStore.Downloads
+ * and RELATIVE_PATH/IS_PENDING all arrived in API 29, so this works on the oldest firmware
+ * the app supports.
  *
  * Downloads is deliberately chosen over the app's private dirs because it survives an
  * uninstall (feedback: "no data loss when the app is updated"). Two recovery paths:

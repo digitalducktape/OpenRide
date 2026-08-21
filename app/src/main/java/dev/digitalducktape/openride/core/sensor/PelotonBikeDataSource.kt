@@ -17,6 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Real [BikeDataSource] for the Peloton Bike Gen 2's onboard sensors (PRD P0-2, issue #3).
  *
+ * Verified streaming on the Gen 2 (`RB1VQ`, Android 11). It does **not** stream on the Bike+
+ * (`topaz`, Android 10), where the bind and `registerCallback` both succeed and no frame ever
+ * follows — that board feeds [PelotonBikeInterfaceDataSource] instead. Neither class picks a
+ * board; [AffernetBikeDataSource] runs both and keeps whichever delivers a frame.
+ *
  * Reads cadence / resistance / power off the flywheel by binding the tablet's on-device
  * **affernet system service** (`com.onepeloton.affernetservice`) — an exported, unguarded
  * service any app may bind, independent of Peloton subscription state. This is the technique
@@ -52,7 +57,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class PelotonBikeDataSource(
     private val context: Context,
-) : BikeDataSource {
+) : BoundBikeDataSource {
 
     private val _metrics = MutableStateFlow(BikeMetrics.ZERO)
     override val metrics: StateFlow<BikeMetrics> = _metrics.asStateFlow()
@@ -146,7 +151,7 @@ class PelotonBikeDataSource(
      * emulator / non-bike environment) or the bind is denied, this degrades to
      * [ConnectionState.Unavailable] instead of throwing. Call once; call [stop] to release.
      */
-    fun start() {
+    override fun start() {
         try {
             val intent = Intent(SERVICE_ACTION).apply { setPackage(SERVICE_PACKAGE) }
             val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
@@ -173,7 +178,7 @@ class PelotonBikeDataSource(
         runCatching { service?.setFakeDataMode(enabled) ?: false }.getOrDefault(false)
 
     /** Unbinds the service. Safe to call even if [start] never bound. */
-    fun stop() {
+    override fun stop() {
         runCatching { service?.unregisterCallback(callback, CLIENT_ID) }
         try {
             context.unbindService(serviceConnection)
@@ -182,16 +187,6 @@ class PelotonBikeDataSource(
         }
         service = null
         _connectionState.value = ConnectionState.Unavailable
-    }
-
-    private fun BikeData.toBikeMetrics(): BikeMetrics {
-        val watts = (power / POWER_SCALE).toInt()
-        return BikeMetrics(
-            cadenceRpm = rpm.toInt(),
-            resistancePercent = currentResistance.coerceIn(0, 100),
-            powerWatts = watts,
-            speedMph = pelotonSpeedMphFromPower(watts.toDouble()),
-        )
     }
 
     private companion object {
@@ -207,8 +202,5 @@ class PelotonBikeDataSource(
 
         /** Requested frame interval; ~1 Hz is plenty for the in-ride metrics UI. */
         const val REPORT_RATE_MS = 1000
-
-        /** Raw power is centi-watts (watts x 100). */
-        const val POWER_SCALE = 100L
     }
 }

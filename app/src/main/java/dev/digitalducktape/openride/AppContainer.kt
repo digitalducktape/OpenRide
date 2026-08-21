@@ -28,9 +28,9 @@ import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
+import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
-import dev.digitalducktape.openride.core.sensor.PelotonBikeDataSource
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -45,10 +45,11 @@ import kotlinx.coroutines.flow.combine
  * constructor injection.
  *
  * [bikeDataSource] is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
- * (default `false`) switches it to [PelotonBikeDataSource] — the real Gen 2 system-service
- * binding from T3/#3, which is unverified on actual hardware (see that class's doc). Every
- * other layer only depends on the [BikeDataSource] interface, so this toggle is the one
- * place the choice is made.
+ * (default `false`) switches it to [AffernetBikeDataSource] — the real system-service binding,
+ * which races the two affernet sensor interfaces and keeps whichever one the board actually
+ * feeds (Gen 2 streams over `IV1Interface`, Bike+ over `IBikeInterface`). Every other layer
+ * only depends on the [BikeDataSource] interface, so this toggle is the one place the choice
+ * is made.
  */
 class AppContainer(private val applicationContext: Context) {
     /** Long-lived scope for singletons that need to run coroutines outside any one screen's lifecycle. */
@@ -102,7 +103,7 @@ class AppContainer(private val applicationContext: Context) {
 
     val bikeDataSource: BikeDataSource by lazy {
         if (BuildConfig.USE_REAL_BIKE_SENSOR) {
-            PelotonBikeDataSource(applicationContext).also { it.start() }
+            AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
         } else {
             MockBikeDataSource(scope = containerScope)
         }

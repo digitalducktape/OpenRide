@@ -4,7 +4,7 @@
   <img src="docs/screenshots/header.png" width="100%" alt="OpenRide — the open source bike app for your workout" />
 </p>
 
-OpenRide is a free, independent workout app for the Peloton Bike (Gen 2). It replaces the screen you normally see when you turn on the bike with a similar-feeling experience — live stats while you ride, a library of free cycling videos, and a history of all your past rides — without needing a Peloton subscription.
+OpenRide is a free, independent workout app for the Peloton Bike (Gen 2) and Bike+. It replaces the screen you normally see when you turn on the bike with a similar-feeling experience — live stats while you ride, a library of free cycling videos, and a history of all your past rides — without needing a Peloton subscription.
 
 It's installed using a free tool called [OpenPelo](https://github.com/doudar/Openpelo), which lets you add apps to the bike's tablet. This doesn't require rooting the device or unlocking anything permanently.
 
@@ -35,7 +35,7 @@ OpenRide isn't available in an app store — you install it onto the bike's tabl
 
 ### What you'll need
 
-- A Peloton Bike (Gen 2), with [OpenPelo](https://github.com/doudar/Openpelo) already set up on it. OpenPelo is what gives your computer the ability to talk to the bike's tablet — set that up first, following its own instructions.
+- A Peloton Bike (Gen 2) or Bike+, with [OpenPelo](https://github.com/doudar/Openpelo) already set up on it. OpenPelo is what gives your computer the ability to talk to the bike's tablet — set that up first, following its own instructions.
 - A computer with `adb` installed (this is Android's device-connection tool, part of the free "Android SDK platform-tools" download).
 
 ### Step 1: Get the APK
