@@ -1,0 +1,37 @@
+; OpenRide mini-games: a Godot 4.7.2 project embedded in the Android app (docs/GAMES.md).
+; The version is pinned: it must match the org.godotengine:godot library in the app.
+
+config_version=5
+
+[application]
+
+config/name="OpenRide Games"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+; The Android back button must never quit: quitting the engine kills the app's whole process.
+; Session handles the go-back request instead.
+config/quit_on_go_back=false
+
+[autoload]
+
+InputBus="*res://autoload/InputBus.gd"
+Session="*res://autoload/Session.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+; Fullscreen (immersive, no nav bar) on the bike; a normal window when run from the editor on a desktop.
+window/size/mode=3
+window/size/mode.pc=0
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+window/handheld/orientation=0
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
