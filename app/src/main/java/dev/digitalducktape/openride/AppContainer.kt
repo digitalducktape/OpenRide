@@ -1,12 +1,19 @@
 package dev.digitalducktape.openride
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import dev.digitalducktape.openride.core.backup.AutoBackupManager
 import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.camera.CameraXFaceSource
+import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
+import dev.digitalducktape.openride.core.camera.HeadTracker
+import dev.digitalducktape.openride.core.camera.InMemoryHeadCalibrationStore
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
@@ -116,6 +123,24 @@ class AppContainer(private val applicationContext: Context) {
             rideRepository = rideRepository,
             scope = containerScope,
             heartRateBpm = heartRateManager.bpm,
+        )
+    }
+
+    /**
+     * Camera head lean/standing for the mini-games (#33). The camera only runs while a game sets
+     * a tracker mode other than `off`. Calibrations live in memory until #35's 5→6 migration adds
+     * `Profile.headCalibration`; swap in a Room-backed [dev.digitalducktape.openride.core.camera.HeadCalibrationStore] then.
+     */
+    val headTracker: HeadTracker by lazy {
+        DefaultHeadTracker(
+            faceSource = CameraXFaceSource(applicationContext),
+            calibrationStore = InMemoryHeadCalibrationStore(),
+            activeProfileId = activeProfileHolder.activeProfileId,
+            hasCameraPermission = {
+                ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+            },
+            scope = containerScope,
         )
     }
 

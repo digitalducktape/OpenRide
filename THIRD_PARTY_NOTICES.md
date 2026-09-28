@@ -33,6 +33,13 @@ source code from any of them. See `docs/INTEROP.md` for details.
   does not bundle or redistribute OpenPelo; it is referenced only as an external
   install prerequisite in the README and `docs/INSTALL.md`.
 
+- **1€ (One Euro) filter** — Géry Casiez, Nicolas Roussel and Daniel Vogel,
+  "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive
+  Systems", CHI 2012. The head tracker's smoothing implements the algorithm from
+  the paper's description
+  (`app/src/main/java/dev/digitalducktape/openride/core/camera/OneEuroFilter.kt`);
+  no code was copied.
+
 ## Redistributed runtime dependencies
 
 All runtime dependencies are fetched by Gradle and are under permissive licenses
@@ -49,6 +56,7 @@ OpenRide's own source beyond attribution. Authoritative versions live in
 | Kotlinx Serialization | `org.jetbrains.kotlinx` | Apache-2.0 |
 | Coil | `io.coil-kt` | Apache-2.0 |
 | Godot Engine (Android library, mini-games) | `org.godotengine:godot` | MIT |
+| CameraX (camera-core, camera-camera2, camera-lifecycle) and lifecycle-process | `androidx.camera`, `androidx.lifecycle` | Apache-2.0 |
 
 ### Godot Engine
 
@@ -78,6 +86,23 @@ FreeType, zlib, libpng, HarfBuzz and others). They are listed, with their licens
 Godot's `COPYRIGHT.txt` (https://github.com/godotengine/godot/blob/4.7.2-stable/COPYRIGHT.txt),
 and are available at runtime from the engine itself (`Engine.get_copyright_info()` /
 `Engine.get_license_info()`).
+
+### Proprietary, free-to-use SDK (not open source)
+
+The mini-games head tracker (`core/camera/`) uses Google's ML Kit face detection
+for on-device face boxes. It is **not** under an open-source license: Google
+distributes it free of charge under its own terms, and the app links it as a
+prebuilt binary. No ML Kit code is copied into this repository.
+
+| Dependency | Group | License |
+|---|---|---|
+| ML Kit face detection, bundled model (`face-detection`) and ML Kit common/vision libraries | `com.google.mlkit` | [ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) |
+| Google Play services components that ML Kit bundles (`play-services-mlkit-face-detection`, `play-services-base`/`basement`/`tasks`) | `com.google.android.gms` | Android Software Development Kit License |
+| Transitive support libraries (Firebase components/encoders, datatransport, odml image) | `com.google.firebase`, `com.google.android.datatransport`, `com.google.android.odml` | Apache-2.0 |
+
+Camera frames are analysed in memory on the tablet and never stored or sent
+by OpenRide. Per Google's ML Kit documentation, the SDK itself may report
+API usage and performance metrics to Google; images are processed on device.
 
 ### Test-only dependencies
 

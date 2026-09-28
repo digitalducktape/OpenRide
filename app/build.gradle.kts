@@ -243,6 +243,15 @@ dependencies {
     implementation(libs.godot)
     implementation(libs.androidx.fragment)
 
+    // Mini-games head tracker (#33): CameraX image analysis (no preview) feeding ML Kit's
+    // *bundled* face detector (model inside the APK). The bike tablet has no Google Play
+    // services, so the unbundled variant, which fetches its model through them, would never
+    // get one. lifecycle-process lets the camera follow the app's foreground state.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.mlkit.face.detection)
+    implementation(libs.androidx.lifecycle.process)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
