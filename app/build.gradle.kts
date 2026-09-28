@@ -76,6 +76,16 @@ android {
         }
     }
 
+    // debugReal is created with initWith(debug), which copies build settings but not source
+    // sets. Share the debug-only tools (the head-tracker bench and fixture logger, #33) with it
+    // so they run on the bike with the real sensors. Release never sees them.
+    sourceSets {
+        getByName("debugReal") {
+            java.srcDir("src/debug/java")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
