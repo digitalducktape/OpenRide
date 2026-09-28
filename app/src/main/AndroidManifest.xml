@@ -72,10 +72,15 @@
         </activity>
 
         <!-- Backs ExportShare.kt (PRD P1-1/P1-2, T14): hands exported TCX/CSV files to the
-             Android share sheet via a content:// URI instead of a raw file:// path. -->
+             Android share sheet via a content:// URI instead of a raw file:// path. Also the
+             self-updater's APK hand-off and avatar captures (see res/xml/file_paths.xml).
+
+             An app-owned subclass at its own authority: the Godot AAR declares the plain
+             androidx FileProvider at ${applicationId}.fileprovider with its own paths file,
+             and the two must coexist (see OpenRideFileProvider). -->
         <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+            android:name=".core.files.OpenRideFileProvider"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

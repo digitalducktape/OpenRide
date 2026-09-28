@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.content.FeedFetcher
+import dev.digitalducktape.openride.core.files.FileProviderCache
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -54,6 +55,7 @@ class UpdateRepositoryTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         File(context.cacheDir, "updates").deleteRecursively()
+        FileProviderCache.clear()
     }
 
     @Test
@@ -130,5 +132,7 @@ class UpdateRepositoryTest {
         assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         // A content:// URI via FileProvider, never a file:// path.
         assertEquals("content", intent.data?.scheme)
+        // The app's own provider, not the Godot engine's `.fileprovider` (see OpenRideFileProvider).
+        assertEquals("${context.packageName}.files", intent.data?.authority)
     }
 }

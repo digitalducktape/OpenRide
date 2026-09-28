@@ -35,8 +35,16 @@ android {
     }
 
     buildTypes {
+        // Mini-games (#32): the Godot engine ships one native library per ABI (~23 MB compressed
+        // each). The bike tablets are arm64, so the builds that reach a bike carry only that;
+        // the mock debug build also keeps x86_64 so it still runs games on an x86 emulator.
+        debug {
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        }
+
         release {
             isMinifyEnabled = false
+            ndk { abiFilters += "arm64-v8a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -56,6 +64,11 @@ android {
             // This is the build published to the bike, so it updates from the `real` asset.
             buildConfigField("String", "UPDATE_APK_ASSET_INFIX", "\"real\"")
             matchingFallbacks += "debug"
+            // Bike-only build: arm64 alone (initWith copied debug's emulator ABI too).
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
         }
     }
 
@@ -89,6 +102,12 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // Mini-games (#32): store native libraries compressed (extracted at install) rather
+        // than page-aligned and uncompressed, so the Godot engine adds ~23 MB to the APK the
+        // self-updater downloads instead of ~69 MB.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -110,6 +129,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
     implementation(libs.androidx.exifinterface)
+
+    // Mini-games (#32): the Godot engine as an Android library; GameHostActivity embeds it.
+    // Must match the editor version that exports games/ (checked by exportGamesPack).
+    implementation(libs.godot)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
