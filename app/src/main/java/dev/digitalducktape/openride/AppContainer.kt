@@ -28,6 +28,7 @@ import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
+import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
@@ -142,6 +143,15 @@ class AppContainer(private val applicationContext: Context) {
             connectionFactory = { address -> BleHeartRateDataSource(applicationContext, address) },
             scope = containerScope,
         )
+    }
+
+    /**
+     * Mini-games (#32): the app-scoped side of the Godot bridge. One per process, like the
+     * Godot engine itself, so every GameHostActivity (and the engine's one plugin instance)
+     * shares it and the same live sensor feed.
+     */
+    val gameBridge: GameBridge by lazy {
+        GameBridge(bikeDataSource = bikeDataSource, heartRateBpm = heartRateManager.bpm)
     }
 
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */
