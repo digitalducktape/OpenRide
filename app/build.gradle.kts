@@ -186,6 +186,17 @@ abstract class ExportGamesPackTask @Inject constructor(
             "`godot.bin=...` to local.properties). See docs/GAMES.md."
 }
 
+/**
+ * APK/bundle packaging tasks of every variant. The pack is exported only when one of them is
+ * scheduled, or when exportGamesPack is asked for by name.
+ */
+val apkPackagingTasks = mutableSetOf<String>()
+var gamesPackNeeded = false
+gradle.taskGraph.whenReady {
+    gamesPackNeeded = allTasks.any { it.project == project && it.name in apkPackagingTasks } ||
+        gradle.startParameter.taskNames.any { it.substringAfterLast(':') == "exportGamesPack" }
+}
+
 val exportGamesPack = tasks.register<ExportGamesPackTask>("exportGamesPack") {
     group = "build"
     description = "Exports the Godot project in games/ to games.pck for the APK's assets."
@@ -197,12 +208,18 @@ val exportGamesPack = tasks.register<ExportGamesPackTask>("exportGamesPack") {
     }
     godotBin.set(providers.environmentVariable("GODOT_BIN").orElse(provider { localGodotBin }))
     godotVersion.set(libs.versions.godot.get())
+    // Unit tests merge the variant's assets too, but must not need Godot: skip the export
+    // unless this build packages an APK or bundle (assemble*, install*, bundle*) or the task
+    // was asked for by name. Skipped, it leaves its output as it was.
+    onlyIf("an APK or bundle is being packaged") { gamesPackNeeded }
 }
 
 // Every variant's assets include the pack, so asset merging runs exportGamesPack first.
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(exportGamesPack, ExportGamesPackTask::outputDir)
+        val name = variant.name.replaceFirstChar { it.uppercase() }
+        apkPackagingTasks += listOf("package$name", "package${name}Bundle")
     }
 }
 

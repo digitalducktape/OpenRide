@@ -76,7 +76,7 @@ The rest of this section is technical detail for anyone contributing to the code
 - Sensor access sits behind a `BikeDataSource` abstraction with a `MockBikeDataSource` (simulated ride) so all UI/logic development runs in a standard emulator; only the real system-service binding needs the physical bike
 - Room database: `Profile` / `Ride` / `RideSample` (per-second samples — required for FIT/TCX export)
 - Content browser fetches per-channel YouTube RSS (`/feeds/videos.xml?channel_id=…`) on-device: no API key, no quota, no backend
-- Mini-games are a Godot 4.7.2 project in `games/`, embedded through `GameHostActivity` and the `OpenRideBridge` plugin; every build exports it, so `GODOT_BIN` must point at the Godot editor — see [docs/GAMES.md](docs/GAMES.md)
+- Mini-games are a Godot 4.7.2 project in `games/`, embedded through `GameHostActivity` and the `OpenRideBridge` plugin; APK builds export it, so they need `GODOT_BIN` pointing at the Godot editor (unit tests don't) — see [docs/GAMES.md](docs/GAMES.md)
 
 ## License
 

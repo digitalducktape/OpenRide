@@ -198,13 +198,20 @@ subclass at `${applicationId}.files`, and each provider keeps its own paths file
 
 The Gradle task `exportGamesPack` runs `$GODOT_BIN --headless --path games --import`, then
 `--export-pack Android games.pck`. Every variant's assets include the result, so it runs
-before asset merging in any APK build and in the unit tests. It fails with setup instructions
-if `GODOT_BIN` is missing or the version doesn't match. `games.pck` and `games/.godot/` are
-git-ignored.
+before asset merging.
+
+**Only builds that package an APK or bundle need Godot:** `assemble*`, `install*`, `bundle*`,
+or `exportGamesPack` by name. In those builds the task fails with setup instructions if
+`GODOT_BIN` is missing or the version doesn't match. Unit tests don't need the pack, so a
+build without packaging skips the export. A contributor without Godot can still run
+`./gradlew :app:testDebugUnitTest`.
+
+`games.pck` and `games/.godot/` are git-ignored.
 
 ```sh
 ./gradlew :app:assembleDebugReal   # bike build; exports the pack first
 ./gradlew :app:exportGamesPack     # just the pack (app/build/generated/assets/exportGamesPack/)
+./gradlew :app:testDebugUnitTest   # no Godot needed
 ```
 
 Packaging:
