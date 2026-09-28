@@ -39,7 +39,7 @@ android {
     }
 
     buildTypes {
-        // Mini-games (#32): the Godot engine ships one native library per ABI (~23 MB compressed
+        // Mini-games (#32): the Godot engine ships one native library per ABI (~26 MB compressed
         // each). The bike tablets are arm64, so the builds that reach a bike carry only that;
         // the mock debug build also keeps x86_64 so it still runs games on an x86 emulator.
         debug {
@@ -107,8 +107,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         // Mini-games (#32): store native libraries compressed (extracted at install) rather
-        // than page-aligned and uncompressed, so the Godot engine adds ~23 MB to the APK the
-        // self-updater downloads instead of ~69 MB.
+        // than page-aligned and uncompressed, so the Godot engine adds ~26 MB to the APK the
+        // self-updater downloads instead of ~71 MB.
         jniLibs {
             useLegacyPackaging = true
         }
