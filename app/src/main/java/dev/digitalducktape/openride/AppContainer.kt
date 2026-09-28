@@ -40,9 +40,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 
 /**
- * Simple hand-rolled dependency container (no Hilt/DI framework per project scope), so
- * [MainActivity] and Compose screens can pull their dependencies from one place via
- * constructor injection.
+ * Simple hand-rolled dependency container (no Hilt/DI framework per project scope), owned by
+ * [OpenRideApplication] so [MainActivity], the games host and Compose screens can pull their
+ * dependencies from one place via constructor injection.
  *
  * [bikeDataSource] is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
  * (default `false`) switches it to [AffernetBikeDataSource] — the real system-service binding,
@@ -84,7 +84,7 @@ class AppContainer(private val applicationContext: Context) {
     /**
      * Rolling automatic backup to shared Downloads storage plus silent restore on an empty
      * database, so an app update/reinstall doesn't lose ride data. Started once from
-     * [MainActivity.onCreate].
+     * [OpenRideApplication.onCreate].
      */
     val autoBackupManager: AutoBackupManager by lazy {
         AutoBackupManager(
@@ -131,7 +131,7 @@ class AppContainer(private val applicationContext: Context) {
     /**
      * Connects to whichever BLE strap is paired for the active profile and exposes a single
      * live bpm/connection-state pair (PRD P1-4, T17). Constructed eagerly from
-     * [MainActivity.onCreate] (not just whenever a screen happens to reference it first) so it
+     * [OpenRideApplication.onCreate] (not just whenever a screen happens to reference it first) so it
      * starts observing the active profile the moment the app launches, same reasoning as
      * [rideSessionManager]'s screen-on observation.
      */
@@ -187,7 +187,7 @@ class AppContainer(private val applicationContext: Context) {
     /**
      * Best-effort launch check (PRD #22/T22): asks GitHub for the latest release and, if it's
      * newer, publishes it to [updateAvailability] for the Home banner. Silent on any failure —
-     * a launch must never be blocked or interrupted by the updater. Call from [MainActivity].
+     * a launch must never be blocked or interrupted by the updater. Called from [OpenRideApplication].
      */
     suspend fun refreshUpdateAvailability(currentVersionCode: Int, assetInfix: String) {
         val result = updateRepository.check(currentVersionCode, assetInfix)
