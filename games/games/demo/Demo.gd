@@ -71,7 +71,7 @@ func _ready() -> void:
 		_stripes.append(stripe)
 	_ball_texture = _circle_texture(int(DemoLogic.BALL_RADIUS), BALL_COLOR)
 	_player = Polygon2D.new()
-	_player.polygon = PackedVector2Array([Vector2(0, -50), Vector2(-DemoLogic.PLAYER_HALF_WIDTH, 40), Vector2(DemoLogic.PLAYER_HALF_WIDTH, 40)])
+	_player.polygon = PackedVector2Array(DemoLogic.PLAYER_SHAPE)
 	_player.color = PLAYER_COLOR
 	_player.position = Vector2(DemoLogic.FIELD.x / 2, DemoLogic.PLAYER_Y)
 	add_child(_player)

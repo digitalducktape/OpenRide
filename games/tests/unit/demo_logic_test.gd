@@ -21,6 +21,19 @@ func test_lean_maps_to_the_screen_with_margins() -> void:
 	assert_float(DemoLogic.x_for_lean(-1.0)).is_equal(DemoLogic.EDGE)
 	assert_float(DemoLogic.x_for_lean(1.0)).is_equal(1920.0 - DemoLogic.EDGE)
 	assert_float(DemoLogic.x_for_lean(3.0)).is_equal(1920.0 - DemoLogic.EDGE)
+	# The gain puts the edge short of full lock.
+	assert_float(DemoLogic.x_for_lean(-1.0 / DemoLogic.STEERING_GAIN)).is_equal_approx(DemoLogic.EDGE, 0.01)
+	assert_float(DemoLogic.x_for_lean(0.5)).is_equal_approx(960.0 + 0.5 * DemoLogic.STEERING_GAIN * (960.0 - DemoLogic.EDGE), 0.01)
+
+
+func test_hits_follow_the_triangle_not_a_box() -> void:
+	var tip := Vector2(960, DemoLogic.PLAYER_Y - 50)
+	# Beside the tip, clear of the triangle but inside the old base-wide box (95 px): a miss.
+	assert_bool(DemoLogic.touches_player(tip + Vector2(80, 0), 960)).is_false()
+	assert_bool(DemoLogic.touches_player(tip + Vector2(35, 0), 960)).is_true()
+	# Touching a base corner: a hit.
+	assert_bool(DemoLogic.touches_player(Vector2(960 + 55 + 35, DemoLogic.PLAYER_Y + 40), 960)).is_true()
+	assert_bool(DemoLogic.touches_player(Vector2(960 + 55 + 45, DemoLogic.PLAYER_Y + 40), 960)).is_false()
 
 
 func test_cadence_speeds_the_balls() -> void:
