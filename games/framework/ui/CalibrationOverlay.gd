@@ -30,7 +30,7 @@ const PROMPTS := {
 }
 const RETRY_REASONS := {
 	"unstable": "Hold still for a moment",
-	"no_face": "Can't see you: face the screen",
+	"no_face": "Can't see you. Face the screen: is the room bright enough?",
 	"too_small": "Lean a little further",
 	"wrong_direction": "Other way!",
 }
@@ -144,7 +144,7 @@ func _show(new_mode: String) -> void:
 	elif mode == "lost":
 		_strip_text.text = "Can't see you: face the screen  ·  tap to recalibrate"
 	elif mode == "unavailable":
-		_strip_text.text = "Camera steering is off: no face found  ·  tap to try again"
+		_strip_text.text = "Camera steering is off: no face found. Is the room bright enough?  ·  tap to try again"
 
 
 ## Draws the latest calibration_progress (Session.calibration).

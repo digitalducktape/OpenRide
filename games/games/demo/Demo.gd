@@ -11,6 +11,8 @@ const MUSIC_STYLE := {
 	# Drums and bass always; harmony and lead come in as cadence nears the target.
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
 }
+## Logs lean and ball outcomes every frame, for steering checks on the bike (docs/GAMES.md).
+const TRACE_LEAN := true
 const STRIPES := 12
 const BACKGROUND := Color(0.08, 0.09, 0.16)
 const BALL_COLOR := Color(1.0, 0.45, 0.2)
@@ -99,7 +101,16 @@ func _on_prepare(seg: Dictionary) -> void:
 
 
 func _on_frame(delta: float) -> void:
-	for event in logic.step(delta, InputBus.lean_x, InputBus.cadence):
+	var events := logic.step(delta, InputBus.lean_x, InputBus.cadence)
+	if TRACE_LEAN:
+		# Steering diagnosis on the bike: every frame's lean and position, and each ball's outcome.
+		print("OPENRIDE_GAMES lean t=%d x=%+.3f px=%.0f tr=%d" % [
+			Time.get_ticks_msec(), InputBus.lean_x, logic.player_x, InputBus.tracker_state])
+		for event in events:
+			if event.type != "spawn":
+				print("OPENRIDE_GAMES ball %s t=%d bx=%.0f px=%.0f" % [
+					event.type, Time.get_ticks_msec(), event.at.x, logic.player_x])
+	for event in events:
 		match event.type:
 			"dodge":
 				if award(event.points) > 0.0:

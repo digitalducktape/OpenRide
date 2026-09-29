@@ -347,7 +347,8 @@ shapes, so no font needs the glyph. Everything uses Godot's default font.
   `lean_2d`. It shows a progress bar.
   The header reads "Step 2 of 3" (`step_index`, `step_count`; left out for a centre-only
   run), and "Try 2" from `attempt`. `retry_reason` becomes a hint: "Hold still for a moment",
-  "Can't see you: face the screen", "Lean a little further" or "Other way!".
+  "Can't see you. Face the screen: is the room bright enough?" (on the bike, a dark room was
+  the usual cause), "Lean a little further" or "Other way!".
 - **When the tracker needs calibration** (`tracker_state` 1), it offers "Tap to calibrate".
 - **When the face is lost** (`tracker_state` 4), it shows a slim "Can't see you" strip.
 - **When a calibration ended in `tracker_state` 0** (no face found after two tries), it shows
