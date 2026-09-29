@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_8ldwo"]
+
+[resource]
+script = ExtResource("1_8ldwo")
+wave = 1
+attack = 0.002
+sustain = 0.06
+decay = 0.6
+freq_start = 1046.5
+freq_end = 1046.5
+vibrato_depth = 0.08
+vibrato_rate = 5.0
+jump_ratio = 1.5
+jump_time = 0.08
+volume = 0.4

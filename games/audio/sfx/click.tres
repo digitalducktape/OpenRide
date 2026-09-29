@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_iceqh"]
+
+[resource]
+script = ExtResource("1_iceqh")
+attack = 0.001
+sustain = 0.006
+decay = 0.025
+freq_start = 1800.0
+freq_end = 1100.0
+lowpass_start = 5000.0
+volume = 0.3

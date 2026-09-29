@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_ipk2l"]
+
+[resource]
+script = ExtResource("1_ipk2l")
+wave = 0
+noise_mix = 0.5
+attack = 0.001
+sustain = 0.03
+decay = 0.25
+punch = 0.6
+freq_start = 180.0
+freq_end = 60.0
+sweep_time = 0.15
+lowpass_start = 2000.0
+lowpass_end = 400.0
+volume = 0.6
