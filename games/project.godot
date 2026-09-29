@@ -15,6 +15,8 @@ config/quit_on_go_back=false
 [autoload]
 
 InputBus="*res://autoload/InputBus.gd"
+Effort="*res://autoload/Effort.gd"
+AudioDirector="*res://autoload/AudioDirector.gd"
 Session="*res://autoload/Session.gd"
 
 [display]
