@@ -248,11 +248,13 @@ func _process(delta: float) -> void:
 					_report(game.finish())
 	_log_left -= delta
 	if _log_left <= 0.0:
-		_log_left = FRAME_LOG_SEC
-		print("OPENRIDE_GAMES frame fps=%d phase=%s game=%s cadence=%d power=%d resistance=%d sensors_ok=%s time_left=%.0f tracker=%d score=%d effort=%.2f" % [
+		# Every second while the camera runs (for tuning steering on the bike), else every 5 s.
+		_log_left = 1.0 if Session.tracker_mode != "off" else FRAME_LOG_SEC
+		print("OPENRIDE_GAMES frame fps=%d phase=%s game=%s cadence=%d power=%d resistance=%d sensors_ok=%s time_left=%.0f tracker=%d lean_x=%+.2f lean_depth=%+.2f standing=%s score=%d effort=%.2f" % [
 			Engine.get_frames_per_second(), Phase.keys()[phase], game.game_id if game else "-",
 			InputBus.cadence, InputBus.power, InputBus.resistance, InputBus.sensors_ok,
-			InputBus.segment_time_left, InputBus.tracker_state, Effort.score, Effort.multiplier])
+			InputBus.segment_time_left, InputBus.tracker_state, InputBus.lean_x, InputBus.lean_depth,
+			InputBus.standing, Effort.score, Effort.multiplier])
 
 
 # --- Buttons ---

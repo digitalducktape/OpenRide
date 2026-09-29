@@ -186,6 +186,11 @@ func _on_session_resumed() -> void:
 
 
 func _on_calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String) -> void:
+	# Progress arrives many times a second: log a step's start, its retries and its end.
+	var starting: bool = calibration.is_empty() or calibration.step != step or calibration.attempt != attempt
+	if starting or (fraction >= 1.0 and calibration.fraction < 1.0):
+		print("OPENRIDE_GAMES <- calibration_progress %s %d/%d attempt %d %s fraction %.2f" % [
+			step, step_index + 1, step_count, attempt, retry_reason, fraction])
 	calibration = {
 		"step": step,
 		"fraction": fraction,

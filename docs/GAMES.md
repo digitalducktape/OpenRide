@@ -553,8 +553,11 @@ adb logcat -s godot OpenRideGames GodotActivity Godot
 What to look for in the log:
 
 - Every signal and call is logged as `OPENRIDE_GAMES <- signal` or `OPENRIDE_GAMES -> method`.
-- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… game=… cadence=… score=…
-  effort=…` line every 5 s.
+- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… tracker=… lean_x=…
+  lean_depth=… standing=… score=… effort=…` line every 5 s, and every second while the
+  camera runs.
+- `Session` logs each calibration step as it starts, retries and completes
+  (`OPENRIDE_GAMES <- calibration_progress left 2/3 attempt 1 …`).
 - `OpenRideGames` lines come from the Kotlin side of the session.
 
 ## Originality and licensing
