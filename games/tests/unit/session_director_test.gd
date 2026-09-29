@@ -23,6 +23,7 @@ func before_test() -> void:
 	director.process_mode = Node.PROCESS_MODE_DISABLED
 	local.process_mode = Node.PROCESS_MODE_DISABLED
 	finished = local._results
+	director._last_recalibrate_msec = -1
 
 
 func after_test() -> void:
@@ -215,10 +216,50 @@ func test_the_centre_alone_is_retaken_once_extremes_exist() -> void:
 func test_recalibrate_runs_every_step() -> void:
 	_start(_plan([_seg()]))
 	_step(8.0)
+	InputBus.tracker_state = InputBus.TRACKER_TRACKING
 	var before: int = local.calibrations_started
 	director.hud.recalibrate_pressed.emit()
 	assert_int(local.calibrations_started - before).is_equal(1)
 	assert_int(local.calibration_step_count()).is_equal(3)
+
+
+func test_recalibrate_is_debounced() -> void:
+	_start(_plan([_seg()]))
+	_step(8.0)
+	InputBus.tracker_state = InputBus.TRACKER_TRACKING
+	var before: int = local.calibrations_started
+	director.hud.recalibrate_pressed.emit()
+	InputBus.tracker_state = InputBus.TRACKER_TRACKING  # as if the new run hadn't shown yet
+	director.hud.recalibrate_pressed.emit()  # a double tap
+	assert_int(local.calibrations_started - before).is_equal(1)
+	director._last_recalibrate_msec -= SessionDirector.RECALIBRATE_DEBOUNCE_MSEC + 1
+	director.hud.recalibrate_pressed.emit()
+	assert_int(local.calibrations_started - before).is_equal(2)
+
+
+func test_recalibrate_never_restarts_a_running_calibration() -> void:
+	_start(_plan([_seg()]))
+	InputBus.tracker_state = InputBus.TRACKER_CALIBRATING
+	var before: int = local.calibrations_started
+	director.hud.recalibrate_pressed.emit()
+	director.calibration.recalibrate_requested.emit()
+	assert_int(local.calibrations_started - before).is_equal(0)
+
+
+func test_overlay_taps_count_only_when_no_calibration_runs() -> void:
+	_start(_plan([_seg()]))
+	var overlay := director.calibration
+	var taps := [0]
+	var count := func(): taps[0] += 1
+	overlay.recalibrate_requested.connect(count)
+	var tap := InputEventMouseButton.new()
+	tap.button_index = MOUSE_BUTTON_LEFT
+	tap.pressed = true
+	for shown in ["calibrating", "needs", "lost", "unavailable"]:
+		overlay._show(shown)
+		overlay._on_gui_input(tap)
+	overlay.recalibrate_requested.disconnect(count)
+	assert_int(taps[0]).is_equal(3)  # not while calibrating
 
 
 func test_a_lean_2d_game_after_lean_x_asks_for_depth_once() -> void:

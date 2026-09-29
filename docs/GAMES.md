@@ -353,8 +353,10 @@ shapes, so no font needs the glyph. Everything uses Godot's default font.
 - **When a calibration ended in `tracker_state` 0** (no face found after two tries), it shows
   a slim "Camera steering is off" strip.
 
-Tapping any of them calls `request_calibration`, and so does the HUD's Recalibrate button;
-both run every step. `Session.calibration` holds the session's latest progress, with all six
+Tapping "tap to calibrate", "can't see you" or "camera off" calls `request_calibration`, and so
+does the HUD's Recalibrate button; both run every step. A tap during a running calibration is
+ignored (on the bike, stray taps restarted runs mid-step), and requests within 1 s of the last
+one are dropped (a double tap sent two). `Session.calibration` holds the session's latest progress, with all six
 fields.
 
 ## Audio: the `AudioDirector` interface

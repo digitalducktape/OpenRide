@@ -8,7 +8,8 @@ extends CanvasLayer
 ##   - a slim "can't see you" strip when the face is lost (tracker_state 4)
 ##   - a slim "camera steering is off" strip when a calibration ended in tracker_state 0 (no
 ##     face found after two tries)
-## Tapping it asks for a recalibration (`recalibrate_requested`). It shows the step (with its
+## Tapping it asks for a recalibration (`recalibrate_requested`), except while a calibration
+## runs. It shows the step (with its
 ## 3-2-1 for the centre), "step 2 of 3" (step_index, step_count), the attempt and the
 ## retry_reason from calibration_progress.
 
@@ -17,6 +18,8 @@ signal recalibrate_requested
 const LAYER := 25
 const RECENT_MSEC := 1000
 const CENTRE_COUNT := 3  ## the centre step's 3-2-1
+## Modes in which a tap asks for a calibration; never "calibrating".
+const TAPPABLE_MODES := ["needs", "lost", "unavailable"]
 
 const PROMPTS := {
 	"centre": "Sit centred and look at the screen",
@@ -35,7 +38,7 @@ const ARROWS := {"left": Vector2.LEFT, "right": Vector2.RIGHT, "in": Vector2.UP,
 
 ## Set by Session: whether the game on screen uses the camera.
 var camera_game := false
-var mode := ""  ## "", "calibrating", "needs", "lost": what is showing
+var mode := ""  ## "", "calibrating", "needs", "lost" or "unavailable": what is showing
 
 var _full: Control
 var _strip: PanelContainer
@@ -87,8 +90,6 @@ func _init() -> void:
 	_bar.size = Vector2(0, 24)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_bar)
-	var hint := _centred(box, HudTheme.SMALL, HudTheme.MUTED)
-	hint.text = "Tap to start again"
 
 	_strip = PanelContainer.new()
 	_strip.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(0.35, 0.2, 0.05, 0.92), 0))
@@ -179,8 +180,12 @@ func _draw_arrow() -> void:
 	_arrow.draw_colored_polygon(PackedVector2Array([tip, tip - direction * 70 + side, tip - direction * 70 - side]), HudTheme.GOOD)
 
 
+## A tap asks for a calibration only when none is running: "tap to calibrate", "can't see you"
+## and "camera off". During a calibration the screen still takes the tap (so it can't skip the
+## intro card underneath) but ignores it: on the bike, stray taps restarted runs mid-step.
+## SessionDirector debounces what gets through.
 func _on_gui_input(event: InputEvent) -> void:
-	if visible and event is InputEventMouseButton and event.pressed:
+	if visible and mode in TAPPABLE_MODES and event is InputEventMouseButton and event.pressed:
 		recalibrate_requested.emit()
 
 

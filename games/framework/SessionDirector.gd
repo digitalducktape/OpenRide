@@ -21,6 +21,7 @@ const GRACE_SEC := 4.5  ## Kotlin's grace is 5 s; report before it gives up
 const IDLE_SCENE := "res://Main.tscn"
 const COUNTDOWN_CUES := 3  ## countdown cue on each of the intro card's last 3 seconds
 const FRAME_LOG_SEC := 5.0
+const RECALIBRATE_DEBOUNCE_MSEC := 1000
 
 var phase := Phase.IDLE
 var game: Game  ## the game on screen, if any
@@ -42,6 +43,7 @@ var _last_count := 0
 var calibrated_mode := ""
 
 var _log_left := FRAME_LOG_SEC
+var _last_recalibrate_msec := -1
 
 
 func _ready() -> void:
@@ -267,11 +269,19 @@ func _on_pause_pressed() -> void:
 
 
 ## The rider asked to recalibrate (Recalibrate, or a tap on the calibration overlay): every
-## step runs again.
+## step runs again. Ignored while a calibration runs, and within RECALIBRATE_DEBOUNCE_MSEC of
+## the last request (a double tap on the bike sent two, the second restarting the first).
 func _recalibrate() -> void:
-	if info and info.uses_camera() and Session.active:
-		Session.request_calibration(info.calibration_mode())
-		calibrated_mode = _wider(calibrated_mode, info.calibration_mode())
+	if not (info and info.uses_camera() and Session.active):
+		return
+	if InputBus.tracker_state == InputBus.TRACKER_CALIBRATING:
+		return
+	var now := Time.get_ticks_msec()
+	if _last_recalibrate_msec >= 0 and now - _last_recalibrate_msec < RECALIBRATE_DEBOUNCE_MSEC:
+		return
+	_last_recalibrate_msec = now
+	Session.request_calibration(info.calibration_mode())
+	calibrated_mode = _wider(calibrated_mode, info.calibration_mode())
 
 
 ## Called after set_tracker_mode for each segment. Kotlin (TrackerLink) starts the session's
