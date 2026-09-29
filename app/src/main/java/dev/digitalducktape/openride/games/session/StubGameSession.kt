@@ -40,7 +40,7 @@ import kotlinx.serialization.json.JsonObject
 class StubGameSession(
     private val signals: GameSignals,
     private val scope: CoroutineScope,
-    private val plan: SessionPlanMessage = placeholderJustRide(),
+    private val plan: SessionPlanMessage = demoJustRide(),
     private val random: Random = Random.Default,
     private val onExit: () -> Unit,
     private val endModeFor: (PlanSegment) -> EndMode = { if (it.durationSec < 0) EndMode.GAME else EndMode.TIMER },
@@ -240,13 +240,13 @@ class StubGameSession(
         const val GRACE_SEC = 5
         private const val TICK_MS = 1_000L
 
-        /** The foundation's default plan: an open-ended Just Ride of the placeholder scene. */
-        fun placeholderJustRide() = SessionPlanMessage(
+        /** The default plan until #35: an open-ended Just Ride of the framework's demo game (#34). */
+        fun demoJustRide() = SessionPlanMessage(
             kind = SessionKind.JUST_RIDE,
-            planId = "just-ride:placeholder",
+            planId = "just-ride:demo",
             difficulty = Difficulty.STANDARD,
             totalSec = -1,
-            segments = listOf(PlanSegment(gameId = "placeholder", role = SegmentRole.FREE, durationSec = -1)),
+            segments = listOf(PlanSegment(gameId = "demo", role = SegmentRole.FREE, durationSec = -1)),
         )
     }
 }

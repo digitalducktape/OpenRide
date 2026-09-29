@@ -1,0 +1,196 @@
+extends GdUnitTestSuite
+## SessionDirector against the desktop's LocalSession: scene loading, the intro card and skip,
+## gameplay, pause, ending, end-session and the summary. Both clocks are stepped by hand.
+
+const LocalSession := preload("res://autoload/LocalSession.gd")
+
+var director: SessionDirector
+var local: Node
+var finished: Array = []  # segment_finished results LocalSession received
+
+
+func _plan(segments: Array, kind := "circuit") -> Dictionary:
+	return {"kind": kind, "plan_id": "test", "difficulty": "standard", "total_sec": 0, "segments": segments}
+
+
+func _seg(game_id := "demo", role := "work", duration := 60) -> Dictionary:
+	return {"game_id": game_id, "role": role, "duration_sec": duration}
+
+
+func before_test() -> void:
+	director = Session.director
+	local = Session._local
+	director.process_mode = Node.PROCESS_MODE_DISABLED
+	local.process_mode = Node.PROCESS_MODE_DISABLED
+	finished = local._results
+
+
+func after_test() -> void:
+	if Session.active:
+		Session.request_end()
+		_step(LocalSession.GRACE_SEC + 0.1)
+	director.process_mode = Node.PROCESS_MODE_ALWAYS
+	local.process_mode = Node.PROCESS_MODE_ALWAYS
+	director.summary_screen.visible = false
+
+
+## Advances both clocks by `seconds`, in small steps.
+func _step(seconds: float) -> void:
+	var left := seconds
+	while left > 0.0:
+		var dt := minf(left, 0.25)
+		local._process(dt)
+		director._process(dt)
+		left -= dt
+
+
+func _start(plan: Dictionary) -> void:
+	local.start(plan)
+	finished = local._results
+
+
+func test_a_segment_loads_its_game_with_the_intro_card() -> void:
+	_start(_plan([_seg()]))
+	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
+	assert_object(director.game).is_not_null()
+	assert_str(director.game.game_id).is_equal("demo")
+	assert_object(get_tree().current_scene).is_same(director.game)
+	assert_bool(director.intro_card.visible).is_true()
+	assert_bool(director.hud.visible).is_false()
+	assert_bool(Effort.is_scoring()).is_false()
+	assert_bool(Effort.enabled).is_true()  # a work segment
+	assert_str(Session.tracker_mode).is_equal("lean_x")
+	assert_int(local.tracker_state()).is_equal(InputBus.TRACKER_CALIBRATING)  # asked to calibrate
+
+
+func test_gameplay_starts_when_the_intro_ends() -> void:
+	_start(_plan([_seg()]))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	assert_int(director.phase).is_equal(SessionDirector.Phase.PLAYING)
+	assert_bool(director.intro_card.visible).is_false()
+	assert_bool(director.hud.visible).is_true()
+	assert_bool(director.game.playing).is_true()
+	assert_bool(Effort.is_scoring()).is_true()
+
+
+func test_the_timer_ends_the_segment_with_stars_in_the_result() -> void:
+	_start(_plan([_seg("demo", "work", 5)]))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	director.game.played_sec = 60.0
+	Effort.award(2000.0)
+	_step(5.1)  # segment_ending: the demo ends at once
+	assert_int(finished.size()).is_equal(1)
+	var result: Dictionary = finished[0]
+	assert_str(result.game_id).is_equal("demo")
+	assert_bool(result.skipped).is_false()
+	assert_int(result.stars).is_between(1, 3)
+	assert_bool(result.stats.has("effort_avg")).is_true()
+	assert_bool(Session.active).is_false()  # the last timed segment: the session finished
+
+
+func test_tapping_the_card_skips_to_the_next_segment() -> void:
+	_start(_plan([_seg("demo", "warmup"), _seg("demo", "work")]))
+	assert_bool(director.can_skip()).is_true()
+	var first := director.game
+	director.skip()
+	assert_int(finished.size()).is_equal(1)
+	assert_bool(finished[0].skipped).is_true()
+	assert_int(finished[0].stars).is_equal(0)
+	assert_int(int(Session.segment.index)).is_equal(1)
+	assert_object(director.game).is_not_same(first)
+	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
+	# The previous (skipped) result shows on the new card; calibration was asked for only once.
+	assert_bool(director.intro_card._previous.visible).is_true()
+
+
+func test_skipping_during_gameplay_does_nothing() -> void:
+	_start(_plan([_seg("demo", "warmup"), _seg("demo", "work")]))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	director.skip()
+	assert_int(finished.size()).is_equal(0)
+
+
+func test_the_only_segment_of_an_open_ride_cannot_be_skipped() -> void:
+	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
+	assert_bool(director.can_skip()).is_false()
+	assert_bool(director.intro_card._skip_hint.visible).is_false()
+	director.skip()
+	assert_int(finished.size()).is_equal(0)
+
+
+func test_pause_and_resume() -> void:
+	_start(_plan([_seg()]))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	director.hud.pause_pressed.emit()
+	assert_bool(Session.paused).is_true()
+	assert_bool(director.game.paused).is_true()
+	assert_bool(director.pause_overlay.visible).is_true()
+	assert_bool(Effort.is_scoring()).is_false()
+	var played: float = director.game.played_sec
+	_step(3.0)
+	assert_float(director.game.played_sec).is_equal(played)
+	director.pause_overlay.resume_pressed.emit()
+	assert_bool(Session.paused).is_false()
+	assert_bool(director.game.paused).is_false()
+	assert_bool(director.pause_overlay.visible).is_false()
+
+
+func test_pause_freezes_the_intro_countdown() -> void:
+	_start(_plan([_seg()]))
+	Session.request_pause()
+	_step(LocalSession.INTRO_SEC + 1.0)
+	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
+	Session.request_resume()
+	_step(LocalSession.INTRO_SEC + 0.1)
+	assert_int(director.phase).is_equal(SessionDirector.Phase.PLAYING)
+
+
+func test_end_asks_for_confirmation_then_shows_the_summary() -> void:
+	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	director.hud.end_pressed.emit()
+	assert_bool(director.pause_overlay.is_confirming()).is_true()
+	assert_bool(Session.active).is_true()
+	director.pause_overlay.end_confirmed.emit()
+	assert_bool(Session.active).is_false()
+	assert_int(director.phase).is_equal(SessionDirector.Phase.SUMMARY)
+	assert_bool(director.summary_screen.visible).is_true()
+	assert_bool(director.hud.visible).is_false()
+	assert_object(director.game).is_null()
+	assert_str(Session.tracker_mode).is_equal("off")
+	assert_int(Session.summary.results.size()).is_equal(1)
+	assert_bool(Session.summary.results[0].skipped).is_false()
+
+
+func test_ending_on_the_intro_card_records_the_game_as_skipped() -> void:
+	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
+	Session.request_end()
+	assert_bool(Session.active).is_false()
+	assert_bool(Session.summary.results[0].skipped).is_true()
+
+
+func test_summary_done_exits_and_the_desktop_starts_again() -> void:
+	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
+	Session.request_end()
+	assert_bool(director.summary_screen.visible).is_true()
+	director.summary_screen.done_pressed.emit()
+	assert_bool(Session.active).is_true()  # request_exit restarts the local plan
+	assert_bool(director.summary_screen.visible).is_false()
+	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
+
+
+func test_an_open_ride_whose_game_ended_offers_to_end_the_session() -> void:
+	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
+	_step(LocalSession.INTRO_SEC + 0.1)
+	director.game.end_segment()  # an open-ended segment may end itself
+	assert_int(finished.size()).is_equal(1)
+	assert_bool(Session.active).is_true()
+	assert_bool(director.done_panel.visible).is_true()
+
+
+func test_an_unknown_game_is_skipped() -> void:
+	_start(_plan([_seg("no_such_game"), _seg("demo")]))
+	assert_int(finished.size()).is_equal(1)
+	assert_bool(finished[0].skipped).is_true()
+	assert_str(finished[0].game_id).is_equal("no_such_game")
+	assert_str(director.game.game_id).is_equal("demo")

@@ -48,7 +48,7 @@ class StubGameSessionTest {
     private val signals = RecordingSignals()
     private var exits = 0
 
-    private fun session(plan: SessionPlanMessage = StubGameSession.placeholderJustRide()) =
+    private fun session(plan: SessionPlanMessage = StubGameSession.demoJustRide()) =
         StubGameSession(signals, scope, plan, random = Random(7), onExit = { exits++ })
 
     private fun result(stars: Int = 2, skipped: Boolean = false) =
@@ -79,7 +79,7 @@ class StubGameSessionTest {
         assertEquals(listOf("session_started", "segment_started"), signals.names)
         val plan = signals.payload("session_started")
         assertEquals("just_ride", plan["kind"]!!.jsonPrimitive.content)
-        assertEquals("placeholder", plan["segments"]!!.jsonArray.single().jsonObject["game_id"]!!.jsonPrimitive.content)
+        assertEquals("demo", plan["segments"]!!.jsonArray.single().jsonObject["game_id"]!!.jsonPrimitive.content)
         val segment = signals.payload("segment_started")
         assertEquals(-1, segment["duration_sec"]!!.jsonPrimitive.int)
         assertEquals("game", segment["end_mode"]!!.jsonPrimitive.content)

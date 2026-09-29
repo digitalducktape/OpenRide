@@ -15,6 +15,7 @@ func _initialize() -> void:
 func _run() -> void:
 	_input_bus = root.get_node("InputBus")
 	_session = root.get_node("Session")
+	_session._local.start()  # a -s script starts nothing by itself
 	await _frames(3)
 	_check(_input_bus.is_simulated(), "no bridge on a desktop: simulator active")
 	_check(_input_bus.sensors_ok, "simulated sensors are ok")
@@ -45,12 +46,10 @@ func _run() -> void:
 	_check(_session.paused, "P pauses")
 	await _tap(KEY_P)
 	_check(not _session.paused, "P resumes")
-	# Esc asks the game to finish its segment; with no game scene loaded here, the session ends
-	# after the 5 s grace, as the app would.
+	# Esc ends the session: on the intro card the demo is recorded as skipped, then the summary.
 	await _tap(KEY_ESCAPE)
-	_check(_session.active, "Esc waits for the game's result")
-	await create_timer(5.5).timeout
 	_check(not _session.active and not _session.summary.is_empty(), "Esc ends the session")
+	_check(_session.director.summary_screen.visible, "the summary shows")
 
 	if _failures.is_empty():
 		print("PASS sim keyboard")
