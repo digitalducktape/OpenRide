@@ -41,10 +41,19 @@
          through — there is no baked-in update endpoint. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Mini-games head tracking (#33): CameraX analyses the rider-facing camera in memory to
+         read head lean and standing (MediaPipe face detection, on device, with its usage
+         reporting disabled below). Frames are never stored or sent, and the camera only runs
+         while a camera game is on screen. The runtime request (with an explainer) belongs to the
+         games hub. Not required: the app installs and runs without a camera. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
     <!-- Profile avatar photos are taken by handing ACTION_IMAGE_CAPTURE to whatever camera app
-         the tablet has (so OpenRide itself never needs the CAMERA permission). On API 30+,
-         package visibility filtering hides that app unless the intent is declared here — without
-         this the launch just fails as "no camera app available". -->
+         the tablet has. Because the manifest now declares CAMERA (above), Android refuses that
+         intent until the permission is granted, so the profile editor asks for it first. On API
+         30+, package visibility filtering hides the camera app unless the intent is declared
+         here — without this the launch just fails as "no camera app available". -->
     <queries>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
@@ -92,6 +101,22 @@
             android:resizeableActivity="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode|layoutDirection|locale"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
+        <!-- Mini-games head tracker (#33): MediaPipe Tasks' tasks-core reports usage statistics to
+             Google (TasksStatsProtoLogger → RemoteLoggingClient → datatransport's "cct" backend,
+             log source COREML_ON_DEVICE_SOLUTIONS: app id and version, task, running mode,
+             invocation counts and latencies; never images). The library has no switch for it,
+             so this unregisters the cct backend: datatransport then drops each event before
+             storing it ("Transport backend 'cct' is not registered"), and its uploader deletes
+             any batch already queued for cct without sending it. Nothing else in the app uses
+             datatransport. -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="merge">
+            <meta-data
+                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+                tools:node="remove" />
+        </service>
 
         <!-- Backs ExportShare.kt (PRD P1-1/P1-2, T14): hands exported TCX/CSV files to the
              Android share sheet via a content:// URI instead of a raw file:// path. Also the

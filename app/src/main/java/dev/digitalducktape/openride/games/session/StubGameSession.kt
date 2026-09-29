@@ -15,6 +15,7 @@ import dev.digitalducktape.openride.games.bridge.SessionKind
 import dev.digitalducktape.openride.games.bridge.SessionPlanMessage
 import dev.digitalducktape.openride.games.bridge.SessionSummary
 import dev.digitalducktape.openride.games.bridge.SessionTotals
+import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.TrackerMode
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,8 @@ class StubGameSession(
     private val onExit: () -> Unit,
     private val endModeFor: (PlanSegment) -> EndMode = { if (it.durationSec < 0) EndMode.GAME else EndMode.TIMER },
     private val log: (String) -> Unit = {},
+    /** The camera head tracker's session side; null runs the session without a camera. */
+    private val tracker: TrackerLink? = null,
 ) : GameSession {
     private enum class Phase { WAITING, INTRO, PLAYING, ENDING, AWAITING_END, FINISHED }
 
@@ -63,7 +66,7 @@ class StubGameSession(
     override var segmentTimeLeftSec: Double = -1.0
         private set
 
-    /** The last valid `set_tracker_mode`; the camera tracker (#33) will act on it. */
+    /** The last valid `set_tracker_mode`. */
     @Volatile
     var trackerMode: TrackerMode = TrackerMode.OFF
         private set
@@ -71,6 +74,7 @@ class StubGameSession(
     override fun onGameReady() = post {
         if (phase != Phase.WAITING) return@post
         log("session_started ${plan.planId}")
+        tracker?.start()
         signals.sessionStarted(BridgeMessages.encode(plan))
         startSegment(0)
         startClock()
@@ -88,13 +92,20 @@ class StubGameSession(
     }
 
     override fun onRequestCalibration(mode: String) = post {
-        // No tracker until #33: nothing to calibrate, so no calibration_progress either.
         log("request_calibration ${CalibrationMode.fromWire(mode) ?: "unknown mode '$mode'"}")
+        if (phase != Phase.FINISHED) tracker?.requestCalibration(mode)
     }
 
     override fun onSetTrackerMode(mode: String) = post {
         val parsed = TrackerMode.fromWire(mode)
-        if (parsed == null) log("set_tracker_mode: unknown mode '$mode'") else trackerMode = parsed
+        if (parsed == null) {
+            log("set_tracker_mode: unknown mode '$mode'")
+            return@post
+        }
+        log("set_tracker_mode ${parsed.wire}")
+        trackerMode = parsed
+        // The summary screen never needs the camera.
+        if (phase != Phase.FINISHED) tracker?.setTrackerMode(mode)
     }
 
     override fun onRequestPause() = post {
@@ -211,6 +222,7 @@ class StubGameSession(
     private fun finish() {
         phase = Phase.FINISHED
         segmentTimeLeftSec = -1.0
+        tracker?.stop()
         val summary = SessionSummary(
             rideId = null, // Nothing is recorded until #35.
             results = results.toList(),

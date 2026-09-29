@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.OpenRideBridgePlugin
+import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.session.StubGameSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +46,7 @@ class GameHostActivity : GodotActivity() {
 
     private var session: StubGameSession? = null
     private var sessionScope: CoroutineScope? = null
+    private var trackerLink: TrackerLink? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Attach before the engine starts so its first frame poll finds the session.
@@ -94,22 +96,29 @@ class GameHostActivity : GodotActivity() {
         // A child of the activity's scope per session, so a finished session's clock can be
         // cancelled without touching the (long-lived) activity.
         val scope = CoroutineScope(lifecycleScope.coroutineContext + SupervisorJob(lifecycleScope.coroutineContext.job))
+        val log: (String) -> Unit = { Log.i(TAG, it) }
+        val tracker = TrackerLink(appContainer.headTracker, bridge, scope, log)
         val newSession = StubGameSession(
             signals = bridge,
             scope = scope,
             onExit = ::exitToApp,
-            log = { Log.i(TAG, it) },
+            log = log,
+            tracker = tracker,
         )
         session = newSession
         sessionScope = scope
+        trackerLink = tracker
         bridge.attach(newSession)
     }
 
     private fun endSession() {
         session?.let(bridge::detach)
+        // The camera never outlives the session that asked for it.
+        trackerLink?.stop()
         sessionScope?.cancel()
         session = null
         sessionScope = null
+        trackerLink = null
     }
 
     /** Back to the app, keeping the engine alive: never `finish()` (see the class comment). */

@@ -60,7 +60,7 @@ func test_a_segment_loads_its_game_with_the_intro_card() -> void:
 	assert_bool(Effort.is_scoring()).is_false()
 	assert_bool(Effort.enabled).is_true()  # a work segment
 	assert_str(Session.tracker_mode).is_equal("lean_x")
-	assert_int(local.tracker_state()).is_equal(InputBus.TRACKER_CALIBRATING)  # asked to calibrate
+	assert_int(local.tracker_state()).is_equal(InputBus.TRACKER_CALIBRATING)  # the camera mode calibrates
 
 
 func test_gameplay_starts_when_the_intro_ends() -> void:
@@ -186,6 +186,81 @@ func test_an_open_ride_whose_game_ended_offers_to_end_the_session() -> void:
 	assert_int(finished.size()).is_equal(1)
 	assert_bool(Session.active).is_true()
 	assert_bool(director.done_panel.visible).is_true()
+
+
+func test_one_calibration_per_session_start() -> void:
+	# The session side (TrackerLink, or LocalSession here) calibrates on the first camera mode;
+	# the director must not ask for a second, forced one.
+	var before: int = local.calibrations_started
+	_start(_plan([_seg("demo", "warmup"), _seg("demo", "work"), _seg("demo", "cooldown")]))
+	assert_int(local.calibrations_started - before).is_equal(1)
+	assert_str(director.calibrated_mode).is_equal("lean_x")
+	director.skip()
+	director.skip()
+	assert_int(int(Session.segment.index)).is_equal(2)
+	assert_int(local.calibrations_started - before).is_equal(1)
+
+
+func test_the_centre_alone_is_retaken_once_extremes_exist() -> void:
+	_start(_plan([_seg()]))
+	_step(8.0)  # a full calibration, if this process had no extremes yet
+	assert_bool(local.is_calibrating()).is_false()
+	_start(_plan([_seg()]))
+	assert_int(local.calibration_step_count()).is_equal(1)
+	_step(3.5)
+	assert_str(Session.calibration.step).is_equal("centre")
+	assert_int(Session.calibration.step_count).is_equal(1)
+
+
+func test_recalibrate_runs_every_step() -> void:
+	_start(_plan([_seg()]))
+	_step(8.0)
+	var before: int = local.calibrations_started
+	director.hud.recalibrate_pressed.emit()
+	assert_int(local.calibrations_started - before).is_equal(1)
+	assert_int(local.calibration_step_count()).is_equal(3)
+
+
+func test_a_lean_2d_game_after_lean_x_asks_for_depth_once() -> void:
+	_start(_plan([_seg()]))
+	var depth := GameInfo.new()
+	depth.tracker_mode = "lean_2d"
+	var before: int = local.calibrations_started
+	director._calibrate_for(depth)
+	assert_int(local.calibrations_started - before).is_equal(1)
+	assert_int(local.calibration_step_count()).is_equal(5)
+	director._calibrate_for(depth)
+	director._calibrate_for(GameRegistry.info("demo"))
+	assert_int(local.calibrations_started - before).is_equal(1)
+	assert_str(director.calibrated_mode).is_equal("lean_2d")
+
+
+func test_the_overlay_draws_every_calibration_field() -> void:
+	_start(_plan([_seg()]))
+	var overlay := director.calibration
+	Session._on_calibration_progress("left", 0.5, 1, 3, 2, "unstable")
+	overlay._process(0.0)
+	assert_str(overlay.mode).is_equal("calibrating")
+	assert_str(overlay._prompt.text).is_equal("Lean comfortably left")
+	assert_str(overlay._detail.text).is_equal("CALIBRATING  ·  STEP 2 OF 3  ·  TRY 2")
+	assert_str(overlay._retry.text).is_equal("Hold still for a moment")
+	assert_float(overlay._bar.size.x).is_equal(450.0)
+	Session._on_calibration_progress("centre", 0.4, 0, 1, 1, "")
+	overlay._process(0.0)
+	assert_str(overlay._detail.text).is_equal("CALIBRATING")  # centre only: no step count
+	assert_str(overlay._count.text).is_equal("2")
+	assert_str(overlay._retry.text).is_empty()
+
+
+func test_the_overlay_reports_an_unavailable_camera() -> void:
+	_start(_plan([_seg()]))
+	var overlay := director.calibration
+	Session._on_calibration_progress("centre", 0.2, 0, 3, 2, "no_face")
+	Session.calibration.at_msec = 0  # long ago
+	InputBus.tracker_state = InputBus.TRACKER_OFF  # as Kotlin reports after two failed tries
+	overlay._process(0.0)
+	assert_str(overlay.mode).is_equal("unavailable")
+	assert_bool(overlay._strip.visible).is_true()
 
 
 func test_an_unknown_game_is_skipped() -> void:

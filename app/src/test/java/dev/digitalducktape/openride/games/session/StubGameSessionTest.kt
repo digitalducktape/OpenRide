@@ -1,8 +1,11 @@
 package dev.digitalducktape.openride.games.session
 
+import dev.digitalducktape.openride.games.bridge.CalibrationProgressSignal
 import dev.digitalducktape.openride.games.bridge.Difficulty
 import dev.digitalducktape.openride.games.bridge.EndMode
+import dev.digitalducktape.openride.games.bridge.FakeHeadTracker
 import dev.digitalducktape.openride.games.bridge.GameSignals
+import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.PlanSegment
 import dev.digitalducktape.openride.games.bridge.SegmentRole
 import dev.digitalducktape.openride.games.bridge.SessionKind
@@ -38,7 +41,9 @@ private class RecordingSignals : GameSignals {
     override fun segmentEnding() { events += "segment_ending" to null }
     override fun sessionPaused() { events += "session_paused" to null }
     override fun sessionResumed() { events += "session_resumed" to null }
-    override fun calibrationProgress(step: String, fraction: Double) { events += "calibration_progress" to "$step:$fraction" }
+    override fun calibrationProgress(progress: CalibrationProgressSignal) {
+        events += "calibration_progress" to "${progress.step}:${progress.fraction}"
+    }
     override fun sessionFinished(summaryJson: String) { events += "session_finished" to summaryJson }
 }
 
@@ -310,5 +315,66 @@ class StubGameSessionTest {
         scope.runCurrent()
 
         assertEquals(TrackerMode.LEAN_2D, session.trackerMode)
+    }
+
+    @Test
+    fun `the head tracker follows the session - fresh centre, game modes, recalibration, off at the end`() {
+        val tracker = FakeHeadTracker()
+        val session = StubGameSession(
+            signals, scope, random = Random(7), onExit = { exits++ },
+            tracker = TrackerLink(tracker, signals, scope),
+        )
+
+        session.onGameReady()
+        session.onSetTrackerMode("lean_x")
+        scope.runCurrent()
+        // The centre is re-taken as the first camera game starts, and Godot hears about it.
+        assertEquals(listOf("resetSession", "setMode:lean_x", "calibrate:lean_x:force=false"), tracker.calls)
+        assertEquals("centre:0.0", signals.events.last { it.first == "calibration_progress" }.second)
+
+        tracker.finishCalibration()
+        session.onRequestCalibration("lean_2d")
+        session.onRequestEnd()
+        scope.advanceTimeBy(6_000) // the game never reports: finished after the grace period
+        assertEquals("session_finished", signals.names.last())
+        session.onSetTrackerMode("lean_x") // from the summary screen: ignored
+        scope.runCurrent()
+
+        assertEquals(
+            listOf(
+                "resetSession", "setMode:lean_x", "calibrate:lean_x:force=false",
+                "calibrate:lean_2d:force=true", "setMode:off",
+            ),
+            tracker.calls,
+        )
+    }
+
+    @Test
+    fun `the framework's calls for a circuit of camera games calibrate once`() {
+        // What Godot's SessionDirector sends (docs/GAMES.md): set_tracker_mode at every
+        // segment_started, no request_calibration of its own, "off" on the summary.
+        val tracker = FakeHeadTracker()
+        val session = StubGameSession(
+            signals, scope, plan = timedPlan(1, 1, 1), random = Random(7), onExit = { exits++ },
+            tracker = TrackerLink(tracker, signals, scope),
+        )
+
+        session.onGameReady()
+        session.onSetTrackerMode("lean_x")
+        scope.runCurrent()
+        session.onSegmentFinished(result(skipped = true)) // skipped while still calibrating
+        session.onSetTrackerMode("lean_x")
+        scope.runCurrent()
+        tracker.finishCalibration()
+        session.onSegmentFinished(result(skipped = true))
+        session.onSetTrackerMode("lean_x")
+        session.onSegmentFinished(result(skipped = true))
+        scope.runCurrent()
+        assertEquals("session_finished", signals.names.last())
+        session.onSetTrackerMode("off")
+        scope.runCurrent()
+
+        assertEquals(1, tracker.calls.count { it.startsWith("calibrate:") })
+        assertEquals("calibrate:lean_x:force=false", tracker.calls.single { it.startsWith("calibrate:") })
     }
 }

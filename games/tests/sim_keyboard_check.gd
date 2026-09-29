@@ -19,6 +19,7 @@ func _run() -> void:
 	await _frames(3)
 	_check(_input_bus.is_simulated(), "no bridge on a desktop: simulator active")
 	_check(_input_bus.sensors_ok, "simulated sensors are ok")
+	_check(_input_bus.tracker_state == _input_bus.TRACKER_CALIBRATING, "the demo's camera mode calibrates (tracker %d)" % _input_bus.tracker_state)
 	var cadence: float = _input_bus.cadence
 	var resistance: float = _input_bus.resistance
 

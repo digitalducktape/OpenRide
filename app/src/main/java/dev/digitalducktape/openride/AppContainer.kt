@@ -1,12 +1,19 @@
 package dev.digitalducktape.openride
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import dev.digitalducktape.openride.core.backup.AutoBackupManager
 import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.camera.CameraXFaceSource
+import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
+import dev.digitalducktape.openride.core.camera.HeadTracker
+import dev.digitalducktape.openride.core.camera.InMemoryHeadCalibrationStore
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
@@ -29,6 +36,7 @@ import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
 import dev.digitalducktape.openride.games.bridge.GameBridge
+import dev.digitalducktape.openride.games.bridge.toTrackerReading
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
@@ -119,6 +127,30 @@ class AppContainer(private val applicationContext: Context) {
         )
     }
 
+    /**
+     * Camera head lean/standing for the mini-games (#33). The camera only runs while a game sets
+     * a tracker mode other than `off`. Calibrations live in memory until #35's 5→6 migration adds
+     * `Profile.headCalibration`; swap in a Room-backed [dev.digitalducktape.openride.core.camera.HeadCalibrationStore] then.
+     */
+    val headTracker: HeadTracker by lazy {
+        DefaultHeadTracker(
+            faceSource = headFaceSource,
+            calibrationStore = InMemoryHeadCalibrationStore(),
+            activeProfileId = activeProfileHolder.activeProfileId,
+            hasCameraPermission = {
+                ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+            },
+            scope = containerScope,
+        )
+    }
+
+    /**
+     * The camera under [headTracker]. Only [headTracker] starts and stops it; the debug bench
+     * reads its frame-rate stats and taps its frames for fixtures.
+     */
+    val headFaceSource: CameraXFaceSource by lazy { CameraXFaceSource(applicationContext) }
+
     /** Scopes the session to whichever rider is currently selected (PRD P0-3). */
     val activeProfileHolder: ActiveProfileHolder by lazy {
         ActiveProfileHolder(applicationContext)
@@ -151,7 +183,11 @@ class AppContainer(private val applicationContext: Context) {
      * shares it and the same live sensor feed.
      */
     val gameBridge: GameBridge by lazy {
-        GameBridge(bikeDataSource = bikeDataSource, heartRateBpm = heartRateManager.bpm)
+        GameBridge(
+            bikeDataSource = bikeDataSource,
+            heartRateBpm = heartRateManager.bpm,
+            trackerReading = { headTracker.state.value.toTrackerReading() },
+        )
     }
 
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */

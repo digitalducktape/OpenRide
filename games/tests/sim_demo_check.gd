@@ -30,6 +30,9 @@ func _run() -> void:
 	_check(_director.intro_card.visible, "the intro card shows")
 	_check(_director.calibration.visible and _director.calibration.mode == "calibrating", "calibration runs for the camera game")
 	_check(_director.calibration._prompt.text.contains("centred"), "calibration starts centred (got '%s')" % _director.calibration._prompt.text)
+	var progress: Dictionary = _session.calibration
+	_check(progress.step == "centre" and progress.step_index == 0 and progress.step_count == 3 and progress.attempt == 1
+		and progress.retry_reason == "", "calibration_progress carries all six fields (%s)" % [progress])
 
 	# Warm-up: wait out the card, then weave while pedalling.
 	await _until(func(): return _director.phase_name() == "PLAYING", 15.0)
@@ -48,6 +51,7 @@ func _run() -> void:
 		_key(key, false)
 		key = KEY_RIGHT if key == KEY_LEFT else KEY_LEFT
 	_check(results.size() == 1 and int(results[0].score) > 0, "the warm-up scored (%s)" % [results])
+	_check(_session.calibration.step == "right" and _session.calibration.fraction == 1.0, "calibration ran to the last step")
 	_check(results[0].stats.get("dodged", 0) > 0, "balls were dodged")
 	_check(results[0].stats.effort_avg == 1.0, "no effort multiplier in a warm-up")
 
@@ -57,6 +61,7 @@ func _run() -> void:
 	_click(Vector2(960, 540))
 	await _frames(3)
 	_check(results.size() == 2 and results[1].skipped, "a tap skipped the work segment (%s)" % [results])
+	_check(_session._local.calibrations_started == 1, "one calibration for the whole circuit (%d)" % _session._local.calibrations_started)
 
 	# Cool-down: pause and resume, then end with Esc.
 	await _until(func(): return _director.phase_name() == "PLAYING", 15.0)
