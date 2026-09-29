@@ -8,17 +8,25 @@ game and every builder depends on:
 
 - the **Bridge contract** between Kotlin and Godot, which is the source of truth from here on;
 - how the engine is hosted;
-- how to build, run and debug the games.
+- the **framework** every game is built on, and how to add a game;
+- the **AudioDirector** interface the audio generators plug into;
+- how to build, run, test and debug the games.
 
 ## Layout
 
 | Where | What |
 | --- | --- |
 | `games/` | The Godot 4.7.2 project (Compatibility renderer, 1920x1080, landscape) |
-| `games/Main.tscn` | Main scene. For now it is a placeholder that shows the live input frame and drives the session lifecycle by hand. The framework (#34) replaces it. |
+| `games/Main.tscn` | The idle scene: shown before a session's first game loads and behind the summary |
 | `games/autoload/InputBus.gd` | Polls the input frame every frame, or runs the keyboard simulator |
-| `games/autoload/Session.gd` | Session signals and methods, with JSON already parsed. On a desktop, `LocalSession.gd` plays a local plan. |
-| `games/tests/` | Headless checks (not exported) |
+| `games/autoload/Session.gd` | Session signals and methods, with JSON already parsed. Its `SessionDirector` child runs the session on screen. On a desktop, `LocalSession.gd` plays a local plan. |
+| `games/autoload/Effort.gd` | Scoring with the effort multiplier: games award points only through it |
+| `games/autoload/AudioDirector.gd` | Buses, music stems, effects and cues; the generators (#36) register with it |
+| `games/framework/` | `Game` (the base class), `GameInfo` (declarations), `SessionDirector`, `EffortMeter`, `Stars`, the HUD kit (`hud/`) and the intro card, pause, calibration and summary screens (`ui/`) |
+| `games/games/` | One folder per game, and `Registry.gd`, which lists them. `demo/` is the reference game. |
+| `games/tests/unit/` | GdUnit4 suites (not exported) |
+| `games/tests/sim_*.gd` | Headless desktop playthroughs (not exported) |
+| `games/addons/gdUnit4/` | GdUnit4 6.2.1 (MIT), vendored for the tests (not exported) |
 | `games/assets/SOURCES.md` | Source, author and licence of every asset |
 | `app/.../games/GameHostActivity.kt` | Hosts the engine |
 | `app/.../games/bridge/` | The `OpenRideBridge` plugin, the app-scoped `GameBridge`, the input frame and the JSON messages |
@@ -135,9 +143,10 @@ These describe how the foundation (#32) implements v1. They don't change the con
   - It never quits (`application/config/quit_on_go_back=false`).
   - During a session it calls `request_pause()`.
   - After the summary it calls `request_exit()`.
-- **The stub.** Until #35, `StubGameSession` plays an open-ended Just Ride of the `placeholder`
+- **The stub.** Until #35, `StubGameSession` plays an open-ended Just Ride of the `demo`
   game. It sends `ride_id: null` and records nothing. `request_calibration` and
-  `set_tracker_mode` are logged, not acted on.
+  `set_tracker_mode` are logged, not acted on. It sets `effort` only for work segments, so its
+  Just Ride shows no effort badge; #35 applies `effort_in_just_ride`.
 
 ## Hosting the engine
 
@@ -177,6 +186,213 @@ The Godot AAR declares androidx `FileProvider` at `${applicationId}.fileprovider
 `GodotIO` hard-codes that authority. So the app's own provider is the `OpenRideFileProvider`
 subclass at `${applicationId}.files`, and each provider keeps its own paths file.
 
+## The framework
+
+Every game is a scene whose root extends `Game`. The framework (#34) does everything around it,
+so a game only plays. None of this changes the Bridge contract.
+
+### A session on screen
+
+`Session`'s child `SessionDirector` (`games/framework/SessionDirector.gd`) listens to
+`Session`'s signals:
+
+1. **`session_started`**: it clears the last session (the engine is reused, see above).
+2. **`segment_started`**: it does the following, in order.
+   - It loads `GameRegistry`'s scene for `game_id` and makes it the current scene. An unknown
+     `game_id` is reported as skipped.
+   - It calls `set_tracker_mode` with the game's `tracker_mode`.
+   - It calls `request_calibration` once per session, at the first camera game. Kotlin chooses
+     centre-only or the full flow.
+   - It starts the segment in `Effort` and `AudioDirector` (`segment.effort`, `segment.audio`).
+   - It calls `game.prepare(segment)`, then shows the **intro card** for `intro_sec`. The card
+     shows "Up next", the role, the game's `how_to` and `target_text()`, the previous result,
+     and a countdown ending 3-2-1.
+3. **Intro card tap**: this skips the game (`segment_finished` with `skipped: true`). The one
+   exception is the last segment of an open-ended plan, which would leave nothing to play.
+4. **Gameplay**: the HUD shows, `Effort` starts scoring, and it calls `game.start(segment)`.
+   `end_mode: game` games end themselves (`end_segment()`). Open-ended segments count the timer
+   up, and the game runs until Kotlin ends the session.
+5. **`segment_ending`**: it calls `game.request_finish()`, and the game has 5 s to call
+   `end_segment()`. After 4.5 s the director reports for it. A `segment_ending` during the intro
+   card reports the game as skipped.
+6. **The result**: this is `game.finish()`, with `stars` from the game's thresholds.
+   `segment_finished` then goes to Kotlin. When an open-ended plan's last game ends, it offers
+   **End session**.
+7. **Pause**: `session_paused` shows the pause screen (Resume, End session) and freezes the
+   game, whether the rider paused or Kotlin auto-paused. The HUD's Pause button calls
+   `request_pause`/`request_resume`. Its End button, and the pause screen's, ask for
+   confirmation, then call `request_end`.
+8. **`session_finished`**: it goes back to the idle scene, sets the tracker off, and shows the
+   **summary**: each segment's result and stars, the totals, and any bests. Its **Done** button
+   (or Android back) calls `request_exit`. Circuit mode (#37) adds its sections with
+   `SummaryScreen.add_section()`.
+
+### Adding a game
+
+A game is **one folder and one registry line**:
+
+1. Create `games/games/<game_id>/` with a scene whose root node's script extends `Game`.
+   `games/games/demo/` is the reference: `Demo.tscn`, `Demo.gd` (the scene) and `DemoLogic.gd`
+   (the rules).
+2. Add `"<game_id>": "res://games/<game_id>/<Name>.tscn"` to `GameRegistry.GAMES` in
+   `games/games/Registry.gd`.
+
+`registry_test.gd` then checks that the game loads and that its declarations are valid. The
+game is also playable on the desktop: run its scene with F6, or play the project.
+
+**Declarations.** `info()` returns a `GameInfo`:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `title`, `how_to` | The registry key; the name on cards and the summary; a one-line how-to for the intro card |
+| `supports` | Just Ride modes: any of `rounds`, `minutes`, `open` |
+| `min_sec`, `max_sec`, `min_rounds`, `max_rounds` | Duration limits |
+| `roles` | Circuit roles it can fill: `warmup`, `work`, `recovery`, `cooldown` |
+| `tracker_mode` | `off`, `lean_x`, `lean_2d` or `lean_stand`. `Session` sets it for the segment. |
+| `effort_in_just_ride` | Whether the effort multiplier applies in a Just Ride |
+| `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
+| `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
+
+For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
+1.0× must stay short of 3 stars (epic #31). `demo_logic_test.gd` checks this for the demo.
+
+**Hooks.** A game overrides the ones it needs. It never overrides `_process`.
+
+| Hook | When |
+| --- | --- |
+| `_on_prepare(segment)` | The scene is loaded and the intro card shows. `segment`, `params`, `difficulty`, `rng` (seeded from `seed`) and `hud` are set. Build the level, add HUD widgets, ask for music. |
+| `_on_start()` | Gameplay begins |
+| `_on_frame(delta)` | Every gameplay frame while not paused. Read `InputBus`. |
+| `_on_pause()`, `_on_resume()` | The scene's processing is also frozen while paused |
+| `_on_finish_requested()` | The timer ran out: wrap up and call `end_segment()` within 5 s. By default the game ends at once. |
+| `target_text(segment)` | The intro card's target line, e.g. "Hold 250 W" |
+
+**What a game calls:**
+
+- `award(points)` scores through `Effort`. It returns what counted.
+- `end_segment()` ends the segment. It is honoured in `end_mode: game`, in open-ended
+  segments, and after `request_finish`. A game that finishes early in a timed slot starts another
+  round instead (epic #31, "Short games fill their slot").
+- Set `won` (true / false) for games with a winner, and add counts to `stats`. `effort_avg` and
+  `played_sec` are added for you.
+- `AudioDirector.play_music()`, `play_sfx()` and `set_intensity()` (see Audio below).
+
+**Rules:**
+
+- Keep the rules in a plain class (`RefCounted`) and test it headless with scripted inputs, like
+  `DemoLogic`. The scene only draws it.
+- Talk to Kotlin only through `InputBus`, `Session` and the framework. Never call
+  `get_tree().quit()`.
+- Reset in `_on_prepare`, not `_ready`: every segment gets a fresh instance of the scene, but
+  the autoloads live on.
+
+### Effort
+
+The `Effort` autoload applies the epic's multiplier (maths in `EffortMeter`):
+
+- **The formula:** `1 + 0.5 × clamp((resistance − 30) / 30, 0, 1)`. It is 1.0× at ≤ 30% resistance
+  and 1.5× at ≥ 60%.
+- **The grinding guard:** the multiplier only applies while cadence is 60 rpm or more. Below
+  that it is 1.0×.
+- **`effort: false`:** the multiplier is always 1.0×, and the HUD badge is hidden.
+
+`Effort.award(points)` returns 0 outside gameplay: on the intro card, while paused, while
+`sensors_ok` is 0 and after the end. That is how "sensor loss freezes scoring" is enforced.
+`stats.effort_avg` is the multiplier's average, weighted by time, over the time scoring
+counted.
+
+### HUD kit
+
+`Hud` (`games/framework/hud/`) goes over every game. It shows:
+
+- the game's title and role;
+- the effort badge (`EffortBadge`: "Effort ×1.3" and a resistance gauge that marks 30% and 60%);
+- the segment timer (`SegmentTimer`);
+- the score, with Pause and End;
+- Recalibrate, for camera games;
+- the sensor banner (`SensorBanner`).
+
+It is sized for a 1920x1080 canvas read from about 1 m away (`HudTheme`). Numbers are 96 px,
+text is never below 34 px, and buttons are 110 px tall.
+
+Games add their own widgets under the timer with `hud.add_widget()`, for example a
+`TargetBand` (a cadence floor or a power cap) or a `BigNumber`. `StarRow` draws stars as
+shapes, so no font needs the glyph. Everything uses Godot's default font.
+
+### Calibration UI
+
+`CalibrationOverlay` shows only in camera games:
+
+- **While calibrating** (`tracker_state` 2, or `calibration_progress` in the last second), it
+  prompts each step: centre, with a 3-2-1 from `fraction`, then left, right, and in / back for
+  `lean_2d`. It shows a progress bar.
+- **When the tracker needs calibration** (`tracker_state` 1), it offers "Tap to calibrate".
+- **When the face is lost** (`tracker_state` 4), it shows a slim "Can't see you" strip.
+
+Tapping any of them calls `request_calibration`, and so does the HUD's Recalibrate button.
+`Session.calibration` holds the latest progress. The overlay shows the #33 proposal's
+`step_index`, `step_count`, `attempt` and `retry_reason` when they are present, and works
+without them. The v1 bridge doesn't carry them yet.
+
+## Audio: the `AudioDirector` interface
+
+The `AudioDirector` autoload owns playback, and generators plug into it (#36: `SfxSynth`,
+`MusicGen`, under `games/audio/`). **Until something registers, every call plays silence** and
+logs `OPENRIDE_GAMES audio: nothing provides '<name>' yet; silent` once per name.
+
+**Buses:** `Master`, then `Music`, `SFX` and `Cues`, which all send to `Master`. They are created
+at startup.
+
+- `segment.audio.music_volume` sets `Music`.
+- `sfx_volume` sets `SFX` and `Cues`.
+- `audio.music: false` fades the music out for that segment. A game's `play_music` is then kept
+  but not played.
+- `Music` ducks by 10 dB under every cue.
+
+### Registration (for generators)
+
+Call these at startup. `res://audio/Cues.gd` is an optional hook: if that script exists,
+`AudioDirector` instantiates it once in its `_ready` and calls its `register(director)`, so
+generators can register without an autoload of their own.
+
+| Method | Contract |
+| --- | --- |
+| `register_sound(name: String, stream: AudioStream)` | A named effect or cue, rendered ahead of time. It replaces any earlier sound of that name. |
+| `register_sound_factory(factory: Callable)` | `factory(name: String) -> AudioStream` (or `null`). It is asked on the main thread the first time an unregistered name plays, and the answer is cached. Use it for lazy rendering of presets. |
+| `register_music_generator(generator: Callable)` | `generator(request: Dictionary) -> Dictionary`, mapping each stem name to a **looping** `AudioStream`, all the same length. `request` is `{style, tempo_bpm, seed}`. It **runs on a `WorkerThreadPool` thread**, so it must not touch the scene tree. Disk caching (`user://audio_cache/`) is the generator's job; `AudioDirector` keeps the last 4 renders in memory. |
+
+### Playback (for games)
+
+| Method | Behaviour |
+| --- | --- |
+| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). |
+| `set_intensity(value: float)` | 0-1. Stems fade in or out over 1.5 s as `value` crosses their gate. |
+| `stop_music(fade_sec := 2.0)` | Fades the music out |
+| `play_sfx(name, volume_db := 0.0, pitch := 1.0) -> bool` | An effect on `SFX`, from 8 voices. `false` means silence. |
+| `play_cue(name) -> bool` | A cue on `Cues`, which ducks the music |
+
+**Cue names the framework plays** (#36 should provide them):
+
+| Name | When |
+| --- | --- |
+| `countdown` | Each of the intro card's 3, 2, 1 |
+| `go` | Gameplay starts |
+| `segment_end` | A segment's result is in |
+| `pause`, `resume` | The session pauses and resumes |
+| `summary` | The summary appears |
+
+The demo asks for `dodge` and `hit` effects and for music with the style
+`{"name": "demo_drive", "stem_gates": {"harmony": 0.5, "lead": 0.85}}`.
+
+`Session` handles the rest:
+
+- `begin_session()` and `begin_segment(segment)` apply the settings above.
+- `set_paused()` pauses the music and effects, but not cues.
+- `end_session()` fades the music out after the last segment.
+- The music keeps playing across the intro card until the next game asks for its own.
+
+`sound_played(name, bus)` and `music_started(key)` are there for tests and debugging.
+
 ## Setting up
 
 1. **Install Godot 4.7.2.** It must be exactly the release of the `org.godotengine:godot`
@@ -206,7 +422,8 @@ or `exportGamesPack` by name. In those builds the task fails with setup instruct
 build without packaging skips the export. A contributor without Godot can still run
 `./gradlew :app:testDebugUnitTest`.
 
-`games.pck` and `games/.godot/` are git-ignored.
+`games.pck`, `games/.godot/` and `games/reports/` are git-ignored. The pack leaves out
+`tests/` and `addons/gdUnit4/` (`games/export_presets.cfg`).
 
 ```sh
 ./gradlew :app:assembleDebugReal   # bike build; exports the pack first
@@ -239,16 +456,55 @@ Open `games/project.godot` in the Godot 4.7.2 editor and press Play. With no bri
 | P | pause / resume |
 | Esc | end session |
 
-On a desktop, `request_exit()` restarts the local plan. A scene run on its own (F6) that
-declares a `game_id` property gets a Just Ride of that game.
+On a desktop:
 
-To check the simulator headless (session lifecycle, then the keys above through injected key
-events):
+- The local Just Ride is of the demo game.
+- `request_exit()` (the summary's Done) restarts the local plan.
+- A game scene run on its own (F6) gets a Just Ride of that game.
+- The simulator also stands in for the head tracker. `tracker_state` follows the game's
+  tracker mode, and `request_calibration` plays a scripted centre, left and right run (plus in
+  and back for `lean_2d`) as `calibration_progress`.
+- Just Rides of games that declare `effort_in_just_ride` have the multiplier.
+
+Under a `-s` script (the headless checks and GdUnit4), the local plan doesn't start by itself.
+The script calls `Session._local.start(plan)`.
+
+## Tests
+
+**GdUnit4 suites** (`games/tests/unit/`) cover `Effort` (the curve, the grinding guard at 59
+vs. 60 rpm, `effort: false`, `effort_avg`, the freezes), stars, the `Game` base class, the
+registry and every game's declarations, the demo's rules, `AudioDirector`, and
+`SessionDirector` against the local session. Import once on a fresh checkout, then run them
+headless:
 
 ```sh
-$GODOT_BIN --headless --path games -s res://tests/sim_lifecycle_check.gd
-$GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd
+$GODOT_BIN --headless --path games --import
+$GODOT_BIN --headless --path games -s -d --remote-debug tcp://127.0.0.1:0 \
+  res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests/unit --ignoreHeadlessMode
 ```
+
+- The exit code is 0 when everything passes.
+- Reports land in `games/reports/`, which is git-ignored.
+- `-a` also takes a single suite, e.g. `res://tests/unit/effort_meter_test.gd`.
+- The `--remote-debug` address keeps a script error from dropping into Godot's interactive
+  debugger. The "Unable to connect" errors it prints are expected.
+- `--ignoreHeadlessMode` is needed because the suites simulate no GUI input.
+
+**Headless desktop playthroughs** drive the simulator and print PASS or FAIL:
+
+```sh
+$GODOT_BIN --headless --path games -s res://tests/sim_lifecycle_check.gd  # session lifecycle
+$GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd   # the keys above
+$GODOT_BIN --headless --path games -s res://tests/sim_demo_check.gd       # the demo, end to end
+```
+
+`sim_demo_check` plays a three-segment local circuit at 4× speed:
+
+- the intro card and calibration;
+- a warm-up played with the arrow keys, which must score;
+- a work segment skipped with a tap on the card;
+- pause and resume with P;
+- Esc to end, then the summary and Done.
 
 ## Running on the bike
 
@@ -268,7 +524,8 @@ adb logcat -s godot OpenRideGames GodotActivity Godot
 What to look for in the log:
 
 - Every signal and call is logged as `OPENRIDE_GAMES <- signal` or `OPENRIDE_GAMES -> method`.
-- The placeholder prints an `OPENRIDE_GAMES frame fps=… cadence=…` line every 5 s.
+- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… game=… cadence=… score=…
+  effort=…` line every 5 s.
 - `OpenRideGames` lines come from the Kotlin side of the session.
 
 ## Originality and licensing
