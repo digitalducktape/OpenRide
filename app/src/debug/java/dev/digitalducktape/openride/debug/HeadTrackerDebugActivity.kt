@@ -34,11 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import dev.digitalducktape.openride.AppContainer
+import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.core.camera.CameraXFaceSource
-import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
-import dev.digitalducktape.openride.core.camera.InMemoryHeadCalibrationStore
 import dev.digitalducktape.openride.core.camera.TrackerMode
 import java.io.File
 import kotlinx.coroutines.Job
@@ -81,22 +79,15 @@ class HeadTrackerDebugActivity : ComponentActivity() {
         }
     }
 
-    private val container by lazy { AppContainer(applicationContext) }
-    private val cameraSource by lazy { CameraXFaceSource(applicationContext) }
+    // The app's own tracker and camera (one per process, shared with the games host), so the
+    // bench measures exactly what a game gets and never opens a second sensor binding.
+    private val container get() = appContainer
+    private val cameraSource get() = container.headFaceSource
+    private val tracker get() = container.headTracker
     @Volatile private var logger: HeadFixtureLogger? = null
     private val prompt = MutableStateFlow("Idle")
     private var protocolJob: Job? = null
     private val tone by lazy { ToneGenerator(AudioManager.STREAM_MUSIC, 90) }
-
-    private val tracker by lazy {
-        DefaultHeadTracker(
-            faceSource = RecordingFaceSource(cameraSource) { t, face -> logger?.record(t, face) },
-            calibrationStore = InMemoryHeadCalibrationStore(),
-            activeProfileId = MutableStateFlow(null),
-            hasCameraPermission = ::hasCameraPermission,
-            scope = lifecycleScope,
-        )
-    }
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { tracker.refreshPermission() }
@@ -104,6 +95,7 @@ class HeadTrackerDebugActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        cameraSource.frameTap = { t, face -> logger?.record(t, face) }
         if (!hasCameraPermission()) permissionLauncher.launch(Manifest.permission.CAMERA)
 
         val mode = intent.getStringExtra("mode")?.let(TrackerMode::fromWireName) ?: TrackerMode.LEAN_X
@@ -132,6 +124,7 @@ class HeadTrackerDebugActivity : ComponentActivity() {
         super.onDestroy()
         tracker.setMode(TrackerMode.OFF)
         stopRecording()
+        cameraSource.frameTap = null
     }
 
     private fun hasCameraPermission() =

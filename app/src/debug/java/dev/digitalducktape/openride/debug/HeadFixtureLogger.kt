@@ -1,7 +1,6 @@
 package dev.digitalducktape.openride.debug
 
 import dev.digitalducktape.openride.core.camera.FaceObservation
-import dev.digitalducktape.openride.core.camera.FaceSource
 import dev.digitalducktape.openride.core.camera.HeadFixtureCsv
 import java.io.BufferedWriter
 import java.io.File
@@ -37,23 +36,4 @@ class HeadFixtureLogger(directory: File, private val cadenceRpm: () -> Int) {
 
     @Synchronized
     fun close() = writer.close()
-}
-
-/** Passes frames through to the tracker while handing each one to [onFrame] first. */
-class RecordingFaceSource(
-    private val delegate: FaceSource,
-    private val onFrame: (timestampMs: Long, face: FaceObservation?) -> Unit,
-) : FaceSource {
-    override fun start(listener: FaceSource.Listener) {
-        delegate.start(object : FaceSource.Listener {
-            override fun onFrame(timestampMs: Long, face: FaceObservation?) {
-                onFrame(timestampMs, face)
-                listener.onFrame(timestampMs, face)
-            }
-
-            override fun onError(error: Throwable) = listener.onError(error)
-        })
-    }
-
-    override fun stop() = delegate.stop()
 }

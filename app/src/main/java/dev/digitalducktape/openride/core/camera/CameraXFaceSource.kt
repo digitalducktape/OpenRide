@@ -53,6 +53,12 @@ class CameraXFaceSource(
     private val _stats = MutableStateFlow(Stats())
     val stats: StateFlow<Stats> = _stats.asStateFlow()
 
+    /**
+     * Sees every frame the listener sees, just before it: the debug build's fixture logger
+     * (numbers only). Null in normal use.
+     */
+    @Volatile var frameTap: ((timestampMs: Long, face: FaceObservation?) -> Unit)? = null
+
     private val mainExecutor = ContextCompat.getMainExecutor(context)
 
     /**
@@ -166,7 +172,9 @@ class CameraXFaceSource(
                     recordStats(SystemClock.elapsedRealtime() - detectStart)
                     val current = listener
                     if (current != null && myGeneration == generation) {
-                        current.onFrame(timestampMs, face?.toObservation(uprightWidth, uprightHeight))
+                        val observation = face?.toObservation(uprightWidth, uprightHeight)
+                        frameTap?.invoke(timestampMs, observation)
+                        current.onFrame(timestampMs, observation)
                     }
                 } finally {
                     proxy.close()

@@ -133,7 +133,7 @@ class AppContainer(private val applicationContext: Context) {
      */
     val headTracker: HeadTracker by lazy {
         DefaultHeadTracker(
-            faceSource = CameraXFaceSource(applicationContext),
+            faceSource = headFaceSource,
             calibrationStore = InMemoryHeadCalibrationStore(),
             activeProfileId = activeProfileHolder.activeProfileId,
             hasCameraPermission = {
@@ -143,6 +143,12 @@ class AppContainer(private val applicationContext: Context) {
             scope = containerScope,
         )
     }
+
+    /**
+     * The camera under [headTracker]. Only [headTracker] starts and stops it; the debug bench
+     * reads its frame-rate stats and taps its frames for fixtures.
+     */
+    val headFaceSource: CameraXFaceSource by lazy { CameraXFaceSource(applicationContext) }
 
     /** Scopes the session to whichever rider is currently selected (PRD P0-3). */
     val activeProfileHolder: ActiveProfileHolder by lazy {
