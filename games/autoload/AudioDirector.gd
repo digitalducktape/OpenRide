@@ -250,6 +250,14 @@ func _want(key: String) -> void:
 	_render_task = WorkerThreadPool.add_task(_render.bind(request), false, "AudioDirector music")
 
 
+## When the engine quits mid-render, let the worker finish before this node (and its mutex) is
+## freed. On the bike the engine never quits; this is for desktop runs and headless tests.
+func _exit_tree() -> void:
+	if _render_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_render_task)
+		_render_task = -1
+
+
 func _render(request: Dictionary) -> void:
 	var stems = _music_generator.call(request)
 	_render_mutex.lock()
