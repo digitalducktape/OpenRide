@@ -201,7 +201,7 @@ class HeadTrackingEngineTest {
         val sitStart = script.now
         val states = engine.play(script.hold(3_000, SEATED))
         val exitedAt = states.first { !it.second.standing }.first.timestampMs
-        assertTrue(exitedAt - sitStart in 980L..1_060L)
+        assertTrue(exitedAt - sitStart in 1_480L..1_560L)
         assertEquals(0.0, states.last().second.leanX, 1e-6)
     }
 

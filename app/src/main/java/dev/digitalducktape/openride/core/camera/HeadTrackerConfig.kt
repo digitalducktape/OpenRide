@@ -73,7 +73,11 @@ data class HeadTrackerConfig(
      */
     val standMaxDrop: Double = 0.05,
     val standEnterMs: Long = 500,
-    val standExitMs: Long = 1_000,
+    /**
+     * Exit takes longer than entry: standing riders bob, and on the recorded ride a 1 s exit
+     * briefly dropped to seated in the middle of two stands.
+     */
+    val standExitMs: Long = 1_500,
 
     // --- posture baselines --------------------------------------------------------------------
     /** Standing baseline = median face x over this long after standing is detected. */

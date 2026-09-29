@@ -229,6 +229,13 @@ class HeadTrackerFixtureTest {
                     "${detected.timestampMs - rose.timestampMs} ms later; standing ${"%.0f".format(share * 100)}% of the segment",
             )
             assertTrue(detected.timestampMs - rose.timestampMs <= 1_000)
+            // Once detected, standing holds while the rider is up: mid-stand the face drops to
+            // seated-looking for up to ~1.3 s at a time, which flickered to seated with a 1 s exit.
+            // (The second stand ends with a real early sit, before the "sit" prompt.)
+            val lastUp = segment.last { postureStanding(it.face) }
+            val midStand = segment.filter { it.timestampMs in detected.timestampMs..lastUp.timestampMs }
+            val dropouts = midStand.count { !it.state.standing }
+            assertEquals("seated frames mid-stand @${rose.segmentStartMs}", 0, dropouts)
         }
         replayed.filter { it.step == "sit" }.groupBy { it.segmentStartMs }.values.forEach { segment ->
             // When the rider actually sat: after the last frame whose face still says "standing".
@@ -237,7 +244,8 @@ class HeadTrackerFixtureTest {
             println("sit @${segment.first().segmentStartMs}: face last looked standing at ${lastUp?.intoSegmentMs} ms, standing cleared after ${lastDetected?.intoSegmentMs} ms")
             if (lastDetected != null) {
                 val sat = lastUp ?: segment.first()
-                assertTrue(lastDetected.timestampMs - sat.timestampMs <= 1_500)
+                // The exit hysteresis is 1.5 s; allow the one frame it takes to observe it.
+                assertTrue(lastDetected.timestampMs - sat.timestampMs <= config.standExitMs + 50)
             }
         }
     }

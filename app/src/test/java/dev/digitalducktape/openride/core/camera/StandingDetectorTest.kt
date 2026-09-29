@@ -35,14 +35,14 @@ class StandingDetectorTest {
     }
 
     @Test
-    fun `standing is left after one second back in the saddle`() {
+    fun `standing is left after one and a half seconds back in the saddle`() {
         val detector = StandingDetector(config)
         detector.run(FrameScript().hold(2_000, standingFace))
         assertTrue(detector.standing)
 
-        val script = FrameScript(2_000).hold(2_000, SEATED)
+        val script = FrameScript(2_000).hold(2_500, SEATED)
         val exitedAt = detector.run(script).firstFalse()!!
-        assertTrue("exited at $exitedAt", exitedAt in 3_000L..3_060L)
+        assertTrue("exited at $exitedAt", exitedAt in 3_500L..3_560L)
         assertNull(detector.standingSinceMs)
     }
 
@@ -59,11 +59,11 @@ class StandingDetectorTest {
     }
 
     @Test
-    fun `a dip shorter than a second does not end standing`() {
+    fun `a dip shorter than a second and a half does not end standing`() {
         val detector = StandingDetector(config)
         val script = FrameScript()
             .hold(2_000, standingFace)
-            .hold(800, SEATED)
+            .hold(1_300, SEATED)
             .hold(2_000, standingFace)
         val out = detector.run(script)
         assertTrue(out.drop(out.indexOfFirst { it.second }).all { it.second })
