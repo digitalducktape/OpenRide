@@ -175,7 +175,7 @@ class HeadTrackingEngine(
 
         val depthMapping = depthAxis
         val depth = if (mode == TrackerMode.LEAN_2D && depthMapping != null) {
-            val gated = standing || face.pitchDeg < config.depthMinPitchDeg
+            val gated = standing || face.pitchDeg - base.pitchDeg < config.depthMinPitchFromCentreDeg
             val raw = if (gated) 0.0 else depthMapping.normalize(face.size / base.size - 1.0)
             deadZone(depthFilter.filter(timestampMs, raw), config.deadZone)
         } else {

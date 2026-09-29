@@ -1,6 +1,8 @@
 package dev.digitalducktape.openride.core.camera
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.hardware.camera2.CaptureRequest
 import android.os.SystemClock
 import android.util.Log
@@ -9,18 +11,12 @@ import android.util.Size
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetector
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,23 +24,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * The thin Android layer under [HeadTracker]: CameraX image analysis (no preview) at 320x240 into
- * ML Kit's bundled face detector, reporting the largest face per frame as a [FaceObservation].
- * Frames are analysed in memory and closed immediately; nothing is stored or sent.
+ * The thin Android layer under [HeadTracker]: CameraX image analysis (no preview) at 320x240,
+ * each frame turned upright and handed to a [FaceAnalyzer] (MediaPipe, model bundled in the
+ * APK's assets). Frames are analysed in memory and dropped; nothing is stored or sent.
  *
  * Settings proven on the Gen 2 tablet by the camera spike:
  * - The tablet has exactly one camera, rider-facing, whose HAL reports `LENS_FACING_BACK`; a
  *   front-camera selector finds nothing, so this takes whichever camera exists.
  * - Auto-exposure's default 5-30 fps range drags analysis to ~13 fps in room light; locking it to
  *   30-30 gives a steady 30 fps.
- * - 320x240, fast mode, min face 0.2: 9-20 ms per frame, ~65 ms capture-to-result, about one core.
  *
  * The camera is bound to the *process* lifecycle, so it also stops whenever the app is in the
  * background, whatever the tracker mode.
+ *
+ * @param analyzerFactory creates the face model when the camera starts; it is closed when the
+ *   camera stops, so its memory is only held while a camera game runs.
  */
 class CameraXFaceSource(
     private val context: Context,
     private val lifecycleOwner: LifecycleOwner = ProcessLifecycleOwner.get(),
+    @Volatile var analyzerFactory: (Context) -> FaceAnalyzer = ::MediaPipeFaceDetectorAnalyzer,
 ) : FaceSource {
 
     /** Rolling analysis rate and per-frame detection time, for the debug screen and logs. */
@@ -61,21 +60,20 @@ class CameraXFaceSource(
 
     private val mainExecutor = ContextCompat.getMainExecutor(context)
 
-    /**
-     * One analysis thread for the source's (app-long) lifetime. Never shut down: ML Kit posts
-     * completions to it after a stop, and a shut-down executor would reject them.
-     */
+    /** One analysis thread for the source's (app-long) lifetime; the model only runs on it. */
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     // Guarded by the main thread (start/stop hop there before touching them).
     private var analysis: ImageAnalysis? = null
-    private var detector: FaceDetector? = null
 
     /** Frames from a stopped session are dropped by comparing generations. */
     @Volatile private var generation = 0
     @Volatile private var listener: FaceSource.Listener? = null
 
-    // Stats, touched only on the analysis executor.
+    // Touched only on the analysis executor.
+    private var analyzer: FaceAnalyzer? = null
+    private var analyzerGeneration = -1
+    private var frameBitmap: Bitmap? = null
     private var windowStartMs = 0L
     private var windowFrames = 0
     private var windowDetectMs = 0L
@@ -103,28 +101,20 @@ class CameraXFaceSource(
                 val cameraInfo = provider.availableCameraInfos.firstOrNull()
                     ?: throw IllegalStateException("no camera on this device")
 
-                val faceDetector = FaceDetection.getClient(
-                    FaceDetectorOptions.Builder()
-                        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
-                        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
-                        .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
-                        .setMinFaceSize(MIN_FACE_SIZE)
-                        .build(),
-                )
+                @Suppress("DEPRECATION") // ResolutionSelector needs CameraX 1.3's newer API; this is proven on the bike.
                 val builder = ImageAnalysis.Builder()
                     .setTargetResolution(Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 Camera2Interop.Extender(builder).setCaptureRequestOption(
                     CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
                     Range(TARGET_FPS, TARGET_FPS),
                 )
                 val useCase = builder.build()
-                useCase.setAnalyzer(analysisExecutor) { proxy -> analyze(proxy, faceDetector, myGeneration) }
+                useCase.setAnalyzer(analysisExecutor) { proxy -> analyze(proxy, myGeneration, listener) }
 
                 unbind()
                 analysis = useCase
-                detector = faceDetector
                 analysisExecutor.execute { resetStats() }
                 provider.bindToLifecycle(lifecycleOwner, cameraInfo.cameraSelector, useCase)
                 Log.i(TAG, "camera bound: ${provider.availableCameraInfos.size} camera(s), facing=${cameraInfo.lensFacing}")
@@ -145,41 +135,63 @@ class CameraXFaceSource(
             Log.w(TAG, "unbind failed", e)
         }
         useCase.clearAnalyzer()
-        val faceDetector = detector
-        detector = null
-        // Close on the analysis thread, behind any frame already queued there.
-        analysisExecutor.execute { faceDetector?.close() }
+        // Release the model on the analysis thread, behind any frame already queued there.
+        analysisExecutor.execute { closeAnalyzer() }
     }
 
-    @OptIn(ExperimentalGetImage::class)
-    private fun analyze(proxy: ImageProxy, faceDetector: FaceDetector, myGeneration: Int) {
-        val image = proxy.image
-        if (image == null || myGeneration != generation) {
+    private fun analyze(proxy: ImageProxy, myGeneration: Int, listener: FaceSource.Listener) {
+        try {
+            if (myGeneration != generation) return
+            val model = analyzerFor(myGeneration)
+            val frame = upright(proxy)
+            val timestampMs = proxy.imageInfo.timestamp / 1_000_000
+            val detectStart = SystemClock.elapsedRealtime()
+            val face = model.detect(frame, timestampMs)
+            recordStats(SystemClock.elapsedRealtime() - detectStart)
+            if (myGeneration == generation) {
+                frameTap?.invoke(timestampMs, face)
+                listener.onFrame(timestampMs, face)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "face analysis failed", e)
+            if (myGeneration == generation) listener.onError(e)
+        } finally {
             proxy.close()
-            return
+        }
+    }
+
+    /** The model for this camera session, created on first use (on the analysis thread). */
+    private fun analyzerFor(myGeneration: Int): FaceAnalyzer {
+        val current = analyzer
+        if (current != null && analyzerGeneration == myGeneration) return current
+        closeAnalyzer()
+        return analyzerFactory(context).also {
+            analyzer = it
+            analyzerGeneration = myGeneration
+        }
+    }
+
+    private fun closeAnalyzer() {
+        analyzer?.close()
+        analyzer = null
+        analyzerGeneration = -1
+    }
+
+    /** The frame as an upright RGBA bitmap, reusing one buffer when no rotation is needed. */
+    private fun upright(proxy: ImageProxy): Bitmap {
+        val plane = proxy.planes[0]
+        val raw = if (plane.pixelStride == 4 && plane.rowStride == proxy.width * 4) {
+            val reuse = frameBitmap?.takeIf { it.width == proxy.width && it.height == proxy.height }
+                ?: Bitmap.createBitmap(proxy.width, proxy.height, Bitmap.Config.ARGB_8888).also { frameBitmap = it }
+            plane.buffer.rewind()
+            reuse.copyPixelsFromBuffer(plane.buffer)
+            reuse
+        } else {
+            proxy.toBitmap()
         }
         val rotation = proxy.imageInfo.rotationDegrees
-        // ML Kit reports boxes in upright coordinates.
-        val uprightWidth = if (rotation == 90 || rotation == 270) proxy.height else proxy.width
-        val uprightHeight = if (rotation == 90 || rotation == 270) proxy.width else proxy.height
-        val timestampMs = proxy.imageInfo.timestamp / 1_000_000
-        val detectStart = SystemClock.elapsedRealtime()
-
-        faceDetector.process(InputImage.fromMediaImage(image, rotation))
-            .addOnCompleteListener(analysisExecutor) { task ->
-                try {
-                    val face = if (task.isSuccessful) task.result.maxByOrNull(::area) else null
-                    recordStats(SystemClock.elapsedRealtime() - detectStart)
-                    val current = listener
-                    if (current != null && myGeneration == generation) {
-                        val observation = face?.toObservation(uprightWidth, uprightHeight)
-                        frameTap?.invoke(timestampMs, observation)
-                        current.onFrame(timestampMs, observation)
-                    }
-                } finally {
-                    proxy.close()
-                }
-            }
+        if (rotation == 0) return raw
+        return Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, Matrix().apply { postRotate(rotation.toFloat()) }, false)
     }
 
     private fun resetStats() {
@@ -204,23 +216,12 @@ class CameraXFaceSource(
         }
     }
 
-    private fun area(face: Face) = face.boundingBox.width() * face.boundingBox.height()
-
-    private fun Face.toObservation(width: Int, height: Int) = FaceObservation(
-        cx = boundingBox.exactCenterX().toDouble() / width,
-        cy = boundingBox.exactCenterY().toDouble() / height,
-        size = boundingBox.height().toDouble() / height,
-        pitchDeg = headEulerAngleX.toDouble(),
-        yawDeg = headEulerAngleY.toDouble(),
-    )
-
     companion object {
         /** Log tag; the bike logs at W, so `adb shell setprop log.tag.HeadTracker VERBOSE` first. */
         const val TAG = "HeadTracker"
         private const val ANALYSIS_WIDTH = 320
         private const val ANALYSIS_HEIGHT = 240
         private const val TARGET_FPS = 30
-        private const val MIN_FACE_SIZE = 0.2f
         private const val STATS_WINDOW_MS = 5_000L
     }
 }

@@ -1,7 +1,11 @@
 package dev.digitalducktape.openride.debug
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
@@ -36,6 +40,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.core.camera.CameraXFaceSource
+import dev.digitalducktape.openride.core.camera.FaceAnalyzer
+import dev.digitalducktape.openride.core.camera.FaceObservation
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
 import dev.digitalducktape.openride.core.camera.TrackerMode
 import java.io.File
@@ -50,7 +56,8 @@ import kotlinx.coroutines.launch
  * Not reachable from the app's UI. Launch with
  *
  *     adb shell am start -n <pkg>/dev.digitalducktape.openride.debug.HeadTrackerDebugActivity \
- *         [--es mode lean_x|lean_2d|lean_stand] [--ez calibrate true] [--ez record true]
+ *         [--es mode lean_x|lean_2d|lean_stand] [--ez calibrate true] [--ez record true] \
+ *         [--es still <image in files/>]
  *
  * "Record protocol" prompts the rider through centre, leans, sprint, knob glance, stand/sit and
  * lean in/back, writing a numbers-only CSV fixture to `files/headtracker/`. A once-a-second
@@ -85,6 +92,8 @@ class HeadTrackerDebugActivity : ComponentActivity() {
     private val cameraSource get() = container.headFaceSource
     private val tracker get() = container.headTracker
     @Volatile private var logger: HeadFixtureLogger? = null
+    private val lastFace = MutableStateFlow<FaceObservation?>(null)
+    private var defaultAnalyzer: ((Context) -> FaceAnalyzer)? = null
     private val prompt = MutableStateFlow("Idle")
     private var protocolJob: Job? = null
     private val tone by lazy { ToneGenerator(AudioManager.STREAM_MUSIC, 90) }
@@ -95,7 +104,11 @@ class HeadTrackerDebugActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        cameraSource.frameTap = { t, face -> logger?.record(t, face) }
+        cameraSource.frameTap = { t, face ->
+            lastFace.value = face
+            logger?.record(t, face)
+        }
+        chooseAnalyzer()
         if (!hasCameraPermission()) permissionLauncher.launch(Manifest.permission.CAMERA)
 
         val mode = intent.getStringExtra("mode")?.let(TrackerMode::fromWireName) ?: TrackerMode.LEAN_X
@@ -111,7 +124,8 @@ class HeadTrackerDebugActivity : ComponentActivity() {
                     CameraXFaceSource.TAG,
                     "mode=${s.mode.wireName} state=${s.trackerState} lean=%.2f depth=%.2f standing=${s.standing} ".format(s.leanX, s.leanDepth) +
                         "cal=${s.calibration?.let { "${it.step.wireName}:%.2f#${it.attempt}${it.retryReason?.let { r -> "/" + r.wireName } ?: ""}".format(it.fraction) }} " +
-                        "unavailable=${s.unavailable?.wireName} fps=%.1f detect=%.1fms rpm=${container.bikeDataSource.metrics.value.cadenceRpm} step=${prompt.value}".format(stats.fps, stats.detectMs),
+                        "unavailable=${s.unavailable?.wireName} fps=%.1f detect=%.1fms rpm=${container.bikeDataSource.metrics.value.cadenceRpm} step=${prompt.value} ".format(stats.fps, stats.detectMs) +
+                        "face=${lastFace.value?.let { "cx=%.3f cy=%.3f size=%.3f pitch=%.1f yaw=%.1f".format(it.cx, it.cy, it.size, it.pitchDeg, it.yawDeg) }}",
                 )
                 logger?.flush()
             }
@@ -125,6 +139,35 @@ class HeadTrackerDebugActivity : ComponentActivity() {
         tracker.setMode(TrackerMode.OFF)
         stopRecording()
         cameraSource.frameTap = null
+        defaultAnalyzer?.let { cameraSource.analyzerFactory = it }
+    }
+
+    /**
+     * Benchmarking: `--es still <file in files/>` analyses that still image in place of every
+     * camera frame (same cadence, same thread), so timing includes a face with nobody on the
+     * bike. The camera still runs, so its cost is included too.
+     */
+    private fun chooseAnalyzer() {
+        val still = intent.getStringExtra("still")?.let { BitmapFactory.decodeFile(File(filesDir, it).path) }?.let(::fitToFrame)
+            ?: return
+        val model = cameraSource.analyzerFactory
+        defaultAnalyzer = model
+        cameraSource.analyzerFactory = { context -> StillImageAnalyzer(model(context), still) }
+        Log.i(CameraXFaceSource.TAG, "bench: analysing a still image in place of camera frames")
+    }
+
+    /** Fits a still inside the 320x240 analysis frame, centred on black. */
+    private fun fitToFrame(source: Bitmap): Bitmap {
+        val scale = minOf(320f / source.width, 240f / source.height)
+        val scaled = Bitmap.createScaledBitmap(source, (source.width * scale).toInt(), (source.height * scale).toInt(), true)
+        return Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888).apply {
+            Canvas(this).drawBitmap(scaled, (320f - scaled.width) / 2, (240f - scaled.height) / 2, null)
+        }
+    }
+
+    private class StillImageAnalyzer(private val model: FaceAnalyzer, private val still: Bitmap) : FaceAnalyzer {
+        override fun detect(frame: Bitmap, timestampMs: Long) = model.detect(still, timestampMs)
+        override fun close() = model.close()
     }
 
     private fun hasCameraPermission() =

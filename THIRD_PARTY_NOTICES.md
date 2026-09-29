@@ -57,6 +57,11 @@ OpenRide's own source beyond attribution. Authoritative versions live in
 | Coil | `io.coil-kt` | Apache-2.0 |
 | Godot Engine (Android library, mini-games) | `org.godotengine:godot` | MIT |
 | CameraX (camera-core, camera-camera2, camera-lifecycle) and lifecycle-process | `androidx.camera`, `androidx.lifecycle` | Apache-2.0 |
+| MediaPipe Tasks (`tasks-vision`, `tasks-core`, with native `libmediapipe_tasks_jni.so`) | `com.google.mediapipe` | Apache-2.0 |
+| MediaPipe's dependencies: Guava, Flogger, Google Android datatransport, Firebase encoders, `javax.inject` | `com.google.guava`, `com.google.flogger`, `com.google.android.datatransport`, `com.google.firebase`, `javax.inject` | Apache-2.0 |
+| Protocol Buffers (Java lite runtime, via MediaPipe) | `com.google.protobuf` | BSD-3-Clause |
+| Guava's annotation artifacts (jsr305, error_prone, j2objc, failureaccess) | `com.google.code.findbugs`, `com.google.errorprone`, `com.google.j2objc`, `com.google.guava` | Apache-2.0 |
+| checker-compat-qual, animal-sniffer-annotations (via Guava) | `org.checkerframework`, `org.codehaus.mojo` | MIT (checker-compat-qual is dual-licensed GPL-2.0-with-classpath-exception / MIT; used under MIT) |
 
 ### Godot Engine
 
@@ -87,22 +92,28 @@ Godot's `COPYRIGHT.txt` (https://github.com/godotengine/godot/blob/4.7.2-stable/
 and are available at runtime from the engine itself (`Engine.get_copyright_info()` /
 `Engine.get_license_info()`).
 
-### Proprietary, free-to-use SDK (not open source)
+### MediaPipe and the BlazeFace model
 
-The mini-games head tracker (`core/camera/`) uses Google's ML Kit face detection
-for on-device face boxes. It is **not** under an open-source license: Google
-distributes it free of charge under its own terms, and the app links it as a
-prebuilt binary. No ML Kit code is copied into this repository.
+The mini-games head tracker (`core/camera/`) finds the rider's face with Google's
+MediaPipe Tasks Face Detector — https://ai.google.dev/edge/mediapipe — linked as
+the prebuilt `com.google.mediapipe:tasks-vision` library (Apache-2.0).
 
-| Dependency | Group | License |
-|---|---|---|
-| ML Kit face detection, bundled model (`face-detection`) and ML Kit common/vision libraries | `com.google.mlkit` | [ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) |
-| Google Play services components that ML Kit bundles (`play-services-mlkit-face-detection`, `play-services-base`/`basement`/`tasks`) | `com.google.android.gms` | Android Software Development Kit License |
-| Transitive support libraries (Firebase components/encoders, datatransport, odml image) | `com.google.firebase`, `com.google.android.datatransport`, `com.google.android.odml` | Apache-2.0 |
+Its model ships unmodified in the APK as
+`app/src/main/assets/mediapipe/blaze_face_short_range.tflite`, downloaded from
+https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite
+(MD5 `a3dd6ec31725290770b97cec0cbf94c9`). It is licensed under the **Apache License,
+Version 2.0**, per the "MediaPipe BlazeFace Short Range" model card by Google
+(https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20(Short%20Range).pdf).
+Citation: V. Bazarevsky et al., "BlazeFace: Sub-millisecond Neural Face Detection on
+Mobile GPUs", CVPR Workshop on Computer Vision for AR/VR, 2019.
 
-Camera frames are analysed in memory on the tablet and never stored or sent
-by OpenRide. Per Google's ML Kit documentation, the SDK itself may report
-API usage and performance metrics to Google; images are processed on device.
+Camera frames are analysed in memory on the tablet and never stored or sent by
+OpenRide. MediaPipe Tasks' `tasks-core` also contains a usage-statistics reporter
+that would send the app's id and version, the task, its running mode, and
+invocation counts and latencies (never images) to Google through the
+datatransport library. OpenRide's manifest unregisters the transport's backend, so
+these reports are dropped on the device and never sent (see the comment in
+`app/src/main/AndroidManifest.xml`).
 
 ### Test-only dependencies
 

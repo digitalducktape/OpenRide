@@ -79,11 +79,25 @@ class StandingDetectorTest {
     }
 
     @Test
-    fun `the pitch limit is minus fifteen degrees`() {
+    fun `the pitch limit is eight and a half degrees below the seated pitch`() {
+        // SEATED is pitched -6 degrees, so the limit is -14.5.
         val tipped = StandingDetector(config)
-        assertFalse(tipped.run(FrameScript().hold(2_000, standingFace.copy(pitchDeg = -16.0))).last().second)
+        assertFalse(tipped.run(FrameScript().hold(2_000, standingFace.copy(pitchDeg = -15.0))).last().second)
         val level = StandingDetector(config)
         assertTrue(level.run(FrameScript().hold(2_000, standingFace.copy(pitchDeg = -14.0))).last().second)
+    }
+
+    @Test
+    fun `the pitch limit follows the calibrated centre, whatever the model's zero`() {
+        // A model that reads the same head 10 degrees higher: seated +4, knob glance -12.
+        val offset = CentreBaseline(cx = SEATED.cx, cy = SEATED.cy, size = SEATED.size, pitchDeg = SEATED.pitchDeg + 10)
+        val glance = SEATED.shifted(dy = 0.02, sizeRatio = 1.3, pitchDeg = -12.0)
+        val detector = StandingDetector(config)
+        val out = FrameScript().hold(3_000, glance).frames.map { detector.update(it.timestampMs, it.face!!, offset) }
+        assertTrue(out.none { it })
+        val upright = StandingDetector(config)
+        val standing = FrameScript().hold(2_000, standingFace.copy(pitchDeg = 2.0)).frames.map { upright.update(it.timestampMs, it.face!!, offset) }
+        assertTrue(standing.last())
     }
 
     @Test

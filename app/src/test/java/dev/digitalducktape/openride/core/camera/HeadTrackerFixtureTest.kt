@@ -216,7 +216,7 @@ class HeadTrackerFixtureTest {
         val config = engine.config
         fun postureStanding(face: FaceObservation?) = face != null &&
             face.size > centre.size * config.standSizeRatio &&
-            face.pitchDeg > config.standMinPitchDeg &&
+            face.pitchDeg - centre.pitchDeg > config.standMinPitchFromCentreDeg &&
             face.cy - centre.cy <= config.standMaxDrop
 
         replayed.filter { it.step == "stand" }.groupBy { it.segmentStartMs }.values.forEach { segment ->

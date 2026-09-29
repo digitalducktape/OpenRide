@@ -57,8 +57,15 @@ data class HeadTrackerConfig(
     // --- standing -----------------------------------------------------------------------------
     /** Standing: face larger than this multiple of the seated baseline... */
     val standSizeRatio: Double = 1.25,
-    /** ...with the head no more pitched-down than this (a knob glance is about -22°)... */
-    val standMinPitchDeg: Double = -15.0,
+    /**
+     * ...with the head pitched down no further than this from the calibrated centre's pitch...
+     *
+     * Relative, not absolute, so it holds for any face model: the keypoint pitch estimate
+     * ([FaceGeometry.pitchFromKeypoints]) and ML Kit's Euler angle disagree on where zero is.
+     * On the recorded ride (ML Kit) the seated centre was -6.7°, a knob glance -22° (-15° from
+     * centre) and standing -8° (-1.6° from centre); -8.5° from centre is the old absolute -15°.
+     */
+    val standMinPitchFromCentreDeg: Double = -8.5,
     /**
      * ...and the face no lower than this (fraction of frame height) below the seated baseline.
      * Standing raises the face; leaning in or sitting down lowers it. Without this guard the
@@ -80,6 +87,9 @@ data class HeadTrackerConfig(
     val faceLostStateMs: Long = 3_000,
 
     // --- depth (experimental) -----------------------------------------------------------------
-    /** Depth reads 0 while the head is pitched further down than this (knob glances). */
-    val depthMinPitchDeg: Double = -15.0,
+    /**
+     * Depth reads 0 while the head is pitched further down than this from the calibrated centre
+     * (knob glances); relative for the same reason as [standMinPitchFromCentreDeg].
+     */
+    val depthMinPitchFromCentreDeg: Double = -8.5,
 )

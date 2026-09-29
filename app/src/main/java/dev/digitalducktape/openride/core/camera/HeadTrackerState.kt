@@ -6,8 +6,9 @@ package dev.digitalducktape.openride.core.camera
  * @param cx face-box centre x as a fraction of frame width (0 = left edge of the image).
  * @param cy face-box centre y as a fraction of frame height (0 = top edge).
  * @param size face-box height as a fraction of frame height (grows as the rider comes closer).
- * @param pitchDeg head pitch (ML Kit Euler X); negative = looking down.
- * @param yawDeg head yaw (ML Kit Euler Y).
+ * @param pitchDeg head pitch in degrees; negative = looking down. Only compared with the
+ *   calibrated centre's pitch, so a model's zero point doesn't matter (see [FaceGeometry]).
+ * @param yawDeg head yaw in degrees (recorded in fixtures; the engine doesn't use it).
  */
 data class FaceObservation(
     val cx: Double,

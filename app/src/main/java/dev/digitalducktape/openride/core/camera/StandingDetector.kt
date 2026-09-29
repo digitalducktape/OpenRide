@@ -11,7 +11,8 @@ data class CentreBaseline(
 /**
  * Seated/standing with hysteresis. The standing posture is a face at least
  * [HeadTrackerConfig.standSizeRatio] times the seated size, not pitched down past
- * [HeadTrackerConfig.standMinPitchDeg] (so a knob glance never counts), and not lower in the frame
+ * [HeadTrackerConfig.standMinPitchFromCentreDeg] from the seated pitch (so a knob glance never
+ * counts), and not lower in the frame
  * than [HeadTrackerConfig.standMaxDrop] below the seated face (so leaning in or sitting down never
  * counts). It must hold for [HeadTrackerConfig.standEnterMs] to enter and be absent for
  * [HeadTrackerConfig.standExitMs] to exit. Frames without a face don't advance either timer.
@@ -50,6 +51,6 @@ class StandingDetector(private val config: HeadTrackerConfig) {
 
     private fun looksStanding(face: FaceObservation, baseline: CentreBaseline): Boolean =
         face.size > baseline.size * config.standSizeRatio &&
-            face.pitchDeg > config.standMinPitchDeg &&
+            face.pitchDeg - baseline.pitchDeg > config.standMinPitchFromCentreDeg &&
             face.cy - baseline.cy <= config.standMaxDrop
 }
