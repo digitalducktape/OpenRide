@@ -13,10 +13,13 @@ import kotlinx.coroutines.launch
  *
  * - Input frame fields 6-9 come from [state]: `leanX`, `leanDepth`, `standingValue`,
  *   `trackerState.code`.
- * - `calibration_progress(step, fraction)` comes from [HeadTrackerState.calibration]
- *   (`step.wireName`, `fraction`) while `trackerState` is `CALIBRATING`.
- * - `set_tracker_mode(mode)` → [setMode] (`TrackerMode.fromWireName`).
+ * - `calibration_progress(step, fraction, step_index, step_count, attempt, retry_reason)` comes
+ *   from [HeadTrackerState.calibration] while `trackerState` is `CALIBRATING`.
+ * - `set_tracker_mode(mode)` → [setMode], plus [calibrate] (`force = false`) for the first camera
+ *   mode of a session.
  * - `request_calibration(mode)` (the rider tapped to recalibrate) → [calibrate] with `force = true`.
+ *
+ * The games bridge does all of this in `games/bridge/TrackerLink.kt`.
  *
  * The camera runs only while the mode is not `off` and nothing makes the tracker
  * [HeadTrackerState.unavailable]. Frames are analysed in memory and never stored or sent.

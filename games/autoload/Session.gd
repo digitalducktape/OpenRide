@@ -13,7 +13,12 @@ signal segment_started(segment: Dictionary)
 signal segment_ending
 signal session_paused
 signal session_resumed
-signal calibration_progress(step: String, fraction: float)
+## While the head tracker calibrates (InputBus.tracker_state is TRACKER_CALIBRATING).
+## step: "centre", "left", "right", "in" or "back"; fraction: 0..1 through it (restarts on a retry);
+## step_index / step_count: 0-based position in this calibration (1 step when only the centre is
+## re-taken, 3 for lean_x, 5 for lean_2d); attempt: 1, then 2+ on retries; retry_reason: "" on a
+## first attempt, else "unstable", "no_face", "too_small" or "wrong_direction".
+signal calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String)
 signal session_finished(summary: Dictionary)
 
 const BRIDGE := "OpenRideBridge"
@@ -153,8 +158,8 @@ func _on_session_resumed() -> void:
 	session_resumed.emit()
 
 
-func _on_calibration_progress(step: String, fraction: float) -> void:
-	calibration_progress.emit(step, fraction)
+func _on_calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String) -> void:
+	calibration_progress.emit(step, fraction, step_index, step_count, attempt, retry_reason)
 
 
 func _on_session_finished(new_summary: Dictionary) -> void:

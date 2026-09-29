@@ -29,7 +29,10 @@ private class RecordingEmitter : GameSignals {
     override fun segmentEnding() { events += "segment_ending" }
     override fun sessionPaused() { events += "session_paused" }
     override fun sessionResumed() { events += "session_resumed" }
-    override fun calibrationProgress(step: String, fraction: Double) { events += "calibration_progress:$step:$fraction" }
+    override fun calibrationProgress(progress: CalibrationProgressSignal) {
+        events += "calibration_progress:${progress.step}:${progress.fraction}:${progress.stepIndex}/${progress.stepCount}" +
+            ":${progress.attempt}:${progress.retryReason}"
+    }
     override fun sessionFinished(summaryJson: String) { events += "session_finished:$summaryJson" }
 }
 
@@ -144,13 +147,13 @@ class GameBridgeTest {
         bridge.segmentEnding()
         bridge.sessionPaused()
         bridge.sessionResumed()
-        bridge.calibrationProgress("centre", 0.5)
+        bridge.calibrationProgress(CalibrationProgressSignal("centre", 0.5, 0, 3, 2, "unstable"))
         bridge.sessionFinished("{}")
 
         assertEquals(
             listOf(
                 "session_started:{}", "segment_started:{}", "segment_ending", "session_paused",
-                "session_resumed", "calibration_progress:centre:0.5", "session_finished:{}",
+                "session_resumed", "calibration_progress:centre:0.5:0/3:2:unstable", "session_finished:{}",
             ),
             emitter.events,
         )

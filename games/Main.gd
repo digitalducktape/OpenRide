@@ -25,6 +25,10 @@ var _pause_button: Button
 var _finish_button: Button
 var _end_button: Button
 var _exit_button: Button
+var _camera_button: Button
+var _camera_on := false
+var _calibration := ""
+var _last_calibration_key := ""
 
 var _log: PackedStringArray = []
 var _intro_left := 0.0
@@ -40,7 +44,7 @@ func _ready() -> void:
 	Session.segment_ending.connect(_on_segment_ending)
 	Session.session_paused.connect(func(): _event("session_paused"))
 	Session.session_resumed.connect(func(): _event("session_resumed"))
-	Session.calibration_progress.connect(func(step, fraction): _event("calibration_progress %s %.2f" % [step, fraction]))
+	Session.calibration_progress.connect(_on_calibration_progress)
 	Session.session_finished.connect(_on_session_finished)
 	_mode_label.text = "keyboard simulator" if InputBus.is_simulated() else "bridge: OpenRideBridge"
 	_refresh_buttons()
@@ -62,8 +66,9 @@ func _process(delta: float) -> void:
 	_metrics_label.text = "cadence %d rpm    power %d W    resistance %d    speed %.1f mph    heart rate %s" % [
 		InputBus.cadence, InputBus.power, InputBus.resistance, InputBus.speed,
 		"--" if InputBus.heart_rate < 0 else str(int(InputBus.heart_rate))]
-	_tracker_label.text = "lean x %+.2f    lean depth %+.2f    %s    tracker %d" % [
-		InputBus.lean_x, InputBus.lean_depth, "standing" if InputBus.standing else "seated", InputBus.tracker_state]
+	_tracker_label.text = "lean x %+.2f    lean depth %+.2f    %s    tracker %d    %s" % [
+		InputBus.lean_x, InputBus.lean_depth, "standing" if InputBus.standing else "seated", InputBus.tracker_state,
+		_calibration if InputBus.tracker_state == InputBus.TRACKER_CALIBRATING else ""]
 	_cadence_bar.size.x = (W - 120.0) * clampf(InputBus.cadence / 120.0, 0.0, 1.0)
 	_resistance_bar.size.x = (W - 120.0) * clampf(InputBus.resistance / 100.0, 0.0, 1.0)
 	var time_left := "open-ended" if InputBus.segment_time_left < 0 else "%d s left" % ceili(InputBus.segment_time_left)
@@ -93,6 +98,10 @@ func _on_session_started(plan: Dictionary) -> void:
 	_score = 0.0
 	_in_segment = false
 	_log = []
+	# Kotlin starts every session with the camera off.
+	_camera_on = false
+	_camera_button.text = "Camera: off"
+	_last_calibration_key = ""
 	_event("session_started %s" % plan.get("plan_id", "?"))
 	_refresh_buttons()
 
@@ -102,6 +111,22 @@ func _on_segment_started(segment: Dictionary) -> void:
 	_intro_left = float(segment.get("intro_sec", 0))
 	_event("segment_started %d/%d %s" % [int(segment.index) + 1, int(segment.count), segment.game_id])
 	_refresh_buttons()
+
+
+func _on_calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String) -> void:
+	_calibration = "calibrating %s (%d/%d) %d%%%s" % [
+		step, step_index + 1, step_count, int(fraction * 100),
+		"" if retry_reason.is_empty() else "  attempt %d: %s" % [attempt, retry_reason]]
+	var key := "%s#%d" % [step, attempt]
+	if key != _last_calibration_key:
+		_event("calibration_progress %s %d/%d attempt %d %s" % [step, step_index + 1, step_count, attempt, retry_reason])
+		_last_calibration_key = key
+
+
+func _on_camera_pressed() -> void:
+	_camera_on = not _camera_on
+	Session.set_tracker_mode("lean_x" if _camera_on else "off")
+	_camera_button.text = "Camera: lean_x" if _camera_on else "Camera: off"
 
 
 func _on_segment_ending() -> void:
@@ -180,6 +205,16 @@ func _build_ui() -> void:
 	_finish_button = _add_button("Finish segment", 1, _finish_segment)
 	_end_button = _add_button("End session", 2, Session.request_end)
 	_exit_button = _add_button("Exit", 3, Session.request_exit)
+
+	# Head-tracker check (#33): turns the camera on in lean_x, which calibrates on first use.
+	_camera_button = Button.new()
+	_camera_button.text = "Camera: off"
+	_camera_button.position = Vector2(W - 480, 110)
+	_camera_button.size = Vector2(420, 90)
+	_camera_button.focus_mode = Control.FOCUS_NONE
+	_camera_button.add_theme_font_size_override("font_size", 36)
+	_camera_button.pressed.connect(_on_camera_pressed)
+	add_child(_camera_button)
 
 	_intro_card = _add_label("", Vector2(W / 2 - 600, H / 2 - 220), 64, Color(1, 1, 1))
 	_intro_card.size = Vector2(1200, 360)

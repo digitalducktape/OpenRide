@@ -11,7 +11,7 @@ interface GameSignals {
     fun segmentEnding()
     fun sessionPaused()
     fun sessionResumed()
-    fun calibrationProgress(step: String, fraction: Double)
+    fun calibrationProgress(progress: CalibrationProgressSignal)
     fun sessionFinished(summaryJson: String)
 }
 
@@ -53,7 +53,7 @@ interface GameSession {
 class GameBridge(
     private val bikeDataSource: BikeDataSource,
     private val heartRateBpm: StateFlow<Int?>,
-    /** Head-tracker fields 6-9; the camera tracker (#33) plugs in here. */
+    /** Head-tracker fields 6-9: the camera tracker's latest snapshot (see [toTrackerReading]). */
     private val trackerReading: () -> TrackerReading = { TrackerReading.OFF },
 ) : GameSignals {
     @Volatile
@@ -106,6 +106,6 @@ class GameBridge(
     override fun segmentEnding() { emitter?.segmentEnding() }
     override fun sessionPaused() { emitter?.sessionPaused() }
     override fun sessionResumed() { emitter?.sessionResumed() }
-    override fun calibrationProgress(step: String, fraction: Double) { emitter?.calibrationProgress(step, fraction) }
+    override fun calibrationProgress(progress: CalibrationProgressSignal) { emitter?.calibrationProgress(progress) }
     override fun sessionFinished(summaryJson: String) { emitter?.sessionFinished(summaryJson) }
 }

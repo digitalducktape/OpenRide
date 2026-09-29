@@ -36,6 +36,7 @@ import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
 import dev.digitalducktape.openride.games.bridge.GameBridge
+import dev.digitalducktape.openride.games.bridge.toTrackerReading
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
@@ -182,7 +183,11 @@ class AppContainer(private val applicationContext: Context) {
      * shares it and the same live sensor feed.
      */
     val gameBridge: GameBridge by lazy {
-        GameBridge(bikeDataSource = bikeDataSource, heartRateBpm = heartRateManager.bpm)
+        GameBridge(
+            bikeDataSource = bikeDataSource,
+            heartRateBpm = heartRateManager.bpm,
+            trackerReading = { headTracker.state.value.toTrackerReading() },
+        )
     }
 
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */
