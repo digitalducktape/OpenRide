@@ -3,6 +3,8 @@ package dev.digitalducktape.openride
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.content.ContextCompat
@@ -37,12 +39,15 @@ import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
 import dev.digitalducktape.openride.games.bridge.GameBridge
+import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.toTrackerReading
+import dev.digitalducktape.openride.games.session.GameSessionManager
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -193,6 +198,29 @@ class AppContainer(private val applicationContext: Context) {
         )
     }
 
+    /**
+     * Mini-games sessions (#35): walks each session's plan over [gameBridge] and records it as a
+     * ride through [rideSessionManager] plus its game results. App-scoped, on the main thread,
+     * so a session's ride is saved even after the games host has gone to the back.
+     */
+    val gameSessionManager: GameSessionManager by lazy {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val log: (String) -> Unit = { Log.i(GAMES_LOG_TAG, it) }
+        GameSessionManager(
+            signals = gameBridge,
+            scope = scope,
+            rideSessionManager = rideSessionManager,
+            gameResultDao = database.gameResultDao(),
+            activeProfileId = { activeProfileHolder.activeProfileId.value },
+            profileFtp = { profileRepository.getProfile(it)?.ftp },
+            tracker = TrackerLink(headTracker, gameBridge, scope, log),
+            otherMusicActive = {
+                (applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
+            },
+            log = log,
+        )
+    }
+
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */
     val contentSourceRepository: ContentSourceRepository by lazy {
         ContentSourceRepository(database.contentSourceDao())
@@ -245,6 +273,8 @@ class AppContainer(private val applicationContext: Context) {
         }
     }
 }
+
+private const val GAMES_LOG_TAG = "OpenRideGames"
 
 /**
  * Builds a [ViewModelProvider.Factory] from a plain lambda, so screens can construct their

@@ -8,16 +8,12 @@ import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.lifecycleScope
 import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.OpenRideBridgePlugin
-import dev.digitalducktape.openride.games.bridge.TrackerLink
-import dev.digitalducktape.openride.games.session.StubGameSession
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
+import dev.digitalducktape.openride.games.session.GameSessionManager
+import dev.digitalducktape.openride.games.session.JustRideMode
+import dev.digitalducktape.openride.games.session.SessionRequest
 import org.godotengine.godot.Godot
 import org.godotengine.godot.GodotActivity
 import org.godotengine.godot.plugin.GodotPlugin
@@ -27,9 +23,9 @@ import org.godotengine.godot.plugin.GodotPlugin
  * `games/` project (`res://games.pck`, packed into the APK's assets by `exportGamesPack`) and
  * connects it to the app through the `OpenRideBridge` plugin.
  *
- * Kotlin owns each session: the attached [StubGameSession] (the real `GameSessionManager` in
- * #35) walks the plan, and when the game calls `request_exit()` after its summary the rider
- * goes back to the Compose app.
+ * Kotlin owns each session: the app-scoped [GameSessionManager] runs the [SessionRequest] this
+ * activity was started with (and records its ride), and when the game calls `request_exit()`
+ * after its summary the rider goes back to the Compose app.
  *
  * **This activity lives as long as the app process.** Godot runs one engine per process and
  * cannot restart it: destroying the host terminates the engine, after which Godot force-quits
@@ -44,13 +40,12 @@ class GameHostActivity : GodotActivity() {
     private val bridge: GameBridge
         get() = appContainer.gameBridge
 
-    private var session: StubGameSession? = null
-    private var sessionScope: CoroutineScope? = null
-    private var trackerLink: TrackerLink? = null
+    private val sessions: GameSessionManager
+        get() = appContainer.gameSessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Attach before the engine starts so its first frame poll finds the session.
-        startSession()
+        startSession(intent)
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         Log.i(TAG, "game host created")
@@ -59,8 +54,9 @@ class GameHostActivity : GodotActivity() {
     /** Entering games again: the engine is already running, so only the session is new. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         Log.i(TAG, "game host re-entered")
-        startSession()
+        startSession(intent)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -81,7 +77,7 @@ class GameHostActivity : GodotActivity() {
     override fun onDestroy() {
         // Only reached when the process is going away anyway (see the class comment).
         Log.w(TAG, "game host destroyed")
-        endSession()
+        bridge.detach(sessions)
         super.onDestroy()
     }
 
@@ -91,39 +87,18 @@ class GameHostActivity : GodotActivity() {
     /** Only consulted on the engine's first start in this process. */
     override fun getHostPlugins(engine: Godot): Set<GodotPlugin> = setOf(OpenRideBridgePlugin(engine, bridge))
 
-    private fun startSession() {
-        endSession()
-        // A child of the activity's scope per session, so a finished session's clock can be
-        // cancelled without touching the (long-lived) activity.
-        val scope = CoroutineScope(lifecycleScope.coroutineContext + SupervisorJob(lifecycleScope.coroutineContext.job))
-        val log: (String) -> Unit = { Log.i(TAG, it) }
-        val tracker = TrackerLink(appContainer.headTracker, bridge, scope, log)
-        val newSession = StubGameSession(
-            signals = bridge,
-            scope = scope,
-            onExit = ::exitToApp,
-            log = log,
-            tracker = tracker,
-        )
-        session = newSession
-        sessionScope = scope
-        trackerLink = tracker
-        bridge.attach(newSession)
-    }
-
-    private fun endSession() {
-        session?.let(bridge::detach)
-        // The camera never outlives the session that asked for it.
-        trackerLink?.stop()
-        sessionScope?.cancel()
-        session = null
-        sessionScope = null
-        trackerLink = null
+    private fun startSession(intent: Intent) {
+        val request = SessionRequest.fromJson(intent.getStringExtra(EXTRA_REQUEST)) ?: DEFAULT_REQUEST
+        Log.i(TAG, "game session: $request")
+        // A session still running (the rider left without its summary) is finished and saved.
+        sessions.begin(request, onExit = ::exitToApp)
+        bridge.attach(sessions)
     }
 
     /** Back to the app, keeping the engine alive: never `finish()` (see the class comment). */
     private fun exitToApp() {
-        endSession()
+        // The session saves its ride app-scoped, so leaving never cuts that short.
+        bridge.detach(sessions)
         moveTaskToBack(true)
         Log.i(TAG, "game host moved to back")
     }
@@ -134,6 +109,12 @@ class GameHostActivity : GodotActivity() {
         /** Exported by the `exportGamesPack` Gradle task into the APK's assets. */
         private const val GAMES_PACK = "res://games.pck"
 
-        fun intent(context: Context): Intent = Intent(context, GameHostActivity::class.java)
+        private const val EXTRA_REQUEST = "dev.digitalducktape.openride.games.SESSION_REQUEST"
+
+        /** Until the Games hub (#38) picks: a 20-minute Just Ride of the demo. */
+        val DEFAULT_REQUEST: SessionRequest = SessionRequest.JustRide("demo", JustRideMode.Timed(20))
+
+        fun intent(context: Context, request: SessionRequest = DEFAULT_REQUEST): Intent =
+            Intent(context, GameHostActivity::class.java).putExtra(EXTRA_REQUEST, request.toJson())
     }
 }

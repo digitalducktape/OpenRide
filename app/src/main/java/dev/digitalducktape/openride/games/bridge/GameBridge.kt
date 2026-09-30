@@ -17,8 +17,7 @@ interface GameSignals {
 
 /**
  * The Kotlin side of one game session: answers the contract's Godot → Kotlin methods and owns
- * the session clock. [dev.digitalducktape.openride.games.session.StubGameSession] until the
- * real `GameSessionManager` (#35) replaces it.
+ * the session clock: [dev.digitalducktape.openride.games.session.GameSessionManager].
  *
  * The bridge calls these on Godot's thread; implementations hand off to their own.
  */
