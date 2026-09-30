@@ -17,6 +17,9 @@ import androidx.room.PrimaryKey
  *   see [dev.digitalducktape.openride.core.profile.AvatarPhotoStore]) shown in place of the
  *   emoji/color avatar wherever the rider's circle appears. Added in schema version 4
  *   ([dev.digitalducktape.openride.core.data.MIGRATION_3_4]); `null` means emoji avatar.
+ * @param headCalibration the rider's camera lean extremes for the mini-games (#33), as
+ *   [dev.digitalducktape.openride.core.camera.HeadCalibration] JSON, reused while fresh (the
+ *   same day). Added in schema version 6 ([MIGRATION_5_6]); `null` until the first calibration.
  */
 @Entity(tableName = "profiles")
 data class Profile(
@@ -28,4 +31,5 @@ data class Profile(
     val ftp: Int?,
     val pairedHrDeviceAddress: String? = null,
     val avatarPhotoPath: String? = null,
+    val headCalibration: String? = null,
 )

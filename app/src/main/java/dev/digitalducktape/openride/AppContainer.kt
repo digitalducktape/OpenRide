@@ -13,7 +13,6 @@ import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
 import dev.digitalducktape.openride.core.camera.CameraXFaceSource
 import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTracker
-import dev.digitalducktape.openride.core.camera.InMemoryHeadCalibrationStore
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
@@ -21,7 +20,9 @@ import dev.digitalducktape.openride.core.data.MIGRATION_1_2
 import dev.digitalducktape.openride.core.data.MIGRATION_2_3
 import dev.digitalducktape.openride.core.data.MIGRATION_3_4
 import dev.digitalducktape.openride.core.data.MIGRATION_4_5
+import dev.digitalducktape.openride.core.data.MIGRATION_5_6
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.ProfileHeadCalibrationStore
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.heartrate.AndroidBleScanner
@@ -69,7 +70,7 @@ class AppContainer(private val applicationContext: Context) {
             applicationContext,
             OpenRideDatabase::class.java,
             OpenRideDatabase.DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
     }
 
     /** Rider avatar photos on disk (camera capture feature); paths live on [dev.digitalducktape.openride.core.data.Profile.avatarPhotoPath]. */
@@ -87,7 +88,7 @@ class AppContainer(private val applicationContext: Context) {
 
     /** Whole-database backup/restore to one shareable file (PRD P1-8, T15). */
     val backupRepository: BackupRepository by lazy {
-        BackupRepository(database, database.profileDao(), database.rideDao(), avatarPhotoStore)
+        BackupRepository(database, database.profileDao(), database.rideDao(), avatarPhotoStore, database.gameResultDao())
     }
 
     /**
@@ -103,7 +104,9 @@ class AppContainer(private val applicationContext: Context) {
             dataChanges = combine(
                 database.profileDao().observeAll(),
                 database.rideDao().observeRideCount(),
-            ) { profiles, rideCount -> profiles to rideCount },
+                // A game session saves its results just after its ride.
+                database.gameResultDao().observeCount(),
+            ) { profiles, rideCount, resultCount -> Triple(profiles, rideCount, resultCount) },
             isDatabaseEmpty = {
                 database.profileDao().getAllOnce().isEmpty() && database.rideDao().getAllRidesOnce().isEmpty()
             },
@@ -129,13 +132,13 @@ class AppContainer(private val applicationContext: Context) {
 
     /**
      * Camera head lean/standing for the mini-games (#33). The camera only runs while a game sets
-     * a tracker mode other than `off`. Calibrations live in memory until #35's 5→6 migration adds
-     * `Profile.headCalibration`; swap in a Room-backed [dev.digitalducktape.openride.core.camera.HeadCalibrationStore] then.
+     * a tracker mode other than `off`. Each rider's lean extremes are kept in
+     * `Profile.headCalibration`.
      */
     val headTracker: HeadTracker by lazy {
         DefaultHeadTracker(
             faceSource = headFaceSource,
-            calibrationStore = InMemoryHeadCalibrationStore(),
+            calibrationStore = ProfileHeadCalibrationStore(database.profileDao()),
             activeProfileId = activeProfileHolder.activeProfileId,
             hasCameraPermission = {
                 ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.CAMERA) ==

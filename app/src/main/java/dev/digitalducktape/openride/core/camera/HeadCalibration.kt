@@ -72,10 +72,9 @@ data class HeadCalibration(
 }
 
 /**
- * Where [HeadCalibration]s live, per profile. Kept behind an interface because the Room column
- * (`Profile.headCalibration`, JSON via [HeadCalibration.toJson]) arrives with the single 5→6
- * migration owned by the sessions issue (#35); until then [InMemoryHeadCalibrationStore] keeps
- * them for the app's lifetime.
+ * Where [HeadCalibration]s live, per profile. The app keeps them in `Profile.headCalibration`
+ * (JSON via [HeadCalibration.toJson]; [dev.digitalducktape.openride.core.data.ProfileHeadCalibrationStore]);
+ * [InMemoryHeadCalibrationStore] is for tests.
  */
 interface HeadCalibrationStore {
     suspend fun load(profileId: Long): HeadCalibration?

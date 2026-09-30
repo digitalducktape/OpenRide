@@ -92,6 +92,7 @@ class RideSessionManager(
 
     private var profileId: Long = 0
     private var videoId: String? = null
+    private var gamePlan: String? = null
     private var rideStartEpochMs: Long = 0
     private var tickerJob: Job? = null
     private var resumeWatcherJob: Job? = null
@@ -110,12 +111,15 @@ class RideSessionManager(
      * Starts a new ride for [profileId]. No-op if not currently [RideSessionState.Idle].
      * [videoId] is the class the ride plays in the in-app player (v2), recorded on the
      * persisted ride for the Classes tab's "taken" badges; `null` for a Quick Start.
+     * [gamePlan] is the mini-games session plan the ride records (#35), saved as
+     * [Ride.gamePlan]; `null` for any other ride.
      */
-    fun start(profileId: Long, videoId: String? = null) {
+    fun start(profileId: Long, videoId: String? = null, gamePlan: String? = null) {
         if (_state.value != RideSessionState.Idle) return
 
         this.profileId = profileId
         this.videoId = videoId
+        this.gamePlan = gamePlan
         rideStartEpochMs = epochMillisProvider()
         sampleBuffer.clear()
         sumCadence = 0
@@ -150,11 +154,19 @@ class RideSessionManager(
     }
 
     /**
-     * Manually pauses timer/sampling. No-op if not currently [RideSessionState.Active]. A
-     * manual pause is deliberately *not* an [autoPaused] one, so it will not auto-resume when
-     * the rider starts pedaling again — only [resume] brings it back.
+     * Manually pauses timer/sampling. A manual pause is deliberately *not* an [autoPaused] one,
+     * so it will not auto-resume when the rider starts pedaling again — only [resume] brings it
+     * back. During an auto-pause it turns that pause into a manual one (a game's pause button
+     * can be pressed while freewheeling, #35); otherwise it is a no-op unless
+     * [RideSessionState.Active].
      */
     fun pause() {
+        if (_state.value == RideSessionState.Paused && _autoPaused.value) {
+            resumeWatcherJob?.cancel()
+            resumeWatcherJob = null
+            _autoPaused.value = false
+            return
+        }
         if (_state.value != RideSessionState.Active) return
 
         tickerJob?.cancel()
@@ -217,6 +229,7 @@ class RideSessionManager(
             outputKj = outputKj,
             calories = calories,
             videoId = videoId,
+            gamePlan = gamePlan,
         )
 
         val rideId = rideRepository.saveRide(ride, sampleBuffer.toList())
