@@ -469,7 +469,7 @@ generators can register without an autoload of their own.
 
 | Method | Behaviour |
 | --- | --- |
-| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). |
+| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). The same style and seed at a new tempo is a **tempo change**: it swaps in on the next phrase boundary instead (see "Tempo changes on a phrase boundary"). |
 | `set_intensity(value: float)` | 0-1. Stems fade in or out over 1.5 s as `value` crosses their gate. |
 | `stop_music(fade_sec := 2.0)` | Fades the music out |
 | `play_sfx(name, volume_db := 0.0, pitch := 1.0) -> bool` | An effect on `SFX`, from 8 voices. `false` means silence. |
@@ -620,41 +620,38 @@ Open `res://audio/gallery/StyleGallery.tscn` in the editor and press F6.
 
 It plays through its own players, not `AudioDirector`, so it needs no session.
 
-### Tempo changes on a phrase boundary (proposed `AudioDirector` hook)
+### Tempo changes on a phrase boundary
 
-`AudioDirector` crossfades new music in over 2 s as soon as its render finishes, which is right
-between games. Within a game, a tempo change should land on a phrase boundary with no gap and
-the beat grid unbroken. This matters for Cadence Karaoke's target changes and Kart Race's
-cadence-following. `MusicGen` renders the next tempo ahead and the gallery demonstrates the
-switch (`StyleGallery.gd`, `_process` and `_seconds_into_phrase`). The switch itself needs the
-following change in `AudioDirector` (#34 owns it).
+Between games, new music crossfades in over 2 s as soon as it renders. Within a game, a **tempo
+change** lands on a phrase boundary instead, with no gap and the beat grid unbroken. Cadence
+Karaoke's target changes and Kart Race's cadence-following rely on this. `AudioDirector` does
+it:
 
-1. **Recognise a tempo change.** A new request with the same style and seed but a different
-   `tempo_bpm`, while music is playing. An explicit `play_music(..., at_phrase := true)`
-   would also do.
-2. **Hold the finished render.** When it arrives in `_collect_render`, keep it as *pending*
-   instead of calling `_start`. A newer request replaces the pending one, and `music: false`
-   drops it.
-3. **Find the playing loop's phrase length** from the stream itself, not from the tempo.
-   `tempo_scale` and per-bar rounding make the stream the only exact source.
-   - `phrase_sec = stem.get_length() / (bars / 4)`, with `bars` from the style request
-     (16 by default).
-4. **Track the phrase position each frame.**
-   - `since = fposmod(deck.get_playback_position() + AudioServer.get_time_since_last_mix(), phrase_sec)`.
-   - When `since` wraps (drops by more than half a phrase), the boundary has just passed.
-   - Don't switch while paused.
-5. **Switch in that frame.**
-   - Start the new deck with `player.play(since)`, so its beat grid starts exactly on the
-     boundary despite frame timing.
-   - Crossfade over about 30 ms, not 2 s.
-   - Give the new stems the current stem levels at once, with no 1.5 s gate fade-in.
-   - Optionally, start at the same phrase of the form: `from = next_phrase_index × new_phrase_sec + since`.
+1. **A tempo change** is a `play_music` request with the same style and seed as the playing
+   music but another `tempo_bpm`. Any other request crossfades as before.
+2. **It waits, pending.** When its render is ready, it isn't started: `pending_music_key()`
+   returns it.
+   - A newer request replaces it; asking for the playing tempo again cancels it.
+   - `stop_music()`, `audio.music: false` and a new session drop it.
+3. **The phrase length comes from the playing stream**, not the tempo, because `tempo_scale`
+   and per-bar rounding change it: `phrase_seconds() = stem length / (bars / 4)`, with `bars`
+   from the style request (16 by default).
+4. **Each frame** (not while paused), the director computes the time since the last boundary:
+   `fposmod(position + AudioServer.get_time_since_last_mix(), phrase)`. The first frame in
+   which it wraps (drops by more than half a phrase, so a few ms of mix jitter doesn't count)
+   is just past the boundary.
+5. **The swap.** The new tempo starts that far into its loop (`play(since)`), so its beat grid
+   starts exactly on the boundary despite frame timing. It crossfades over 30 ms
+   (`SWAP_FADE_SEC`), and each stem keeps its current level, with no gate fade-in. The
+   director emits `tempo_swapped(key, since_boundary)`, then `music_started(key)`.
 6. **In games:** call `play_music` with the new tempo (same style and seed) a few seconds before
-   the change is due. The render (under 0.2 s on a Mac) needs to finish before the boundary.
+   the change is due. The render (about 1 s on the tablet) must finish before the boundary,
+   or the swap waits for the next one.
 
-`sim_gallery_check` measures the gallery's switch: it lands 7.7 ms after the boundary, and the
-old loop plays its phrase out. The switch is frame-quantised, but `play(since)` compensates, so
-the new beat grid is exact. On the bike this needs checking with a live tempo change.
+`sim_phrase_swap_check` plays a 4-bar loop at 180 bpm with the real `MusicGen`, then asks for
+160 and 170 bpm. The 170 replaces the 160, waits out the phrase and swaps in 5.5 ms after the
+boundary. The gallery (`StyleGallery.gd`) does the same with its own players. A live tempo
+change is still to be checked on the bike.
 
 ## Setting up
 
@@ -773,10 +770,14 @@ For generated audio (#36):
     serial vs. parallel renders, overrides and `tempo_scale`, the director contract on a
     worker thread, the phrase clock and the disk cache.
   - `audio_hook_test` plays every framework cue and the demo's music through `AudioDirector`.
+  - `audio_director_phrase_test` covers tempo changes: pending until the boundary, the phrase
+    length from the stream, jitter, the carried stem levels, replacement, music off, pause, and
+    other music still crossfading at once.
 - **Headless checks:**
 
   ```sh
-  $GODOT_BIN --headless --path games -s res://tests/sim_gallery_check.gd  # gallery + phrase switch
+  $GODOT_BIN --headless --path games -s res://tests/sim_gallery_check.gd       # gallery + phrase switch
+  $GODOT_BIN --headless --path games -s res://tests/sim_phrase_swap_check.gd   # AudioDirector's tempo swap
   $GODOT_BIN --headless --path games -s res://tests/audio_bench.gd -- --tempo=90 [--wav=DIR]
   ```
 
