@@ -120,16 +120,29 @@ data class HeadTrackerConfig(
 
     // --- looking away ------------------------------------------------------------------------
     /**
-     * Looking away from the screen (bike run 4): the face stays detected but its keypoint yaw
-     * leaves the range seen during calibration. On run 4 the calibrated range was -9.8..+6.1;
-     * riding never went further than 25° outside it for more than one frame, while the
-     * look-aways sat at ±90° for seconds. A frame beyond the range ± this margin is not used
-     * for steering...
+     * Looking away from the screen while the face stays detected ([LookAwayGate]). BlazeFace's
+     * keypoints distort differently per side (bike run 5): turning right saturates the yaw
+     * estimate at +90, but turning left mostly doesn't (yaw beyond -35 on only 12-15% of frames);
+     * instead the far eye's keypoint slips and the pitch estimate jumps up (median +20..+31
+     * against +3 riding). A face frame is "turned away" when its yaw leaves the calibrated range
+     * by more than [lookAwayYawMarginDeg], or its pitch rises more than [lookAwayPitchUpDeg] above
+     * the calibrated centre's...
      */
     val lookAwayYawMarginDeg: Double = 25.0,
-    /** ...and after this long beyond it (missing-face frames don't interrupt), every frame is ignored... */
-    val lookAwayLatchMs: Long = 300,
-    /** ...until the face has been back within the range this long. */
+    val lookAwayPitchUpDeg: Double = 20.0,
+    /**
+     * ...unless the face sits this far (frame heights) below the calibrated centre: looking down
+     * at the bike degrades the keypoints the same way, and must not freeze steering (run 5).
+     */
+    val lookAwayLowFaceDrop: Double = 0.10,
+    /**
+     * The gate latches when, over the last [lookAwayWindowMs] of face frames, at least
+     * [lookAwayShare] (and 3 frames) were turned away: during a look-away the keypoints flicker
+     * back into range on some frames, which a run of consecutive frames would miss...
+     */
+    val lookAwayWindowMs: Long = 500,
+    val lookAwayShare: Double = 0.6,
+    /** ...and releases once the face has been back within range for this long, frame after frame. */
     val lookAwayReleaseMs: Long = 300,
 
     // --- face lost ----------------------------------------------------------------------------
