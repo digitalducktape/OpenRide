@@ -111,66 +111,87 @@ class AdaptiveDeadZone(private val config: HeadTrackerConfig) {
 }
 
 /**
- * "Not looking at the screen": the face is still detected, but its yaw has left the range the
- * rider showed while calibrating. Frames beyond the range ± [HeadTrackerConfig.lookAwayYawMarginDeg]
- * are rejected one by one. Once rejections have lasted [HeadTrackerConfig.lookAwayLatchMs]
- * (frames with no face don't interrupt that), the gate latches and rejects every frame, including
- * the in-range ones a head passes through while turning, until the face has stayed within the
- * range, frame after frame, for [HeadTrackerConfig.lookAwayReleaseMs]. The engine treats rejected frames as a lost face:
- * hold, ease to centre, then `face lost`.
+ * "Not looking at the screen": the face is still detected, but its keypoints say it is turned
+ * away (see [HeadTrackerConfig.lookAwayYawMarginDeg] and [HeadTrackerConfig.lookAwayPitchUpDeg]).
+ * Each such frame is rejected. When turned-away frames make up [HeadTrackerConfig.lookAwayShare]
+ * of the last [HeadTrackerConfig.lookAwayWindowMs] of face frames, the gate latches and rejects
+ * every frame, including the in-range ones a turned head flickers through, until the face has
+ * stayed within range, frame after frame, for [HeadTrackerConfig.lookAwayReleaseMs]. A face well
+ * below the calibrated centre (looking down at the bike) is never counted as turned away. The
+ * engine treats rejected frames as a lost face: hold, ease to centre, then `face lost`.
  *
  * Not thread-safe.
  */
 class LookAwayGate(private val config: HeadTrackerConfig) {
-    private var min: Double? = null
-    private var max: Double? = null
-    private var outsideSinceMs: Long? = null
+    private var yawMin: Double? = null
+    private var yawMax: Double? = null
+    private var centre: CentreBaseline? = null
+    private val recent = ArrayDeque<Pair<Long, Boolean>>()
     private var insideSinceMs: Long? = null
 
     /** Latched: the rider is looking away. */
     var lookingAway = false
         private set
 
-    /** The allowed yaw range; null disables the gate. */
-    fun setRange(minDeg: Double?, maxDeg: Double?) {
-        min = minDeg
-        max = maxDeg
+    /** The calibrated yaw range and centre; null disables the gate. */
+    fun setReference(yawMinDeg: Double?, yawMaxDeg: Double?, centre: CentreBaseline?) {
+        yawMin = yawMinDeg
+        yawMax = yawMaxDeg
+        this.centre = centre
         reset()
     }
 
-    /** True when [face] must not be used for steering. */
+    private enum class Look { AT_SCREEN, YAW_OUT, PITCH_UP }
+
+    private fun classify(face: FaceObservation, lo: Double, hi: Double, base: CentreBaseline): Look = when {
+        face.cy - base.cy > config.lookAwayLowFaceDrop -> Look.AT_SCREEN
+        face.yawDeg < lo - config.lookAwayYawMarginDeg || face.yawDeg > hi + config.lookAwayYawMarginDeg -> Look.YAW_OUT
+        face.pitchDeg - base.pitchDeg > config.lookAwayPitchUpDeg -> Look.PITCH_UP
+        else -> Look.AT_SCREEN
+    }
+
+    /**
+     * True when [face] must not be used for steering: while latched, or on its own when its yaw
+     * is out of range (a detector glitch or the start of a turn). A pitch-up frame on its own is
+     * still used: fast sweeps tip the head up for a moment (run 4), so pitch only counts towards
+     * latching.
+     */
     fun reject(timestampMs: Long, face: FaceObservation): Boolean {
-        val lo = min ?: return false
-        val hi = max ?: return false
-        val outside = face.yawDeg < lo - config.lookAwayYawMarginDeg || face.yawDeg > hi + config.lookAwayYawMarginDeg
+        val look = classify(face, yawMin ?: return false, yawMax ?: return false, centre ?: return false)
+        val outside = look != Look.AT_SCREEN
+        recent.addLast(timestampMs to outside)
+        while (recent.isNotEmpty() && timestampMs - recent.first().first > config.lookAwayWindowMs) recent.removeFirst()
+        if (!lookingAway) {
+            val away = recent.count { it.second }
+            if (away >= MIN_FRAMES && away >= config.lookAwayShare * recent.size) lookingAway = true
+        }
+        if (!lookingAway) return look == Look.YAW_OUT
         if (outside) {
             insideSinceMs = null
-            val since = outsideSinceMs ?: timestampMs.also { outsideSinceMs = it }
-            if (timestampMs - since >= config.lookAwayLatchMs) lookingAway = true
             return true
-        }
-        if (!lookingAway) {
-            outsideSinceMs = null
-            return false
         }
         val back = insideSinceMs ?: timestampMs.also { insideSinceMs = it }
         if (timestampMs - back >= config.lookAwayReleaseMs) {
             lookingAway = false
-            outsideSinceMs = null
             insideSinceMs = null
+            recent.clear()
             return false
         }
         return true
     }
 
-    /** A frame without a face: it continues a look-away, but doesn't count as looking back. */
+    /** A frame without a face: it doesn't count as looking back. */
     fun onNoFace() {
         insideSinceMs = null
     }
 
     fun reset() {
         lookingAway = false
-        outsideSinceMs = null
+        recent.clear()
         insideSinceMs = null
+    }
+
+    private companion object {
+        const val MIN_FRAMES = 3
     }
 }

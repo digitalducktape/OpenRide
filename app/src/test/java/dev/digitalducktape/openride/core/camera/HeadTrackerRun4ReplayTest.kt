@@ -51,7 +51,7 @@ class HeadTrackerRun4ReplayTest {
         return out to saved
     }
 
-    private fun ungated() = HeadTrackerConfig(lookAwayYawMarginDeg = 1e9)
+    private fun ungated() = HeadTrackerConfig(lookAwayYawMarginDeg = 1e9, lookAwayPitchUpDeg = 1e9)
 
     /** Contiguous runs of rows labelled [step]. */
     private fun List<Replayed>.segments(step: String): List<List<Replayed>> {

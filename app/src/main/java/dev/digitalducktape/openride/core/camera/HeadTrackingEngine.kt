@@ -106,7 +106,7 @@ class HeadTrackingEngine(
     fun resetSession() {
         centre = null
         calibration = null
-        lookAway.setRange(null, null)
+        lookAway.setReference(null, null, null)
         calibrationDefaults = emptySet()
         leanAxis = null
         depthAxis = null
@@ -169,9 +169,10 @@ class HeadTrackingEngine(
         ).also { if (measuredAll) onFullCalibration(it) }
         // The look-away gate allows the yaw seen now (at least the centre) and when the extremes
         // were measured.
-        lookAway.setRange(
+        lookAway.setReference(
             listOfNotNull(result.yawMinDeg, extremes.yawMinDeg).minOrNull(),
             listOfNotNull(result.yawMaxDeg, extremes.yawMaxDeg).maxOrNull(),
+            result.centre,
         )
         pendingReuse = null
         calibration = extremes
