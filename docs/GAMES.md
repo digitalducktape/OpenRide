@@ -285,13 +285,54 @@ $GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd
    for it (#38), grant it with
    `adb shell pm grant dev.digitalducktape.openride.real android.permission.CAMERA`.
 
-The tablet logs at level W, so Godot's `print` output is invisible until you raise the level:
+### Capturing logs on the bike
+
+The tablet logs at level W (`getprop log.tag` prints `W`), so every app `Log.i`/`Log.v` and
+every Godot `print` is dropped unless its tag is raised. Four things have silently lost a
+capture:
+
+- **`log.tag.*` doesn't survive a reboot.** Set the tags after every boot, and check them with
+  `getprop`. No app restart is needed: the app and Godot re-check the tag on every line.
+- **The ring buffer is 256 KiB, and logd prunes the chattiest app first.** With
+  `HeadTrackerFrames` on (30 lines a second), OpenRide is the chattiest app, so a capture taken
+  with `logcat -d` after the ride can contain only other apps' W lines. Enlarge the buffer, and
+  record while riding.
+- **A live `adb logcat` over wireless ADB stops when ADB drops.** Record to a file on the
+  tablet instead.
+- **`HeadTrackerFrames` exists only in debuggable builds** (`debugReal`, `debug`). A release
+  build never writes it.
+
+The recipe, in order:
 
 ```sh
+# 1. After every boot: raise the tags, then confirm they're set.
 adb shell setprop log.tag.godot VERBOSE
 adb shell setprop log.tag.OpenRideGames VERBOSE
-adb logcat -s godot OpenRideGames GodotActivity Godot
+adb shell setprop log.tag.HeadTracker VERBOSE
+adb shell setprop log.tag.HeadTrackerFrames VERBOSE   # per-frame raw/filtered lean + face row
+adb shell getprop | grep log.tag
+
+# 2. A bigger ring buffer.
+adb logcat -G 16M
+
+# 3. Record on the tablet, so a dropped ADB connection doesn't end the capture.
+adb shell 'nohup logcat -v threadtime -f /sdcard/Download/openride-run.log -r 8192 -n 8 \
+  godot:V OpenRideGames:V HeadTracker:V HeadTrackerFrames:V GodotActivity:V "*:S" \
+  > /dev/null 2>&1 &'
+
+# ... ride ...
+
+# 4. Stop the recorder and pull the files (openride-run.log, .1, .2, ...).
+adb shell pkill -f openride-run.log
+for f in $(adb shell ls /sdcard/Download/ | grep openride-run.log); do adb pull "/sdcard/Download/$f"; done
 ```
+
+To follow along live instead, run `adb logcat -s godot OpenRideGames HeadTracker`. It stops
+if ADB drops, so keep the on-tablet recorder running too.
+
+`HeadTrackerFrames` lines carry `fixture=<row>` in the `HeadFixtureCsv` format. Collect those
+rows into a CSV file under `app/src/test/resources/headtracker/` to replay the ride in the unit
+tests.
 
 What to look for in the log:
 
