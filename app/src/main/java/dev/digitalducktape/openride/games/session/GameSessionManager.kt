@@ -60,7 +60,8 @@ import kotlinx.serialization.json.jsonPrimitive
  * - After the last segment a timed plan finishes by itself; an open-ended one waits for
  *   `request_end`.
  * - Finishing stops and saves the ride, writes one `game_results` row per segment, works out
- *   the rider's bests and only then sends `session_finished`.
+ *   the rider's bests and only then sends `session_finished`. A session with under a minute of
+ *   gameplay, or no pedalling at all, is discarded instead (`ride_id: null`).
  *
  * Every entry point hops onto [scope] (the main thread in the app), so all state is touched on
  * one thread; only [segmentTimeLeftSec] is read from Godot's thread. A session with no active
@@ -102,6 +103,7 @@ class GameSessionManager(
     private var playedSec = 0
     private var graceLeftSec = 0
     private var elapsedSec = 0
+    private var gameplaySec = 0
     private var riderPaused = false
     private var paused = false
     private var endRequested = false
@@ -140,6 +142,7 @@ class GameSessionManager(
         playedSec = 0
         graceLeftSec = 0
         elapsedSec = 0
+        gameplaySec = 0
         riderPaused = false
         paused = false
         endRequested = false
@@ -304,6 +307,7 @@ class GameSessionManager(
             Phase.INTRO -> if (--introLeftSec <= 0) phase = Phase.PLAYING
             Phase.PLAYING -> {
                 playedSec++
+                gameplaySec++
                 updateTimeLeft()
                 val duration = current.durationSec
                 val stopAt = when {
@@ -377,8 +381,13 @@ class GameSessionManager(
         val wasRecording = recording
         val pid = profileId
         val elapsed = elapsedSec
+        val keep = wasRecording && worthKeeping(gameplaySec)
+        if (wasRecording && !keep) {
+            log("discarding the ride: ${gameplaySec}s of gameplay, pedalled=${pedalled()}")
+            rideSessionManager.discard()
+        }
         savingJob = scope.launch {
-            val ride = if (wasRecording) saveRide(played, finishedPlan) else null
+            val ride = if (keep) saveRide(played, finishedPlan) else null
             val bests = if (ride != null && pid != null && finishedPlan != null) bests(pid, ride.id, finishedPlan, played) else EMPTY
             val summary = SessionSummary(
                 rideId = ride?.id,
@@ -397,6 +406,15 @@ class GameSessionManager(
             _finishedRideId.value = ride?.id
         }
     }
+
+    /**
+     * Whether the session belongs in History: at least [MIN_GAMEPLAY_SEC] of gameplay (intro
+     * cards don't count, so a skipped or abandoned game isn't a ride) and some pedalling.
+     * Normal rides have no such rule; they're always ended deliberately from the ride screen.
+     */
+    private fun worthKeeping(gameplay: Int): Boolean = gameplay >= MIN_GAMEPLAY_SEC && pedalled()
+
+    private fun pedalled(): Boolean = rideSessionManager.liveAggregates.value.let { it.maxCadence > 0 || it.maxPower > 0 }
 
     /** The ride through the normal recording path, then its results. Null if nothing was saved. */
     private suspend fun saveRide(played: List<Played>, finishedPlan: SessionPlan?): Ride? {
@@ -473,6 +491,9 @@ class GameSessionManager(
 
     companion object {
         const val GRACE_SEC = 5
+
+        /** The shortest session saved as a ride: a game's shortest timed length (`min_sec`). */
+        const val MIN_GAMEPLAY_SEC = 60
         private const val TICK_MS = 1_000L
         private val EMPTY = JsonObject(emptyMap())
 

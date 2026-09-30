@@ -301,14 +301,14 @@ class GameSessionManagerTest {
 
     @Test
     fun `a game-ended segment finishes when the game reports`() {
-        val m = manager().play(SessionRequest.JustRide("racer", JustRideMode.Timed(1)))
-        seconds(10 + 42)
+        val m = manager().play(SessionRequest.JustRide("racer", JustRideMode.Timed(2)))
+        seconds(10 + 70)
         m.report(gameId = "racer")
 
         assertFalse("segment_ending" in signals.names)
         assertEquals("session_finished", signals.names.last())
         val rideId = signals.payload("session_finished")["ride_id"]!!.jsonPrimitive.long
-        assertEquals(42, runBlocking { db.gameResultDao().getForRide(rideId) }.single().durationSec)
+        assertEquals(70, runBlocking { db.gameResultDao().getForRide(rideId) }.single().durationSec)
     }
 
     @Test
@@ -329,8 +329,10 @@ class GameSessionManagerTest {
         val count = signals.payload("session_started")["segments"]!!.jsonArray.size
         assertEquals(10, count)
 
-        // Skip every segment from its intro card.
-        repeat(count) { m.report(skipped = true, gameId = "demo") }
+        // Play the warm-up, then skip every other segment from its intro card.
+        seconds(10 + 180)
+        m.report(gameId = "demo")
+        repeat(count - 1) { m.report(skipped = true, gameId = "demo") }
 
         val segments = signals.payloads("segment_started")
         assertEquals((0 until count).toList(), segments.map { it.int("index") })
@@ -344,7 +346,7 @@ class GameSessionManagerTest {
         val rideId = signals.payload("session_finished")["ride_id"]!!.jsonPrimitive.long
         val rows = runBlocking { db.gameResultDao().getForRide(rideId) }
         assertEquals((0 until count).toList(), rows.map { it.segmentIndex })
-        assertTrue(rows.all { it.skipped })
+        assertEquals(listOf(false) + List(count - 1) { true }, rows.map { it.skipped })
         assertEquals("circuit-20", runBlocking { db.rideDao().getById(rideId) }!!.gamePlan)
     }
 
@@ -420,8 +422,8 @@ class GameSessionManagerTest {
 
     @Test
     fun `request_end mid-segment asks the game to finish, then saves and finishes`() {
-        val m = manager().play(oneMinute)
-        seconds(30)
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Timed(2)))
+        seconds(10 + 60)
         m.call { onRequestEnd() }
         assertEquals("segment_ending", signals.names.last())
         m.report()
@@ -432,8 +434,8 @@ class GameSessionManagerTest {
 
     @Test
     fun `request_end while paused still finishes after the grace period`() {
-        val m = manager().play(oneMinute)
-        seconds(30)
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Timed(2)))
+        seconds(10 + 80)
         m.call { onRequestPause() }
         m.call { onRequestEnd() }
         seconds(5)
@@ -441,7 +443,7 @@ class GameSessionManagerTest {
         assertEquals("session_finished", signals.names.last())
         val rideId = signals.payload("session_finished")["ride_id"]!!.jsonPrimitive.long
         // The paused seconds aren't ridden.
-        assertEquals(30, runBlocking { db.rideDao().getById(rideId) }!!.durationSec)
+        assertEquals(90, runBlocking { db.rideDao().getById(rideId) }!!.durationSec)
     }
 
     @Test
@@ -464,8 +466,8 @@ class GameSessionManagerTest {
 
     @Test
     fun `request_exit before the summary saves the ride and leaves`() {
-        val m = manager().play(oneMinute)
-        seconds(30)
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Timed(2)))
+        seconds(10 + 65)
         m.call { onRequestExit() }
 
         assertEquals(1, exits)
@@ -478,8 +480,8 @@ class GameSessionManagerTest {
 
     @Test
     fun `entering games again during a session saves the old ride before starting the new one`() {
-        val m = manager().play(oneMinute)
-        seconds(30)
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Timed(2)))
+        seconds(10 + 65)
         m.play(oneMinute)
 
         assertEquals(listOf("session_started", "segment_started", "session_finished", "session_started", "segment_started"), signals.names)
@@ -488,6 +490,62 @@ class GameSessionManagerTest {
     }
 
     // --- Not recorded -----------------------------------------------------------------------
+
+    @Test
+    fun `a session with under a minute of gameplay is discarded`() {
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Open))
+        seconds(10 + 59) // a long intro doesn't count: only gameplay does
+        m.call { onRequestEnd() }
+        m.report()
+
+        assertEquals(JsonNull, signals.payload("session_finished")["ride_id"])
+        assertEquals(JsonObject(emptyMap()), signals.payload("session_finished")["bests"])
+        assertEquals(0, runBlocking { db.rideDao().getAllRidesOnce() }.size)
+        assertEquals(RideSessionState.Idle, rides.state.value)
+        assertNull(m.finishedRideId.value)
+    }
+
+    @Test
+    fun `a session skipped from its intro card is discarded`() {
+        val m = manager().play(oneMinute)
+        seconds(4)
+        m.report(skipped = true)
+
+        assertEquals(JsonNull, signals.payload("session_finished")["ride_id"])
+        assertEquals(0, runBlocking { db.rideDao().getAllRidesOnce() }.size)
+    }
+
+    @Test
+    fun `a minute of gameplay is kept`() {
+        val m = manager().play(SessionRequest.JustRide("quick", JustRideMode.Open))
+        seconds(10 + 60)
+        m.call { onRequestEnd() }
+        m.report()
+
+        assertEquals(1, runBlocking { db.rideDao().getAllRidesOnce() }.size)
+    }
+
+    @Test
+    fun `a session without any pedalling is discarded, however long`() {
+        bike.setMetrics(cadenceRpm = 0, resistancePercent = 40, powerWatts = 0)
+        val m = manager().play(oneMinute)
+        seconds(111)
+        m.report()
+
+        assertEquals(JsonNull, signals.payload("session_finished")["ride_id"])
+        assertEquals(0, runBlocking { db.rideDao().getAllRidesOnce() }.size)
+        assertEquals(RideSessionState.Idle, rides.state.value)
+    }
+
+    @Test
+    fun `a discarded session doesn't block the next ride`() {
+        val m = manager().play(oneMinute)
+        seconds(5)
+        m.call { onRequestExit() }
+        m.play(oneMinute)
+
+        assertEquals(RideSessionState.Active, rides.state.value)
+    }
 
     @Test
     fun `without an active rider the session plays but records nothing`() {

@@ -259,7 +259,10 @@ ride in History, exports and backups:
 - It starts when the session starts and records through intro cards.
 - Freewheel auto-pause applies. A rider's pause (`request_pause`) pauses the ride too. Either
   kind freezes the session clock and sends `session_paused` / `session_resumed`.
-- When the session finishes, the ride is saved with `gamePlan`, then one `game_results` row
+- A session with under a minute of gameplay (intro cards don't count), or with no pedalling
+  at all, is discarded rather than saved, and `session_finished` carries `ride_id: null`.
+  Normal rides have no such rule: they're only ever ended deliberately.
+- Otherwise, when the session finishes, the ride is saved with `gamePlan`, then one `game_results` row
   per segment (`startSec` on the session clock, `durationSec` of gameplay). Then the ride
   manager returns to idle, so the app's next ride can start.
 - `GameResultDao` answers personal bests per rider (per game, plan and difficulty), the

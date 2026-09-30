@@ -244,6 +244,27 @@ class RideSessionManagerTest {
     }
 
     @Test
+    fun `discard ends the ride without saving it and returns to Idle`() = runTest {
+        val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
+        manager.start(profileId, gamePlan = "just-ride:demo:open")
+        fakeBikeDataSource.setMetrics(cadenceRpm = 80, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        manager.discard()
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        assertEquals(RideSessionState.Idle, manager.state.value)
+        assertEquals(0, manager.elapsedSec.value)
+        assertTrue(!manager.isRideActive.value)
+        assertEquals(0, db.rideDao().getAllRidesOnce().size)
+        // The next ride starts cleanly.
+        manager.start(profileId)
+        assertEquals(RideSessionState.Active, manager.state.value)
+    }
+
+    @Test
     fun `a quick start ride persists no video id`() = runTest {
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
         manager.start(profileId)

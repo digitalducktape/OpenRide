@@ -238,6 +238,29 @@ class RideSessionManager(
         return savedRide
     }
 
+    /**
+     * Ends the ride without saving it and returns to [RideSessionState.Idle]. Used by the
+     * mini-games (#35) for sessions too short or empty to belong in History. No-op unless
+     * [RideSessionState.Active]/[RideSessionState.Paused].
+     */
+    fun discard() {
+        val current = _state.value
+        if (current !is RideSessionState.Active && current !is RideSessionState.Paused) return
+
+        tickerJob?.cancel()
+        tickerJob = null
+        resumeWatcherJob?.cancel()
+        resumeWatcherJob = null
+        _autoPaused.value = false
+        _isRideActive.value = false
+        resetFreewheelTracking()
+        _elapsedSec.value = 0
+        _liveAggregates.value = LiveAggregates()
+        sampleBuffer.clear()
+        _goal.value = RideGoal.None
+        _state.value = RideSessionState.Idle
+    }
+
     /** Returns to [RideSessionState.Idle], ready for another ride. No-op unless [RideSessionState.Finished]. */
     fun reset() {
         if (_state.value !is RideSessionState.Finished) return
