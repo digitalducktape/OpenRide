@@ -135,8 +135,8 @@ class HeadTrackingEngineTest {
         val full = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85))).last().second
         assertTrue("85% lean read ${full.leanX}", full.leanX >= 0.99)
         val partial = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85 * 0.65))).last().second
-        // 0.65 of full lock, less the dead zone: (0.65 - 0.3) / 0.7 = 0.5.
-        assertEquals(0.5, partial.leanX, 0.02)
+        // 0.65 of full lock, through the soft dead zone.
+        assertEquals(deadZone(0.65, config.deadZone, config.deadZoneRamp), partial.leanX, 0.02)
     }
 
     @Test
@@ -279,7 +279,7 @@ class HeadTrackingEngineTest {
         val back = engine.play(script.hold(1_000, SEATED.shifted(sizeRatio = 0.85))).last().second
         assertEquals(-1.0, back.leanDepth, 0.0)
         val partIn = engine.play(script.hold(2_000, SEATED.shifted(sizeRatio = 1 + 0.2 * 0.85 * 0.65))).last().second
-        assertEquals(0.5, partIn.leanDepth, 0.02)
+        assertEquals(deadZone(0.65, config.deadZone, config.deadZoneRamp), partIn.leanDepth, 0.02)
         assertFalse(back.standing)
     }
 

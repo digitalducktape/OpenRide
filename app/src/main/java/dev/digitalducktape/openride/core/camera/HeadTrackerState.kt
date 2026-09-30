@@ -133,6 +133,11 @@ data class HeadTrackerState(
     val leanX: Double = 0.0,
     val leanDepth: Double = 0.0,
     val standing: Boolean = false,
+    /**
+     * The lean before filtering and the dead zone (same units: ±1 = full lock, not clamped), for
+     * debug logging and tuning; 0 when no face was measured. Not sent to games.
+     */
+    val rawLeanX: Double = 0.0,
     val calibration: CalibrationProgress? = null,
     val unavailable: UnavailableReason? = null,
 ) {

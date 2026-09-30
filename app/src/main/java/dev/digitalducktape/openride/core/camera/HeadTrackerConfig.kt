@@ -16,10 +16,12 @@ data class HeadTrackerConfig(
      */
     val filterMinCutoffHz: Double = 0.5,
     /**
-     * How fast the cutoff rises with speed. 0.3 keeps bounce smooth while a deliberate lean
-     * (several lean units per second) still arrives within ~100 ms of the raw signal.
+     * How fast the cutoff rises with speed. Bike run 2 felt capped ("could only go so fast"): at
+     * 0.3 the filter's time constant was ~145-230 ms at the rider's lean speeds. 0.7 halves the
+     * lag of a recorded lean or return (raw halfway -> output halfway: median 67 -> 34 ms, p90
+     * 100 -> 76 ms) while seated wobble and pedal bounce, which are slow, stay filtered.
      */
-    val filterBeta: Double = 0.3,
+    val filterBeta: Double = 0.7,
     val filterDerivativeCutoffHz: Double = 1.0,
     /**
      * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. Bike run 2
@@ -32,7 +34,7 @@ data class HeadTrackerConfig(
      * Soft edge beyond [deadZone]: the output eases in over this much lean instead of starting
      * with a step in slope, so leaving the dead zone is smooth.
      */
-    val deadZoneRamp: Double = 0.3,
+    val deadZoneRamp: Double = 0.4,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 

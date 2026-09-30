@@ -83,6 +83,11 @@ class DefaultHeadTracker(
     config: HeadTrackerConfig = HeadTrackerConfig(),
     private val wallClockMs: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /**
+     * Debug builds only: sees every analysed frame with the state it produced (raw vs filtered
+     * lean), on the camera's thread. Null in release.
+     */
+    private val frameLog: ((timestampMs: Long, face: FaceObservation?, state: HeadTrackerState) -> Unit)? = null,
 ) : HeadTracker {
 
     private val lock = Any()
@@ -104,6 +109,7 @@ class DefaultHeadTracker(
             synchronized(lock) {
                 if (!cameraRunning) return
                 val next = engine.onFrame(timestampMs, face)
+                frameLog?.invoke(timestampMs, face, next)
                 // The per-frame fast path: nothing about availability changed.
                 if (next.unavailable == null) {
                     _state.value = next
