@@ -10,10 +10,13 @@ import kotlinx.coroutines.flow.Flow
  * @param database the app's [RoomDatabase] instance, used only to open the transaction
  *   that [saveRide] needs to write the ride's aggregate row and its full sample series
  *   atomically (PRD T4 AC).
+ * @param gameResultDao mini-games results (#35) for [getGameResults]; `null` (tests that don't
+ *   involve games) reads every ride as having none.
  */
 class RideRepository(
     private val database: RoomDatabase,
     private val rideDao: RideDao,
+    private val gameResultDao: GameResultDao? = null,
 ) {
     /**
      * Writes [ride] and [samples] in a single transaction: either both land, or neither
@@ -39,4 +42,7 @@ class RideRepository(
     suspend fun getRide(rideId: Long): Ride? = rideDao.getById(rideId)
 
     suspend fun getSamples(rideId: Long): List<RideSample> = rideDao.getSamples(rideId)
+
+    /** A game session's per-segment results, in plan order; empty for any other ride. */
+    suspend fun getGameResults(rideId: Long): List<GameResult> = gameResultDao?.getForRide(rideId).orEmpty()
 }

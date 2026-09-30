@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.digitalducktape.openride.ui.common.ExportShare
+import dev.digitalducktape.openride.ui.common.GameBadge
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import dev.digitalducktape.openride.ui.theme.MetricTextStyles
 import java.time.YearMonth
@@ -195,6 +196,7 @@ private fun RideHistoryListItem(row: RideHistoryRow, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            row.gameBadge?.let { GameBadge(it, modifier = Modifier.padding(top = 6.dp)) }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(

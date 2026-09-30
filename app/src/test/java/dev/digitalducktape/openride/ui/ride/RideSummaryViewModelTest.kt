@@ -5,6 +5,7 @@ package dev.digitalducktape.openride.ui.ride
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.digitalducktape.openride.core.data.GameResult
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
@@ -83,6 +84,43 @@ class RideSummaryViewModelTest {
         assertEquals(3, viewModel.samples.value.size)
         assertEquals((0 until 3).toList(), viewModel.samples.value.map { it.tSec })
         assertTrue(viewModel.samples.value.all { it.power == 200 })
+    }
+
+    @Test
+    fun `a game ride loads its badge and segment results`() = runTest {
+        val gameRides = RideRepository(db, db.rideDao(), db.gameResultDao())
+        val rideId = gameRides.saveRide(
+            Ride(
+                profileId = profileId, startEpochMs = 0, durationSec = 1210, avgCadence = 80, maxCadence = 90,
+                avgPower = 150, maxPower = 200, avgResistance = 40, outputKj = 180.0, calories = 173,
+                gamePlan = "just-ride:demo:minutes:20",
+            ),
+            emptyList(),
+        )
+        db.gameResultDao().insertAll(listOf(GameResult(rideId, 0, "demo", "free", "standard", 0, 1200, 900.0, 2, null, false, "{}")))
+        val manager = RideSessionManager(FakeBikeDataSource(), gameRides, backgroundScope) { 0L }
+
+        val viewModel = RideSummaryViewModel(gameRides, profileRepository, manager, rideId)
+        viewModel.load()
+
+        assertEquals("Demo · 20 min", viewModel.gameBadge.value)
+        assertEquals(listOf("1. Demo"), viewModel.gameResults.value.map { it.title })
+        assertEquals(2, viewModel.gameResults.value.single().stars)
+    }
+
+    @Test
+    fun `an ordinary ride has no game results`() = runTest {
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        manager.start(profileId)
+        advanceTimeBy(1_000)
+        runCurrent()
+        val ride = requireNotNull(manager.stop())
+
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, ride.id)
+        viewModel.load()
+
+        assertNull(viewModel.gameBadge.value)
+        assertTrue(viewModel.gameResults.value.isEmpty())
     }
 
     @Test

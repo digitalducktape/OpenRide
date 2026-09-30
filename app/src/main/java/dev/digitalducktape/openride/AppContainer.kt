@@ -88,7 +88,7 @@ class AppContainer(private val applicationContext: Context) {
     }
 
     val rideRepository: RideRepository by lazy {
-        RideRepository(database, database.rideDao())
+        RideRepository(database, database.rideDao(), database.gameResultDao())
     }
 
     /** Whole-database backup/restore to one shareable file (PRD P1-8, T15). */
