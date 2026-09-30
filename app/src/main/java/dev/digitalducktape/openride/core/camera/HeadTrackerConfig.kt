@@ -35,6 +35,19 @@ data class HeadTrackerConfig(
      * with a step in slope, so leaving the dead zone is smooth.
      */
     val deadZoneRamp: Double = 0.4,
+    /**
+     * The lean dead zone fades out while the head moves deliberately ([AdaptiveDeadZone]): bike
+     * run 3's rider felt "a bit of hesitation in the centre" going from far left to right, where
+     * the soft edge's flat middle held the output still for a third of the crossing. A move is
+     * the filtered lean travelling at least [deadZoneMoveOn] (lean units) within
+     * [deadZoneMoveWindowMs]; it ends when the travel drops below [deadZoneMoveOff].
+     */
+    val deadZoneMoveWindowMs: Long = 150,
+    val deadZoneMoveOn: Double = 0.35,
+    val deadZoneMoveOff: Double = 0.1,
+    /** Time constants of the fade: out while moving, back in once still. */
+    val deadZoneFadeOutMs: Long = 40,
+    val deadZoneFadeBackMs: Long = 300,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 
