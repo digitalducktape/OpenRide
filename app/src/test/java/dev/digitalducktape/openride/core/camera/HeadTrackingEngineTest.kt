@@ -135,8 +135,8 @@ class HeadTrackingEngineTest {
         val full = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85))).last().second
         assertTrue("85% lean read ${full.leanX}", full.leanX >= 0.99)
         val partial = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85 * 0.65))).last().second
-        // 0.65 of full lock, less the dead zone: (0.65 - 0.3) / 0.7 = 0.5.
-        assertEquals(0.5, partial.leanX, 0.02)
+        // 0.65 of full lock, through the soft dead zone.
+        assertEquals(deadZone(0.65, config.deadZone, config.deadZoneRamp), partial.leanX, 0.02)
     }
 
     @Test
@@ -170,6 +170,27 @@ class HeadTrackingEngineTest {
         assertTrue(states.all { abs(it.leanX) < 0.05 })
         assertTrue(states.none { it.standing })
         assertTrue("depth during glance: ${states.maxOf { abs(it.leanDepth) }}", states.all { abs(it.leanDepth) < 0.05 })
+    }
+
+    @Test
+    fun `a lean that falls back to the default is used and reported, but not saved as the rider's`() {
+        engine.setMode(TrackerMode.LEAN_X)
+        engine.startCalibration(TrackerMode.LEAN_X, reuse = null)
+        val centreMs = config.centreSettleMs + config.centreCaptureMs
+        val extremeMs = config.extremeSettleMs + config.extremeCaptureMs
+        val script = FrameScript()
+            .hold(centreMs, SEATED)
+            .hold(3 * extremeMs + config.fallbackNoticeMs + 200, SEATED.shifted(dx = -0.02)) // too small x3
+            .hold(extremeMs + 100, SEATED.shifted(dx = RIGHT_LEAN_DX))
+            .hold(200, SEATED)
+        val states = engine.play(script).map { it.second }
+
+        assertTrue(states.any { it.calibration?.retryReason == CalibrationRetryReason.USED_DEFAULT })
+        val last = states.last()
+        assertEquals(TrackerState.TRACKING, last.trackerState)
+        assertEquals(setOf(CalibrationStep.LEFT), last.calibrationDefaults)
+        assertEquals(config.defaultLeftDx, engine.calibration!!.leftDx, 0.0)
+        assertTrue("defaulted extremes must not be saved: $saved", saved.isEmpty())
     }
 
     // --- standing and posture baselines ---------------------------------------------------
@@ -279,7 +300,7 @@ class HeadTrackingEngineTest {
         val back = engine.play(script.hold(1_000, SEATED.shifted(sizeRatio = 0.85))).last().second
         assertEquals(-1.0, back.leanDepth, 0.0)
         val partIn = engine.play(script.hold(2_000, SEATED.shifted(sizeRatio = 1 + 0.2 * 0.85 * 0.65))).last().second
-        assertEquals(0.5, partIn.leanDepth, 0.02)
+        assertEquals(deadZone(0.65, config.deadZone, config.deadZoneRamp), partIn.leanDepth, 0.02)
         assertFalse(back.standing)
     }
 

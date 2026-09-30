@@ -1,6 +1,8 @@
 package dev.digitalducktape.openride.core.camera
 
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AxisMappingTest {
@@ -19,6 +21,36 @@ class AxisMappingTest {
         assertEquals(-0.5, deadZone(-0.65, 0.3), 1e-9)
         assertEquals(1.0, deadZone(1.0, 0.3), 1e-9)
         assertEquals(-1.0, deadZone(-1.0, 0.3), 1e-9)
+    }
+
+    @Test
+    fun `the soft edge eases out of the dead zone with no step in value or slope`() {
+        val zone = 0.15
+        val ramp = 0.3
+        assertEquals(0.0, deadZone(0.15, zone, ramp), 0.0)
+        // Just outside the zone the output is tiny (slope 0 at the edge)...
+        val justOut = deadZone(0.16, zone, ramp)
+        assertTrue("just out $justOut", justOut > 0 && justOut < 1e-3)
+        // ...and it rises monotonically and smoothly to full lock.
+        var previous = 0.0
+        var previousSlope = 0.0
+        for (i in 1..1000) {
+            val x = zone + i * (1 - zone) / 1000
+            val y = deadZone(x, zone, ramp)
+            val slope = (y - previous) / ((1 - zone) / 1000)
+            assertTrue("monotonic at $x", y >= previous)
+            assertTrue("smooth slope at $x", abs(slope - previousSlope) < 0.02 || i == 1)
+            previous = y
+            previousSlope = slope
+        }
+        assertEquals(1.0, deadZone(1.0, zone, ramp), 1e-9)
+        assertEquals(-1.0, deadZone(-1.0, zone, ramp), 1e-9)
+        assertEquals(-deadZone(0.4, zone, ramp), deadZone(-0.4, zone, ramp), 0.0)
+    }
+
+    @Test
+    fun `a zero ramp is the plain rescaled dead zone`() {
+        assertEquals(deadZone(0.65, 0.3), deadZone(0.65, 0.3, 0.0), 0.0)
     }
 
     @Test

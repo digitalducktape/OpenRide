@@ -138,6 +138,76 @@ class CalibrationSequenceTest {
         assertTrue(seq.run(script).last() is Outcome.Completed)
     }
 
+    // --- the retry cap -------------------------------------------------------------------------
+
+    @Test
+    fun `a lean that stays too small falls back to the default after three attempts`() {
+        val seq = fullLeanX()
+        val tooSmall = SEATED.shifted(dx = -0.02)
+        val script = FrameScript()
+        seq.run(script.hold(centreMs, SEATED).hold(2 * extremeMs + 33, tooSmall))
+        assertEquals(3, seq.progress.attempt)
+        assertEquals(CalibrationRetryReason.TOO_SMALL, seq.progress.retryReason)
+
+        // The third failure ends the step with a notice instead of a fourth attempt...
+        seq.run(script.hold(extremeMs, tooSmall))
+        assertEquals(CalibrationStep.LEFT, seq.progress.step)
+        assertEquals(CalibrationRetryReason.USED_DEFAULT, seq.progress.retryReason)
+        assertEquals(3, seq.progress.attempt)
+        // ...that lasts the notice time, then the next step starts.
+        seq.run(script.hold(config.fallbackNoticeMs + 33, SEATED))
+        assertEquals(CalibrationStep.RIGHT, seq.progress.step)
+        assertEquals(1, seq.progress.attempt)
+
+        val done = seq.run(script.hold(extremeMs, SEATED.shifted(dx = RIGHT_LEAN_DX)).hold(100, SEATED))
+        val result = (done.last() as Outcome.Completed).result
+        assertEquals(config.defaultLeftDx, result.leftDx!!, 0.0)
+        assertEquals(RIGHT_LEAN_DX, result.rightDx!!, 0.005)
+        assertEquals(setOf(CalibrationStep.LEFT), result.usedDefaults)
+    }
+
+    @Test
+    fun `a step that keeps failing uses the rider's previous extreme when there is one`() {
+        val previous = HeadCalibration(leftDx = -0.19, rightDx = 0.18, calibratedAtEpochMs = 1L)
+        val seq = CalibrationSequence(CalibrationSequence.stepsFor(TrackerMode.LEAN_X, false), config, fallback = previous)
+        val script = FrameScript()
+            .hold(centreMs, SEATED)
+            .hold(extremeMs, SEATED.shifted(dx = LEFT_LEAN_DX))
+            // Right keeps leaning left: wrong direction three times.
+            .hold(3 * extremeMs, SEATED.shifted(dx = LEFT_LEAN_DX))
+            .hold(config.fallbackNoticeMs + 100, SEATED)
+        val result = (seq.run(script).last() as Outcome.Completed).result
+        assertEquals(0.18, result.rightDx!!, 0.0)
+        assertEquals(setOf(CalibrationStep.RIGHT), result.usedDefaults)
+    }
+
+    @Test
+    fun `an unstable centre falls back to the median of its last attempt after three tries`() {
+        val seq = fullLeanX()
+        seq.run(FrameScript().hold(3 * centreMs + 33) { t -> SEATED.shifted(dx = bounce(t, 0.06, 1.0)) })
+        assertEquals(CalibrationRetryReason.USED_DEFAULT, seq.progress.retryReason)
+        assertEquals(CalibrationStep.CENTRE, seq.progress.step)
+    }
+
+    @Test
+    fun `a capped calibration is bounded in time`() {
+        // Every step failing takes at most 3 attempts plus the notice: lean_x worst case is
+        // 3 x 3 s + 2 x 3 x 2.5 s + 3 x 1.5 s = 28.5 s, and then it tracks.
+        val seq = fullLeanX()
+        val wobbling = FrameScript().hold(3 * centreMs + config.fallbackNoticeMs + 33) { t -> SEATED.shifted(dx = bounce(t, 0.06, 1.0)) }
+        val outcomes = seq.run(wobbling.hold(2 * (3 * extremeMs + config.fallbackNoticeMs) + 1_000, SEATED))
+        assertTrue(outcomes.last() is Outcome.Completed)
+        val result = (outcomes.last() as Outcome.Completed).result
+        assertEquals(setOf(CalibrationStep.CENTRE, CalibrationStep.LEFT, CalibrationStep.RIGHT), result.usedDefaults)
+    }
+
+    @Test
+    fun `no-face attempts still end calibration as unavailable, not with defaults`() {
+        val seq = fullLeanX()
+        val outcomes = seq.run(FrameScript().hold(2 * centreMs + 66, null))
+        assertTrue(outcomes.last() is Outcome.FailedNoFace)
+    }
+
     @Test
     fun `a lean that is too small is retried`() {
         val seq = fullLeanX()

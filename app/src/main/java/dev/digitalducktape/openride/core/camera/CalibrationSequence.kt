@@ -14,6 +14,8 @@ data class CalibrationResult(
     val rightDx: Double? = null,
     val inRatio: Double? = null,
     val backRatio: Double? = null,
+    /** Steps that fell back to a previous or default value after too many attempts. */
+    val usedDefaults: Set<CalibrationStep> = emptySet(),
 )
 
 /**
@@ -26,12 +28,18 @@ data class CalibrationResult(
  *   the [HeadTrackerConfig.maxNoFaceAttempts]th such failure ends calibration with [Outcome.FailedNoFace]
  * - centre wobbling more than [HeadTrackerConfig.maxCentreSd] → retry, [CalibrationRetryReason.UNSTABLE]
  * - a lean too small, or towards the wrong side → retry with the matching reason
- * Unstable and too-small retries are unlimited: the rider is visible, and the prompt says what to
- * fix. Calibration never silently accepts a bad centre.
+ * Any other failure retries the step up to [HeadTrackerConfig.maxAttemptsPerStep] attempts in
+ * all. After that the step falls back instead of retrying forever: extremes from [fallback] (the
+ * rider's previous calibration) or the config defaults, and for the centre [fallbackCentre] or
+ * the median of its last attempt. The step then reports [CalibrationRetryReason.USED_DEFAULT] for
+ * [HeadTrackerConfig.fallbackNoticeMs] before moving on, and the result lists it in
+ * [CalibrationResult.usedDefaults], so a fallback is never silent.
  */
 class CalibrationSequence(
     val steps: List<CalibrationStep>,
     private val config: HeadTrackerConfig,
+    private val fallback: HeadCalibration? = null,
+    private val fallbackCentre: CentreBaseline? = null,
 ) {
     sealed interface Outcome {
         data object InProgress : Outcome
@@ -57,6 +65,9 @@ class CalibrationSequence(
     private var rightDx: Double? = null
     private var inRatio: Double? = null
     private var backRatio: Double? = null
+    private val usedDefaults = mutableSetOf<CalibrationStep>()
+    /** While a fallen-back step shows its notice: when the notice ends. */
+    private var noticeUntilMs: Long? = null
 
     private var outcome: Outcome = Outcome.InProgress
 
@@ -75,6 +86,17 @@ class CalibrationSequence(
 
         val start = stepStartMs ?: timestampMs.also { stepStartMs = it }
         val step = steps[stepIndex]
+
+        val noticeEnd = noticeUntilMs
+        if (noticeEnd != null) {
+            if (timestampMs < noticeEnd) {
+                lastFraction = (1.0 - (noticeEnd - timestampMs).toDouble() / config.fallbackNoticeMs).coerceIn(0.0, 1.0)
+                return Outcome.InProgress
+            }
+            noticeUntilMs = null
+            return advance(timestampMs)
+        }
+
         val settleMs = if (step == CalibrationStep.CENTRE) config.centreSettleMs else config.extremeSettleMs
         val captureMs = if (step == CalibrationStep.CENTRE) config.centreCaptureMs else config.extremeCaptureMs
         val elapsed = timestampMs - start
@@ -91,29 +113,60 @@ class CalibrationSequence(
 
         // The step's time is up: judge it. This frame is the first of whatever comes next.
         val failure = evaluate(step)
-        if (failure == null) {
-            if (stepIndex == steps.lastIndex) {
-                outcome = Outcome.Completed(
-                    CalibrationResult(centre!!, leftDx, rightDx, inRatio, backRatio),
-                )
-                return outcome
-            }
-            stepIndex++
-            attempt = 1
-            retryReason = null
-        } else {
-            if (failure == CalibrationRetryReason.NO_FACE && ++noFaceFailures >= config.maxNoFaceAttempts) {
-                outcome = Outcome.FailedNoFace
-                return outcome
-            }
-            attempt++
-            retryReason = failure
+        if (failure == null) return advance(timestampMs)
+        if (failure == CalibrationRetryReason.NO_FACE && ++noFaceFailures >= config.maxNoFaceAttempts) {
+            outcome = Outcome.FailedNoFace
+            return outcome
         }
+        if (failure != CalibrationRetryReason.NO_FACE && attempt >= config.maxAttemptsPerStep) {
+            useFallback(step)
+            retryReason = CalibrationRetryReason.USED_DEFAULT
+            noticeUntilMs = timestampMs + config.fallbackNoticeMs
+            lastFraction = 0.0
+            return Outcome.InProgress
+        }
+        attempt++
+        retryReason = failure
+        restartStep(timestampMs)
+        return Outcome.InProgress
+    }
+
+    /** The current step is done (measured or fallen back): the next step, or the result. */
+    private fun advance(timestampMs: Long): Outcome {
+        if (stepIndex == steps.lastIndex) {
+            outcome = Outcome.Completed(
+                CalibrationResult(centre!!, leftDx, rightDx, inRatio, backRatio, usedDefaults.toSet()),
+            )
+            return outcome
+        }
+        stepIndex++
+        attempt = 1
+        retryReason = null
+        restartStep(timestampMs)
+        return Outcome.InProgress
+    }
+
+    private fun restartStep(timestampMs: Long) {
         stepStartMs = timestampMs
         lastFraction = 0.0
         captureFrames = 0
         captured.clear()
-        return Outcome.InProgress
+    }
+
+    private fun useFallback(step: CalibrationStep) {
+        usedDefaults += step
+        when (step) {
+            CalibrationStep.CENTRE -> centre = fallbackCentre ?: CentreBaseline(
+                cx = median(captured.map { it.cx }),
+                cy = median(captured.map { it.cy }),
+                size = median(captured.map { it.size }),
+                pitchDeg = median(captured.map { it.pitchDeg }),
+            )
+            CalibrationStep.LEFT -> leftDx = fallback?.leftDx ?: config.defaultLeftDx
+            CalibrationStep.RIGHT -> rightDx = fallback?.rightDx ?: config.defaultRightDx
+            CalibrationStep.IN -> inRatio = fallback?.inRatio
+            CalibrationStep.BACK -> backRatio = fallback?.backRatio
+        }
     }
 
     /** Returns null if [step] measured successfully (and records it), else why it must repeat. */

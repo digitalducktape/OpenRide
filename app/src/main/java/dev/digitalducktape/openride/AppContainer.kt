@@ -3,6 +3,7 @@ package dev.digitalducktape.openride
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.content.ContextCompat
@@ -12,7 +13,10 @@ import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
 import dev.digitalducktape.openride.core.camera.CameraXFaceSource
 import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
+import dev.digitalducktape.openride.core.camera.FaceObservation
+import dev.digitalducktape.openride.core.camera.HeadFixtureCsv
 import dev.digitalducktape.openride.core.camera.HeadTracker
+import dev.digitalducktape.openride.core.camera.HeadTrackerState
 import dev.digitalducktape.openride.core.camera.InMemoryHeadCalibrationStore
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
@@ -142,6 +146,25 @@ class AppContainer(private val applicationContext: Context) {
                     PackageManager.PERMISSION_GRANTED
             },
             scope = containerScope,
+            frameLog = if (BuildConfig.DEBUG) ::logHeadFrame else null,
+        )
+    }
+
+    /**
+     * Debug builds: one line per camera frame with the raw and filtered lean, and the face as a
+     * fixture CSV row (numbers only) so a ride can be replayed in the unit tests. Silent unless
+     * enabled: `adb shell setprop log.tag.HeadTrackerFrames VERBOSE`.
+     */
+    private fun logHeadFrame(timestampMs: Long, face: FaceObservation?, state: HeadTrackerState) {
+        if (!Log.isLoggable(HEAD_FRAMES_TAG, Log.VERBOSE)) return
+        Log.v(
+            HEAD_FRAMES_TAG,
+            String.format(
+                java.util.Locale.US,
+                "raw=%+.3f lean=%+.3f depth=%+.3f standing=%d state=%d fixture=%s",
+                state.rawLeanX, state.leanX, state.leanDepth, if (state.standing) 1 else 0, state.trackerState.code,
+                HeadFixtureCsv.format(HeadFixtureCsv.Row(timestampMs, "live", face, bikeDataSource.metrics.value.cadenceRpm)),
+            ),
         )
     }
 
@@ -249,6 +272,8 @@ class AppContainer(private val applicationContext: Context) {
  * getting normal [ViewModel] lifecycle/state-retention behavior from Compose Navigation's
  * per-destination [androidx.lifecycle.ViewModelStoreOwner].
  */
+private const val HEAD_FRAMES_TAG = "HeadTrackerFrames"
+
 fun <T : ViewModel> viewModelFactory(create: () -> T): ViewModelProvider.Factory =
     object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

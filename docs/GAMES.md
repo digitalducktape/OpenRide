@@ -90,6 +90,11 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
   - `retry_reason`: `""` on a first attempt, otherwise why the step is repeated: `unstable`
     (hold still), `no_face` (look at the screen), `too_small` (lean a bit further) or
     `wrong_direction`.
+  - `used_default`: the step failed 3 times, so it won't be retried again. Calibration uses the
+    rider's previous value for it (or a default lean) and moves on after this is shown for 1.5 s
+    (`fraction` counts through that). Say so, e.g. "Using your usual lean — recalibrate any
+    time". No-face failures don't count towards this: two of those end calibration as
+    unavailable, as before.
   - Calibration has ended when `tracker_state` leaves 2: 3 (tracking) on success, or 0 when the
     camera is unavailable (no face found after two tries).
 - `session_finished(summary_json)`: `{ride_id, results:[…], totals, bests:{…}}`, sent after Kotlin has
@@ -130,6 +135,9 @@ playable this way.
   games in the session track straight away.
 - `lean_2d` games that want depth call `request_calibration("lean_2d")`, unless depth was
   calibrated earlier. Without depth extremes `lean_depth` reads 0 and left/right still work.
+- A calibration can't run away: each step gets at most 3 attempts before it falls back
+  (`used_default`). The worst case for `lean_x` is about 28 s. The fallback values are used but
+  never saved as the rider's.
 - The camera stops when the session finishes or the rider leaves games.
 - Face lost: the lean holds for 0.5 s, then eases to centre, and `tracker_state` becomes 4 after 3 s.
   Standing needs 0.5 s to enter and 1.5 s to leave.
