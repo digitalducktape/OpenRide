@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.digitalducktape.openride.games.session.GameLabels
 import dev.digitalducktape.openride.ui.common.ExportShare
+import dev.digitalducktape.openride.ui.common.GameBadge
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import dev.digitalducktape.openride.ui.theme.MetricTextStyles
 import dev.digitalducktape.openride.ui.theme.OpenRideColors
@@ -54,6 +56,8 @@ fun RideSummaryScreen(
     val samples by viewModel.samples.collectAsState()
     val suggestedFtp by viewModel.suggestedFtp.collectAsState()
     val ftpApplied by viewModel.ftpApplied.collectAsState()
+    val gameBadge by viewModel.gameBadge.collectAsState()
+    val gameResults by viewModel.gameResults.collectAsState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var selectedMetric by remember { mutableStateOf(RideMetric.Output) }
@@ -96,6 +100,7 @@ fun RideSummaryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp),
                         )
+                        gameBadge?.let { GameBadge(it, modifier = Modifier.padding(top = 8.dp)) }
                     }
                 }
 
@@ -119,6 +124,15 @@ fun RideSummaryScreen(
                             .fillMaxWidth()
                             .padding(top = 20.dp),
                     )
+
+                    if (gameResults.isNotEmpty()) {
+                        GameResultsList(
+                            rows = gameResults,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 24.dp),
+                        )
+                    }
 
                     ExportRow(
                         onExportTcx = {
@@ -157,6 +171,48 @@ fun RideSummaryScreen(
                 modifier = Modifier.padding(top = 40.dp),
             ) {
                 Text("Done")
+            }
+        }
+    }
+}
+
+/** A game session's segments (#35): each game, its role and difficulty, score and stars. */
+@Composable
+private fun GameResultsList(rows: List<GameLabels.ResultRow>, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Games",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = row.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = row.detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (!row.skipped) {
+                    Text(
+                        text = "★".repeat(row.stars) + "☆".repeat(3 - row.stars),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = OpenRideColors.Accent,
+                    )
+                }
             }
         }
     }

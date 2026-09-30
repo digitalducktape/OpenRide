@@ -8,7 +8,17 @@ extends RefCounted
 const FIELD := Vector2(1920, 1080)
 const PLAYER_Y := 930.0
 const PLAYER_HALF_WIDTH := 55.0
+## The player's triangle around (player_x, PLAYER_Y). Balls hit it only when they touch this
+## shape, so a ball that visibly misses misses: on the bike, a box as wide as the triangle's base
+## counted balls passing the tip up to 24 px clear of it.
+const PLAYER_SHAPE := [Vector2(0, -50), Vector2(-PLAYER_HALF_WIDTH, 40), Vector2(PLAYER_HALF_WIDTH, 40)]
 const EDGE := 120.0  ## full lean puts the player this far from the screen edge
+## Lean → position gain. On the bike (run 2) the player crossed the screen in about 1.2 s and
+## moved at a median 0.68 lean units/s, limited by how far the head must travel. With 1.3 the
+## edge comes at lean_x 0.77, which is about 85% of the tracker's full-lock head lean under both
+## the old dead zone (0.3, linear) and #33's retune (0.15 with a 0.4 ease-in ramp): the retune
+## changes the feel near centre, not the travel to the edge, so the same gain still applies.
+const STEERING_GAIN := 1.3
 const BALL_RADIUS := 40.0
 const BASE_SPEED := 300.0  ## px/s at 0 rpm
 const SPEED_PER_RPM := 5.0
@@ -44,9 +54,10 @@ func _init(seed_value: int, difficulty := "standard", floor_rpm := -1.0) -> void
 	_spawn_left = 0.5
 
 
-## The player's x for a lean from -1 (left) to +1 (right).
+## The player's x for a lean from -1 (left) to +1 (right), with STEERING_GAIN: the screen edge
+## comes at 1 / STEERING_GAIN of the tracker's full lock.
 static func x_for_lean(lean: float) -> float:
-	return FIELD.x / 2 + clampf(lean, -1.0, 1.0) * (FIELD.x / 2 - EDGE)
+	return FIELD.x / 2 + clampf(lean * STEERING_GAIN, -1.0, 1.0) * (FIELD.x / 2 - EDGE)
 
 
 static func fall_speed(cadence: float) -> float:
@@ -66,12 +77,11 @@ func step(delta: float, lean: float, cadence: float) -> Array[Dictionary]:
 	var dy := fall_speed(cadence) * delta
 	var kept: Array[Vector2] = []
 	for ball in balls:
-		var before := ball.y
 		ball.y += dy
-		if _crosses_player(before, ball.y) and absf(ball.x - player_x) < PLAYER_HALF_WIDTH + BALL_RADIUS:
+		if touches_player(ball, player_x):
 			hits += 1
 			streak = 0
-			events.append({"type": "hit", "at": Vector2(ball.x, PLAYER_Y)})
+			events.append({"type": "hit", "at": ball})
 		elif ball.y > FIELD.y + BALL_RADIUS:
 			dodged += 1
 			var points := 0.0
@@ -86,8 +96,17 @@ func step(delta: float, lean: float, cadence: float) -> Array[Dictionary]:
 	return events
 
 
-func _crosses_player(before: float, after: float) -> bool:
-	return before < PLAYER_Y and after >= PLAYER_Y
+## Whether a ball at `ball` overlaps the player's triangle at `x`.
+static func touches_player(ball: Vector2, x: float) -> bool:
+	var local := ball - Vector2(x, PLAYER_Y)
+	if Geometry2D.is_point_in_polygon(local, PackedVector2Array(PLAYER_SHAPE)):
+		return true
+	for i in 3:
+		var a: Vector2 = PLAYER_SHAPE[i]
+		var b: Vector2 = PLAYER_SHAPE[(i + 1) % 3]
+		if local.distance_to(Geometry2D.get_closest_point_to_segment(local, a, b)) < BALL_RADIUS:
+			return true
+	return false
 
 
 func _spawn_x() -> float:

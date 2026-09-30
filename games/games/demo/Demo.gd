@@ -11,6 +11,8 @@ const MUSIC_STYLE := {
 	# Drums and bass always; harmony and lead come in as cadence nears the target.
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
 }
+## Logs lean and ball outcomes every frame, for steering checks on the bike (docs/GAMES.md).
+const TRACE_LEAN := true
 const STRIPES := 12
 const BACKGROUND := Color(0.08, 0.09, 0.16)
 const BALL_COLOR := Color(1.0, 0.45, 0.2)
@@ -40,11 +42,16 @@ func info() -> GameInfo:
 	i.tracker_mode = "lean_x"
 	i.effort_in_just_ride = true
 	i.stars_per_minute = true
-	# Points per minute. 3 stars needs about 1.3× effort: a perfect run at 1.0× stays below.
+	# Points per minute of gameplay, against a perfect run at 1.0× (every ball dodged at the
+	# full streak bonus): 750 / 1000 / 1286 a minute on easy / standard / hard.
+	#   1 star: about 20% of that, for play that scores at all steadily. The bike's first
+	#     rides (about 300 a minute, pedalling near the cadence floor) earned nothing at 30%.
+	#   2 stars: about 55%, for dodging most balls above the floor.
+	#   3 stars: above a perfect 1.0× run, so it needs the effort multiplier (about 1.3×).
 	i.star_thresholds = {
-		"easy": [220, 480, 760],
-		"standard": [300, 650, 1020],
-		"hard": [390, 850, 1300],
+		"easy": [150, 410, 760],
+		"standard": [200, 550, 1020],
+		"hard": [260, 700, 1300],
 	}
 	return i
 
@@ -69,7 +76,7 @@ func _ready() -> void:
 		_stripes.append(stripe)
 	_ball_texture = _circle_texture(int(DemoLogic.BALL_RADIUS), BALL_COLOR)
 	_player = Polygon2D.new()
-	_player.polygon = PackedVector2Array([Vector2(0, -50), Vector2(-DemoLogic.PLAYER_HALF_WIDTH, 40), Vector2(DemoLogic.PLAYER_HALF_WIDTH, 40)])
+	_player.polygon = PackedVector2Array(DemoLogic.PLAYER_SHAPE)
 	_player.color = PLAYER_COLOR
 	_player.position = Vector2(DemoLogic.FIELD.x / 2, DemoLogic.PLAYER_Y)
 	add_child(_player)
@@ -99,7 +106,16 @@ func _on_prepare(seg: Dictionary) -> void:
 
 
 func _on_frame(delta: float) -> void:
-	for event in logic.step(delta, InputBus.lean_x, InputBus.cadence):
+	var events := logic.step(delta, InputBus.lean_x, InputBus.cadence)
+	if TRACE_LEAN:
+		# Steering diagnosis on the bike: every frame's lean and position, and each ball's outcome.
+		print("OPENRIDE_GAMES lean t=%d x=%+.3f px=%.0f tr=%d" % [
+			Time.get_ticks_msec(), InputBus.lean_x, logic.player_x, InputBus.tracker_state])
+		for event in events:
+			if event.type != "spawn":
+				print("OPENRIDE_GAMES ball %s t=%d bx=%.0f px=%.0f" % [
+					event.type, Time.get_ticks_msec(), event.at.x, logic.player_x])
+	for event in events:
 		match event.type:
 			"dodge":
 				if award(event.points) > 0.0:

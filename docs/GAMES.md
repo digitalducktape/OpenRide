@@ -31,7 +31,7 @@ game and every builder depends on:
 | `games/assets/SOURCES.md` | Source, author and licence of every asset |
 | `app/.../games/GameHostActivity.kt` | Hosts the engine |
 | `app/.../games/bridge/` | The `OpenRideBridge` plugin, the app-scoped `GameBridge`, the input frame and the JSON messages |
-| `app/.../games/session/StubGameSession.kt` | Walks a plan over the bridge without recording anything, until `GameSessionManager` (#35) replaces it |
+| `app/.../games/session/` | `GameSessionManager` (runs and records sessions), `SessionPlan` and its builders, `GameCatalog` (Kotlin's copy of each game's declarations), `GameAudioPrefs` |
 
 Games talk to Kotlin only through the `InputBus` and `Session` autoloads, never through the
 `OpenRideBridge` singleton directly.
@@ -62,6 +62,7 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 
 - `session_started(plan_json)`: `{kind: circuit | just_ride, plan_id, difficulty, total_sec,
   segments:[{game_id, role, duration_sec}]}`. Sent once; it drives the circuit progress strip.
+  `total_sec` includes every intro card, and is `-1` for an open-ended plan.
 - `segment_started(segment_json)`: `{index, count, game_id, duration_sec, intro_sec, end_mode, role,
   difficulty, effort, seed, audio:{music, music_volume, sfx_volume}, params:{…}}`.
   - `intro_sec`: Godot shows the intro card for this long (10 s in circuits and at session start),
@@ -79,18 +80,44 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 - `segment_ending()`: the timer ran out. The game must call `segment_finished` within 5 s, or Kotlin
   records a zero-score result.
 - `session_paused()`, `session_resumed()`: from auto-pause on freewheel or a rider's pause request.
-- `calibration_progress(step, fraction)`: drives the calibration UI.
+- `calibration_progress(step, fraction, step_index, step_count, attempt, retry_reason)`: drives the
+  calibration UI, sent as the head tracker's calibration advances (while `tracker_state` is 2).
+  - `step` ∈ `centre | left | right | in | back`: the pose to hold ("sit centred", "lean
+    left", "lean right", and for `lean_2d` "lean in", "sit back").
+  - `fraction`: 0..1 through the current step. It restarts from 0 on a retry.
+  - `step_index`, `step_count`: the step's 0-based position in this calibration. `step_count`
+    is 1 when only the centre is re-taken (the rider's extremes from earlier today are reused),
+    3 for `lean_x` and 5 for `lean_2d`.
+  - `attempt`: 1 for the first try at this step, then 2, 3… on retries.
+  - `retry_reason`: `""` on a first attempt, otherwise why the step is repeated: `unstable`
+    (hold still), `no_face` (look at the screen), `too_small` (lean a bit further) or
+    `wrong_direction`.
+  - `used_default`: the step failed 3 times, so it won't be retried again. Calibration uses the
+    rider's previous value for it (or a default lean) and moves on after this is shown for 1.5 s
+    (`fraction` counts through that). Say so, e.g. "Using your usual lean — recalibrate any
+    time". No-face failures don't count towards this: two of those end calibration as
+    unavailable, as before.
+  - Calibration has ended when `tracker_state` leaves 2: 3 (tracking) on success, or 0 when the
+    camera is unavailable (no face found after two tries).
 - `session_finished(summary_json)`: `{ride_id, results:[…], totals, bests:{…}}`, sent after Kotlin has
   saved the ride. Godot shows the summary, then calls `request_exit()`.
+  - `ride_id` is null when nothing was recorded (no active rider, or another ride in progress).
+  - `results` are the `segment_finished` payloads in plan order, with zero results for games
+    that didn't report.
+  - `totals`: `{score, stars, segments, elapsed_sec}`; `elapsed_sec` is the ride's duration.
+  - `bests`: `{"score": true}` and/or `{"stars": true}` when the session's total beat the rider's
+    best at the same plan and difficulty (a first scoring session counts); `{}` otherwise.
 
 **Godot → Kotlin methods:**
 
 - `segment_finished(result_json)`: `{game_id, score, stars (0-3), won (bool|null), skipped (bool),
   stats:{effort_avg, …}}`. A skip is reported as `skipped: true` during the intro card; Kotlin then
   advances to the next segment.
-- `request_calibration(mode)`: `mode` ∈ `lean_x | lean_2d`.
+- `request_calibration(mode)`: `mode` ∈ `lean_x | lean_2d`. The rider asked to recalibrate:
+  every step runs again.
 - `set_tracker_mode(mode)`: `off | lean_x | lean_2d | lean_stand`, sent by `Session` from each game's
-  declaration. The camera only runs when not `off`.
+  declaration. The camera only runs when not `off`. The first camera mode of a session starts a
+  calibration by itself (see "Head tracker" below).
 - `request_pause()`, `request_resume()`: the rider's pause button.
 - `request_end()`: the rider ends the session (early, or an open-ended Just Ride). Kotlin stops and saves
   the ride, then sends `session_finished`.
@@ -104,22 +131,28 @@ synthesises frames from the keyboard and `Session` plays a local plan (a Just Ri
 depth, `+`/`-` = cadence, `[`/`]` = resistance, Space = stand, P = pause, Esc = end session. Every game must be fully
 playable this way.
 
+**Head tracker** (`core/camera/`, #33), as the bridge sees it:
 
-### Proposed additions (pending spec update)
-
-These come from the HeadTracker work (#33). They are **not part of v1 yet**. The foundation
-does not implement them, and nothing may depend on them until the contract above is edited to
-include them.
-
-- `calibration_progress(step, fraction)` sends `step` as a string: `centre`, `left`, `right`,
-  `in` or `back`.
-- It should also carry:
-  - `step_index`
-  - `step_count`
-  - `attempt`
-  - `retry_reason`: `unstable`, `no_face`, `too_small` or `wrong_direction`
-
-Until the HeadTracker is wired in, bridge fields 6-9 read `0` and `tracker_state` reads `0` (off).
+- Fields 6-9 always show the tracker's latest state. They read `0`, with `tracker_state` 0 (off),
+  whenever the camera isn't running.
+- Every session starts by forgetting the last session's centre. The centre is re-taken in every
+  session, because a silently off-centre calibration was the camera spike's worst failure.
+- The first `set_tracker_mode` with a camera mode in a session starts a calibration at once
+  (`tracker_state` 2). It re-takes only the centre (3 s) if the rider's lean extremes were
+  measured earlier the same day, otherwise every step (about 8 s for `lean_x`). Later camera
+  games in the session track straight away.
+- `lean_2d` games that want depth call `request_calibration("lean_2d")`, unless depth was
+  calibrated earlier. Without depth extremes `lean_depth` reads 0 and left/right still work.
+- A calibration can't run away: each step gets at most 3 attempts before it falls back
+  (`used_default`). The worst case for `lean_x` is about 28 s. The fallback values are used but
+  never saved as the rider's.
+- The camera stops when the session finishes or the rider leaves games.
+- Face lost: the lean holds for 0.5 s, then eases to centre, and `tracker_state` becomes 4 after 3 s.
+- Looking away counts as face lost. The detector often keeps the face when the rider turns the head
+  from the screen, so the tracker also compares head yaw with the range the rider showed while
+  calibrating (plus 25°). After 300 ms beyond it, steering holds and eases to centre, and
+  `tracker_state` becomes 4 as above. It resumes once the rider has faced the screen for 300 ms.
+  Standing needs 0.5 s to enter and 1.5 s to leave.
 
 ### Implementation notes
 
@@ -128,7 +161,7 @@ These describe how the foundation (#32) implements v1. They don't change the con
 - **Wire format.** Each JSON payload is one `String` argument, and `Session` parses and
   stringifies it. Godot's JSON parser returns every number as a float (`1.0`), so Kotlin
   accepts whole numbers written either way (`"stars": 3.0`).
-  - `calibration_progress` is `(String, float)`.
+  - `calibration_progress` is `(String, float, int, int, int, String)`.
   - Plugin method names are the contract's snake_case names.
 - **Readiness.** The contract has no "ready" method. Kotlin sends `session_started` after the
   first `get_input_frame()` poll once a session is attached. By then the autoloads' `_ready`
@@ -144,10 +177,10 @@ These describe how the foundation (#32) implements v1. They don't change the con
   - It never quits (`application/config/quit_on_go_back=false`).
   - During a session it calls `request_pause()`.
   - After the summary it calls `request_exit()`.
-- **The stub.** Until #35, `StubGameSession` plays an open-ended Just Ride of the `demo`
-  game. It sends `ride_id: null` and records nothing. `request_calibration` and
-  `set_tracker_mode` are logged, not acted on. It sets `effort` only for work segments, so its
-  Just Ride shows no effort badge; #35 applies `effort_in_just_ride`.
+- **The session engine** is `GameSessionManager` (app-scoped, #35). Its tracker commands go
+  through `TrackerLink` (`games/bridge/`). See "Sessions and recording" below.
+- **Head-tracker fields** come from `AppContainer.headTracker` on every poll
+  (`HeadTrackerState.toTrackerReading()`).
 
 ## Hosting the engine
 
@@ -183,6 +216,66 @@ So the foundation uses the spec's fallback: **the host stays alive for the app's
 The `OpenRideApplication` owns the `AppContainer`, so the games host shares the app's database,
 sensor binding and ride session.
 
+`GameHostActivity.intent(context, request)` starts games with a `SessionRequest` (a Just Ride
+or a circuit, and a difficulty). Each entry calls `GameSessionManager.begin(request)` and
+attaches it to the bridge. A session still running when games are entered again is finished
+and its ride saved first.
+
+## Sessions and recording
+
+`GameSessionManager` (`app/.../games/session/`, #35) is the Kotlin side of every session. It
+is app-scoped, so a ride is saved even after the host has gone to the back.
+
+**Plans.** When Godot is ready, it turns the request into a `SessionPlan` with the active
+rider's FTP (`SessionPlans`):
+
+| Request | Plan (`plan_id`, also `Ride.gamePlan`) | Segment |
+| --- | --- | --- |
+| Just Ride, timed N min | `just-ride:<game>:minutes:<N>` | `role: free`, N × 60 s, the game's `timedEndMode` (normally `timer`) |
+| Just Ride, N rounds | `just-ride:<game>:rounds:<N>` | `role: free`, N × the game's `roundSec`, `end_mode: game`, `params.rounds = N` |
+| Just Ride, open-ended | `just-ride:<game>:open` | `role: free`, `duration_sec: -1`, `end_mode: game` |
+| Circuit | `circuit-20`, `circuit-30`, `circuit-45` | the preset's slots (`CircuitPresets`), `end_mode: timer` |
+
+- Lengths are clamped to the game's limits; a mode the game doesn't support is refused.
+- Circuit presets are data. Until a preset's games exist, their slots play the demo (#37).
+- `effort` is true for work segments, and for Just Rides of games declaring
+  `effort_in_just_ride`.
+- Kotlin keeps its own copy of each game's declarations in `GameCatalog`. **Adding a game
+  means adding its `GameDeclaration` there too**, matching its `info()`.
+
+**Params.** Every segment's `params` carry `ftp_watts` and `ftp_is_default` (true when the
+rider has no FTP, so 150 W was used and the hub should nudge), plus one power figure:
+
+- work, and Just Rides of work games: `target_watts` = 90 / 105 / 120 % of FTP for easy /
+  standard / hard;
+- recovery: `power_cap_watts` = 60 % of FTP; warm-up and cool-down: 65 %. Difficulty never
+  moves a cap. Recovery games use their own params for difficulty.
+
+Game-specific params come from the game's `GameDeclaration.params` (the demo sends
+`cadence_floor`).
+
+**Audio.** `segment.audio` is decided once per session from `GameAudioPrefs`. With game music
+on "auto" (the default), `music` is false while `AudioManager.isMusicActive()`. Effects always
+play. The hub (#38) will store the setting and volumes; until then the defaults apply.
+
+**Recording.** The ride goes through the app's own `RideSessionManager`, so it is an ordinary
+ride in History, exports and backups:
+
+- It starts when the session starts and records through intro cards.
+- Freewheel auto-pause applies. A rider's pause (`request_pause`) pauses the ride too. Either
+  kind freezes the session clock and sends `session_paused` / `session_resumed`.
+- A session with under a minute of gameplay (intro cards don't count), or with no pedalling
+  at all, is discarded rather than saved, and `session_finished` carries `ride_id: null`.
+  Normal rides have no such rule: they're only ever ended deliberately.
+- Otherwise, when the session finishes, the ride is saved with `gamePlan`, then one `game_results` row
+  per segment (`startSec` on the session clock, `durationSec` of gameplay). Then the ride
+  manager returns to idle, so the app's next ride can start.
+- `GameResultDao` answers personal bests per rider (per game, plan and difficulty), the
+  household leaderboard per game, and a plan's best session. Skipped segments never count.
+- The ride summary lists each segment's result, and History shows a game badge.
+- Room schema 6 adds these (`MIGRATION_5_6`), with `Profile.headCalibration` for the head
+  tracker's saved extremes.
+
 The Godot AAR declares androidx `FileProvider` at `${applicationId}.fileprovider`, and Godot's
 `GodotIO` hard-codes that authority. So the app's own provider is the `OpenRideFileProvider`
 subclass at `${applicationId}.files`, and each provider keeps its own paths file.
@@ -201,9 +294,11 @@ so a game only plays. None of this changes the Bridge contract.
 2. **`segment_started`**: it does the following, in order.
    - It loads `GameRegistry`'s scene for `game_id` and makes it the current scene. An unknown
      `game_id` is reported as skipped.
-   - It calls `set_tracker_mode` with the game's `tracker_mode`.
-   - It calls `request_calibration` once per session, at the first camera game. Kotlin chooses
-     centre-only or the full flow.
+   - It calls `set_tracker_mode` with the game's `tracker_mode`. The session's first camera
+     mode starts the calibration on the Kotlin side (see "Head tracker"), so Godot doesn't
+     request one then: a `request_calibration` would force a second, full run. Godot asks only
+     when a `lean_2d` game follows a session calibrated for `lean_x` alone (depth needs its own
+     extremes), and when the rider taps to recalibrate.
    - It starts the segment in `Effort` and `AudioDirector` (`segment.effort`, `segment.audio`).
    - It calls `game.prepare(segment)`, then shows the **intro card** for `intro_sec`. The card
      shows "Up next", the role, the game's `how_to` and `target_text()`, the previous result,
@@ -327,13 +422,21 @@ shapes, so no font needs the glyph. Everything uses Godot's default font.
 - **While calibrating** (`tracker_state` 2, or `calibration_progress` in the last second), it
   prompts each step: centre, with a 3-2-1 from `fraction`, then left, right, and in / back for
   `lean_2d`. It shows a progress bar.
+  The header reads "Step 2 of 3" (`step_index`, `step_count`; left out for a centre-only
+  run), and "Try 2" from `attempt`. `retry_reason` becomes a hint: "Hold still for a moment",
+  "Can't see you. Face the screen: is the room bright enough?" (on the bike, a dark room was
+  the usual cause), "Lean a little further" or "Other way!". For `used_default` it shows "Using
+  your usual range; recalibrate later if steering feels off" (no 3-2-1 over it).
 - **When the tracker needs calibration** (`tracker_state` 1), it offers "Tap to calibrate".
 - **When the face is lost** (`tracker_state` 4), it shows a slim "Can't see you" strip.
+- **When a calibration ended in `tracker_state` 0** (no face found after two tries), it shows
+  a slim "Camera steering is off" strip.
 
-Tapping any of them calls `request_calibration`, and so does the HUD's Recalibrate button.
-`Session.calibration` holds the latest progress. The overlay shows the #33 proposal's
-`step_index`, `step_count`, `attempt` and `retry_reason` when they are present, and works
-without them. The v1 bridge doesn't carry them yet.
+Tapping "tap to calibrate", "can't see you" or "camera off" calls `request_calibration`, and so
+does the HUD's Recalibrate button; both run every step. A tap during a running calibration is
+ignored (on the bike, stray taps restarted runs mid-step), and requests within 1 s of the last
+one are dropped (a double tap sent two). `Session.calibration` holds the session's latest progress, with all six
+fields.
 
 ## Audio: the `AudioDirector` interface
 
@@ -618,9 +721,11 @@ On a desktop:
 - The local Just Ride is of the demo game.
 - `request_exit()` (the summary's Done) restarts the local plan.
 - A game scene run on its own (F6) gets a Just Ride of that game.
-- The simulator also stands in for the head tracker. `tracker_state` follows the game's
-  tracker mode, and `request_calibration` plays a scripted centre, left and right run (plus in
-  and back for `lean_2d`) as `calibration_progress`.
+- The simulator also stands in for the head tracker and `TrackerLink`. `tracker_state`
+  follows the game's tracker mode. The session's first camera mode plays a scripted
+  calibration as `calibration_progress`: centre, left and right (plus in and back for
+  `lean_2d`), or the centre alone once an earlier run in the same process covered the mode.
+  `request_calibration` plays every step.
 - Just Rides of games that declare `effort_in_just_ride` have the multiplier.
 
 Under a `-s` script (the headless checks and GdUnit4), the local plan doesn't start by itself.
@@ -687,22 +792,71 @@ For generated audio (#36):
 
 1. Install with `adb install -r app/build/outputs/apk/debugReal/app-debugReal.apk`. The `-r`
    keeps the rider's data, so never uninstall.
-2. On the tablet, open **Profile → Mini-games (preview)**. The Games hub (#38) replaces this
-   entry point.
+2. On the tablet, open **Profile → Mini-games (preview)** and pick a Just Ride of the demo
+   (20 minutes or open-ended). Both record a ride for the active rider. The Games hub (#38)
+   replaces this entry point.
+3. The demo is a `lean_x` game, so the camera starts and calibrates during the first intro
+   card. The camera needs the CAMERA permission. Until the hub asks
+   for it (#38), grant it with
+   `adb shell pm grant dev.digitalducktape.openride.real android.permission.CAMERA`.
 
-The tablet logs at level W, so Godot's `print` output is invisible until you raise the level:
+### Capturing logs on the bike
+
+The tablet logs at level W (`getprop log.tag` prints `W`), so every app `Log.i`/`Log.v` and
+every Godot `print` is dropped unless its tag is raised. Four things have silently lost a
+capture:
+
+- **`log.tag.*` doesn't survive a reboot.** Set the tags after every boot, and check them with
+  `getprop`. No app restart is needed: the app and Godot re-check the tag on every line.
+- **The ring buffer is 256 KiB, and logd prunes the chattiest app first.** With
+  `HeadTrackerFrames` on (30 lines a second), OpenRide is the chattiest app, so a capture taken
+  with `logcat -d` after the ride can contain only other apps' W lines. Enlarge the buffer, and
+  record while riding.
+- **A live `adb logcat` over wireless ADB stops when ADB drops.** Record to a file on the
+  tablet instead.
+- **`HeadTrackerFrames` exists only in debuggable builds** (`debugReal`, `debug`). A release
+  build never writes it.
+
+The recipe, in order:
 
 ```sh
+# 1. After every boot: raise the tags, then confirm they're set.
 adb shell setprop log.tag.godot VERBOSE
 adb shell setprop log.tag.OpenRideGames VERBOSE
-adb logcat -s godot OpenRideGames GodotActivity Godot
+adb shell setprop log.tag.HeadTracker VERBOSE
+adb shell setprop log.tag.HeadTrackerFrames VERBOSE   # per-frame raw/filtered lean + face row
+adb shell getprop | grep log.tag
+
+# 2. A bigger ring buffer.
+adb logcat -G 16M
+
+# 3. Record on the tablet, so a dropped ADB connection doesn't end the capture.
+adb shell 'nohup logcat -v threadtime -f /sdcard/Download/openride-run.log -r 8192 -n 8 \
+  godot:V OpenRideGames:V HeadTracker:V HeadTrackerFrames:V GodotActivity:V "*:S" \
+  > /dev/null 2>&1 &'
+
+# ... ride ...
+
+# 4. Stop the recorder and pull the files (openride-run.log, .1, .2, ...).
+adb shell pkill -f openride-run.log
+for f in $(adb shell ls /sdcard/Download/ | grep openride-run.log); do adb pull "/sdcard/Download/$f"; done
 ```
+
+To follow along live instead, run `adb logcat -s godot OpenRideGames HeadTracker`. It stops
+if ADB drops, so keep the on-tablet recorder running too.
+
+`HeadTrackerFrames` lines carry `fixture=<row>` in the `HeadFixtureCsv` format. Collect those
+rows into a CSV file under `app/src/test/resources/headtracker/` to replay the ride in the unit
+tests.
 
 What to look for in the log:
 
 - Every signal and call is logged as `OPENRIDE_GAMES <- signal` or `OPENRIDE_GAMES -> method`.
-- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… game=… cadence=… score=…
-  effort=…` line every 5 s.
+- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… tracker=… lean_x=…
+  lean_depth=… standing=… score=… effort=…` line every 5 s, and every second while the
+  camera runs.
+- `Session` logs each calibration step as it starts, retries and completes
+  (`OPENRIDE_GAMES <- calibration_progress left 2/3 attempt 1 …`).
 - `OpenRideGames` lines come from the Kotlin side of the session.
 
 ## Originality and licensing

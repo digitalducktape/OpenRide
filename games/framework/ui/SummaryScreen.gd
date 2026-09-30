@@ -99,8 +99,9 @@ func add_section(section: Control) -> void:
 	_extra.add_child(section)
 
 
-## The bests the summary carries, one line. Its shape belongs to #35; until then this lists
-## whatever keys are truthy ("new best: score, stars").
+## The bests the summary carries, one line. Kotlin (#35) sends `{"score": true}` and/or
+## `{"stars": true}` when the session beat the rider's best at this plan and difficulty; this
+## lists whatever keys are truthy ("Personal best: score, stars").
 static func bests_text(bests) -> String:
 	if not (bests is Dictionary) or bests.is_empty():
 		return ""

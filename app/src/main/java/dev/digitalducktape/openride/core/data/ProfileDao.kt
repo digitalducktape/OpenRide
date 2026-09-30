@@ -25,6 +25,13 @@ interface ProfileDao {
     @Delete
     suspend fun delete(profile: Profile)
 
+    /** [Profile.headCalibration] alone, so the head tracker never reads or rewrites other fields. */
+    @Query("SELECT headCalibration FROM profiles WHERE id = :id")
+    suspend fun getHeadCalibration(id: Long): String?
+
+    @Query("UPDATE profiles SET headCalibration = :json WHERE id = :id")
+    suspend fun setHeadCalibration(id: Long, json: String?)
+
     // --- Backup & restore (PRD P1-8, T15) ---------------------------------------------------
 
     @Query("SELECT * FROM profiles")

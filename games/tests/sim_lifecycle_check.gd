@@ -27,6 +27,9 @@ func _run() -> void:
 	# Open-ended default plan (a scene run in the editor starts it by itself).
 	session._local.start()
 	_expect(["session_started", "segment_started"], "default plan starts")
+	# The demo's camera mode starts the session's calibration by itself, once (as TrackerLink).
+	_expect_true(session._local.is_calibrating() and session._local.calibrations_started == 1,
+		"the first camera mode calibrates once (%d)" % session._local.calibrations_started)
 	_expect_true(session.plan.segments[0].game_id == "demo", "default game is the demo")
 	session.request_pause()
 	session.request_resume()
@@ -40,6 +43,7 @@ func _run() -> void:
 	_events.clear()
 	session.request_exit()
 	_expect(["session_started", "segment_started"], "request_exit restarts the local plan")
+	_expect_true(session._local.calibrations_started == 2, "a new session calibrates again")
 
 	# A timed plan: segment_ending after intro + duration, then a zero result after the grace.
 	# The director answers segment_ending for its game, so unhook it to see the grace.

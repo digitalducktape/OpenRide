@@ -6,14 +6,20 @@ extends CanvasLayer
 ##   - while calibrating (tracker_state 2, or progress arrived in the last second)
 ##   - "tap to calibrate" when the tracker needs calibration (tracker_state 1)
 ##   - a slim "can't see you" strip when the face is lost (tracker_state 4)
-## Tapping it asks for a recalibration (`recalibrate_requested`). The step_index, step_count,
-## attempt and retry_reason fields proposed in #33 are shown when present.
+##   - a slim "camera steering is off" strip when a calibration ended in tracker_state 0 (no
+##     face found after two tries)
+## Tapping it asks for a recalibration (`recalibrate_requested`), except while a calibration
+## runs. It shows the step (with its
+## 3-2-1 for the centre), "step 2 of 3" (step_index, step_count), the attempt and the
+## retry_reason from calibration_progress.
 
 signal recalibrate_requested
 
 const LAYER := 25
 const RECENT_MSEC := 1000
 const CENTRE_COUNT := 3  ## the centre step's 3-2-1
+## Modes in which a tap asks for a calibration; never "calibrating".
+const TAPPABLE_MODES := ["needs", "lost", "unavailable"]
 
 const PROMPTS := {
 	"centre": "Sit centred and look at the screen",
@@ -24,15 +30,17 @@ const PROMPTS := {
 }
 const RETRY_REASONS := {
 	"unstable": "Hold still for a moment",
-	"no_face": "Can't see you: face the screen",
+	"no_face": "Can't see you. Face the screen: is the room bright enough?",
 	"too_small": "Lean a little further",
 	"wrong_direction": "Other way!",
+	# The step failed 3 times; calibration moves on with the rider's previous or a default value.
+	"used_default": "Using your usual range; recalibrate later if steering feels off",
 }
 const ARROWS := {"left": Vector2.LEFT, "right": Vector2.RIGHT, "in": Vector2.UP, "back": Vector2.DOWN}
 
 ## Set by Session: whether the game on screen uses the camera.
 var camera_game := false
-var mode := ""  ## "", "calibrating", "needs", "lost": what is showing
+var mode := ""  ## "", "calibrating", "needs", "lost" or "unavailable": what is showing
 
 var _full: Control
 var _strip: PanelContainer
@@ -84,8 +92,6 @@ func _init() -> void:
 	_bar.size = Vector2(0, 24)
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_bar)
-	var hint := _centred(box, HudTheme.SMALL, HudTheme.MUTED)
-	hint.text = "Tap to start again"
 
 	_strip = PanelContainer.new()
 	_strip.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(0.35, 0.2, 0.05, 0.92), 0))
@@ -118,6 +124,9 @@ func _mode_now() -> String:
 		return "needs"
 	if InputBus.tracker_state == InputBus.TRACKER_FACE_LOST:
 		return "lost"
+	if InputBus.tracker_state == InputBus.TRACKER_OFF and not progress.is_empty() and Session.tracker_mode != "off":
+		# Calibration ended in 0: the camera is unavailable (no face found after two tries).
+		return "unavailable"
 	return ""
 
 
@@ -125,7 +134,7 @@ func _show(new_mode: String) -> void:
 	mode = new_mode
 	visible = not mode.is_empty()
 	_full.visible = mode == "calibrating" or mode == "needs"
-	_strip.visible = mode == "lost"
+	_strip.visible = mode == "lost" or mode == "unavailable"
 	if mode == "needs":
 		_step = ""
 		_detail.text = "CAMERA"
@@ -136,21 +145,27 @@ func _show(new_mode: String) -> void:
 		_arrow.queue_redraw()
 	elif mode == "lost":
 		_strip_text.text = "Can't see you: face the screen  ·  tap to recalibrate"
+	elif mode == "unavailable":
+		_strip_text.text = "Camera steering is off: no face found. Is the room bright enough?  ·  tap to try again"
 
 
+## Draws the latest calibration_progress (Session.calibration).
 func _update_progress(progress: Dictionary) -> void:
-	_step = str(progress.get("step", "centre"))
-	_fraction = clampf(float(progress.get("fraction", 0.0)), 0.0, 1.0)
+	if progress.is_empty():
+		return  # tracker_state is 2 but the first progress hasn't arrived yet
+	_step = progress.step
+	_fraction = clampf(progress.fraction, 0.0, 1.0)
 	_prompt.text = PROMPTS.get(_step, _step.capitalize())
 	var parts := PackedStringArray(["CALIBRATING"])
-	if progress.has("step_index") and progress.has("step_count"):
-		parts.append("STEP %d OF %d" % [int(progress.step_index) + 1, int(progress.step_count)])
-	if int(progress.get("attempt", 1)) > 1:
-		parts.append("TRY %d" % int(progress.attempt))
+	if progress.step_count > 1:
+		parts.append("STEP %d OF %d" % [progress.step_index + 1, progress.step_count])
+	if progress.attempt > 1:
+		parts.append("TRY %d" % progress.attempt)
 	_detail.text = "  ·  ".join(parts)
-	_count.text = str(maxi(1, ceili(CENTRE_COUNT * (1.0 - _fraction)))) if _step == "centre" and _fraction < 1.0 else ""
-	var reason := str(progress.get("retry_reason", ""))
-	_retry.text = RETRY_REASONS.get(reason, "") if not reason.is_empty() else ""
+	var fallback: bool = progress.retry_reason == "used_default"  # fraction counts the 1.5 s notice
+	_count.text = str(maxi(1, ceili(CENTRE_COUNT * (1.0 - _fraction)))) if _step == "centre" and _fraction < 1.0 and not fallback else ""
+	_retry.text = RETRY_REASONS.get(progress.retry_reason, "")
+	_retry.add_theme_color_override("font_color", HudTheme.MUTED if fallback else HudTheme.WARN)
 	_bar.size.x = 900.0 * _fraction
 	_arrow.queue_redraw()
 
@@ -169,8 +184,12 @@ func _draw_arrow() -> void:
 	_arrow.draw_colored_polygon(PackedVector2Array([tip, tip - direction * 70 + side, tip - direction * 70 - side]), HudTheme.GOOD)
 
 
+## A tap asks for a calibration only when none is running: "tap to calibrate", "can't see you"
+## and "camera off". During a calibration the screen still takes the tap (so it can't skip the
+## intro card underneath) but ignores it: on the bike, stray taps restarted runs mid-step.
+## SessionDirector debounces what gets through.
 func _on_gui_input(event: InputEvent) -> void:
-	if visible and event is InputEventMouseButton and event.pressed:
+	if visible and mode in TAPPABLE_MODES and event is InputEventMouseButton and event.pressed:
 		recalibrate_requested.emit()
 
 

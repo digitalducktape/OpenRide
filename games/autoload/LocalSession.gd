@@ -1,6 +1,6 @@
 extends Node
 ## Desktop stand-in for the Kotlin session (docs/GAMES.md, "Desktop simulation"). Plays a local
-## plan through Session with the same timeline as the app (StubGameSession.kt):
+## plan through Session with the same timeline as the app (GameSessionManager.kt):
 ##   session_started → per segment: segment_started → intro card (intro_sec) → gameplay →
 ##   segment_ending when the timer runs out (1.5 × duration for end_mode "game") → the game's
 ##   segment_finished, or a zero result after 5 s. A timed plan then finishes by itself; an
@@ -8,9 +8,11 @@ extends Node
 ## Payloads go through a JSON round trip so games see exactly the types the bridge delivers
 ## (every number a float).
 ##
-## It also stands in for the head tracker: `tracker_state()` follows `set_tracker_mode`, and
-## `request_calibration` plays a scripted calibration (centre, left, right, and in/back for
-## lean_2d) as calibration_progress, with the extra fields proposed in #33.
+## It also stands in for the head tracker and its session side (TrackerLink.kt, docs/GAMES.md
+## "Head tracker"): `tracker_state()` follows `set_tracker_mode`; a session's first camera mode
+## starts a scripted calibration by itself (centre-only once this process has "same-day"
+## extremes covering the mode, otherwise centre, left, right, and in/back for lean_2d), and
+## `request_calibration` runs every step. Progress arrives as calibration_progress.
 
 const INTRO_SEC := 10
 const GRACE_SEC := 5.0
@@ -36,6 +38,11 @@ var _calibration_steps: Array = []  # steps still to run; empty when not calibra
 var _calibration_count := 0
 var _calibration_step_left := 0.0
 var _calibration_report_left := 0.0
+var _session_calibrated := false  # this session's centre is taken (TrackerLink's resetSession)
+var _extremes := {}  # modes with "same-day" extremes: lean_x, lean_2d (kept across sessions)
+var _calibration_mode := ""
+## Calibrations started since launch, automatic or requested (for tests: one per session start).
+var calibrations_started := 0
 
 
 func _init(session: Node) -> void:
@@ -78,6 +85,7 @@ func start(plan: Dictionary = {}) -> void:
 	_end_requested = false
 	_results = []
 	_calibration_steps = []
+	_session_calibrated = false
 	_session._on_session_started(_wire(_plan))
 	_start_segment(0)
 
@@ -110,19 +118,43 @@ func request_resume() -> void:
 	_session._on_session_resumed()
 
 
+## As TrackerLink.setTrackerMode: a camera mode with no calibration this session starts one.
 func set_tracker_mode(mode: String) -> void:
 	_tracker_mode = mode
 	if mode == "off":
 		_calibration_steps = []
+	elif not _session_calibrated and _calibration_steps.is_empty():
+		_start_calibration("lean_2d" if mode == "lean_2d" else "lean_x", false)
 
 
+## As TrackerLink.requestCalibration: the rider asked, so every step runs.
 func request_calibration(mode: String) -> void:
-	_calibration_steps = ["centre", "left", "right"]
-	if mode == "lean_2d":
-		_calibration_steps += ["in", "back"]
+	_start_calibration(mode, true)
+
+
+func _start_calibration(mode: String, force: bool) -> void:
+	_calibration_mode = mode
+	_session_calibrated = true
+	calibrations_started += 1
+	if not force and _extremes.has(mode):
+		_calibration_steps = ["centre"]
+	else:
+		_calibration_steps = ["centre", "left", "right"]
+		if mode == "lean_2d":
+			_calibration_steps += ["in", "back"]
 	_calibration_count = _calibration_steps.size()
 	_calibration_step_left = CALIBRATION_STEPS[_calibration_steps[0]]
 	_calibration_report_left = 0.0
+
+
+## Whether a scripted calibration is running (for tests).
+func is_calibrating() -> bool:
+	return not _calibration_steps.is_empty()
+
+
+## Steps in the running (or last) calibration (for tests).
+func calibration_step_count() -> int:
+	return _calibration_count
 
 
 ## What bridge field 9 would read: off, calibrating, or tracking.
@@ -236,15 +268,16 @@ func _calibrate(delta: float) -> void:
 	if _calibration_report_left <= 0.0 or done:
 		_calibration_report_left = CALIBRATION_REPORT_SEC
 		var fraction: float = 1.0 if done else 1.0 - _calibration_step_left / CALIBRATION_STEPS[step]
-		_session._on_calibration_progress(step, fraction, {
-			"step_index": _calibration_count - _calibration_steps.size(),
-			"step_count": _calibration_count,
-			"attempt": 1,
-		})
+		_session._on_calibration_progress(step, fraction,
+			_calibration_count - _calibration_steps.size(), _calibration_count, 1, "")
 	if done:
 		_calibration_steps.pop_front()
 		if not _calibration_steps.is_empty():
 			_calibration_step_left = CALIBRATION_STEPS[_calibration_steps[0]]
+		elif _calibration_count > 1:
+			_extremes[_calibration_mode] = true
+			if _calibration_mode == "lean_2d":
+				_extremes["lean_x"] = true
 
 
 func _zero_result() -> Dictionary:

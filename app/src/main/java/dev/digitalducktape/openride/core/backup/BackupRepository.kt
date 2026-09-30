@@ -2,6 +2,7 @@ package dev.digitalducktape.openride.core.backup
 
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
+import dev.digitalducktape.openride.core.data.GameResultDao
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileDao
 import dev.digitalducktape.openride.core.data.RideDao
@@ -27,12 +28,15 @@ import kotlinx.serialization.json.Json
  *   profile's photo travels *inside* the backup as base64 bytes and is re-materialized as a
  *   fresh file on restore, so photos survive reinstalls the same way ride data does. `null`
  *   (tests without photo concerns) simply leaves photos out.
+ * @param gameResultDao mini-games results (#35), which travel with their rides. `null` (tests
+ *   that predate them) leaves them out of the snapshot and untouched on restore.
  */
 class BackupRepository(
     private val database: RoomDatabase,
     private val profileDao: ProfileDao,
     private val rideDao: RideDao,
     private val avatarPhotoStore: AvatarPhotoStore? = null,
+    private val gameResultDao: GameResultDao? = null,
     private val epochMillisProvider: () -> Long = System::currentTimeMillis,
 ) {
     private val json = Json {
@@ -48,6 +52,7 @@ class BackupRepository(
         },
         rides = rideDao.getAllRidesOnce().map { it.toBackup() },
         samples = rideDao.getAllSamplesOnce().map { it.toBackup() },
+        gameResults = gameResultDao?.getAllOnce()?.map { it.toBackup() }.orEmpty(),
     )
 
     private fun encodePhoto(profile: Profile): String? = profile.avatarPhotoPath
@@ -86,6 +91,7 @@ class BackupRepository(
             backup.toEntity().copy(avatarPhotoPath = restorePhoto(backup))
         }
         database.withTransaction {
+            gameResultDao?.deleteAll()
             rideDao.deleteAllSamples()
             rideDao.deleteAllRides()
             profileDao.deleteAll()
@@ -93,6 +99,7 @@ class BackupRepository(
             profileDao.insertAll(restoredProfiles)
             rideDao.insertRides(snapshot.rides.map { it.toEntity() })
             rideDao.insertSamples(snapshot.samples.map { it.toEntity() })
+            gameResultDao?.insertAll(snapshot.gameResults.map { it.toEntity() })
         }
     }
 

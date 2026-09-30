@@ -1,12 +1,23 @@
 package dev.digitalducktape.openride
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.core.content.ContextCompat
 import androidx.room.Room
 import dev.digitalducktape.openride.core.backup.AutoBackupManager
 import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.camera.CameraXFaceSource
+import dev.digitalducktape.openride.core.camera.DefaultHeadTracker
+import dev.digitalducktape.openride.core.camera.FaceObservation
+import dev.digitalducktape.openride.core.camera.HeadFixtureCsv
+import dev.digitalducktape.openride.core.camera.HeadTracker
+import dev.digitalducktape.openride.core.camera.HeadTrackerState
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
@@ -14,7 +25,9 @@ import dev.digitalducktape.openride.core.data.MIGRATION_1_2
 import dev.digitalducktape.openride.core.data.MIGRATION_2_3
 import dev.digitalducktape.openride.core.data.MIGRATION_3_4
 import dev.digitalducktape.openride.core.data.MIGRATION_4_5
+import dev.digitalducktape.openride.core.data.MIGRATION_5_6
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.ProfileHeadCalibrationStore
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.heartrate.AndroidBleScanner
@@ -29,11 +42,15 @@ import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
 import dev.digitalducktape.openride.games.bridge.GameBridge
+import dev.digitalducktape.openride.games.bridge.TrackerLink
+import dev.digitalducktape.openride.games.bridge.toTrackerReading
+import dev.digitalducktape.openride.games.session.GameSessionManager
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,7 +78,7 @@ class AppContainer(private val applicationContext: Context) {
             applicationContext,
             OpenRideDatabase::class.java,
             OpenRideDatabase.DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
     }
 
     /** Rider avatar photos on disk (camera capture feature); paths live on [dev.digitalducktape.openride.core.data.Profile.avatarPhotoPath]. */
@@ -74,12 +91,12 @@ class AppContainer(private val applicationContext: Context) {
     }
 
     val rideRepository: RideRepository by lazy {
-        RideRepository(database, database.rideDao())
+        RideRepository(database, database.rideDao(), database.gameResultDao())
     }
 
     /** Whole-database backup/restore to one shareable file (PRD P1-8, T15). */
     val backupRepository: BackupRepository by lazy {
-        BackupRepository(database, database.profileDao(), database.rideDao(), avatarPhotoStore)
+        BackupRepository(database, database.profileDao(), database.rideDao(), avatarPhotoStore, database.gameResultDao())
     }
 
     /**
@@ -95,7 +112,9 @@ class AppContainer(private val applicationContext: Context) {
             dataChanges = combine(
                 database.profileDao().observeAll(),
                 database.rideDao().observeRideCount(),
-            ) { profiles, rideCount -> profiles to rideCount },
+                // A game session saves its results just after its ride.
+                database.gameResultDao().observeCount(),
+            ) { profiles, rideCount, resultCount -> Triple(profiles, rideCount, resultCount) },
             isDatabaseEmpty = {
                 database.profileDao().getAllOnce().isEmpty() && database.rideDao().getAllRidesOnce().isEmpty()
             },
@@ -118,6 +137,50 @@ class AppContainer(private val applicationContext: Context) {
             heartRateBpm = heartRateManager.bpm,
         )
     }
+
+    /**
+     * Camera head lean/standing for the mini-games (#33). The camera only runs while a game sets
+     * a tracker mode other than `off`. Each rider's lean extremes are kept in
+     * `Profile.headCalibration`.
+     */
+    val headTracker: HeadTracker by lazy {
+        DefaultHeadTracker(
+            faceSource = headFaceSource,
+            calibrationStore = ProfileHeadCalibrationStore(database.profileDao()),
+            activeProfileId = activeProfileHolder.activeProfileId,
+            hasCameraPermission = {
+                ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+            },
+            scope = containerScope,
+            frameLog = if (BuildConfig.DEBUG) ::logHeadFrame else null,
+        )
+    }
+
+    /**
+     * Debug builds: one line per camera frame with the raw and filtered lean, and the face as a
+     * fixture CSV row (numbers only) so a ride can be replayed in the unit tests. Silent unless
+     * enabled: `adb shell setprop log.tag.HeadTrackerFrames VERBOSE`.
+     */
+    private fun logHeadFrame(timestampMs: Long, face: FaceObservation?, state: HeadTrackerState) {
+        if (!Log.isLoggable(HEAD_FRAMES_TAG, Log.VERBOSE)) return
+        Log.v(
+            HEAD_FRAMES_TAG,
+            String.format(
+                java.util.Locale.US,
+                "raw=%+.3f lean=%+.3f depth=%+.3f standing=%d state=%d away=%d fixture=%s",
+                state.rawLeanX, state.leanX, state.leanDepth, if (state.standing) 1 else 0, state.trackerState.code,
+                if (state.lookingAway) 1 else 0,
+                HeadFixtureCsv.format(HeadFixtureCsv.Row(timestampMs, "live", face, bikeDataSource.metrics.value.cadenceRpm)),
+            ),
+        )
+    }
+
+    /**
+     * The camera under [headTracker]. Only [headTracker] starts and stops it; the debug bench
+     * reads its frame-rate stats and taps its frames for fixtures.
+     */
+    val headFaceSource: CameraXFaceSource by lazy { CameraXFaceSource(applicationContext) }
 
     /** Scopes the session to whichever rider is currently selected (PRD P0-3). */
     val activeProfileHolder: ActiveProfileHolder by lazy {
@@ -151,7 +214,34 @@ class AppContainer(private val applicationContext: Context) {
      * shares it and the same live sensor feed.
      */
     val gameBridge: GameBridge by lazy {
-        GameBridge(bikeDataSource = bikeDataSource, heartRateBpm = heartRateManager.bpm)
+        GameBridge(
+            bikeDataSource = bikeDataSource,
+            heartRateBpm = heartRateManager.bpm,
+            trackerReading = { headTracker.state.value.toTrackerReading() },
+        )
+    }
+
+    /**
+     * Mini-games sessions (#35): walks each session's plan over [gameBridge] and records it as a
+     * ride through [rideSessionManager] plus its game results. App-scoped, on the main thread,
+     * so a session's ride is saved even after the games host has gone to the back.
+     */
+    val gameSessionManager: GameSessionManager by lazy {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val log: (String) -> Unit = { Log.i(GAMES_LOG_TAG, it) }
+        GameSessionManager(
+            signals = gameBridge,
+            scope = scope,
+            rideSessionManager = rideSessionManager,
+            gameResultDao = database.gameResultDao(),
+            activeProfileId = { activeProfileHolder.activeProfileId.value },
+            profileFtp = { profileRepository.getProfile(it)?.ftp },
+            tracker = TrackerLink(headTracker, gameBridge, scope, log),
+            otherMusicActive = {
+                (applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
+            },
+            log = log,
+        )
     }
 
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */
@@ -207,12 +297,16 @@ class AppContainer(private val applicationContext: Context) {
     }
 }
 
+private const val GAMES_LOG_TAG = "OpenRideGames"
+
 /**
  * Builds a [ViewModelProvider.Factory] from a plain lambda, so screens can construct their
  * view models straight from [AppContainer] dependencies (manual DI, no Hilt) while still
  * getting normal [ViewModel] lifecycle/state-retention behavior from Compose Navigation's
  * per-destination [androidx.lifecycle.ViewModelStoreOwner].
  */
+private const val HEAD_FRAMES_TAG = "HeadTrackerFrames"
+
 fun <T : ViewModel> viewModelFactory(create: () -> T): ViewModelProvider.Factory =
     object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

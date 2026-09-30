@@ -76,6 +76,16 @@ android {
         }
     }
 
+    // debugReal is created with initWith(debug), which copies build settings but not source
+    // sets. Share the debug-only tools (the head-tracker bench and fixture logger, #33) with it
+    // so they run on the bike with the real sensors. Release never sees them.
+    sourceSets {
+        getByName("debugReal") {
+            java.srcDir("src/debug/java")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -242,6 +252,14 @@ dependencies {
     // Must match the editor version that exports games/ (checked by exportGamesPack).
     implementation(libs.godot)
     implementation(libs.androidx.fragment)
+
+    // Mini-games head tracker (#33): CameraX image analysis (no preview) feeding MediaPipe
+    // Tasks (Apache-2.0), with its model bundled in assets. lifecycle-process lets the camera
+    // follow the app's foreground state.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.mediapipe.tasks.vision)
+    implementation(libs.androidx.lifecycle.process)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

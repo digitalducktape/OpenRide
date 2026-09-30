@@ -230,6 +230,41 @@ class RideSessionManagerTest {
     }
 
     @Test
+    fun `stop records the game plan when the ride was started with one`() = runTest {
+        val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
+        manager.start(profileId, gamePlan = "just-ride:demo:minutes:20")
+        advanceTimeBy(2_000)
+        runCurrent()
+
+        val ride = manager.stop()
+
+        requireNotNull(ride)
+        assertEquals("just-ride:demo:minutes:20", rideRepository.getRide(ride.id)?.gamePlan)
+        assertNull(ride.videoId)
+    }
+
+    @Test
+    fun `discard ends the ride without saving it and returns to Idle`() = runTest {
+        val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
+        manager.start(profileId, gamePlan = "just-ride:demo:open")
+        fakeBikeDataSource.setMetrics(cadenceRpm = 80, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        manager.discard()
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        assertEquals(RideSessionState.Idle, manager.state.value)
+        assertEquals(0, manager.elapsedSec.value)
+        assertTrue(!manager.isRideActive.value)
+        assertEquals(0, db.rideDao().getAllRidesOnce().size)
+        // The next ride starts cleanly.
+        manager.start(profileId)
+        assertEquals(RideSessionState.Active, manager.state.value)
+    }
+
+    @Test
     fun `a quick start ride persists no video id`() = runTest {
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
         manager.start(profileId)
@@ -446,6 +481,31 @@ class RideSessionManagerTest {
         runCurrent()
 
         assertEquals(RideSessionState.Paused, manager.state.value)
+    }
+
+    @Test
+    fun `a manual pause during an auto-pause stops it auto-resuming`() = runTest {
+        val manager = RideSessionManager(
+            fakeBikeDataSource, rideRepository, backgroundScope, autoPauseThresholdSec = 3,
+        ) { 0L }
+        manager.start(profileId)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 85, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(2_000)
+        runCurrent()
+        fakeBikeDataSource.setMetrics(cadenceRpm = 0, resistancePercent = 40, powerWatts = 0)
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertTrue(manager.autoPaused.value)
+
+        manager.pause()
+        assertTrue(!manager.autoPaused.value)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 85, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        assertEquals(RideSessionState.Paused, manager.state.value)
+        manager.resume()
+        assertEquals(RideSessionState.Active, manager.state.value)
     }
 
     @Test

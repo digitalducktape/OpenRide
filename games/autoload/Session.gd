@@ -17,7 +17,13 @@ signal segment_started(segment: Dictionary)
 signal segment_ending
 signal session_paused
 signal session_resumed
-signal calibration_progress(step: String, fraction: float)
+## While the head tracker calibrates (InputBus.tracker_state is TRACKER_CALIBRATING).
+## step: "centre", "left", "right", "in" or "back"; fraction: 0..1 through it (restarts on a retry);
+## step_index / step_count: 0-based position in this calibration (1 step when only the centre is
+## re-taken, 3 for lean_x, 5 for lean_2d); attempt: 1, then 2+ on retries; retry_reason: "" on a
+## first attempt, else "unstable", "no_face", "too_small" or "wrong_direction"; "used_default" when
+## the step failed 3 times and calibration moves on with the previous or default value.
+signal calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String)
 signal session_finished(summary: Dictionary)
 
 const BRIDGE := "OpenRideBridge"
@@ -29,8 +35,8 @@ var summary: Dictionary = {}  ## the session_finished payload, once the session 
 var active := false  ## between session_started and session_finished
 var paused := false
 var tracker_mode := "off"  ## the last set_tracker_mode
-## The last calibration_progress: {step, fraction}, plus step_index, step_count, attempt and
-## retry_reason when the tracker sends them (proposed in #33; any may be absent).
+## The last calibration_progress this session, as {step, fraction, step_index, step_count,
+## attempt, retry_reason, at_msec}; empty before the first.
 var calibration: Dictionary = {}
 var director: SessionDirector
 
@@ -180,12 +186,22 @@ func _on_session_resumed() -> void:
 	session_resumed.emit()
 
 
-func _on_calibration_progress(step: String, fraction: float, extra: Dictionary = {}) -> void:
-	calibration = extra.duplicate()
-	calibration["step"] = step
-	calibration["fraction"] = fraction
-	calibration["at_msec"] = Time.get_ticks_msec()
-	calibration_progress.emit(step, fraction)
+func _on_calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String) -> void:
+	# Progress arrives many times a second: log a step's start, its retries and its end.
+	var starting: bool = calibration.is_empty() or calibration.step != step or calibration.attempt != attempt
+	if starting or (fraction >= 1.0 and calibration.fraction < 1.0):
+		print("OPENRIDE_GAMES <- calibration_progress %s %d/%d attempt %d %s fraction %.2f" % [
+			step, step_index + 1, step_count, attempt, retry_reason, fraction])
+	calibration = {
+		"step": step,
+		"fraction": fraction,
+		"step_index": step_index,
+		"step_count": step_count,
+		"attempt": attempt,
+		"retry_reason": retry_reason,
+		"at_msec": Time.get_ticks_msec(),
+	}
+	calibration_progress.emit(step, fraction, step_index, step_count, attempt, retry_reason)
 
 
 func _on_session_finished(new_summary: Dictionary) -> void:

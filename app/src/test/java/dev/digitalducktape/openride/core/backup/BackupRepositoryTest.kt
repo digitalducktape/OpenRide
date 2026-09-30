@@ -3,6 +3,7 @@ package dev.digitalducktape.openride.core.backup
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.digitalducktape.openride.core.data.GameResult
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
@@ -96,6 +97,38 @@ class BackupRepositoryTest {
         val reparsed = backupRepository.parse(json)
 
         assertEquals(snapshot, reparsed)
+    }
+
+    @Test
+    fun `game rides and their results survive a backup and restore`() = runTest {
+        val gameBackups = BackupRepository(db, db.profileDao(), db.rideDao(), gameResultDao = db.gameResultDao()) { 0L }
+        val (profileId, _, _) = seedData()
+        val rideId = rideRepository.saveRide(
+            Ride(
+                profileId = profileId, startEpochMs = 0, durationSec = 1200, avgCadence = 80, maxCadence = 90,
+                avgPower = 150, maxPower = 200, avgResistance = 40, outputKj = 180.0, calories = 173,
+                gamePlan = "just-ride:demo:minutes:20",
+            ),
+            emptyList(),
+        )
+        val result = GameResult(rideId, 0, "demo", "free", "standard", 0, 1200, 900.0, 2, null, false, """{"effort_avg":1.2}""")
+        db.gameResultDao().insertAll(listOf(result))
+
+        val json = gameBackups.exportJson()
+        db.gameResultDao().deleteAll()
+        gameBackups.restore(gameBackups.parse(json))
+
+        assertEquals("just-ride:demo:minutes:20", rideRepository.getRide(rideId)?.gamePlan)
+        assertEquals(listOf(result), db.gameResultDao().getForRide(rideId))
+    }
+
+    @Test
+    fun `a backup file without game results still parses`() {
+        val snapshot = backupRepository.parse(
+            """{"version":1,"exportedAtEpochMs":0,"profiles":[],"rides":[],"samples":[]}""",
+        )
+
+        assertEquals(emptyList<GameResultBackup>(), snapshot.gameResults)
     }
 
     @Test

@@ -1,6 +1,7 @@
 package dev.digitalducktape.openride.ui.history
 
 import dev.digitalducktape.openride.core.data.Ride
+import dev.digitalducktape.openride.games.session.GameLabels
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -13,6 +14,8 @@ data class RideHistoryRow(
     val durationLabel: String,
     val outputKjLabel: String,
     val avgCadenceLabel: String,
+    /** The game badge for a mini-games ride (#35), e.g. "Demo · 20 min"; null otherwise. */
+    val gameBadge: String? = null,
 )
 
 /**
@@ -31,6 +34,7 @@ object RideHistoryMapper {
             durationLabel = TimeFormat.elapsed(ride.durationSec),
             outputKjLabel = "%.1f kJ".format(ride.outputKj),
             avgCadenceLabel = "${ride.avgCadence} rpm avg",
+            gameBadge = GameLabels.planBadge(ride.gamePlan),
         )
     }
 }

@@ -5,8 +5,9 @@ extends Node
 ##
 ## Per segment (segment_started):
 ##   load `res://games/<game_id>/…tscn` from GameRegistry, set the tracker mode from the game's
-##   declaration (and ask once per session for calibration in camera games), start Effort and
-##   AudioDirector, then show the intro card for `intro_sec`. Tapping the card skips the game
+##   declaration (Kotlin calibrates on a session's first camera mode by itself; see
+##   `_calibrate_for`), start Effort and AudioDirector, then show the intro card for
+##   `intro_sec`. Tapping the card skips the game
 ##   (segment_finished with `skipped: true`). Then gameplay: HUD on, scoring live.
 ## Ending: `end_mode: game` games end themselves; on segment_ending the game gets 4.5 s to
 ## wrap up (Kotlin allows 5) before the director reports for it. Results carry the stars from
@@ -20,6 +21,7 @@ const GRACE_SEC := 4.5  ## Kotlin's grace is 5 s; report before it gives up
 const IDLE_SCENE := "res://Main.tscn"
 const COUNTDOWN_CUES := 3  ## countdown cue on each of the intro card's last 3 seconds
 const FRAME_LOG_SEC := 5.0
+const RECALIBRATE_DEBOUNCE_MSEC := 1000
 
 var phase := Phase.IDLE
 var game: Game  ## the game on screen, if any
@@ -37,8 +39,11 @@ var done_panel: CanvasLayer  ## an open-ended plan's "segment done: end the sess
 var _intro_left := 0.0
 var _grace_left := 0.0
 var _last_count := 0
-var _calibration_requested := false
+## The calibration this session has covered: "" (none yet), "lean_x" or "lean_2d".
+var calibrated_mode := ""
+
 var _log_left := FRAME_LOG_SEC
+var _last_recalibrate_msec := -1
 
 
 func _ready() -> void:
@@ -108,7 +113,7 @@ static func skipped_result(game_id: String) -> Dictionary:
 func _on_session_started(_plan: Dictionary) -> void:
 	results = []
 	segment = {}
-	_calibration_requested = false
+	calibrated_mode = ""
 	_close_game()
 	_hide_overlays()
 	summary_screen.visible = false
@@ -132,10 +137,7 @@ func _on_segment_started(new_segment: Dictionary) -> void:
 	_show_game(next)
 	Session.set_tracker_mode(info.tracker_mode)
 	calibration.camera_game = info.uses_camera()
-	if info.uses_camera() and not _calibration_requested:
-		# Once per session; Kotlin picks the centre-only or the full flow.
-		_calibration_requested = true
-		Session.request_calibration(info.calibration_mode())
+	_calibrate_for(info)
 	Effort.begin_segment(bool(segment.get("effort", false)))
 	AudioDirector.begin_segment(segment)
 	hud.setup(info, segment)
@@ -248,11 +250,13 @@ func _process(delta: float) -> void:
 					_report(game.finish())
 	_log_left -= delta
 	if _log_left <= 0.0:
-		_log_left = FRAME_LOG_SEC
-		print("OPENRIDE_GAMES frame fps=%d phase=%s game=%s cadence=%d power=%d resistance=%d sensors_ok=%s time_left=%.0f tracker=%d score=%d effort=%.2f" % [
+		# Every second while the camera runs (for tuning steering on the bike), else every 5 s.
+		_log_left = 1.0 if Session.tracker_mode != "off" else FRAME_LOG_SEC
+		print("OPENRIDE_GAMES frame fps=%d phase=%s game=%s cadence=%d power=%d resistance=%d sensors_ok=%s time_left=%.0f tracker=%d lean_x=%+.2f lean_depth=%+.2f standing=%s score=%d effort=%.2f" % [
 			Engine.get_frames_per_second(), Phase.keys()[phase], game.game_id if game else "-",
 			InputBus.cadence, InputBus.power, InputBus.resistance, InputBus.sensors_ok,
-			InputBus.segment_time_left, InputBus.tracker_state, Effort.score, Effort.multiplier])
+			InputBus.segment_time_left, InputBus.tracker_state, InputBus.lean_x, InputBus.lean_depth,
+			InputBus.standing, Effort.score, Effort.multiplier])
 
 
 # --- Buttons ---
@@ -264,9 +268,41 @@ func _on_pause_pressed() -> void:
 		Session.request_pause()
 
 
+## The rider asked to recalibrate (Recalibrate, or a tap on the calibration overlay): every
+## step runs again. Ignored while a calibration runs, and within RECALIBRATE_DEBOUNCE_MSEC of
+## the last request (a double tap on the bike sent two, the second restarting the first).
 func _recalibrate() -> void:
-	if info and info.uses_camera() and Session.active:
-		Session.request_calibration(info.calibration_mode())
+	if not (info and info.uses_camera() and Session.active):
+		return
+	if InputBus.tracker_state == InputBus.TRACKER_CALIBRATING:
+		return
+	var now := Time.get_ticks_msec()
+	if _last_recalibrate_msec >= 0 and now - _last_recalibrate_msec < RECALIBRATE_DEBOUNCE_MSEC:
+		return
+	_last_recalibrate_msec = now
+	Session.request_calibration(info.calibration_mode())
+	calibrated_mode = _wider(calibrated_mode, info.calibration_mode())
+
+
+## Called after set_tracker_mode for each segment. Kotlin (TrackerLink) starts the session's
+## first calibration by itself on the first camera mode, re-taking only the centre when the
+## rider's extremes from earlier today cover the mode, so Godot never asks for that one: asking
+## would force a second, full run. Godot asks only when a lean_2d game follows a session whose
+## calibration covered lean_x alone, since depth needs its own extremes (docs/GAMES.md, "Head
+## tracker").
+func _calibrate_for(game_info: GameInfo) -> void:
+	if not game_info.uses_camera():
+		return
+	var needed := game_info.calibration_mode()
+	if calibrated_mode.is_empty():
+		calibrated_mode = needed  # Kotlin's automatic calibration covers this game's mode
+	elif needed == "lean_2d" and calibrated_mode != "lean_2d":
+		Session.request_calibration(needed)
+		calibrated_mode = needed
+
+
+static func _wider(a: String, b: String) -> String:
+	return "lean_2d" if "lean_2d" in [a, b] else b
 
 
 # --- Scenes ---

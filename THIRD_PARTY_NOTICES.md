@@ -33,6 +33,13 @@ source code from any of them. See `docs/INTEROP.md` for details.
   does not bundle or redistribute OpenPelo; it is referenced only as an external
   install prerequisite in the README and `docs/INSTALL.md`.
 
+- **1€ (One Euro) filter** — Géry Casiez, Nicolas Roussel and Daniel Vogel,
+  "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive
+  Systems", CHI 2012. The head tracker's smoothing implements the algorithm from
+  the paper's description
+  (`app/src/main/java/dev/digitalducktape/openride/core/camera/OneEuroFilter.kt`);
+  no code was copied.
+
 ## Redistributed runtime dependencies
 
 All runtime dependencies are fetched by Gradle and are under permissive licenses
@@ -49,6 +56,12 @@ OpenRide's own source beyond attribution. Authoritative versions live in
 | Kotlinx Serialization | `org.jetbrains.kotlinx` | Apache-2.0 |
 | Coil | `io.coil-kt` | Apache-2.0 |
 | Godot Engine (Android library, mini-games) | `org.godotengine:godot` | MIT |
+| CameraX (camera-core, camera-camera2, camera-lifecycle) and lifecycle-process | `androidx.camera`, `androidx.lifecycle` | Apache-2.0 |
+| MediaPipe Tasks (`tasks-vision`, `tasks-core`, with native `libmediapipe_tasks_jni.so`) | `com.google.mediapipe` | Apache-2.0 |
+| MediaPipe's dependencies: Guava, Flogger, Google Android datatransport, Firebase encoders, `javax.inject` | `com.google.guava`, `com.google.flogger`, `com.google.android.datatransport`, `com.google.firebase`, `javax.inject` | Apache-2.0 |
+| Protocol Buffers (Java lite runtime, via MediaPipe) | `com.google.protobuf` | BSD-3-Clause |
+| Guava's annotation artifacts (jsr305, error_prone, j2objc, failureaccess) | `com.google.code.findbugs`, `com.google.errorprone`, `com.google.j2objc`, `com.google.guava` | Apache-2.0 |
+| checker-compat-qual, animal-sniffer-annotations (via Guava) | `org.checkerframework`, `org.codehaus.mojo` | MIT (checker-compat-qual is dual-licensed GPL-2.0-with-classpath-exception / MIT; used under MIT) |
 
 ### Godot Engine
 
@@ -78,6 +91,29 @@ FreeType, zlib, libpng, HarfBuzz and others). They are listed, with their licens
 Godot's `COPYRIGHT.txt` (https://github.com/godotengine/godot/blob/4.7.2-stable/COPYRIGHT.txt),
 and are available at runtime from the engine itself (`Engine.get_copyright_info()` /
 `Engine.get_license_info()`).
+
+### MediaPipe and the BlazeFace model
+
+The mini-games head tracker (`core/camera/`) finds the rider's face with Google's
+MediaPipe Tasks Face Detector — https://ai.google.dev/edge/mediapipe — linked as
+the prebuilt `com.google.mediapipe:tasks-vision` library (Apache-2.0).
+
+Its model ships unmodified in the APK as
+`app/src/main/assets/mediapipe/blaze_face_short_range.tflite`, downloaded from
+https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite
+(MD5 `a3dd6ec31725290770b97cec0cbf94c9`). It is licensed under the **Apache License,
+Version 2.0**, per the "MediaPipe BlazeFace Short Range" model card by Google
+(https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20(Short%20Range).pdf).
+Citation: V. Bazarevsky et al., "BlazeFace: Sub-millisecond Neural Face Detection on
+Mobile GPUs", CVPR Workshop on Computer Vision for AR/VR, 2019.
+
+Camera frames are analysed in memory on the tablet and never stored or sent by
+OpenRide. MediaPipe Tasks' `tasks-core` also contains a usage-statistics reporter
+that would send the app's id and version, the task, its running mode, and
+invocation counts and latencies (never images) to Google through the
+datatransport library. OpenRide's manifest unregisters the transport's backend, so
+these reports are dropped on the device and never sent (see the comment in
+`app/src/main/AndroidManifest.xml`).
 
 ### Test-only dependencies
 
