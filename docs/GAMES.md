@@ -566,7 +566,10 @@ exactly the same length: `drums`, `bass`, `harmony` and `lead`.
   16-bit natively.
   - On an M-series Mac, a 16-bar, 4-stem loop at 90 bpm (42.7 s of audio) renders in
     60-125 ms (130-270 ms on one thread).
-  - The tablet figure is pending the on-bike check.
+  - On the Gen 2 tablet (4 cores), with the demo running, each style's 16-bar render at
+    90 bpm took 0.78-1.18 s on a `WorkerThreadPool` thread (budget: 5 s). The 14 effects
+    took 0.2 s. The game held 56-61 fps throughout (measured 2026-09-30, mock build,
+    `user://audio_bench`).
 - **Disk cache.** Renders are cached in `user://audio_cache/<sha256>.stems`.
   - The key covers the style's musical content, the tempo, the seed, the bars and
     `MusicGen.VERSION`. Editing a style never plays a stale render; bump `VERSION` when
