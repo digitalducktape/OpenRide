@@ -1,6 +1,6 @@
 extends Node
 ## Desktop stand-in for the Kotlin session (docs/GAMES.md, "Desktop simulation"). Plays a local
-## plan through Session with the same timeline as the app (StubGameSession.kt):
+## plan through Session with the same timeline as the app (GameSessionManager.kt):
 ##   session_started → per segment: segment_started → intro card (intro_sec) → gameplay →
 ##   segment_ending when the timer runs out (1.5 × duration for end_mode "game") → the game's
 ##   segment_finished, or a zero result after 5 s. A timed plan then finishes by itself; an

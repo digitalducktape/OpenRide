@@ -30,7 +30,7 @@ game and every builder depends on:
 | `games/assets/SOURCES.md` | Source, author and licence of every asset |
 | `app/.../games/GameHostActivity.kt` | Hosts the engine |
 | `app/.../games/bridge/` | The `OpenRideBridge` plugin, the app-scoped `GameBridge`, the input frame and the JSON messages |
-| `app/.../games/session/StubGameSession.kt` | Walks a plan over the bridge without recording anything, until `GameSessionManager` (#35) replaces it |
+| `app/.../games/session/` | `GameSessionManager` (runs and records sessions), `SessionPlan` and its builders, `GameCatalog` (Kotlin's copy of each game's declarations), `GameAudioPrefs` |
 
 Games talk to Kotlin only through the `InputBus` and `Session` autoloads, never through the
 `OpenRideBridge` singleton directly.
@@ -61,6 +61,7 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 
 - `session_started(plan_json)`: `{kind: circuit | just_ride, plan_id, difficulty, total_sec,
   segments:[{game_id, role, duration_sec}]}`. Sent once; it drives the circuit progress strip.
+  `total_sec` includes every intro card, and is `-1` for an open-ended plan.
 - `segment_started(segment_json)`: `{index, count, game_id, duration_sec, intro_sec, end_mode, role,
   difficulty, effort, seed, audio:{music, music_volume, sfx_volume}, params:{…}}`.
   - `intro_sec`: Godot shows the intro card for this long (10 s in circuits and at session start),
@@ -94,6 +95,12 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
     camera is unavailable (no face found after two tries).
 - `session_finished(summary_json)`: `{ride_id, results:[…], totals, bests:{…}}`, sent after Kotlin has
   saved the ride. Godot shows the summary, then calls `request_exit()`.
+  - `ride_id` is null when nothing was recorded (no active rider, or another ride in progress).
+  - `results` are the `segment_finished` payloads in plan order, with zero results for games
+    that didn't report.
+  - `totals`: `{score, stars, segments, elapsed_sec}`; `elapsed_sec` is the ride's duration.
+  - `bests`: `{"score": true}` and/or `{"stars": true}` when the session's total beat the rider's
+    best at the same plan and difficulty (a first scoring session counts); `{}` otherwise.
 
 **Godot → Kotlin methods:**
 
@@ -157,11 +164,8 @@ These describe how the foundation (#32) implements v1. They don't change the con
   - It never quits (`application/config/quit_on_go_back=false`).
   - During a session it calls `request_pause()`.
   - After the summary it calls `request_exit()`.
-- **The stub.** Until #35, `StubGameSession` plays an open-ended Just Ride of the `demo`
-  game. It sends `ride_id: null` and records nothing. Its tracker commands go through
-  `TrackerLink` (`games/bridge/`), which `GameSessionManager` should reuse. It sets `effort`
-  only for work segments, so its Just Ride shows no effort badge; #35 applies
-  `effort_in_just_ride`.
+- **The session engine** is `GameSessionManager` (app-scoped, #35). Its tracker commands go
+  through `TrackerLink` (`games/bridge/`). See "Sessions and recording" below.
 - **Head-tracker fields** come from `AppContainer.headTracker` on every poll
   (`HeadTrackerState.toTrackerReading()`).
 
@@ -198,6 +202,63 @@ So the foundation uses the spec's fallback: **the host stays alive for the app's
 
 The `OpenRideApplication` owns the `AppContainer`, so the games host shares the app's database,
 sensor binding and ride session.
+
+`GameHostActivity.intent(context, request)` starts games with a `SessionRequest` (a Just Ride
+or a circuit, and a difficulty). Each entry calls `GameSessionManager.begin(request)` and
+attaches it to the bridge. A session still running when games are entered again is finished
+and its ride saved first.
+
+## Sessions and recording
+
+`GameSessionManager` (`app/.../games/session/`, #35) is the Kotlin side of every session. It
+is app-scoped, so a ride is saved even after the host has gone to the back.
+
+**Plans.** When Godot is ready, it turns the request into a `SessionPlan` with the active
+rider's FTP (`SessionPlans`):
+
+| Request | Plan (`plan_id`, also `Ride.gamePlan`) | Segment |
+| --- | --- | --- |
+| Just Ride, timed N min | `just-ride:<game>:minutes:<N>` | `role: free`, N × 60 s, the game's `timedEndMode` (normally `timer`) |
+| Just Ride, N rounds | `just-ride:<game>:rounds:<N>` | `role: free`, N × the game's `roundSec`, `end_mode: game`, `params.rounds = N` |
+| Just Ride, open-ended | `just-ride:<game>:open` | `role: free`, `duration_sec: -1`, `end_mode: game` |
+| Circuit | `circuit-20`, `circuit-30`, `circuit-45` | the preset's slots (`CircuitPresets`), `end_mode: timer` |
+
+- Lengths are clamped to the game's limits; a mode the game doesn't support is refused.
+- Circuit presets are data. Until a preset's games exist, their slots play the demo (#37).
+- `effort` is true for work segments, and for Just Rides of games declaring
+  `effort_in_just_ride`.
+- Kotlin keeps its own copy of each game's declarations in `GameCatalog`. **Adding a game
+  means adding its `GameDeclaration` there too**, matching its `info()`.
+
+**Params.** Every segment's `params` carry `ftp_watts` and `ftp_is_default` (true when the
+rider has no FTP, so 150 W was used and the hub should nudge), plus one power figure:
+
+- work, and Just Rides of work games: `target_watts` = 90 / 105 / 120 % of FTP for easy /
+  standard / hard;
+- recovery: `power_cap_watts` = 60 % of FTP; warm-up and cool-down: 65 %. Difficulty never
+  moves a cap. Recovery games use their own params for difficulty.
+
+Game-specific params come from the game's `GameDeclaration.params` (the demo sends
+`cadence_floor`).
+
+**Audio.** `segment.audio` is decided once per session from `GameAudioPrefs`. With game music
+on "auto" (the default), `music` is false while `AudioManager.isMusicActive()`. Effects always
+play. The hub (#38) will store the setting and volumes; until then the defaults apply.
+
+**Recording.** The ride goes through the app's own `RideSessionManager`, so it is an ordinary
+ride in History, exports and backups:
+
+- It starts when the session starts and records through intro cards.
+- Freewheel auto-pause applies. A rider's pause (`request_pause`) pauses the ride too. Either
+  kind freezes the session clock and sends `session_paused` / `session_resumed`.
+- When the session finishes, the ride is saved with `gamePlan`, then one `game_results` row
+  per segment (`startSec` on the session clock, `durationSec` of gameplay). Then the ride
+  manager returns to idle, so the app's next ride can start.
+- `GameResultDao` answers personal bests per rider (per game, plan and difficulty), the
+  household leaderboard per game, and a plan's best session. Skipped segments never count.
+- The ride summary lists each segment's result, and History shows a game badge.
+- Room schema 6 adds these (`MIGRATION_5_6`), with `Profile.headCalibration` for the head
+  tracker's saved extremes.
 
 The Godot AAR declares androidx `FileProvider` at `${applicationId}.fileprovider`, and Godot's
 `GodotIO` hard-codes that authority. So the app's own provider is the `OpenRideFileProvider`
@@ -538,10 +599,11 @@ $GODOT_BIN --headless --path games -s res://tests/sim_demo_check.gd       # the 
 
 1. Install with `adb install -r app/build/outputs/apk/debugReal/app-debugReal.apk`. The `-r`
    keeps the rider's data, so never uninstall.
-2. On the tablet, open **Profile → Mini-games (preview)**. The Games hub (#38) replaces this
-   entry point.
-3. The stub's Just Ride plays the demo, a `lean_x` game, so the camera starts and calibrates
-   during the first intro card. The camera needs the CAMERA permission. Until the hub asks
+2. On the tablet, open **Profile → Mini-games (preview)** and pick a Just Ride of the demo
+   (20 minutes or open-ended). Both record a ride for the active rider. The Games hub (#38)
+   replaces this entry point.
+3. The demo is a `lean_x` game, so the camera starts and calibrates during the first intro
+   card. The camera needs the CAMERA permission. Until the hub asks
    for it (#38), grant it with
    `adb shell pm grant dev.digitalducktape.openride.real android.permission.CAMERA`.
 
