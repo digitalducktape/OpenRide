@@ -122,7 +122,7 @@ class HeadTrackerDebugActivity : ComponentActivity() {
                 val stats = cameraSource.stats.value
                 Log.i(
                     CameraXFaceSource.TAG,
-                    "mode=${s.mode.wireName} state=${s.trackerState} lean=%.2f depth=%.2f standing=${s.standing} ".format(s.leanX, s.leanDepth) +
+                    "mode=${s.mode.wireName} state=${s.trackerState} raw=%.2f lean=%.2f depth=%.2f standing=${s.standing} ".format(s.rawLeanX, s.leanX, s.leanDepth) +
                         "cal=${s.calibration?.let { "${it.step.wireName}:%.2f#${it.attempt}${it.retryReason?.let { r -> "/" + r.wireName } ?: ""}".format(it.fraction) }} " +
                         "unavailable=${s.unavailable?.wireName} fps=%.1f detect=%.1fms rpm=${container.bikeDataSource.metrics.value.cadenceRpm} step=${prompt.value} ".format(stats.fps, stats.detectMs) +
                         "face=${lastFace.value?.let { "cx=%.3f cy=%.3f size=%.3f pitch=%.1f yaw=%.1f".format(it.cx, it.cy, it.size, it.pitchDeg, it.yawDeg) }}",

@@ -33,6 +33,8 @@ const RETRY_REASONS := {
 	"no_face": "Can't see you. Face the screen: is the room bright enough?",
 	"too_small": "Lean a little further",
 	"wrong_direction": "Other way!",
+	# The step failed 3 times; calibration moves on with the rider's previous or a default value.
+	"used_default": "Using your usual range; recalibrate later if steering feels off",
 }
 const ARROWS := {"left": Vector2.LEFT, "right": Vector2.RIGHT, "in": Vector2.UP, "back": Vector2.DOWN}
 
@@ -160,8 +162,10 @@ func _update_progress(progress: Dictionary) -> void:
 	if progress.attempt > 1:
 		parts.append("TRY %d" % progress.attempt)
 	_detail.text = "  ·  ".join(parts)
-	_count.text = str(maxi(1, ceili(CENTRE_COUNT * (1.0 - _fraction)))) if _step == "centre" and _fraction < 1.0 else ""
+	var fallback: bool = progress.retry_reason == "used_default"  # fraction counts the 1.5 s notice
+	_count.text = str(maxi(1, ceili(CENTRE_COUNT * (1.0 - _fraction)))) if _step == "centre" and _fraction < 1.0 and not fallback else ""
 	_retry.text = RETRY_REASONS.get(progress.retry_reason, "")
+	_retry.add_theme_color_override("font_color", HudTheme.MUTED if fallback else HudTheme.WARN)
 	_bar.size.x = 900.0 * _fraction
 	_arrow.queue_redraw()
 

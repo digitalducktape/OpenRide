@@ -80,6 +80,13 @@ enum class CalibrationRetryReason(val wireName: String) {
 
     /** Leaned the same way as the other side, or sat back when asked to lean in. */
     WRONG_DIRECTION("wrong_direction"),
+
+    /**
+     * Not a retry: the step failed [HeadTrackerConfig.maxAttemptsPerStep] times, so calibration
+     * uses the previous (or default) value for it and moves on after a short notice ("we'll use
+     * your usual lean").
+     */
+    USED_DEFAULT("used_default"),
 }
 
 /**
@@ -133,6 +140,16 @@ data class HeadTrackerState(
     val leanX: Double = 0.0,
     val leanDepth: Double = 0.0,
     val standing: Boolean = false,
+    /**
+     * The lean before filtering and the dead zone (same units: ±1 = full lock, not clamped), for
+     * debug logging and tuning; 0 when no face was measured. Not sent to games.
+     */
+    val rawLeanX: Double = 0.0,
+    /**
+     * Steps of the last calibration that fell back to previous or default values instead of a
+     * measurement, so the UI can suggest recalibrating. Empty when everything was measured.
+     */
+    val calibrationDefaults: Set<CalibrationStep> = emptySet(),
     val calibration: CalibrationProgress? = null,
     val unavailable: UnavailableReason? = null,
 ) {

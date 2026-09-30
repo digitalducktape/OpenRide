@@ -44,6 +44,8 @@ class HeadTrackingEngine(
     /** Saved extremes to adopt when a centre-only calibration completes. */
     private var pendingReuse: HeadCalibration? = null
     private var noFace = false
+    /** Steps of the last completed calibration that fell back instead of being measured. */
+    private var calibrationDefaults: Set<CalibrationStep> = emptySet()
 
     private var leanAxis: AxisMapping? = null
     private var depthAxis: AxisMapping? = null
@@ -78,12 +80,20 @@ class HeadTrackingEngine(
      * Starts the prompted calibration for [mode]. If [reuse] (fresh saved extremes) covers the
      * mode, only the centre is re-taken; otherwise every step runs. Clears a previous no-face
      * failure.
+     *
+     * A step that keeps failing falls back to [fallback] (the rider's saved extremes, however
+     * old), else this session's extremes, else the config defaults; see [CalibrationSequence].
      */
-    fun startCalibration(mode: TrackerMode, reuse: HeadCalibration?) {
+    fun startCalibration(mode: TrackerMode, reuse: HeadCalibration?, fallback: HeadCalibration? = null) {
         if (mode == TrackerMode.OFF) return
         setMode(mode)
         val centreOnly = reuse != null && reuse.covers(mode)
-        sequence = CalibrationSequence(CalibrationSequence.stepsFor(mode, centreOnly), config)
+        sequence = CalibrationSequence(
+            CalibrationSequence.stepsFor(mode, centreOnly),
+            config,
+            fallback = fallback ?: reuse ?: calibration,
+            fallbackCentre = centre,
+        )
         pendingReuse = if (centreOnly) reuse else null
         noFace = false
         clearTracking()
@@ -94,6 +104,7 @@ class HeadTrackingEngine(
     fun resetSession() {
         centre = null
         calibration = null
+        calibrationDefaults = emptySet()
         leanAxis = null
         depthAxis = null
         sequence = null
@@ -132,13 +143,16 @@ class HeadTrackingEngine(
     private fun finishCalibration(result: CalibrationResult, timestampMs: Long) {
         sequence = null
         centre = result.centre
+        calibrationDefaults = result.usedDefaults
+        // Extremes that fell back aren't the rider's measurement: use them, but don't save them.
+        val measuredAll = result.usedDefaults.none { it != CalibrationStep.CENTRE }
         val extremes = pendingReuse ?: HeadCalibration(
             leftDx = result.leftDx!!,
             rightDx = result.rightDx!!,
             inRatio = result.inRatio,
             backRatio = result.backRatio,
             calibratedAtEpochMs = wallClockMs(),
-        ).also(onFullCalibration)
+        ).also { if (measuredAll) onFullCalibration(it) }
         pendingReuse = null
         calibration = extremes
         leanAxis = AxisMapping.fromExtremes(extremes.leftDx, extremes.rightDx, config.fullLockFraction)
@@ -171,13 +185,14 @@ class HeadTrackingEngine(
         val standing = standingDetector.update(timestampMs, face, base)
         val leanOriginX = postureOriginX(timestampMs, face, base, standing)
 
-        val lean = deadZone(leanFilter.filter(timestampMs, axis.normalize(face.cx - leanOriginX)), config.deadZone)
+        val rawLean = axis.normalize(face.cx - leanOriginX)
+        val lean = deadZone(leanFilter.filter(timestampMs, rawLean), config.deadZone, config.deadZoneRamp)
 
         val depthMapping = depthAxis
         val depth = if (mode == TrackerMode.LEAN_2D && depthMapping != null) {
             val gated = standing || face.pitchDeg - base.pitchDeg < config.depthMinPitchFromCentreDeg
             val raw = if (gated) 0.0 else depthMapping.normalize(face.size / base.size - 1.0)
-            deadZone(depthFilter.filter(timestampMs, raw), config.deadZone)
+            deadZone(depthFilter.filter(timestampMs, raw), config.deadZone, config.deadZoneRamp)
         } else {
             0.0
         }
@@ -190,6 +205,8 @@ class HeadTrackingEngine(
             leanX = lean,
             leanDepth = depth,
             standing = standing,
+            rawLeanX = rawLean,
+            calibrationDefaults = calibrationDefaults,
         )
     }
 
@@ -233,6 +250,7 @@ class HeadTrackingEngine(
             leanX = heldLean * scale,
             leanDepth = heldDepth * scale,
             standing = standingDetector.standing,
+            calibrationDefaults = calibrationDefaults,
         )
     }
 
@@ -263,6 +281,7 @@ class HeadTrackingEngine(
             trackerState = trackerState,
             calibration = seq?.progress,
             unavailable = if (noFace) UnavailableReason.NO_FACE else null,
+            calibrationDefaults = if (seq != null) emptySet() else calibrationDefaults,
         )
     }
 

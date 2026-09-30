@@ -83,6 +83,11 @@ class DefaultHeadTracker(
     config: HeadTrackerConfig = HeadTrackerConfig(),
     private val wallClockMs: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /**
+     * Debug builds only: sees every analysed frame with the state it produced (raw vs filtered
+     * lean), on the camera's thread. Null in release.
+     */
+    private val frameLog: ((timestampMs: Long, face: FaceObservation?, state: HeadTrackerState) -> Unit)? = null,
 ) : HeadTracker {
 
     private val lock = Any()
@@ -104,6 +109,7 @@ class DefaultHeadTracker(
             synchronized(lock) {
                 if (!cameraRunning) return
                 val next = engine.onFrame(timestampMs, face)
+                frameLog?.invoke(timestampMs, face, next)
                 // The per-frame fast path: nothing about availability changed.
                 if (next.unavailable == null) {
                     _state.value = next
@@ -139,7 +145,7 @@ class DefaultHeadTracker(
         val reuse = if (force) null else reusableExtremes(mode)
         synchronized(lock) {
             cameraFailed = false
-            engine.startCalibration(mode, reuse)
+            engine.startCalibration(mode, reuse, fallback = savedExtremes())
         }
         refresh()
     }
@@ -155,6 +161,13 @@ class DefaultHeadTracker(
     }
 
     override fun refreshPermission() = refresh()
+
+    /** The active rider's saved extremes, however old: the fallback for a step that keeps failing. */
+    private fun savedExtremes(): HeadCalibration? {
+        val profileId = activeProfileId.value ?: return null
+        val (loadedFor, saved) = savedForProfile ?: return null
+        return saved.takeIf { loadedFor == profileId }
+    }
 
     private fun reusableExtremes(mode: TrackerMode): HeadCalibration? {
         val profileId = activeProfileId.value ?: return null

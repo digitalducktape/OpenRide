@@ -16,17 +16,25 @@ data class HeadTrackerConfig(
      */
     val filterMinCutoffHz: Double = 0.5,
     /**
-     * How fast the cutoff rises with speed. 0.3 keeps bounce smooth while a deliberate lean
-     * (several lean units per second) still arrives within ~100 ms of the raw signal.
+     * How fast the cutoff rises with speed. Bike run 2 felt capped ("could only go so fast"): at
+     * 0.3 the filter's time constant was ~145-230 ms at the rider's lean speeds. 0.7 halves the
+     * lag of a recorded lean or return (raw halfway -> output halfway: median 67 -> 34 ms, p90
+     * 100 -> 76 ms) while seated wobble and pedal bounce, which are slow, stay filtered.
      */
-    val filterBeta: Double = 0.3,
+    val filterBeta: Double = 0.7,
     val filterDerivativeCutoffHz: Double = 1.0,
     /**
-     * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. 0.3 (about
-     * 0.04 of frame width) removed all steering during the recorded knob glance and nearly all
-     * during the sprint.
+     * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. Bike run 2
+     * showed 0.3 was too wide: 53% of tracking frames read exactly 0 and small corrections felt
+     * imprecise. 0.15 (about 0.02 of frame width) still keeps the recorded knob glance, seated
+     * riding and sprint wobble below visible steering.
      */
-    val deadZone: Double = 0.3,
+    val deadZone: Double = 0.15,
+    /**
+     * Soft edge beyond [deadZone]: the output eases in over this much lean instead of starting
+     * with a step in slope, so leaving the dead zone is smooth.
+     */
+    val deadZoneRamp: Double = 0.4,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 
@@ -53,6 +61,18 @@ data class HeadTrackerConfig(
     val minDepthDelta: Double = 0.04,
     /** Calibration gives up with [UnavailableReason.NO_FACE] after this many no-face attempts. */
     val maxNoFaceAttempts: Int = 2,
+    /**
+     * Attempts per step before calibration stops retrying it (any reason but no face) and falls
+     * back: the previous extremes, else [defaultLeftDx]/[defaultRightDx] (depth: previous, else
+     * none); for the centre, the median of its last attempt. On bike run 2 unlimited retries let
+     * one step reach attempt 5 and one recalibration take 21.6 s.
+     */
+    val maxAttemptsPerStep: Int = 3,
+    /** How long a step that fell back shows `used_default` before calibration moves on. */
+    val fallbackNoticeMs: Long = 1_500,
+    /** Fallback leans (frame widths) with no previous extremes: the spike rider's held leans. */
+    val defaultLeftDx: Double = -0.15,
+    val defaultRightDx: Double = 0.15,
 
     // --- standing -----------------------------------------------------------------------------
     /** Standing: face larger than this multiple of the seated baseline... */
