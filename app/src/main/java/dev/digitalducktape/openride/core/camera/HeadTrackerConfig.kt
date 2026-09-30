@@ -61,6 +61,18 @@ data class HeadTrackerConfig(
     val minDepthDelta: Double = 0.04,
     /** Calibration gives up with [UnavailableReason.NO_FACE] after this many no-face attempts. */
     val maxNoFaceAttempts: Int = 2,
+    /**
+     * Attempts per step before calibration stops retrying it (any reason but no face) and falls
+     * back: the previous extremes, else [defaultLeftDx]/[defaultRightDx] (depth: previous, else
+     * none); for the centre, the median of its last attempt. On bike run 2 unlimited retries let
+     * one step reach attempt 5 and one recalibration take 21.6 s.
+     */
+    val maxAttemptsPerStep: Int = 3,
+    /** How long a step that fell back shows `used_default` before calibration moves on. */
+    val fallbackNoticeMs: Long = 1_500,
+    /** Fallback leans (frame widths) with no previous extremes: the spike rider's held leans. */
+    val defaultLeftDx: Double = -0.15,
+    val defaultRightDx: Double = 0.15,
 
     // --- standing -----------------------------------------------------------------------------
     /** Standing: face larger than this multiple of the seated baseline... */

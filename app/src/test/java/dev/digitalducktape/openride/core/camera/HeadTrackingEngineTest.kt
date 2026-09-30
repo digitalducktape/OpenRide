@@ -172,6 +172,27 @@ class HeadTrackingEngineTest {
         assertTrue("depth during glance: ${states.maxOf { abs(it.leanDepth) }}", states.all { abs(it.leanDepth) < 0.05 })
     }
 
+    @Test
+    fun `a lean that falls back to the default is used and reported, but not saved as the rider's`() {
+        engine.setMode(TrackerMode.LEAN_X)
+        engine.startCalibration(TrackerMode.LEAN_X, reuse = null)
+        val centreMs = config.centreSettleMs + config.centreCaptureMs
+        val extremeMs = config.extremeSettleMs + config.extremeCaptureMs
+        val script = FrameScript()
+            .hold(centreMs, SEATED)
+            .hold(3 * extremeMs + config.fallbackNoticeMs + 200, SEATED.shifted(dx = -0.02)) // too small x3
+            .hold(extremeMs + 100, SEATED.shifted(dx = RIGHT_LEAN_DX))
+            .hold(200, SEATED)
+        val states = engine.play(script).map { it.second }
+
+        assertTrue(states.any { it.calibration?.retryReason == CalibrationRetryReason.USED_DEFAULT })
+        val last = states.last()
+        assertEquals(TrackerState.TRACKING, last.trackerState)
+        assertEquals(setOf(CalibrationStep.LEFT), last.calibrationDefaults)
+        assertEquals(config.defaultLeftDx, engine.calibration!!.leftDx, 0.0)
+        assertTrue("defaulted extremes must not be saved: $saved", saved.isEmpty())
+    }
+
     // --- standing and posture baselines ---------------------------------------------------
 
     @Test

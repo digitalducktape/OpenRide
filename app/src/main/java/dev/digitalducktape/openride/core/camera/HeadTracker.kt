@@ -145,7 +145,7 @@ class DefaultHeadTracker(
         val reuse = if (force) null else reusableExtremes(mode)
         synchronized(lock) {
             cameraFailed = false
-            engine.startCalibration(mode, reuse)
+            engine.startCalibration(mode, reuse, fallback = savedExtremes())
         }
         refresh()
     }
@@ -161,6 +161,13 @@ class DefaultHeadTracker(
     }
 
     override fun refreshPermission() = refresh()
+
+    /** The active rider's saved extremes, however old: the fallback for a step that keeps failing. */
+    private fun savedExtremes(): HeadCalibration? {
+        val profileId = activeProfileId.value ?: return null
+        val (loadedFor, saved) = savedForProfile ?: return null
+        return saved.takeIf { loadedFor == profileId }
+    }
 
     private fun reusableExtremes(mode: TrackerMode): HeadCalibration? {
         val profileId = activeProfileId.value ?: return null

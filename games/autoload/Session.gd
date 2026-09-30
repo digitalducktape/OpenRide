@@ -17,7 +17,8 @@ signal session_resumed
 ## step: "centre", "left", "right", "in" or "back"; fraction: 0..1 through it (restarts on a retry);
 ## step_index / step_count: 0-based position in this calibration (1 step when only the centre is
 ## re-taken, 3 for lean_x, 5 for lean_2d); attempt: 1, then 2+ on retries; retry_reason: "" on a
-## first attempt, else "unstable", "no_face", "too_small" or "wrong_direction".
+## first attempt, else "unstable", "no_face", "too_small" or "wrong_direction"; "used_default" when
+## the step failed 3 times and calibration moves on with the previous or default value.
 signal calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String)
 signal session_finished(summary: Dictionary)
 
