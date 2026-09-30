@@ -293,6 +293,17 @@ func test_the_overlay_draws_every_calibration_field() -> void:
 	assert_str(overlay._retry.text).is_empty()
 
 
+func test_the_overlay_explains_a_step_that_fell_back() -> void:
+	_start(_plan([_seg()]))
+	var overlay := director.calibration
+	Session._on_calibration_progress("centre", 0.5, 0, 3, 3, "used_default")
+	overlay._process(0.0)
+	assert_str(overlay.mode).is_equal("calibrating")
+	assert_str(overlay._retry.text).is_equal("Using your usual range; recalibrate later if steering feels off")
+	assert_str(overlay._count.text).is_empty()  # no 3-2-1 over the fallback notice
+	assert_str(overlay._detail.text).is_equal("CALIBRATING  ·  STEP 1 OF 3  ·  TRY 3")
+
+
 func test_the_overlay_reports_an_unavailable_camera() -> void:
 	_start(_plan([_seg()]))
 	var overlay := director.calibration
