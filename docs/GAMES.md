@@ -779,6 +779,20 @@ For generated audio (#36):
 
   `audio_bench` times every style's 16-bar render, serial and parallel. With `--wav`, it
   writes a mix of each style and every effect as `.wav` files to listen to.
+- **On the tablet:** every music render logs
+  `OPENRIDE_GAMES music <style> <bpm> bpm <bars> bars: rendered in <ms> ms` (or `cache hit`).
+  To time every style with a game running, create the flag file in a debuggable build's
+  `user://`, then open the games host:
+
+  ```sh
+  adb shell run-as dev.digitalducktape.openride touch files/audio_bench   # mock build
+  adb logcat -s godot | grep -E "audio_bench|music|frame fps"
+  ```
+
+  15 s after the engine starts, `Cues.gd` deletes the flag and times each style's uncached
+  16-bar render at 90 bpm on a `WorkerThreadPool` thread
+  (`OPENRIDE_GAMES audio_bench style=… ms=…`). The `frame fps=` lines show the game's frame
+  rate meanwhile.
 
 `sim_demo_check` plays a three-segment local circuit at 4× speed:
 

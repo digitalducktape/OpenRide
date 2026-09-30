@@ -76,16 +76,22 @@ static func render(style: MusicStyle, tempo_bpm: float, music_seed: int, bars :=
 	tempo_bpm = music_tempo(style, tempo_bpm)
 	bars = maxi(1, bars)
 	var key := cache_key(style, tempo_bpm, music_seed, bars)
+	var started := Time.get_ticks_usec()
 	if cache_enabled:
 		var cached := _load_cache(key)
 		if not cached.is_empty():
+			print("OPENRIDE_GAMES music %s %.1f bpm %d bars: cache hit in %d ms" % [style.name, tempo_bpm, bars,
+				(Time.get_ticks_usec() - started) / 1000])
 			return cached
 	var samples := render_samples(style, tempo_bpm, music_seed, bars)
 	var stems := {}
 	for stem in STEMS:
 		stems[stem] = Dsp.to_wav(samples[stem], true)
+	var render_ms := (Time.get_ticks_usec() - started) / 1000
 	if cache_enabled:
 		_save_cache(key, stems)
+	print("OPENRIDE_GAMES music %s %.1f bpm %d bars: rendered in %d ms (%s)" % [style.name, tempo_bpm, bars,
+		render_ms, "parallel" if parallel else "serial"])
 	return stems
 
 
