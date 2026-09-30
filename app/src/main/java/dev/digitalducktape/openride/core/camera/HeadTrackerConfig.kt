@@ -22,11 +22,17 @@ data class HeadTrackerConfig(
     val filterBeta: Double = 0.3,
     val filterDerivativeCutoffHz: Double = 1.0,
     /**
-     * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. 0.3 (about
-     * 0.04 of frame width) removed all steering during the recorded knob glance and nearly all
-     * during the sprint.
+     * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. Bike run 2
+     * showed 0.3 was too wide: 53% of tracking frames read exactly 0 and small corrections felt
+     * imprecise. 0.15 (about 0.02 of frame width) still keeps the recorded knob glance, seated
+     * riding and sprint wobble below visible steering.
      */
-    val deadZone: Double = 0.3,
+    val deadZone: Double = 0.15,
+    /**
+     * Soft edge beyond [deadZone]: the output eases in over this much lean instead of starting
+     * with a step in slope, so leaving the dead zone is smooth.
+     */
+    val deadZoneRamp: Double = 0.3,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 

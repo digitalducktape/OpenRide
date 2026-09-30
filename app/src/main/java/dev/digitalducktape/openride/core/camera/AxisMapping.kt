@@ -44,11 +44,17 @@ class AxisMapping(
 }
 
 /**
- * A centre dead zone of half-width [zone] that keeps the output continuous: values inside read 0,
- * and the rest is rescaled so ±1 still maps to ±1. Clamped to ±1.
+ * A centre dead zone of half-width [zone] with a soft edge: values inside read 0; over the next
+ * [ramp] the output eases in quadratically (slope 0 at the edge, so leaving the zone never jumps),
+ * then grows linearly so ±1 still maps to ±1. Continuous with a continuous slope; clamped to ±1.
+ * With [ramp] 0 it is the plain rescaled dead zone.
  */
-fun deadZone(value: Double, zone: Double): Double {
+fun deadZone(value: Double, zone: Double, ramp: Double = 0.0): Double {
     val magnitude = abs(value)
     if (magnitude <= zone) return 0.0
-    return (sign(value) * (magnitude - zone) / (1.0 - zone)).coerceIn(-1.0, 1.0)
+    val u = magnitude - zone
+    val span = 1.0 - zone
+    val r = ramp.coerceIn(0.0, span)
+    val eased = if (u < r) u * u / (2 * r) else u - r / 2
+    return (sign(value) * eased / (span - r / 2)).coerceIn(-1.0, 1.0)
 }
