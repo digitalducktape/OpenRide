@@ -5,13 +5,22 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.digitalducktape.openride.games.GameHostActivity
+import dev.digitalducktape.openride.games.session.JustRideMode
+import dev.digitalducktape.openride.games.session.SessionRequest
 
 /**
  * Quick access to stock Android settings from within the app (PRD user story: "I want to
@@ -31,13 +40,31 @@ fun SettingsShortcutsRow(modifier: Modifier = Modifier) {
         OutlinedButton(onClick = { launchSettings(context, Settings.ACTION_SETTINGS) }) {
             Text("Device Settings")
         }
-        // Mini-games foundation (#32): a way into the Godot host until the Games hub (#38)
-        // replaces it with a real tab.
-        OutlinedButton(onClick = { context.startActivity(GameHostActivity.intent(context)) }) {
-            Text("Mini-games (preview)")
+        // Mini-games (#32, #35): a way into the Godot host until the Games hub (#38) replaces
+        // it with a real tab. Each session records a ride.
+        Box {
+            var open by remember { mutableStateOf(false) }
+            OutlinedButton(onClick = { open = true }) { Text("Mini-games (preview)") }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                PREVIEW_RIDES.forEach { (label, request) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            open = false
+                            context.startActivity(GameHostActivity.intent(context, request))
+                        },
+                    )
+                }
+            }
         }
     }
 }
+
+/** The preview's Just Rides of the demo game (#35). */
+private val PREVIEW_RIDES = listOf(
+    "Demo · 20 min" to SessionRequest.JustRide("demo", JustRideMode.Timed(20)),
+    "Demo · open-ended" to SessionRequest.JustRide("demo", JustRideMode.Open),
+)
 
 /** Launches a stock Android settings screen by [action] (e.g. [Settings.ACTION_WIFI_SETTINGS]). */
 fun launchSettings(context: Context, action: String) {
