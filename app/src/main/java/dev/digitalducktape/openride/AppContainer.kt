@@ -3,7 +3,11 @@ package dev.digitalducktape.openride
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -45,6 +49,7 @@ import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.toTrackerReading
 import dev.digitalducktape.openride.games.session.GameSessionManager
+import dev.digitalducktape.openride.games.session.OtherMusicDetector
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
@@ -237,11 +242,33 @@ class AppContainer(private val applicationContext: Context) {
             activeProfileId = { activeProfileHolder.activeProfileId.value },
             profileFtp = { profileRepository.getProfile(it)?.ftp },
             tracker = TrackerLink(headTracker, gameBridge, scope, log),
-            otherMusicActive = {
-                (applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
-            },
+            otherMusicActive = otherMusicDetector::otherMusicActive,
             log = log,
         )
+    }
+
+    /**
+     * Tells the rider's own music from the Godot engine's player, for game music on "auto"
+     * (#35). The games host calls [OtherMusicDetector.engineStarting] before the engine starts.
+     */
+    val otherMusicDetector: OtherMusicDetector by lazy {
+        val audioManager = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        OtherMusicDetector(
+            players = {
+                audioManager.activePlaybackConfigurations
+                    .filter { it.audioAttributes.usage == AudioAttributes.USAGE_MEDIA }
+            },
+            musicActive = { audioManager.isMusicActive },
+        ).also { detector ->
+            audioManager.registerAudioPlaybackCallback(
+                object : AudioManager.AudioPlaybackCallback() {
+                    override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>?) {
+                        detector.observe()
+                    }
+                },
+                Handler(Looper.getMainLooper()),
+            )
+        }
     }
 
     /** The Classes tab's configured source list — seeded catalog plus rider additions. */

@@ -79,7 +79,7 @@ class GameSessionManager(
     private val tracker: TrackerLink? = null,
     private val catalog: GameCatalog = GameCatalog.DEFAULT,
     private val audioPrefs: () -> GameAudioPrefs = { GameAudioPrefs() },
-    /** `AudioManager.isMusicActive()`: the rider's own music is playing. */
+    /** The rider's own music (another app's) is playing: [OtherMusicDetector] in the app. */
     private val otherMusicActive: () -> Boolean = { false },
     private val random: Random = Random.Default,
     private val log: (String) -> Unit = {},
@@ -94,7 +94,6 @@ class GameSessionManager(
     private var request: SessionRequest? = null
     private var onExit: () -> Unit = {}
     private var plan: SessionPlan? = null
-    private var audio = GameAudioPrefs().resolve(otherMusicActive = false)
     private var sessionJob: Job? = null
     private var savingJob: Job? = null
     private var segment: SegmentStartMessage? = null
@@ -234,7 +233,6 @@ class GameSessionManager(
         }
         plan = built
         profileId = pid
-        audio = audioPrefs().resolve(otherMusicActive())
         recording = startRide(pid, built.planId)
         log("session_started ${built.planId} (${built.difficulty}, FTP ${ftp.watts} W, recording=$recording)")
         tracker?.start()
@@ -275,7 +273,8 @@ class GameSessionManager(
             difficulty = current.difficulty,
             effort = planned.effort,
             seed = random.nextLong(0, Int.MAX_VALUE.toLong()),
-            audio = audio,
+            // Re-checked every segment, so the rider's music starting or stopping mid-session counts.
+            audio = audioPrefs().resolve(otherMusicActive()),
             params = planned.params,
         )
         segment = message

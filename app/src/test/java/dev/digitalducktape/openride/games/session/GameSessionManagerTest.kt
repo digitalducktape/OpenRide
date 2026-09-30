@@ -81,6 +81,7 @@ class GameSessionManagerTest {
         ftp: Int? = 200,
         otherMusic: Boolean = false,
         tracker: TrackerLink? = null,
+        otherMusicNow: (() -> Boolean)? = null,
     ) = GameSessionManager(
         signals = signals,
         scope = scope,
@@ -90,7 +91,7 @@ class GameSessionManagerTest {
         profileFtp = { ftp },
         tracker = tracker,
         catalog = catalog,
-        otherMusicActive = { otherMusic },
+        otherMusicActive = otherMusicNow ?: { otherMusic },
         random = Random(7),
     )
 
@@ -181,6 +182,21 @@ class GameSessionManagerTest {
         val audio = signals.payload("segment_started")["audio"]!!.jsonObject
         assertFalse(audio["music"]!!.jsonPrimitive.boolean)
         assertEquals(1.0, audio["sfx_volume"]!!.jsonPrimitive.double, 0.0)
+    }
+
+    @Test
+    fun `game music is re-checked at every segment start`() {
+        var riderMusic = true
+        val m = manager(otherMusicNow = { riderMusic }).play(SessionRequest.Circuit("circuit-20"))
+        riderMusic = false
+        m.report(skipped = true, gameId = "demo")
+        riderMusic = true
+        m.report(skipped = true, gameId = "demo")
+
+        assertEquals(
+            listOf(false, true, false),
+            signals.payloads("segment_started").map { it["audio"]!!.jsonObject["music"]!!.jsonPrimitive.boolean },
+        )
     }
 
     @Test

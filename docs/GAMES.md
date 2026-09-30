@@ -253,9 +253,16 @@ rider has no FTP, so 150 W was used and the hub should nudge), plus one power fi
 Game-specific params come from the game's `GameDeclaration.params` (the demo sends
 `cadence_floor`).
 
-**Audio.** `segment.audio` is decided once per session from `GameAudioPrefs`. With game music
-on "auto" (the default), `music` is false while `AudioManager.isMusicActive()`. Effects always
-play. The hub (#38) will store the setting and volumes; until then the defaults apply.
+**Audio.** `segment.audio` is decided at each segment's start from `GameAudioPrefs`, so music
+the rider starts or stops mid-session counts from the next segment. With game music on "auto"
+(the default), `music` is false while another app's music plays. Effects always play.
+
+- `AudioManager.isMusicActive()` alone can't tell, because Godot's own media player keeps it
+  true, and API 29-34 don't say which app a player belongs to (`getClientUid()` is a hidden
+  system API).
+- So `OtherMusicDetector` tells players apart by identity. The players that exist before the
+  engine starts are other apps'. Those that appear in the next 10 s are the engine's.
+- Known limit: another app's paused player still counts as its music while it exists. The hub (#38) will store the setting and volumes; until then the defaults apply.
 
 **Recording.** The ride goes through the app's own `RideSessionManager`, so it is an ordinary
 ride in History, exports and backups:

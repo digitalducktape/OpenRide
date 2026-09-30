@@ -44,6 +44,8 @@ class GameHostActivity : GodotActivity() {
         get() = appContainer.gameSessionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before the engine starts: players that exist now are other apps' music, not Godot's.
+        appContainer.otherMusicDetector.engineStarting()
         // Attach before the engine starts so its first frame poll finds the session.
         startSession(intent)
         super.onCreate(savedInstanceState)

@@ -19,9 +19,9 @@ data class GameAudioPrefs(
     val sfxVolume: Double = 1.0,
 ) {
     /**
-     * `segment.audio` for a session, decided once at its start. With [GameMusicMode.AUTO], game
-     * music stays off when [otherMusicActive] (`AudioManager.isMusicActive()`: the rider brought
-     * their own); effects always play.
+     * `segment.audio`, decided at each segment's start. With [GameMusicMode.AUTO], game music
+     * stays off when [otherMusicActive] (the rider brought their own, see [OtherMusicDetector]);
+     * effects always play.
      */
     fun resolve(otherMusicActive: Boolean) = AudioSettings(
         music = when (music) {
