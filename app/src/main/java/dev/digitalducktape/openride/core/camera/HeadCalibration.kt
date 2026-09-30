@@ -19,6 +19,9 @@ import kotlinx.serialization.json.Json
  * @param rightDx face-x offset of a comfortable lean to the right; opposite sign to [leftDx].
  * @param inRatio face size when leaning in, over the centre size (> 1). `lean_2d` only.
  * @param backRatio face size when sat back, over the centre size (< 1). `lean_2d` only.
+ * @param yawMinDeg / [yawMaxDeg] the head yaw seen while the rider held the centre and the leans
+ *   (keypoint estimate). The look-away gate allows this range plus a margin. Null in
+ *   calibrations saved before it existed; the session's centre step then supplies the range.
  */
 @Serializable
 data class HeadCalibration(
@@ -28,6 +31,8 @@ data class HeadCalibration(
     val inRatio: Double? = null,
     val backRatio: Double? = null,
     val calibratedAtEpochMs: Long,
+    val yawMinDeg: Double? = null,
+    val yawMaxDeg: Double? = null,
 ) {
     val hasDepth: Boolean get() = inRatio != null && backRatio != null
 

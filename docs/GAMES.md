@@ -147,6 +147,10 @@ playable this way.
   never saved as the rider's.
 - The camera stops when the session finishes or the rider leaves games.
 - Face lost: the lean holds for 0.5 s, then eases to centre, and `tracker_state` becomes 4 after 3 s.
+- Looking away counts as face lost. The detector often keeps the face when the rider turns the head
+  from the screen, so the tracker also compares head yaw with the range the rider showed while
+  calibrating (plus 25°). After 300 ms beyond it, steering holds and eases to centre, and
+  `tracker_state` becomes 4 as above. It resumes once the rider has faced the screen for 300 ms.
   Standing needs 0.5 s to enter and 1.5 s to leave.
 
 ### Implementation notes

@@ -109,3 +109,68 @@ class AdaptiveDeadZone(private val config: HeadTrackerConfig) {
         lastMs = null
     }
 }
+
+/**
+ * "Not looking at the screen": the face is still detected, but its yaw has left the range the
+ * rider showed while calibrating. Frames beyond the range ± [HeadTrackerConfig.lookAwayYawMarginDeg]
+ * are rejected one by one. Once rejections have lasted [HeadTrackerConfig.lookAwayLatchMs]
+ * (frames with no face don't interrupt that), the gate latches and rejects every frame, including
+ * the in-range ones a head passes through while turning, until the face has stayed within the
+ * range, frame after frame, for [HeadTrackerConfig.lookAwayReleaseMs]. The engine treats rejected frames as a lost face:
+ * hold, ease to centre, then `face lost`.
+ *
+ * Not thread-safe.
+ */
+class LookAwayGate(private val config: HeadTrackerConfig) {
+    private var min: Double? = null
+    private var max: Double? = null
+    private var outsideSinceMs: Long? = null
+    private var insideSinceMs: Long? = null
+
+    /** Latched: the rider is looking away. */
+    var lookingAway = false
+        private set
+
+    /** The allowed yaw range; null disables the gate. */
+    fun setRange(minDeg: Double?, maxDeg: Double?) {
+        min = minDeg
+        max = maxDeg
+        reset()
+    }
+
+    /** True when [face] must not be used for steering. */
+    fun reject(timestampMs: Long, face: FaceObservation): Boolean {
+        val lo = min ?: return false
+        val hi = max ?: return false
+        val outside = face.yawDeg < lo - config.lookAwayYawMarginDeg || face.yawDeg > hi + config.lookAwayYawMarginDeg
+        if (outside) {
+            insideSinceMs = null
+            val since = outsideSinceMs ?: timestampMs.also { outsideSinceMs = it }
+            if (timestampMs - since >= config.lookAwayLatchMs) lookingAway = true
+            return true
+        }
+        if (!lookingAway) {
+            outsideSinceMs = null
+            return false
+        }
+        val back = insideSinceMs ?: timestampMs.also { insideSinceMs = it }
+        if (timestampMs - back >= config.lookAwayReleaseMs) {
+            lookingAway = false
+            outsideSinceMs = null
+            insideSinceMs = null
+            return false
+        }
+        return true
+    }
+
+    /** A frame without a face: it continues a look-away, but doesn't count as looking back. */
+    fun onNoFace() {
+        insideSinceMs = null
+    }
+
+    fun reset() {
+        lookingAway = false
+        outsideSinceMs = null
+        insideSinceMs = null
+    }
+}

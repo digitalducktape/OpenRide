@@ -24,6 +24,14 @@ class HeadCalibrationTest {
     }
 
     @Test
+    fun `the look-away yaw range round-trips, and calibrations saved before it still load`() {
+        val withYaw = leanOnly.copy(yawMinDeg = -9.8, yawMaxDeg = 3.1)
+        assertEquals(withYaw, HeadCalibration.fromJson(withYaw.toJson()))
+        val older = """{"version":1,"leftDx":-0.16,"rightDx":0.18,"calibratedAtEpochMs":1790000000000}"""
+        assertEquals(leanOnly, HeadCalibration.fromJson(older))
+    }
+
+    @Test
     fun `JSON carries a schema version`() {
         assertTrue(leanOnly.toJson().contains("\"version\":1"))
     }
