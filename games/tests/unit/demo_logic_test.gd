@@ -118,3 +118,14 @@ func test_perfect_play_at_1x_misses_three_stars() -> void:
 		var per_minute: float = 60.0 / DemoLogic.LEVELS[difficulty].spawn_sec * (DemoLogic.DODGE_POINTS + DemoLogic.STREAK_BONUS_MAX)
 		assert_int(Stars.count(per_minute, info.star_thresholds[difficulty])).is_equal(2)
 		assert_int(Stars.count(per_minute * 1.3 * 0.85, info.star_thresholds[difficulty])).is_equal(3)
+
+
+func test_a_patchy_first_ride_earns_a_star() -> void:
+	# The bike's first 280 s Just Ride on standard: 1377 points, cadence mostly near the floor.
+	var info := GameRegistry.info("demo")
+	assert_int(Stars.for_score(1377.0, info, "standard", 280.0)).is_equal(1)
+	# Dodging about half the balls above the floor, with short streaks, is still one star.
+	var half_per_minute: float = 0.5 * 60.0 / DemoLogic.LEVELS.standard.spawn_sec * (DemoLogic.DODGE_POINTS + 1.0)
+	assert_int(Stars.count(half_per_minute, info.star_thresholds.standard)).is_equal(1)
+	# Scoring almost nothing earns nothing.
+	assert_int(Stars.for_score(42.0, info, "standard", 60.0)).is_equal(0)

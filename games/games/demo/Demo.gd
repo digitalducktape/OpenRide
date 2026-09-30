@@ -42,11 +42,16 @@ func info() -> GameInfo:
 	i.tracker_mode = "lean_x"
 	i.effort_in_just_ride = true
 	i.stars_per_minute = true
-	# Points per minute. 3 stars needs about 1.3× effort: a perfect run at 1.0× stays below.
+	# Points per minute of gameplay, against a perfect run at 1.0× (every ball dodged at the
+	# full streak bonus): 750 / 1000 / 1286 a minute on easy / standard / hard.
+	#   1 star: about 20% of that, for play that scores at all steadily. The bike's first
+	#     rides (about 300 a minute, pedalling near the cadence floor) earned nothing at 30%.
+	#   2 stars: about 55%, for dodging most balls above the floor.
+	#   3 stars: above a perfect 1.0× run, so it needs the effort multiplier (about 1.3×).
 	i.star_thresholds = {
-		"easy": [220, 480, 760],
-		"standard": [300, 650, 1020],
-		"hard": [390, 850, 1300],
+		"easy": [150, 410, 760],
+		"standard": [200, 550, 1020],
+		"hard": [260, 700, 1300],
 	}
 	return i
 
