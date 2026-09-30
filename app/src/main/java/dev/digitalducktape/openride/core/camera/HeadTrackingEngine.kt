@@ -52,6 +52,7 @@ class HeadTrackingEngine(
     private val leanFilter = newFilter()
     private val depthFilter = newFilter()
     private val leanDeadZone = AdaptiveDeadZone(config)
+    private val lookAway = LookAwayGate(config)
     private val standingDetector = StandingDetector(config)
     private val standingSamples = mutableListOf<Double>()
     private var standingCx: Double? = null
@@ -105,6 +106,7 @@ class HeadTrackingEngine(
     fun resetSession() {
         centre = null
         calibration = null
+        lookAway.setRange(null, null)
         calibrationDefaults = emptySet()
         leanAxis = null
         depthAxis = null
@@ -137,7 +139,16 @@ class HeadTrackingEngine(
 
         if (centre == null || noFace) return state
 
-        if (face == null) onNoFace(timestampMs) else onFace(timestampMs, face)
+        when {
+            face == null -> {
+                lookAway.onNoFace()
+                onNoFace(timestampMs)
+            }
+            // Looking away: the face is there but not facing the screen; steer as if it were lost.
+            lookAway.reject(timestampMs, face) -> onNoFace(timestampMs)
+            else -> onFace(timestampMs, face)
+        }
+        if (state.lookingAway != lookAway.lookingAway) state = state.copy(lookingAway = lookAway.lookingAway)
         return state
     }
 
@@ -153,7 +164,15 @@ class HeadTrackingEngine(
             inRatio = result.inRatio,
             backRatio = result.backRatio,
             calibratedAtEpochMs = wallClockMs(),
+            yawMinDeg = result.yawMinDeg,
+            yawMaxDeg = result.yawMaxDeg,
         ).also { if (measuredAll) onFullCalibration(it) }
+        // The look-away gate allows the yaw seen now (at least the centre) and when the extremes
+        // were measured.
+        lookAway.setRange(
+            listOfNotNull(result.yawMinDeg, extremes.yawMinDeg).minOrNull(),
+            listOfNotNull(result.yawMaxDeg, extremes.yawMaxDeg).maxOrNull(),
+        )
         pendingReuse = null
         calibration = extremes
         leanAxis = AxisMapping.fromExtremes(extremes.leftDx, extremes.rightDx, config.fullLockFraction)
@@ -259,6 +278,7 @@ class HeadTrackingEngine(
     private fun clearTracking() {
         leanFilter.reset()
         leanDeadZone.reset()
+        lookAway.reset()
         depthFilter.reset()
         standingDetector.reset()
         standingSamples.clear()

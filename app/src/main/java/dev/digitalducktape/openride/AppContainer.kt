@@ -161,8 +161,9 @@ class AppContainer(private val applicationContext: Context) {
             HEAD_FRAMES_TAG,
             String.format(
                 java.util.Locale.US,
-                "raw=%+.3f lean=%+.3f depth=%+.3f standing=%d state=%d fixture=%s",
+                "raw=%+.3f lean=%+.3f depth=%+.3f standing=%d state=%d away=%d fixture=%s",
                 state.rawLeanX, state.leanX, state.leanDepth, if (state.standing) 1 else 0, state.trackerState.code,
+                if (state.lookingAway) 1 else 0,
                 HeadFixtureCsv.format(HeadFixtureCsv.Row(timestampMs, "live", face, bikeDataSource.metrics.value.cadenceRpm)),
             ),
         )

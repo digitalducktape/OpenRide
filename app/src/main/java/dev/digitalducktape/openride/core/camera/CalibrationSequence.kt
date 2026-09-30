@@ -16,6 +16,9 @@ data class CalibrationResult(
     val backRatio: Double? = null,
     /** Steps that fell back to a previous or default value after too many attempts. */
     val usedDefaults: Set<CalibrationStep> = emptySet(),
+    /** Head yaw range over the measured steps' capture windows, or null if none was measured. */
+    val yawMinDeg: Double? = null,
+    val yawMaxDeg: Double? = null,
 )
 
 /**
@@ -66,6 +69,8 @@ class CalibrationSequence(
     private var inRatio: Double? = null
     private var backRatio: Double? = null
     private val usedDefaults = mutableSetOf<CalibrationStep>()
+    private var yawMin: Double? = null
+    private var yawMax: Double? = null
     /** While a fallen-back step shows its notice: when the notice ends. */
     private var noticeUntilMs: Long? = null
 
@@ -113,7 +118,13 @@ class CalibrationSequence(
 
         // The step's time is up: judge it. This frame is the first of whatever comes next.
         val failure = evaluate(step)
-        if (failure == null) return advance(timestampMs)
+        if (failure == null) {
+            for (face in captured) {
+                yawMin = minOf(yawMin ?: face.yawDeg, face.yawDeg)
+                yawMax = maxOf(yawMax ?: face.yawDeg, face.yawDeg)
+            }
+            return advance(timestampMs)
+        }
         if (failure == CalibrationRetryReason.NO_FACE && ++noFaceFailures >= config.maxNoFaceAttempts) {
             outcome = Outcome.FailedNoFace
             return outcome
@@ -135,7 +146,7 @@ class CalibrationSequence(
     private fun advance(timestampMs: Long): Outcome {
         if (stepIndex == steps.lastIndex) {
             outcome = Outcome.Completed(
-                CalibrationResult(centre!!, leftDx, rightDx, inRatio, backRatio, usedDefaults.toSet()),
+                CalibrationResult(centre!!, leftDx, rightDx, inRatio, backRatio, usedDefaults.toSet(), yawMin, yawMax),
             )
             return outcome
         }

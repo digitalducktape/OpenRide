@@ -145,3 +145,51 @@ class AdaptiveDeadZoneTest {
         assertEquals(deadZone(0.3, config.deadZone, config.deadZoneRamp), y, 0.01)
     }
 }
+
+class LookAwayGateTest {
+    private val config = HeadTrackerConfig()
+    private fun face(yaw: Double) = SEATED.copy(yawDeg = yaw)
+    private fun gate() = LookAwayGate(config).apply { setRange(-10.0, 5.0) }
+
+    @Test
+    fun `with no calibrated range nothing is rejected`() {
+        val gate = LookAwayGate(config)
+        assertFalse(gate.reject(0, face(90.0)))
+    }
+
+    @Test
+    fun `yaw within the calibrated range plus the margin is used`() {
+        val gate = gate()
+        for (i in 0 until 60) assertFalse(gate.reject(i * 33L, face(if (i % 2 == 0) -34.0 else 29.0)))
+        assertFalse(gate.lookingAway)
+    }
+
+    @Test
+    fun `a single glitch frame is dropped but does not latch`() {
+        val gate = gate()
+        assertTrue(gate.reject(0, face(-90.0)))
+        assertFalse(gate.reject(33, face(0.0)))
+        assertFalse(gate.lookingAway)
+    }
+
+    @Test
+    fun `300 ms turned away latches, through missing frames, and rejects in-range frames until looking back`() {
+        val gate = gate()
+        assertTrue(gate.reject(0, face(90.0)))
+        gate.onNoFace() // the face flickers out mid-turn
+        assertTrue(gate.reject(310, face(80.0)))
+        assertTrue(gate.lookingAway)
+        // A frame passing through the range while turning is still rejected...
+        assertTrue(gate.reject(343, face(2.0)))
+        gate.onNoFace()
+        // ...and missing frames break a look back, so it must be 300 ms of face frames.
+        assertTrue(gate.reject(700, face(2.0)))
+        var t = 733L
+        while (t < 1_000) {
+            assertTrue(gate.reject(t, face(0.0)))
+            t += 33
+        }
+        assertFalse(gate.reject(t + 33, face(0.0)))
+        assertFalse(gate.lookingAway)
+    }
+}

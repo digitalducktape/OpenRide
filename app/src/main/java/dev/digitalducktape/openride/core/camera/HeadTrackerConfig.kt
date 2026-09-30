@@ -118,6 +118,20 @@ data class HeadTrackerConfig(
     /** Lean is measured from the standing baseline once standing has lasted this long. */
     val postureSwitchMs: Long = 2_000,
 
+    // --- looking away ------------------------------------------------------------------------
+    /**
+     * Looking away from the screen (bike run 4): the face stays detected but its keypoint yaw
+     * leaves the range seen during calibration. On run 4 the calibrated range was -9.8..+6.1;
+     * riding never went further than 25° outside it for more than one frame, while the
+     * look-aways sat at ±90° for seconds. A frame beyond the range ± this margin is not used
+     * for steering...
+     */
+    val lookAwayYawMarginDeg: Double = 25.0,
+    /** ...and after this long beyond it (missing-face frames don't interrupt), every frame is ignored... */
+    val lookAwayLatchMs: Long = 300,
+    /** ...until the face has been back within the range this long. */
+    val lookAwayReleaseMs: Long = 300,
+
     // --- face lost ----------------------------------------------------------------------------
     val faceLostHoldMs: Long = 500,
     val faceLostEaseMs: Long = 500,

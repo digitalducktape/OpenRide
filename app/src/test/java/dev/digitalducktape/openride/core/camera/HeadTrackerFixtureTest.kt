@@ -199,6 +199,18 @@ class HeadTrackerFixtureTest {
     }
 
     @Test
+    fun `the look-away gate never fires while riding the recorded protocol`() {
+        // Seated, leans (up to -49 degrees of ML Kit yaw), sprint, knob glance and standing.
+        val (_, replayed) = replay()
+        val gated = replayed.filter { it.state.lookingAway }
+        assertEquals(emptyList<String>(), gated.filter { it.step != "sit" }.map { "${it.step}@${it.timestampMs}" })
+        // Sitting down the second time the rider turned the head to -37..-42 degrees for ~370 ms
+        // (ML Kit yaw, which reads larger than the keypoint estimate the app now uses): at most
+        // a moment of held steering mid-transition.
+        assertTrue("gated while sitting: ${gated.size} frames", gated.size <= 5)
+    }
+
+    @Test
     fun `nothing seated reads as standing`() {
         val (_, replayed) = replay()
         val seated = setOf(

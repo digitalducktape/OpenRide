@@ -150,6 +150,12 @@ data class HeadTrackerState(
      * measurement, so the UI can suggest recalibrating. Empty when everything was measured.
      */
     val calibrationDefaults: Set<CalibrationStep> = emptySet(),
+    /**
+     * The face is detected but turned away from the screen (see [LookAwayGate]); steering holds
+     * and eases to centre as if the face were lost, and `trackerState` becomes `FACE_LOST` after
+     * [HeadTrackerConfig.faceLostStateMs].
+     */
+    val lookingAway: Boolean = false,
     val calibration: CalibrationProgress? = null,
     val unavailable: UnavailableReason? = null,
 ) {
