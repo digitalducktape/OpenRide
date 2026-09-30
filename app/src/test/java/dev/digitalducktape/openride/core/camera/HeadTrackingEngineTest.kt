@@ -151,6 +151,21 @@ class HeadTrackingEngineTest {
     }
 
     @Test
+    fun `a fast lean from one side to the other does not stall in the centre`() {
+        // Bike run 3: "a bit of hesitation in the centre when going from far left to right".
+        val script = engine.calibrateSynthetic()
+        engine.play(script.hold(1_000, SEATED.shifted(dx = LEFT_LEAN_DX)))
+        script.frames.clear()
+        val states = engine.play(
+            script.hold(600) { t -> SEATED.shifted(dx = LEFT_LEAN_DX + (RIGHT_LEAN_DX - LEFT_LEAN_DX) * t / 600) }
+                .hold(1_000, SEATED.shifted(dx = RIGHT_LEAN_DX)),
+        ).map { it.second }
+        val stalledMs = states.count { abs(it.leanX) < 0.1 } * 33
+        assertTrue("output sat within 0.1 of centre for $stalledMs ms", stalledMs <= 66)
+        assertEquals(1.0, states.last().leanX, 1e-6)
+    }
+
+    @Test
     fun `sprint bounce produces no visible steering`() {
         // Spike: wobble sd ~0.02 of frame width while sprinting; model it as a 0.025 bounce at
         // pedal frequency plus a slower 0.01 sway.

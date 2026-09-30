@@ -1,6 +1,7 @@
 package dev.digitalducktape.openride.core.camera
 
 import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.sign
 
 /**
@@ -57,4 +58,54 @@ fun deadZone(value: Double, zone: Double, ramp: Double = 0.0): Double {
     val r = ramp.coerceIn(0.0, span)
     val eased = if (u < r) u * u / (2 * r) else u - r / 2
     return (sign(value) * eased / (span - r / 2)).coerceIn(-1.0, 1.0)
+}
+
+/**
+ * The lean's dead zone, applied only while the head is near-still. At rest it is [deadZone] with
+ * its soft edge, which hides seated wobble. During a deliberate move (the filtered lean travels
+ * at least [HeadTrackerConfig.deadZoneMoveOn] within [HeadTrackerConfig.deadZoneMoveWindowMs];
+ * pedal bounce and seated wobble travel far less) the dead zone fades out and the output follows
+ * the filtered lean one-to-one, so a lean from one side to the other no longer stalls in the
+ * centre. Once the travel drops below [HeadTrackerConfig.deadZoneMoveOff] (hysteresis) it fades
+ * back in over [HeadTrackerConfig.deadZoneFadeBackMs].
+ *
+ * Trade-off: at full lock and at the centre both mappings agree, but a move that stops part-way
+ * (e.g. half a lean) settles from the one-to-one value back to the dead-zone curve.
+ *
+ * Not thread-safe; one per axis.
+ */
+class AdaptiveDeadZone(private val config: HeadTrackerConfig) {
+    /** 1 = full dead zone (at rest), 0 = pass-through (moving). */
+    var weight = 1.0
+        private set
+
+    var moving = false
+        private set
+
+    private val recent = ArrayDeque<Pair<Long, Double>>()
+    private var lastMs: Long? = null
+
+    fun apply(timestampMs: Long, value: Double): Double {
+        val dtMs = lastMs?.let { (timestampMs - it).coerceIn(0L, 200L) } ?: 0L
+        lastMs = timestampMs
+        recent.addLast(timestampMs to value)
+        while (recent.size > 1 && timestampMs - recent.first().first > config.deadZoneMoveWindowMs) recent.removeFirst()
+        val travel = abs(value - recent.first().second)
+        moving = if (moving) travel >= config.deadZoneMoveOff else travel >= config.deadZoneMoveOn
+
+        val target = if (moving) 0.0 else 1.0
+        val tauMs = if (moving) config.deadZoneFadeOutMs else config.deadZoneFadeBackMs
+        weight += (target - weight) * (1.0 - exp(-dtMs / tauMs.toDouble().coerceAtLeast(1.0)))
+
+        val zoned = deadZone(value, config.deadZone, config.deadZoneRamp)
+        if (weight >= 0.999) return zoned
+        return (weight * zoned + (1.0 - weight) * value.coerceIn(-1.0, 1.0)).coerceIn(-1.0, 1.0)
+    }
+
+    fun reset() {
+        weight = 1.0
+        moving = false
+        recent.clear()
+        lastMs = null
+    }
 }

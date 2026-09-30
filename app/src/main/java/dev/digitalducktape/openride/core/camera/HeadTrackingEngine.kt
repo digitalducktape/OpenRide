@@ -51,6 +51,7 @@ class HeadTrackingEngine(
     private var depthAxis: AxisMapping? = null
     private val leanFilter = newFilter()
     private val depthFilter = newFilter()
+    private val leanDeadZone = AdaptiveDeadZone(config)
     private val standingDetector = StandingDetector(config)
     private val standingSamples = mutableListOf<Double>()
     private var standingCx: Double? = null
@@ -186,7 +187,8 @@ class HeadTrackingEngine(
         val leanOriginX = postureOriginX(timestampMs, face, base, standing)
 
         val rawLean = axis.normalize(face.cx - leanOriginX)
-        val lean = deadZone(leanFilter.filter(timestampMs, rawLean), config.deadZone, config.deadZoneRamp)
+        val filtered = leanFilter.filter(timestampMs, rawLean)
+        val lean = leanDeadZone.apply(timestampMs, filtered)
 
         val depthMapping = depthAxis
         val depth = if (mode == TrackerMode.LEAN_2D && depthMapping != null) {
@@ -256,6 +258,7 @@ class HeadTrackingEngine(
 
     private fun clearTracking() {
         leanFilter.reset()
+        leanDeadZone.reset()
         depthFilter.reset()
         standingDetector.reset()
         standingSamples.clear()
