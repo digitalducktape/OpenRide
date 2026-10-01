@@ -167,9 +167,13 @@ class SessionPlansTest {
 
     @Test
     fun `circuit games not in the catalog yet play the stand-in`() {
-        val plan = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT)
+        val demoOnly = GameCatalog(listOf(GameCatalog.DEMO))
+        val plan = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, demoOnly)
 
         assertTrue(plan.segments.all { it.gameId == "demo" })
+        // Dodge Ball (#39) is in the default catalog, so it plays its own slots.
+        val withDodge = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT)
+        assertTrue(withDodge.segments.any { it.gameId == "dodge_ball" })
         val withTug = GameCatalog(listOf(GameCatalog.DEMO, roundsGame.copy(id = "tug_of_war")))
         assertEquals("tug_of_war", SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, withTug).segments[1].gameId)
     }
