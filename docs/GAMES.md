@@ -63,6 +63,9 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 - `session_started(plan_json)`: `{kind: circuit | just_ride, plan_id, difficulty, total_sec,
   segments:[{game_id, role, duration_sec}]}`. Sent once; it drives the circuit progress strip.
   `total_sec` includes every intro card, and is `-1` for an open-ended plan.
+  - `rider_id`: the active rider's profile id, or null with no active rider. It was added after
+    v1 shipped and is optional; games use it only to remember their options per rider
+    (`GameOptions`).
 - `segment_started(segment_json)`: `{index, count, game_id, duration_sec, intro_sec, end_mode, role,
   difficulty, effort, seed, audio:{music, music_volume, sfx_volume}, params:{…}}`.
   - `intro_sec`: Godot shows the intro card for this long (10 s in circuits and at session start),
@@ -368,6 +371,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `effort_in_just_ride` | Whether the effort multiplier applies in a Just Ride |
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
+| `options` | The game's own settings, shown in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
 1.0× must stay short of 3 stars (epic #31). `demo_logic_test.gd` checks this for the demo.
@@ -380,12 +384,16 @@ For work games, set the thresholds so that 3 stars needs about 1.3× effort. A p
 | `_on_start()` | Gameplay begins |
 | `_on_frame(delta)` | Every gameplay frame while not paused. Read `InputBus`. |
 | `_on_pause()`, `_on_resume()` | The scene's processing is also frozen while paused |
+| `_on_option_changed(key, value)` | The rider changed one of the game's options on the pause screen; `option(key)` already returns the new value |
 | `_on_finish_requested()` | The timer ran out: wrap up and call `end_segment()` within 5 s. By default the game ends at once. |
 | `target_text(segment)` | The intro card's target line, e.g. "Hold 250 W" |
 
 **What a game calls:**
 
 - `award(points)` scores through `Effort`. It returns what counted.
+- `penalize(points)` takes points off without the multiplier (`Effort.penalize`), for
+  penalties such as Dodge Ball's -50. The score never drops below zero.
+- `option(key)` reads one of the game's options for the current rider.
 - `end_segment()` ends the segment. It is honoured in `end_mode: game`, in open-ended
   segments, and after `request_finish`. A game that finishes early in a timed slot starts another
   round instead (epic #31, "Short games fill their slot").
@@ -401,6 +409,19 @@ For work games, set the thresholds so that 3 stars needs about 1.3× effort. A p
   `get_tree().quit()`.
 - Reset in `_on_prepare`, not `_ready`: every segment gets a fresh instance of the scene, but
   the autoloads live on.
+
+### Game options
+
+A game can declare its own settings in `GameInfo.options`, for example Dodge Ball's scene
+lighting and camera tilt. They're generic and framework-owned:
+
+- The pause screen shows a **Game options** button when the game declares any. Its card has one
+  button per option that steps through the choices; **Back** returns to the pause card.
+- `GameOptions` (`framework/GameOptions.gd`) stores the choices in `user://game_options.cfg`,
+  one section per rider and game (`<rider_id>/<game_id>`, `guest/…` with no active rider).
+  Unknown keys and values are ignored, and a missing value reads as the declared default.
+- The game reads them with `option(key)`, usually in `_on_prepare`, and hears changes through
+  `_on_option_changed`.
 
 ### Effort
 
@@ -494,6 +515,7 @@ generators can register without an autoload of their own.
 | `stop_music(fade_sec := 2.0)` | Fades the music out |
 | `play_sfx(name, volume_db := 0.0, pitch := 1.0) -> bool` | An effect on `SFX`, from 8 voices. `false` means silence. |
 | `play_cue(name) -> bool` | A cue on `Cues`, which ducks the music |
+| `set_bus_effects(bus, effects: Array[AudioEffect])` | The game's own effect chain on `Music` or `SFX` (for example a room reverb and a glue compressor), replacing any earlier one. Every segment starts with both buses clean. Native effects cost little, unlike offline reverb in GDScript. |
 
 **Cue names the framework plays** (#36 provides them; see "Generated audio"):
 
@@ -519,8 +541,9 @@ The demo asks for `dodge` and `hit` effects and for music with the style
 
 ## Generated audio (`games/audio/`)
 
-All game music and effects are generated in code (#36). There are no recorded samples and
-nothing to license. `res://audio/Cues.gd` is the single entry point: `AudioDirector` calls its
+All game music and effects are generated in code (#36). Since #39 the generator can also play
+a few recorded CC0 one-shots (`audio/samples/`, listed in `assets/SOURCES.md`): see "Sampled
+instruments and stem effects". `res://audio/Cues.gd` is the single entry point: `AudioDirector` calls its
 `register(director)` at startup, which:
 
 - builds the wavetables and loads the styles on the main thread;
@@ -639,6 +662,25 @@ Open `res://audio/gallery/StyleGallery.tscn` in the editor and press F6.
 - The buttons at the bottom play every effect preset.
 
 It plays through its own players, not `AudioDirector`, so it needs no session.
+
+### Sampled instruments and stem effects
+
+`Samples.gd` decodes recorded one-shots once and caches them as mono floats at 22.05 kHz.
+They must be imported uncompressed (`compress/mode=0` in the `.import` file), because GDScript
+can't decode QOA. `MusicGen` loads a style's samples before its threaded render starts. A style
+uses them through three `MusicStyle` properties:
+
+- `drum_samples`: `{drum: "res://audio/samples/….wav", "gain": 0.8}` replaces those
+  synthesised drums with recordings. The others stay synthesised.
+- A voice's `sample` and `sample_hz` (in `bass_voice`, `harmony_voice` or `lead_voice`) play a
+  recorded tone at any pitch. It is resampled from `sample_hz`, holds on a sustain loop between
+  two rising zero crossings, and has the voice's ADSR and swept low-pass (`Dsp.render_sampled_note`).
+- `stem_fx`: `{stem: {highpass, lowpass, drive, comp_threshold, comp_ratio, comp_release}}`
+  runs one-pole filters, tanh saturation and a peak compressor on each rendered bar
+  (`Dsp.apply_fx`), before the bar's edge fades, so loops stay seamless.
+
+Reverb and bus compression are the game's, through `AudioDirector.set_bus_effects`. The `drive`
+style (Dodge Ball) uses all of this.
 
 ### Tempo changes on a phrase boundary
 
@@ -818,6 +860,16 @@ For generated audio (#36):
   (`OPENRIDE_GAMES audio_bench style=… ms=…`). The `frame fps=` lines show the game's frame
   rate meanwhile.
 
+Dodge Ball (#39):
+
+- `dodge_ball_logic_test` covers the rules: collision, the 0.8 s warning, arrival spacing,
+  shield drain and refill, the power bonus, lives and runs, circuit penalties, waves, streaks,
+  the stars and the time of day.
+- `dodge_ball_scene_test` covers pause, per-rider options and the result's stats.
+- `tests/capture_dodge.gd` takes desktop screenshots in each lighting (it needs a window). With
+  `--play=SECONDS`, add `--write-movie FILE.avi --fixed-fps 30` to record the game's own mix,
+  bus effects included, without playing a sound.
+
 `sim_demo_check` plays a three-segment local circuit at 4× speed:
 
 - the intro card and calibration;
@@ -896,6 +948,33 @@ What to look for in the log:
 - `Session` logs each calibration step as it starts, retries and completes
   (`OPENRIDE_GAMES <- calibration_progress left 2/3 attempt 1 …`).
 - `OpenRideGames` lines come from the Kotlin side of the session.
+
+## Dodge Ball on the tablet (#39)
+
+Dodge Ball is the first 3D game. What holding 60 fps on the Gen 2 tablet (PowerVR GX6250,
+GL Compatibility) took, measured with the mock build:
+
+- **It is fill-rate bound.** The 3D view renders into a `SubViewport` at 0.67 of 1080p, drawn
+  scaled under the HUD, which stays sharp. `Viewport.scaling_3d_scale` below 1 hung the
+  renderer on the tablet.
+- **No MSAA:** 2x halved the frame rate.
+- **The road and verges are unshaded**, lit and fogged by hand. They cover most of the screen,
+  and the engine's per-pixel light and fog cost about a third of the frame.
+- **Shaders sample a 64×64 noise texture** instead of hashing with `sin()` per pixel.
+- **Scenery is lit per vertex, without specular.** The Kenney nature-kit materials are fully
+  metallic (near-black without reflections), so they're replaced by matte ones.
+- **The full-screen effect overlay is hidden while idle**, and HUD labels only change when
+  their value does. A theme override every frame re-laid-out the HUD.
+- **Release builds don't check for null.** A GDScript call on a null node crashed the exported
+  build with SIGSEGV instead of an error, so test on the tablet as well as the editor.
+
+The result: 58-61 fps, and 51-61 while the camera searches for a face (`tracker_state` 2).
+
+For measuring, the game logs `OPENRIDE_GAMES dodge_ball perf game_ms=… process_ms=…
+draw_calls=…` every 5 s. If `user://dodge_tuning.cfg` exists, it overrides the render settings
+(`[render] scale=0.67 msaa=0`) and switches parts off (`[world] sky=false road=false
+verges=false scenery=false balls=false rig=false fog=false screenfx=false`). Write it with
+`adb shell run-as dev.digitalducktape.openride …`.
 
 ## Originality and licensing
 
