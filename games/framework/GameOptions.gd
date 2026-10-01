@@ -61,6 +61,15 @@ static func label_for(spec: Dictionary, value: String) -> String:
 	return str(labels[i]) if i >= 0 and i < labels.size() else value
 
 
+## Forgets everything stored for `rider_id` (tests clean up with this).
+static func forget_rider(rider_id: String) -> void:
+	var config := _config()
+	for section in config.get_sections():
+		if section.begins_with(rider_id + "/"):
+			config.erase_section(section)
+	config.save(path)
+
+
 ## Forgets the cached file (tests, or after `path` changes).
 static func reload() -> void:
 	_file = null

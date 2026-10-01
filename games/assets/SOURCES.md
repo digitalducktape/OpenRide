@@ -6,8 +6,9 @@ for this repo (including procedurally generated content), CC0 / public domain, a
 the SIL Open Font License. A file with an unclear licence is not added. See the epic's
 **Originality and licensing** rule (#31) and `docs/GAMES.md`.
 
-Game music and sound effects are generated in code at runtime (#36, `games/audio/`), so the
-audio itself needs no entry. The parameter files it renders from are listed below. They
+Game music and sound effects are generated in code at runtime (#36, `games/audio/`). Since #39
+the generator also plays a few recorded CC0 one-shots (drums and instrument tones under
+`audio/samples/`), and Dodge Ball plays three CC0 impact recordings; each is listed below. The parameter files it renders from are listed below. They
 contain no recorded sound, and the generated music doesn't quote or imitate existing songs or
 game themes. The
 framework (#34) and the demo game draw everything in code (shapes, a generated ball texture)
@@ -16,5 +17,16 @@ with Godot's default font.
 | File | Source URL | Author | Licence |
 | --- | --- | --- | --- |
 | `audio/sfx/*.tres` (14 `SfxPreset` parameter sets: synth settings, no samples) | Written for this repo (#36) | The OpenRide Authors | Apache-2.0, the repo's licence |
-| `audio/styles/*.tres` (6 `MusicStyle` parameter sets: scales, chord progressions, patterns, synth settings; no samples) | Written for this repo (#36) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `audio/styles/*.tres` (6 `MusicStyle` parameter sets: scales, chord progressions, patterns, synth settings; `drive` names the samples listed below) | Written for this repo (#36) | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `addons/gdUnit4/**/*.png` (9 UI images of the test framework; test-only, not exported) | https://github.com/godot-gdunit-labs/gdUnit4/tree/v6.2.1 | Mike Schulze and GdUnit4 contributors | MIT (`addons/gdUnit4/LICENSE`; code recorded in `THIRD_PARTY_NOTICES.md`) |
+| `audio/samples/kick_punchy.wav` (from `Bass Drum/Wav/Bass Drum__009.wav`, resampled to 22.05 kHz mono) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `audio/samples/snare_crack.wav` (from `Snare/Wav/Snare__003.wav`, resampled) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `audio/samples/hat_closed.wav` (from `Hi-hat/Wav/Hi-hat__010.wav`, resampled) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `audio/samples/hat_open.wav` (from `Hi-hat/Wav/Hi-hat__005.wav`, resampled) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `audio/samples/tone_lead_a4.wav` (from `Instrument/Wav/Instrument__002.wav`, resampled) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `audio/samples/tone_bass_d2.wav` (from `Instrument/Wav/Instrument__005.wav`, resampled) | https://opengameart.org/content/sfx-the-ultimate-2017-16-bit-mini-pack | phoenix1291 | CC0 1.0 |
+| `games/dodge_ball/sounds/impactPunch_heavy_001.ogg`, `impactGlass_heavy_002.ogg`, `impactSoft_heavy_000.ogg` (unchanged) | https://kenney.nl/assets/impact-sounds | Kenney (www.kenney.nl) | CC0 1.0 (pack `License.txt`) |
+| `games/dodge_ball/models/light-curved.glb`, `construction-cone.glb`, `Textures/colormap.png` (unchanged) | https://kenney.nl/assets/city-kit-roads (v2.1) | Kenney (www.kenney.nl) | CC0 1.0 (pack `License.txt`) |
+| `games/dodge_ball/models/tree_default.glb`, `tree_oak.glb`, `tree_pineTallA.glb`, `tree_cone.glb`, `plant_bushLarge.glb`, `rock_largeA.glb` (unchanged; recoloured at runtime) | https://kenney.nl/assets/nature-kit | Kenney (www.kenney.nl) | CC0 1.0 (pack `License.txt`) |
+| `games/dodge_ball/sfx/*.tres` (7 `SfxPreset` parameter sets) and `tod/*.tres` (4 lighting presets), with the scripts that write them | Written for this repo (#39) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `games/dodge_ball/shaders/*.gdshader` (road, verge, sky, ball, warning, shadow, shield, screen effects) | Written for this repo (#39) | The OpenRide Authors | Apache-2.0, the repo's licence |

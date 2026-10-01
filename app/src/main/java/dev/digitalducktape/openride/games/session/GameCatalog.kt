@@ -71,7 +71,35 @@ class GameCatalog(games: List<GameDeclaration>) {
             },
         )
 
+        /** Dodge Ball (#39), `games/games/dodge_ball/`: a work game steered by leaning. */
+        val DODGE_BALL = GameDeclaration(
+            id = "dodge_ball",
+            title = "Dodge Ball",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 90,
+            roles = setOf(SegmentRole.WORK),
+            usesCamera = true,
+            effortInJustRide = true,
+            params = { _, difficulty, _ ->
+                // DodgeBallLogic.LEVELS: the cadence floor and the ball rate's ramp (balls a second).
+                val (floor, start, end) = when (difficulty) {
+                    Difficulty.EASY -> Triple(75, 0.5, 1.2)
+                    Difficulty.STANDARD -> Triple(85, 0.6, 1.5)
+                    Difficulty.HARD -> Triple(90, 0.7, 1.8)
+                }
+                mapOf(
+                    "cadence_floor" to JsonPrimitive(floor),
+                    "ball_rate_start" to JsonPrimitive(start),
+                    "ball_rate_end" to JsonPrimitive(end),
+                )
+            },
+        )
+
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL))
     }
 }

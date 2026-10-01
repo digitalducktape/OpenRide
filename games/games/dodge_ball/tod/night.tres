@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="DodgeTimeOfDay" format=3]
+
+[ext_resource type="Script" path="res://games/dodge_ball/TimeOfDay.gd" id="1_tod"]
+
+[resource]
+script = ExtResource("1_tod")
+id = "night"
+sky_top = Color(0.01, 0.015, 0.05, 1)
+sky_horizon = Color(0.06, 0.08, 0.17, 1)
+sky_ground = Color(0.02, 0.02, 0.03, 1)
+clouds = 0.25
+cloud_color = Color(0.12, 0.14, 0.22, 1)
+stars = 1.0
+halo = 0.5
+sun_size = 0.025
+sun_elevation = 38.0
+sun_azimuth = 25.0
+sun_color = Color(0.6, 0.7, 1.0, 1)
+sun_energy = 0.18
+ambient = Color(0.22, 0.27, 0.45, 1)
+ambient_energy = 0.28
+fog_color = Color(0.04, 0.05, 0.1, 1)
+fog_density = 0.013
+lamp_glow = 1.0
+headlight = 1.0
+ball_glow = 0.35

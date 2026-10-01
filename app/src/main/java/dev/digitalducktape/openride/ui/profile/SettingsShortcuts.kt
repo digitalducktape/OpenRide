@@ -60,8 +60,10 @@ fun SettingsShortcutsRow(modifier: Modifier = Modifier) {
     }
 }
 
-/** The preview's Just Rides of the demo game (#35). */
+/** The preview's Just Rides (#35), until the Games hub (#38) replaces them. */
 private val PREVIEW_RIDES = listOf(
+    "Dodge Ball · 20 min" to SessionRequest.JustRide("dodge_ball", JustRideMode.Timed(20)),
+    "Dodge Ball · open-ended" to SessionRequest.JustRide("dodge_ball", JustRideMode.Open),
     "Demo · 20 min" to SessionRequest.JustRide("demo", JustRideMode.Timed(20)),
     "Demo · open-ended" to SessionRequest.JustRide("demo", JustRideMode.Open),
 )
