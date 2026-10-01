@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_k5ikk"]
+
+[resource]
+script = ExtResource("1_k5ikk")
+name = "bright"
+description = "Bright synth-pop with rich seventh chords and a sixteenth-note arpeggio (Cadence Karaoke)."
+root = 41
+mode = "major"
+progressions = [[0, 4, 5, 3], [5, 3, 0, 4], [0, 5, 3, 4]]
+b_progressions = [[3, 4, 2, 5], [1, 4, 0, 0]]
+chord_size = 4
+drums = "backbeat"
+bass = "root_fifth"
+harmony = "arp"
+energy = 0.75
+lead_high = 86
+bass_voice = {
+"attack": 0.003,
+"cutoff": 600.0,
+"cutoff_env": 1400.0,
+"decay": 0.12,
+"detune": 5.0,
+"filter_decay": 0.08,
+"gain": 0.42,
+"release": 0.04,
+"sustain": 0.6,
+"wave": "square",
+"wave2": "saw"
+}
+harmony_voice = {
+"attack": 0.002,
+"cutoff": 2600.0,
+"cutoff_env": 2000.0,
+"decay": 0.12,
+"filter_decay": 0.05,
+"gain": 0.12,
+"release": 0.04,
+"sustain": 0.3,
+"wave": "pulse"
+}
+lead_voice = {
+"attack": 0.01,
+"cutoff": 3200.0,
+"decay": 0.15,
+"detune": 7.0,
+"gain": 0.15,
+"release": 0.07,
+"sustain": 0.65,
+"vibrato": 0.18,
+"vibrato_rate": 5.5,
+"wave": "saw",
+"wave2": "square"
+}
+tempo_min = 60.0
+suggested_gates = {
+"harmony": 0.2,
+"lead": 0.99
+}

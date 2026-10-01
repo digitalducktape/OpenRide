@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_niep3"]
+
+[resource]
+script = ExtResource("1_niep3")
+wave = 5
+attack = 0.08
+decay = 0.28
+lowpass_start = 500.0
+lowpass_end = 4500.0
+highpass = 250.0
+volume = 0.6

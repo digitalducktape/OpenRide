@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_fsw3n"]
+
+[resource]
+script = ExtResource("1_fsw3n")
+name = "heave"
+description = "Heavy half-time drums and a bass that builds phrase by phrase, Phrygian and dark (Tug of War)."
+root = 40
+mode = "phrygian"
+progressions = [[0, 0, 5, 6], [0, 1, 0, 6], [0, 5, 1, 0]]
+b_progressions = [[3, 3, 4, 4], [5, 5, 1, 1]]
+drums = "halftime"
+bass = "halftime_build"
+energy = 0.75
+lead_low = 64
+lead_high = 79
+lead_density = 0.3
+bass_voice = {
+"attack": 0.005,
+"cutoff": 380.0,
+"cutoff_env": 900.0,
+"decay": 0.2,
+"filter_decay": 0.1,
+"gain": 0.5,
+"mix2": 0.4,
+"octave2": -1.0,
+"release": 0.06,
+"sustain": 0.75,
+"wave": "saw",
+"wave2": "sine"
+}
+harmony_voice = {
+"attack": 0.2,
+"cutoff": 900.0,
+"decay": 0.5,
+"detune": 14.0,
+"gain": 0.12,
+"release": 0.15,
+"sustain": 0.8,
+"wave": "saw",
+"wave2": "saw"
+}
+lead_voice = {
+"attack": 0.03,
+"cutoff": 1800.0,
+"decay": 0.2,
+"gain": 0.15,
+"release": 0.1,
+"sustain": 0.7,
+"vibrato": 0.2,
+"vibrato_rate": 4.5,
+"wave": "saw"
+}
+drum_levels = {
+"hat": 0.7,
+"kick": 1.0,
+"snare": 1.0,
+"tom": 1.0,
+"tom_low": 1.0
+}
+tempo_min = 60.0
+tempo_max = 100.0
+suggested_gates = {
+"drums": 0.0,
+"lead": 0.7
+}

@@ -15,14 +15,26 @@ extends Node
 ## Session drives the rest: begin_segment honours `segment.audio` (music off when the rider
 ## brings their own; the volumes), cues play for the countdown and the segment's end, and
 ## pause pauses the music.
+##
+## A tempo change (the same style and seed at a new tempo, while that music plays) doesn't
+## crossfade in when its render is ready. It waits, pending, for the playing loop's next
+## phrase boundary, then swaps in with a short crossfade, the new loop's beat grid starting on
+## the boundary and the stem levels carried over (docs/GAMES.md, "Tempo changes on a phrase
+## boundary").
 
 signal sound_played(sound: String, bus: String)  ## an effect or cue started
 signal music_started(key: String)  ## a rendered music request started playing
+## A pending tempo change swapped in, `since_boundary` seconds after the phrase boundary (the
+## new loop started that far in, so its beat grid starts on the boundary).
+signal tempo_swapped(key: String, since_boundary: float)
 
 const MUSIC_BUS := "Music"
 const SFX_BUS := "SFX"
 const CUES_BUS := "Cues"
 const CROSSFADE_SEC := 2.0
+const SWAP_FADE_SEC := 0.03  ## the crossfade of a tempo change on a phrase boundary
+const PHRASE_BARS := 4
+const DEFAULT_BARS := 16  ## a style request's `bars` when it has none (MusicGen's default)
 const STEM_FADE_SEC := 1.5
 const DUCK_DB := -10.0  ## music under a cue
 const DUCK_ATTACK_SEC := 0.08
@@ -60,8 +72,14 @@ var _deck_keys := ["", ""]
 var _deck_stems: Array = [[], []]  # stem names in stream order, per deck
 var _deck_gates: Array = [{}, {}]  # stem name -> intensity gate, per deck
 var _deck_levels: Array = [[], []]  # each stem's current linear level, per deck
+var _deck_requests: Array = [{}, {}]  # the play_music request each deck plays
+var _deck_phrase_sec := [0.0, 0.0]  # each deck's phrase length, from its stream
 var _fade := 1.0  # crossfade progress to the current deck
 var _fade_sec := CROSSFADE_SEC
+
+var _pending_key := ""  # a rendered tempo change waiting for the phrase boundary
+var _pending_stems := {}
+var _phrase_last := 0.0  # seconds into the phrase at the previous check
 
 var _requested := {}  # the latest play_music request, kept while music is off
 var _requested_key := ""
@@ -148,6 +166,8 @@ func play_cue(sound: String) -> bool:
 ## target cadence: one beat per pedal stroke), seeded. It renders off the main thread (the
 ## intro card covers it) and crossfades in; the old music plays until then. Asking for what
 ## is already playing changes nothing. With music off, the request is kept but not played.
+## The same style and seed at another tempo is a tempo change: it swaps in on the playing
+## loop's next phrase boundary instead (ask a few seconds ahead; a newer request replaces it).
 func play_music(style: Dictionary, tempo_bpm: float, music_seed := 0) -> void:
 	_requested = {"style": style, "tempo_bpm": tempo_bpm, "seed": music_seed}
 	_requested_key = music_key(_requested)
@@ -155,11 +175,17 @@ func play_music(style: Dictionary, tempo_bpm: float, music_seed := 0) -> void:
 		_want(_requested_key)
 
 
-## Fades the music out.
+## Fades the music out (and drops a pending tempo change).
 func stop_music(fade_sec := CROSSFADE_SEC) -> void:
+	_drop_pending()
 	if _deck_keys[_deck].is_empty():
 		return
 	_crossfade_to_silence(fade_sec)
+
+
+## The tempo change waiting for the phrase boundary, or "".
+func pending_music_key() -> String:
+	return _pending_key
 
 
 ## 0-1: stems whose gate is at or below it play; the rest fade out.
@@ -185,6 +211,7 @@ static func music_key(request: Dictionary) -> String:
 func begin_session() -> void:
 	_requested = {}
 	_requested_key = ""
+	_drop_pending()
 	intensity = 1.0
 	set_paused(false)
 
@@ -218,6 +245,8 @@ func end_session() -> void:
 
 func _process(delta: float) -> void:
 	_collect_render()
+	if not _pending_key.is_empty() and not _paused and _decks[_deck].playing:
+		_check_phrase_swap(_seconds_into_phrase())
 	if _fade < 1.0:
 		_fade = minf(1.0, _fade + delta / maxf(_fade_sec, 0.01))
 	var old := 1 - _deck
@@ -235,10 +264,15 @@ func _process(delta: float) -> void:
 
 
 func _want(key: String) -> void:
-	if key == _deck_keys[_deck]:
+	if key != _pending_key:
+		_drop_pending()  # a newer request replaces a pending tempo change
+	if key == _deck_keys[_deck] or key == _pending_key:
 		return
 	if _music_cache.has(key):
-		_start(key, _music_cache[key])
+		if _is_tempo_change():
+			_hold_for_phrase(key, _music_cache[key])
+		else:
+			_start(key, _music_cache[key])
 		return
 	if not _music_generator.is_valid():
 		_note_silent("music")
@@ -248,6 +282,14 @@ func _want(key: String) -> void:
 	_render_key = key
 	var request := _requested.duplicate(true)
 	_render_task = WorkerThreadPool.add_task(_render.bind(request), false, "AudioDirector music")
+
+
+## When the engine quits mid-render, let the worker finish before this node (and its mutex) is
+## freed. On the bike the engine never quits; this is for desktop runs and headless tests.
+func _exit_tree() -> void:
+	if _render_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_render_task)
+		_render_task = -1
 
 
 func _render(request: Dictionary) -> void:
@@ -277,31 +319,98 @@ func _collect_render() -> void:
 		_want(_requested_key)
 
 
-func _start(key: String, stems: Dictionary) -> void:
+## Starts `stems` on the other deck and crossfades to it over `fade_sec`, from `from_sec` into
+## the loop. `carry_levels` gives stems the playing deck's current levels (a tempo swap)
+## instead of starting each at its gate.
+func _start(key: String, stems: Dictionary, fade_sec := CROSSFADE_SEC, from_sec := 0.0, carry_levels := false) -> void:
 	var names: Array = stems.keys()
 	names.sort()
 	var sync := AudioStreamSynchronized.new()
 	sync.stream_count = names.size()
-	var gates: Dictionary = _requested.get("style", {}).get("stem_gates", {}) if key == _requested_key else {}
+	var request: Dictionary = _requested.duplicate(true) if key == _requested_key else {}
+	var gates: Dictionary = request.get("style", {}).get("stem_gates", {})
+	var old_names: Array = _deck_stems[_deck]
+	var old_levels: Array = _deck_levels[_deck]
 	var levels := []
 	for i in names.size():
 		sync.set_sync_stream(i, stems[names[i]])
 		var level := 1.0 if intensity >= float(gates.get(names[i], 0.0)) else 0.0
+		var old := old_names.find(names[i])
+		if carry_levels and old >= 0:
+			level = old_levels[old]
 		levels.append(level)
 		sync.set_sync_stream_volume(i, _gain_db(level))
 	_deck = 1 - _deck
 	var player := _decks[_deck]
 	player.stream = sync
 	player.volume_db = SILENT_DB
-	player.play()
+	player.play(from_sec)
 	player.stream_paused = _paused
 	_deck_keys[_deck] = key
 	_deck_stems[_deck] = names
 	_deck_gates[_deck] = gates
 	_deck_levels[_deck] = levels
-	_fade_sec = CROSSFADE_SEC
+	_deck_requests[_deck] = request
+	_deck_phrase_sec[_deck] = phrase_seconds(stems, request)
+	_fade_sec = fade_sec
 	_fade = 0.0
 	music_started.emit(key)
+
+
+## The phrase length of a render: its stems' length over the request's phrases (4 bars each).
+## From the stream, not the tempo, since the generator may scale and round the tempo.
+static func phrase_seconds(stems: Dictionary, request: Dictionary) -> float:
+	if stems.is_empty():
+		return 0.0
+	var length: float = (stems.values()[0] as AudioStream).get_length()
+	var bars := int(request.get("style", {}).get("bars", DEFAULT_BARS))
+	return length / maxi(1, bars / PHRASE_BARS)
+
+
+## Whether the latest request is the playing music at another tempo.
+func _is_tempo_change() -> bool:
+	var playing: Dictionary = _deck_requests[_deck]
+	if playing.is_empty() or _deck_keys[_deck].is_empty() or not _decks[_deck].playing:
+		return false
+	return playing.style == _requested.style and playing.seed == _requested.seed \
+		and not is_equal_approx(float(playing.tempo_bpm), float(_requested.tempo_bpm))
+
+
+func _hold_for_phrase(key: String, stems: Dictionary) -> void:
+	_pending_key = key
+	_pending_stems = stems
+	_phrase_last = _seconds_into_phrase()
+
+
+func _drop_pending() -> void:
+	_pending_key = ""
+	_pending_stems = {}
+
+
+## Seconds since the playing deck's last phrase boundary: the mixed position, plus the time
+## since that mix.
+func _seconds_into_phrase() -> float:
+	var phrase: float = _deck_phrase_sec[_deck]
+	if phrase <= 0.0:
+		return 0.0
+	return fposmod(_decks[_deck].get_playback_position() + AudioServer.get_time_since_last_mix(), phrase)
+
+
+## Called each frame with the time since the last boundary. The first check past a boundary
+## (the position wrapped by more than half a phrase; it jitters by a few ms between mixes)
+## swaps the pending tempo in, starting it `since` seconds in so its grid starts on the boundary.
+func _check_phrase_swap(since: float) -> void:
+	if _pending_key.is_empty():
+		return
+	var phrase: float = _deck_phrase_sec[_deck]
+	if since < _phrase_last - phrase / 2.0:
+		var key := _pending_key
+		var stems := _pending_stems
+		_drop_pending()
+		_start(key, stems, SWAP_FADE_SEC, since, true)
+		tempo_swapped.emit(key, since)
+	else:
+		_phrase_last = since
 
 
 func _crossfade_to_silence(fade_sec: float) -> void:
@@ -310,6 +419,8 @@ func _crossfade_to_silence(fade_sec: float) -> void:
 	_deck_keys[_deck] = ""
 	_deck_stems[_deck] = []
 	_deck_levels[_deck] = []
+	_deck_requests[_deck] = {}
+	_deck_phrase_sec[_deck] = 0.0
 	_fade_sec = fade_sec
 	_fade = 0.0 if fade_sec > 0.0 else 1.0
 

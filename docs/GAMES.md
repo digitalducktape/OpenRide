@@ -23,6 +23,7 @@ game and every builder depends on:
 | `games/autoload/Effort.gd` | Scoring with the effort multiplier: games award points only through it |
 | `games/autoload/AudioDirector.gd` | Buses, music stems, effects and cues; the generators (#36) register with it |
 | `games/framework/` | `Game` (the base class), `GameInfo` (declarations), `SessionDirector`, `EffortMeter`, `Stars`, the HUD kit (`hud/`) and the intro card, pause, calibration and summary screens (`ui/`) |
+| `games/audio/` | Generated audio (#36): `SfxSynth` effects, `MusicGen` music, the styles, and `Cues.gd`, which registers them with `AudioDirector`. See "Generated audio". |
 | `games/games/` | One folder per game, and `Registry.gd`, which lists them. `demo/` is the reference game. |
 | `games/tests/unit/` | GdUnit4 suites (not exported) |
 | `games/tests/sim_*.gd` | Headless desktop playthroughs (not exported) |
@@ -481,13 +482,13 @@ generators can register without an autoload of their own.
 
 | Method | Behaviour |
 | --- | --- |
-| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). |
+| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). The same style and seed at a new tempo is a **tempo change**: it swaps in on the next phrase boundary instead (see "Tempo changes on a phrase boundary"). |
 | `set_intensity(value: float)` | 0-1. Stems fade in or out over 1.5 s as `value` crosses their gate. |
 | `stop_music(fade_sec := 2.0)` | Fades the music out |
 | `play_sfx(name, volume_db := 0.0, pitch := 1.0) -> bool` | An effect on `SFX`, from 8 voices. `false` means silence. |
 | `play_cue(name) -> bool` | A cue on `Cues`, which ducks the music |
 
-**Cue names the framework plays** (#36 should provide them):
+**Cue names the framework plays** (#36 provides them; see "Generated audio"):
 
 | Name | When |
 | --- | --- |
@@ -508,6 +509,162 @@ The demo asks for `dodge` and `hit` effects and for music with the style
 - The music keeps playing across the intro card until the next game asks for its own.
 
 `sound_played(name, bus)` and `music_started(key)` are there for tests and debugging.
+
+## Generated audio (`games/audio/`)
+
+All game music and effects are generated in code (#36). There are no recorded samples and
+nothing to license. `res://audio/Cues.gd` is the single entry point: `AudioDirector` calls its
+`register(director)` at startup, which:
+
+- builds the wavetables and loads the styles on the main thread;
+- registers `SfxSynth` as the sound factory, so effects and cues render on first use;
+- registers `MusicGen.generate` as the music generator.
+
+| File | What |
+| --- | --- |
+| `Cues.gd` | The entry point above. `countdown` maps to the `countdown_beep` preset; every other name is a preset name. |
+| `SfxSynth.gd`, `SfxPreset.gd` | The effects generator and its preset resource |
+| `sfx/<name>.tres` | The starter presets |
+| `MusicGen.gd`, `MusicStyle.gd` | The composer and synth, and the style resource |
+| `styles/<name>.tres` | The styles |
+| `Dsp.gd` | Shared oscillators, noise, filters and the float → PCM conversion |
+| `gallery/StyleGallery.tscn` | The desktop audition scene |
+| `tools/make_library.gd` | Regenerates the starter presets and styles from its tables |
+
+### Effects (`SfxSynth`)
+
+An sfxr-style generator with these settings per `SfxPreset`:
+
+- a sine, triangle, saw, square, pulse or noise oscillator, with optional noise mixed in;
+- an attack / sustain / decay envelope with punch;
+- a start → end pitch sweep, vibrato and a pitch jump;
+- low-pass (swept) and high-pass filters;
+- repeats, and seamless looping for continuous sounds such as an engine hum.
+
+Each preset renders once to a 22.05 kHz mono `AudioStreamWAV` and is cached.
+
+- **Starter library:** `whoosh`, `thud`, `click`, `chime`, `alarm_soft`, `boost`,
+  `countdown_beep`, `go`.
+- **Framework cues:** `segment_end`, `pause`, `resume`, `summary`.
+- **Demo:** `dodge`, `hit`.
+
+A game adds its own presets in either of two ways:
+
+```gdscript
+SfxSynth.add_preset_dir("res://games/dodge_ball/sfx")  # <name>.tres files; later dirs win
+SfxSynth.add_preset("launch_whoosh", preset)           # or in code
+AudioDirector.play_sfx("launch_whoosh")
+```
+
+Tune presets in the inspector, or by ear in the gallery.
+
+### Music (`MusicGen`)
+
+A game asks for music by style name through `AudioDirector.play_music`. `MusicGen` composes a
+seeded 16-bar loop in A A' B A form: four-bar phrases, one chord per bar, the B phrase on its
+own progression, and the last phrase the same as the first. It renders four looping stems, all
+exactly the same length: `drums`, `bass`, `harmony` and `lead`.
+
+- **Deterministic.** The same style, seed, tempo and bars always give the same samples. The
+  tune depends only on the style and the seed, so a tempo change keeps the same tune.
+- **Seamless.** Every bar starts and ends at silence, so the loop point never clicks.
+- **Stem lengths.** A stem is `bars × round(4 × 60 × 22050 / tempo)` samples; see
+  `MusicGen.loop_samples()`.
+- **Overrides.** Any other key in the game's style dictionary overrides that `MusicStyle`
+  property. For example, `{"name": "racer", "transpose": 2, "energy": 1.0}` gives Kart
+  Race's final lap. `bars` sets the loop length (16 by default). `AudioDirector` reads
+  `stem_gates` itself.
+- **Speed.** A bar that repeats is rendered once and copied. The four stems render in
+  parallel on `WorkerThreadPool` threads. Godot's WAV loader converts the float samples to
+  16-bit natively.
+  - On an M-series Mac, a 16-bar, 4-stem loop at 90 bpm (42.7 s of audio) renders in
+    60-125 ms (130-270 ms on one thread).
+  - On the Gen 2 tablet (4 cores), with the demo running, each style's 16-bar render at
+    90 bpm took 0.78-1.18 s on a `WorkerThreadPool` thread (budget: 5 s). The 14 effects
+    took 0.2 s. The game held 56-61 fps throughout (measured 2026-09-30, mock build,
+    `user://audio_bench`).
+- **Disk cache.** Renders are cached in `user://audio_cache/<sha256>.stems`.
+  - The key covers the style's musical content, the tempo, the seed, the bars and
+    `MusicGen.VERSION`. Editing a style never plays a stale render; bump `VERSION` when
+    the generator's output changes.
+  - The cache is pruned to 50 MB, oldest first.
+
+| Style (`styles/*.tres`) | Game | Character |
+| --- | --- | --- |
+| `drive` | Dodge Ball | Minor key, four-on-the-floor, pumping eighth-note bass, stabs |
+| `heave` | Tug of War | Phrygian, heavy half-time drums, a bass that builds phrase by phrase |
+| `noir` | Safe Cracker | Harmonic minor sevenths, brushes and ride, walking bass, swung comping, sparse vibes |
+| `bright` | Cadence Karaoke | Major sevenths, backbeat, root-fifth bass, sixteenth-note arpeggio |
+| `racer` | Kart Race | Mixolydian, busy breakbeat, off-beat bass, stabs, detuned saw lead |
+| `demo_drive` | the demo | Dorian four-on-the-floor with a pad |
+
+Each style's `suggested_gates` is a starting point for the game's `stem_gates`.
+
+#### Tempo: where it comes from and how to tune it
+
+Styles have **no base BPM of their own**. The tempo comes from the game:
+
+1. **The game passes `tempo_bpm`** to `play_music`: the segment's target cadence in rpm,
+   so one beat = one pedal stroke. The demo passes `cadence_floor + 20`
+   (`games/games/demo/Demo.gd`).
+2. **`MusicGen` plays at `tempo_bpm × tempo_scale`**, clamped to 30-240 bpm
+   (`MusicGen.music_tempo()`).
+   - `tempo_scale` is a property of each style, in `games/audio/styles/<style>.tres`
+     (the "Tempo" group in the inspector). It is `1.0` for every style today.
+   - `2.0` is double time: one beat per leg, still locked to pedalling.
+   - A game can also override it per request, e.g. `{"name": "drive", "tempo_scale": 2.0}`.
+3. **`tempo_min` / `tempo_max`** in each style only set the gallery's slider. The gallery
+   starts at their midpoint. They don't affect games.
+
+To make a style feel faster everywhere, raise its `tempo_scale` (try `2.0` in the gallery
+first). Cadence Karaoke keeps `1.0`, since its target line is the beat.
+
+#### Style gallery
+
+Open `res://audio/gallery/StyleGallery.tscn` in the editor and press F6.
+
+- Pick a style, tempo, tempo scale, seed and length, then **Render and play**. The status
+  line shows how long the render took.
+- **Intensity** gates the stems at the style's `suggested_gates`; the checkboxes mute stems
+  by hand.
+- **Change tempo at next phrase** renders the new tempo while the old loop plays, then
+  switches on the next phrase boundary, as described below.
+- The buttons at the bottom play every effect preset.
+
+It plays through its own players, not `AudioDirector`, so it needs no session.
+
+### Tempo changes on a phrase boundary
+
+Between games, new music crossfades in over 2 s as soon as it renders. Within a game, a **tempo
+change** lands on a phrase boundary instead, with no gap and the beat grid unbroken. Cadence
+Karaoke's target changes and Kart Race's cadence-following rely on this. `AudioDirector` does
+it:
+
+1. **A tempo change** is a `play_music` request with the same style and seed as the playing
+   music but another `tempo_bpm`. Any other request crossfades as before.
+2. **It waits, pending.** When its render is ready, it isn't started: `pending_music_key()`
+   returns it.
+   - A newer request replaces it; asking for the playing tempo again cancels it.
+   - `stop_music()`, `audio.music: false` and a new session drop it.
+3. **The phrase length comes from the playing stream**, not the tempo, because `tempo_scale`
+   and per-bar rounding change it: `phrase_seconds() = stem length / (bars / 4)`, with `bars`
+   from the style request (16 by default).
+4. **Each frame** (not while paused), the director computes the time since the last boundary:
+   `fposmod(position + AudioServer.get_time_since_last_mix(), phrase)`. The first frame in
+   which it wraps (drops by more than half a phrase, so a few ms of mix jitter doesn't count)
+   is just past the boundary.
+5. **The swap.** The new tempo starts that far into its loop (`play(since)`), so its beat grid
+   starts exactly on the boundary despite frame timing. It crossfades over 30 ms
+   (`SWAP_FADE_SEC`), and each stem keeps its current level, with no gate fade-in. The
+   director emits `tempo_swapped(key, since_boundary)`, then `music_started(key)`.
+6. **In games:** call `play_music` with the new tempo (same style and seed) a few seconds before
+   the change is due. The render (about 1 s on the tablet) must finish before the boundary,
+   or the swap waits for the next one.
+
+`sim_phrase_swap_check` plays a 4-bar loop at 180 bpm with the real `MusicGen`, then asks for
+160 and 170 bpm. The 170 replaces the 160, waits out the phrase and swaps in 5.5 ms after the
+boundary. The gallery (`StyleGallery.gd`) does the same with its own players. A live tempo
+change is still to be checked on the bike.
 
 ## Setting up
 
@@ -615,6 +772,44 @@ $GODOT_BIN --headless --path games -s res://tests/sim_lifecycle_check.gd  # sess
 $GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd   # the keys above
 $GODOT_BIN --headless --path games -s res://tests/sim_demo_check.gd       # the demo, end to end
 ```
+
+For generated audio (#36):
+
+- **GdUnit4 suites:**
+  - `sfx_synth_test` covers every preset: clean, deterministic, and repeats, loops and
+    overrides working.
+  - `music_gen_test` checks that the same seed gives the same music, that loops and bar
+    joins don't click, that stem lengths fit the tempo and bars, levels and ranges, the form,
+    serial vs. parallel renders, overrides and `tempo_scale`, the director contract on a
+    worker thread, the phrase clock and the disk cache.
+  - `audio_hook_test` plays every framework cue and the demo's music through `AudioDirector`.
+  - `audio_director_phrase_test` covers tempo changes: pending until the boundary, the phrase
+    length from the stream, jitter, the carried stem levels, replacement, music off, pause, and
+    other music still crossfading at once.
+- **Headless checks:**
+
+  ```sh
+  $GODOT_BIN --headless --path games -s res://tests/sim_gallery_check.gd       # gallery + phrase switch
+  $GODOT_BIN --headless --path games -s res://tests/sim_phrase_swap_check.gd   # AudioDirector's tempo swap
+  $GODOT_BIN --headless --path games -s res://tests/audio_bench.gd -- --tempo=90 [--wav=DIR]
+  ```
+
+  `audio_bench` times every style's 16-bar render, serial and parallel. With `--wav`, it
+  writes a mix of each style and every effect as `.wav` files to listen to.
+- **On the tablet:** every music render logs
+  `OPENRIDE_GAMES music <style> <bpm> bpm <bars> bars: rendered in <ms> ms` (or `cache hit`).
+  To time every style with a game running, create the flag file in a debuggable build's
+  `user://`, then open the games host:
+
+  ```sh
+  adb shell run-as dev.digitalducktape.openride touch files/audio_bench   # mock build
+  adb logcat -s godot | grep -E "audio_bench|music|frame fps"
+  ```
+
+  15 s after the engine starts, `Cues.gd` deletes the flag and times each style's uncached
+  16-bar render at 90 bpm on a `WorkerThreadPool` thread
+  (`OPENRIDE_GAMES audio_bench style=… ms=…`). The `frame fps=` lines show the game's frame
+  rate meanwhile.
 
 `sim_demo_check` plays a three-segment local circuit at 4× speed:
 

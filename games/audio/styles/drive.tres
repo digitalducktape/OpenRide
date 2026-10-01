@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_d0s0b"]
+
+[resource]
+script = ExtResource("1_d0s0b")
+name = "drive"
+description = "Energetic minor key, driving four-on-the-floor drums, pumping eighth-note bass (Dodge Ball)."
+progressions = [[0, 5, 2, 6], [0, 6, 5, 6], [0, 3, 5, 4]]
+b_progressions = [[5, 6, 0, 0], [3, 4, 5, 6]]
+harmony = "stabs"
+energy = 0.85
+lead_low = 69
+lead_high = 86
+lead_density = 0.55
+bass_voice = {
+"attack": 0.003,
+"cutoff": 450.0,
+"cutoff_env": 1500.0,
+"decay": 0.1,
+"filter_decay": 0.07,
+"gain": 0.45,
+"release": 0.03,
+"sustain": 0.6,
+"wave": "saw"
+}
+harmony_voice = {
+"attack": 0.003,
+"cutoff": 2400.0,
+"cutoff_env": 1500.0,
+"decay": 0.12,
+"detune": 6.0,
+"filter_decay": 0.06,
+"gain": 0.13,
+"release": 0.04,
+"sustain": 0.35,
+"wave": "saw",
+"wave2": "square"
+}
+lead_voice = {
+"attack": 0.008,
+"cutoff": 3500.0,
+"decay": 0.1,
+"gain": 0.17,
+"release": 0.05,
+"sustain": 0.6,
+"vibrato": 0.15,
+"vibrato_rate": 5.5,
+"wave": "square"
+}
+tempo_max = 115.0
+suggested_gates = {
+"harmony": 0.3,
+"lead": 0.8
+}
