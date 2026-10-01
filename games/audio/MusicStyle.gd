@@ -57,6 +57,13 @@ extends Resource
 @export var lead_voice := {"wave": "square", "cutoff": 3000.0, "attack": 0.01, "decay": 0.1, "sustain": 0.6, "release": 0.06, "vibrato": 0.15, "vibrato_rate": 5.5, "gain": 0.2}
 ## 0-1 per drum: kick, snare, hat, ride, crash, tom, clap, brush.
 @export var drum_levels := {}
+## Recorded one-shots for drums, by drum name ("kick", "snare", "hat", …) → a sample under
+## `res://audio/samples/`, plus an optional "gain" (0.8). Drums not listed are synthesised.
+@export var drum_samples := {}
+## Offline effects per stem, applied to each rendered bar (`Dsp.apply_fx`): {stem: {highpass,
+## lowpass, drive, comp_threshold, comp_ratio, comp_release}}. Reverb and bus compression are
+## the game's, through `AudioDirector.set_bus_effects`.
+@export var stem_fx := {}
 
 @export_group("Tempo")
 ## The music plays at the requested tempo (a game passes the target cadence in rpm) times
@@ -93,5 +100,17 @@ func signature() -> Dictionary:
 		"harmony": harmony, "swing": swing, "swing_grid": swing_grid, "energy": energy,
 		"lead_low": lead_low, "lead_high": lead_high, "lead_density": lead_density,
 		"bass_voice": bass_voice, "harmony_voice": harmony_voice, "lead_voice": lead_voice,
-		"drum_levels": drum_levels, "loudness": loudness,
+		"drum_levels": drum_levels, "loudness": loudness, "drum_samples": drum_samples, "stem_fx": stem_fx,
 	}
+
+
+## Every sample this style plays: its drum samples and any voice's `sample`.
+func sample_paths() -> Array:
+	var paths := []
+	for key in drum_samples:
+		if key != "gain":
+			paths.append(str(drum_samples[key]))
+	for voice: Dictionary in [bass_voice, harmony_voice, lead_voice]:
+		if voice.has("sample"):
+			paths.append(str(voice.sample))
+	return paths

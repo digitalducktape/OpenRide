@@ -235,6 +235,110 @@ static func render_note(buf: PackedFloat32Array, start: int, length: int, freq: 
 		pos = block_end
 
 
+## Renders a note from a recorded instrument tone (`Samples.entry`) into `buf`: the sample is
+## read at freq / voice.sample_hz with linear interpolation, holding on its sustain loop for
+## long notes, under the same ADSR and swept low-pass as `render_note`.
+static func render_sampled_note(buf: PackedFloat32Array, start: int, length: int, freq: float, velocity: float,
+		voice: Dictionary, sample: Dictionary) -> void:
+	var data: PackedFloat32Array = sample.get("data", PackedFloat32Array())
+	var end := mini(start + length, buf.size())
+	if end <= start or data.size() < 2:
+		return
+	var n := end - start
+	var rate := freq / maxf(1.0, float(voice.get("sample_hz", 440.0)))
+	var loop_start := float(sample.get("loop_start", 0))
+	var loop_end := float(sample.get("loop_end", data.size()))
+	var loop_len := maxf(1.0, loop_end - loop_start)
+	var gain: float = float(voice.get("gain", 0.5)) * velocity
+	var attack := maxi(8, int(float(voice.get("attack", 0.005)) * SR))
+	var decay := maxi(1, int(float(voice.get("decay", 0.1)) * SR))
+	var sustain: float = voice.get("sustain", 0.7)
+	var release := mini(maxi(16, int(float(voice.get("release", 0.05)) * SR)), n / 2)
+	var release_at := n - release
+	var cutoff: float = voice.get("cutoff", 6000.0)
+	var cutoff_env: float = voice.get("cutoff_env", 0.0)
+	var filter_decay: float = maxf(0.001, float(voice.get("filter_decay", 0.15)))
+	var x := 0.0
+	var y := 0.0
+	var last := data.size() - 1
+	var pos := 0
+	while pos < n:
+		var block_end := mini(pos + BLOCK, n)
+		var t := float(pos) / SR
+		var a := lp_coef(cutoff + cutoff_env * exp(-t / filter_decay))
+		var i := pos
+		while i < block_end:
+			var env: float
+			if i < attack:
+				env = float(i) / attack
+			elif i < attack + decay:
+				env = 1.0 - (1.0 - sustain) * float(i - attack) / decay
+			else:
+				env = sustain
+			if i >= release_at:
+				env *= maxf(0.0, 1.0 - float(i - release_at) / release)
+			var j := int(x)
+			var f := x - j
+			var s := data[j] * (1.0 - f) + data[mini(j + 1, last)] * f
+			y += a * (s - y)
+			buf[start + i] += y * env * gain
+			x += rate
+			if x >= loop_end:
+				x -= loop_len
+			i += 1
+		pos = block_end
+
+
+## Offline per-stem effects, applied to each rendered bar (cheap: one pass, no state carried
+## between bars, which start and end at silence anyway). `fx` keys, all optional:
+##   highpass, lowpass: one-pole cut-offs in Hz
+##   drive: 0-1 soft saturation (tanh), level-compensated
+##   comp_threshold (0-1 linear), comp_ratio, comp_release (s): a peak compressor with a 2 ms
+##   attack, make-up gain applied by the stem's peak normalisation afterwards
+static func apply_fx(buf: PackedFloat32Array, fx: Dictionary) -> void:
+	if fx.is_empty():
+		return
+	var n := buf.size()
+	var hp := float(fx.get("highpass", 0.0))
+	var lp := float(fx.get("lowpass", 0.0))
+	if hp > 0.0:
+		var a := lp_coef(hp)
+		var low := 0.0
+		for i in n:
+			low += a * (buf[i] - low)
+			buf[i] -= low
+	if lp > 0.0:
+		var a := lp_coef(lp)
+		var y := 0.0
+		for i in n:
+			y += a * (buf[i] - y)
+			buf[i] = y
+	var drive := float(fx.get("drive", 0.0))
+	if drive > 0.0:
+		var k := 1.0 + drive * 6.0
+		var norm := 1.0 / tanh(k)
+		for i in n:
+			buf[i] = tanh(buf[i] * k) * norm
+	var threshold := float(fx.get("comp_threshold", 0.0))
+	if threshold > 0.0:
+		var ratio := maxf(1.0, float(fx.get("comp_ratio", 4.0)))
+		var att := exp(-1.0 / (0.002 * SR))
+		var rel := exp(-1.0 / (float(fx.get("comp_release", 0.08)) * SR))
+		# The detector follows the bar's peak level; a quick first pass finds it.
+		var peak := 0.0
+		for i in n:
+			peak = maxf(peak, absf(buf[i]))
+		if peak <= 0.0:
+			return
+		var thr := threshold * peak
+		var env := 0.0
+		for i in n:
+			var level := absf(buf[i])
+			env = (att if level > env else rel) * (env - level) + level
+			if env > thr:
+				buf[i] *= pow(env / thr, 1.0 / ratio - 1.0)
+
+
 ## Mixes `src` × gain into `buf` at `offset` (clipped to buf).
 static func mix_into(buf: PackedFloat32Array, src: PackedFloat32Array, offset: int, gain: float) -> void:
 	var n := mini(src.size(), buf.size() - offset)

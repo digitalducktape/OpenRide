@@ -17,6 +17,7 @@ extends RefCounted
 ##   pruned to 50 MB (oldest first).
 
 const Dsp := preload("res://audio/Dsp.gd")
+const Samples := preload("res://audio/Samples.gd")
 
 const STEMS: Array[String] = ["drums", "bass", "harmony", "lead"]
 const VERSION := 1  ## bump when the output changes, so old cache files are ignored
@@ -98,6 +99,9 @@ static func render(style: MusicStyle, tempo_bpm: float, music_seed: int, bars :=
 ## The four stems as float samples (no cache, no PCM conversion).
 static func render_samples(style: MusicStyle, tempo_bpm: float, music_seed: int, bars := DEFAULT_BARS) -> Dictionary:
 	Dsp.warm()
+	# Load samples here, before the stem tasks: a resource load inside a group task the caller
+	# waits on can deadlock.
+	Samples.warm(style.sample_paths())
 	var score := compose(style, music_seed, bars)
 	var ctx := {"style": style, "bar_len": bar_samples(tempo_bpm), "score": score}
 	var out := {}
@@ -158,7 +162,7 @@ static func style_names() -> PackedStringArray:
 ## Loads every library style (call on the main thread at startup, so worker threads only read).
 static func preload_styles() -> void:
 	for n in style_names():
-		style(n)
+		Samples.warm(style(n).sample_paths())
 
 
 # --- Timing ---
@@ -645,7 +649,7 @@ static func _render_stem(ctx: Dictionary, stem: String) -> PackedFloat32Array:
 		var key := var_to_str(events)
 		keys.append(key)
 		if not rendered.has(key):
-			rendered[key] = _render_bar(events, style, bar_len, voice, kit)
+			rendered[key] = _render_bar(events, style, bar_len, voice, kit, style.stem_fx.get(stem, {}))
 	# Normalise the stem's peak, so every style mixes at the same level.
 	var peak := 0.0
 	for key in rendered:
@@ -677,7 +681,9 @@ static func _step_offset(style: MusicStyle, step: float, bar_len: int) -> int:
 	return int(t)
 
 
-static func _render_bar(events: Array, style: MusicStyle, bar_len: int, voice: Dictionary, kit: Dictionary) -> PackedFloat32Array:
+static func _render_bar(events: Array, style: MusicStyle, bar_len: int, voice: Dictionary, kit: Dictionary,
+		fx := {}) -> PackedFloat32Array:
+	var sample := Samples.entry(str(voice.sample)) if voice.has("sample") else {}
 	var buf := PackedFloat32Array()
 	buf.resize(bar_len)
 	var step_len := float(bar_len) / STEPS
@@ -691,7 +697,11 @@ static func _render_bar(events: Array, style: MusicStyle, bar_len: int, voice: D
 			# Every note (with its release) ends before the bar's fade-out.
 			var length := mini(int(float(ev[1]) * step_len), bar_len - FADE_OUT - start)
 			var freq := Dsp.midi_hz(float(ev[2]) + style.transpose)
-			Dsp.render_note(buf, start, length, freq, float(ev[3]) * loud, voice)
+			if sample.is_empty():
+				Dsp.render_note(buf, start, length, freq, float(ev[3]) * loud, voice)
+			else:
+				Dsp.render_sampled_note(buf, start, length, freq, float(ev[3]) * loud, voice, sample)
+	Dsp.apply_fx(buf, fx)
 	Dsp.fade_edges(buf, FADE_IN, FADE_OUT)
 	return buf
 
@@ -702,8 +712,20 @@ static func _drum_kit(style: MusicStyle) -> Dictionary:
 	var kit := {}
 	for d in DRUM_KEYS.size():
 		var level := float(levels.get(DRUM_KEYS[d], 1.0))
-		if level > 0.0:
+		if level <= 0.0:
+			continue
+		var path := str(style.drum_samples.get(DRUM_KEYS[d], ""))
+		var hit := Samples.data(path) if not path.is_empty() else PackedFloat32Array()
+		if hit.is_empty():
 			kit[d] = _drum(d, level)
+		else:
+			# A recorded one-shot, at the synthesised drum's level so styles mix alike.
+			var scaled := hit.duplicate()
+			var gain := level * float(style.drum_samples.get("gain", 0.8))
+			for i in scaled.size():
+				scaled[i] *= gain
+			Dsp.fade_edges(scaled, 4, 64)
+			kit[d] = scaled
 	return kit
 
 
