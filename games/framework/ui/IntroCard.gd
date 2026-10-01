@@ -2,7 +2,10 @@ class_name IntroCard
 extends CanvasLayer
 ## The card before each segment (epic #31, "Intro card between games"): "Up next: <game>", the
 ## role, a one-line how-to, the target, the previous result and a countdown ending 3-2-1.
-## Tapping it asks to skip the game (`skip_requested`) when skipping is allowed.
+## Its "Skip this game" button asks to skip (`skip_requested`) when there is a next segment.
+## A touch anywhere else does nothing: the full-screen shade takes it, so no stray touch reaches
+## the game or the HUD below, or skips. On the bike a touch on the countdown skipped the only
+## segment of a timed Just Ride, which ended the workout (#35).
 
 signal skip_requested
 
@@ -18,7 +21,8 @@ var _target: Label
 var _count: Label
 var _previous: Label
 var _previous_stars: StarRow
-var _skip_hint: Label
+## The deliberate way to skip, shown only when skipping leaves a segment to play.
+var skip_button: Button
 
 
 func _init() -> void:
@@ -29,8 +33,8 @@ func _init() -> void:
 	var shade := ColorRect.new()
 	shade.color = Color(0, 0, 0, 0.55)
 	shade.size = Vector2(HudTheme.W, HudTheme.H)
+	# Takes every touch over the card and ignores it.
 	shade.mouse_filter = Control.MOUSE_FILTER_STOP
-	shade.gui_input.connect(_on_gui_input)
 	add_child(shade)
 
 	var card := PanelContainer.new()
@@ -60,8 +64,9 @@ func _init() -> void:
 	previous_row.add_child(_previous)
 	_previous_stars = StarRow.new(0, 40.0)
 	previous_row.add_child(_previous_stars)
-	_skip_hint = _centred(box, HudTheme.SMALL, HudTheme.MUTED)
-	_skip_hint.text = "Tap to skip this game"
+	skip_button = HudTheme.button("Skip this game", _on_skip_pressed, Color(0.3, 0.3, 0.36))
+	skip_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(skip_button)
 
 
 ## Shows the card for a segment. `previous` is the last result (or empty), with its title.
@@ -86,7 +91,7 @@ func show_segment(info: GameInfo, segment: Dictionary, target: String, previous:
 			_previous.text = "Last: %s  %d points" % [previous_title, int(previous.get("score", 0))]
 			_previous_stars.stars = int(previous.get("stars", 0))
 	can_skip = skippable
-	_skip_hint.visible = skippable
+	skip_button.visible = skippable
 	set_time_left(float(segment.get("intro_sec", 0)))
 	visible = true
 
@@ -99,8 +104,8 @@ func set_time_left(seconds: float) -> void:
 	_count.add_theme_color_override("font_color", HudTheme.WARN if whole <= 3 else HudTheme.MUTED)
 
 
-func _on_gui_input(event: InputEvent) -> void:
-	if visible and can_skip and event is InputEventMouseButton and event.pressed:
+func _on_skip_pressed() -> void:
+	if visible and can_skip:
 		skip_requested.emit()
 
 

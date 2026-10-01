@@ -2,7 +2,7 @@ extends SceneTree
 ## Headless desktop playthrough of the framework with the demo game and the keyboard simulator:
 ##   $GODOT_BIN --headless --path games -s res://tests/sim_demo_check.gd
 ## A three-segment local circuit, sped up 4×: the intro card and calibration, a played warm-up
-## (weaving with the arrow keys), a skipped work segment (a tap on the card), pause and resume
+## (weaving with the arrow keys), a skipped work segment (a stray tap on the card does nothing, then "Skip this game"), pause and resume
 ## with P, Esc to end, then the summary and Done.
 
 const SPEED := 4.0
@@ -55,12 +55,15 @@ func _run() -> void:
 	_check(results[0].stats.get("dodged", 0) > 0, "balls were dodged")
 	_check(results[0].stats.effort_avg == 1.0, "no effort multiplier in a warm-up")
 
-	# Work: tap the card to skip it.
+	# Work: a stray tap on the card does nothing; its Skip button skips it.
 	await _frames(2)
 	_check(int(_session.segment.index) == 1 and _director.phase_name() == "INTRO", "on to the work segment's card")
-	_click(Vector2(960, 540))
+	await _click(Vector2(960, 300))
 	await _frames(3)
-	_check(results.size() == 2 and results[1].skipped, "a tap skipped the work segment (%s)" % [results])
+	_check(results.size() == 1 and _director.phase_name() == "INTRO", "a stray tap on the card did nothing")
+	await _click(_director.intro_card.skip_button.get_global_rect().get_center())
+	await _frames(3)
+	_check(results.size() == 2 and results[1].skipped, "Skip this game skipped the work segment (%s)" % [results])
 	_check(_session._local.calibrations_started == 1, "one calibration for the whole circuit (%d)" % _session._local.calibrations_started)
 
 	# Cool-down: pause and resume, then end with Esc.

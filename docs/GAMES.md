@@ -316,8 +316,15 @@ so a game only plays. None of this changes the Bridge contract.
    - It calls `game.prepare(segment)`, then shows the **intro card** for `intro_sec`. The card
      shows "Up next", the role, the game's `how_to` and `target_text()`, the previous result,
      and a countdown ending 3-2-1.
-3. **Intro card tap**: this skips the game (`segment_finished` with `skipped: true`). The one
-   exception is the last segment of an open-ended plan, which would leave nothing to play.
+3. **Skipping**: the card's "Skip this game" button skips the game (`segment_finished` with
+   `skipped: true`). It shows only when another segment follows: skipping the last one would end
+   the session, so a one-segment Just Ride never offers it. Any other touch on the card does
+   nothing. On the bike, a touch on the countdown used to skip a timed Just Ride's only
+   segment, which ended the workout.
+   - **Only End, then its confirmation, ends a session.** Every touchable screen follows this:
+     the intro card, calibration (a tap only recalibrates, and never mid-run), the pause screen,
+     the open-ride "Game over" panel (its End asks first) and the summary (Done leaves only
+     after the ride is saved). `intro_touch_test.gd` pushes real touches at each of them.
 4. **Gameplay**: the HUD shows, `Effort` starts scoring, and it calls `game.start(segment)`.
    `end_mode: game` games end themselves (`end_segment()`). Open-ended segments count the timer
    up, and the game runs until Kotlin ends the session.
@@ -815,7 +822,7 @@ For generated audio (#36):
 
 - the intro card and calibration;
 - a warm-up played with the arrow keys, which must score;
-- a work segment skipped with a tap on the card;
+- a tap on the work segment's card, which must do nothing, then its "Skip this game" button;
 - pause and resume with P;
 - Esc to end, then the summary and Done.
 

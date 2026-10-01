@@ -89,7 +89,7 @@ func test_the_timer_ends_the_segment_with_stars_in_the_result() -> void:
 	assert_bool(Session.active).is_false()  # the last timed segment: the session finished
 
 
-func test_tapping_the_card_skips_to_the_next_segment() -> void:
+func test_skipping_the_card_goes_to_the_next_segment() -> void:
 	_start(_plan([_seg("demo", "warmup"), _seg("demo", "work")]))
 	assert_bool(director.can_skip()).is_true()
 	var first := director.game
@@ -114,7 +114,7 @@ func test_skipping_during_gameplay_does_nothing() -> void:
 func test_the_only_segment_of_an_open_ride_cannot_be_skipped() -> void:
 	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
 	assert_bool(director.can_skip()).is_false()
-	assert_bool(director.intro_card._skip_hint.visible).is_false()
+	assert_bool(director.intro_card.skip_button.visible).is_false()
 	director.skip()
 	assert_int(finished.size()).is_equal(0)
 

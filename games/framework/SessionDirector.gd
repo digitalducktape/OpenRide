@@ -7,8 +7,8 @@ extends Node
 ##   load `res://games/<game_id>/…tscn` from GameRegistry, set the tracker mode from the game's
 ##   declaration (Kotlin calibrates on a session's first camera mode by itself; see
 ##   `_calibrate_for`), start Effort and AudioDirector, then show the intro card for
-##   `intro_sec`. Tapping the card skips the game
-##   (segment_finished with `skipped: true`). Then gameplay: HUD on, scoring live.
+##   `intro_sec`. Its "Skip this game" button skips the game when another segment follows
+##   (segment_finished with `skipped: true`); any other touch on the card does nothing. Then gameplay: HUD on, scoring live.
 ## Ending: `end_mode: game` games end themselves; on segment_ending the game gets 4.5 s to
 ## wrap up (Kotlin allows 5) before the director reports for it. Results carry the stars from
 ## the game's thresholds.
@@ -88,16 +88,16 @@ func played_sec() -> float:
 	return game.played_sec if game else 0.0
 
 
-## Whether the intro card may be skipped: not the last segment of an open-ended plan, which
-## would leave the rider with nothing to play.
+## Whether the intro card may be skipped: only when a later segment follows. Skipping the last
+## one would end the session (a timed plan finishes after its last result), and only End with
+## its confirmation may do that. A one-segment Just Ride therefore never offers a skip.
 func can_skip() -> bool:
 	if segment.is_empty():
 		return false
-	var last := int(segment.get("index", 0)) >= int(segment.get("count", 1)) - 1
-	return not (last and float(segment.get("duration_sec", -1)) < 0)
+	return int(segment.get("index", 0)) < int(segment.get("count", 1)) - 1
 
 
-## The rider tapped the intro card.
+## The rider pressed the intro card's "Skip this game".
 func skip() -> void:
 	if phase != Phase.INTRO or not can_skip():
 		return
@@ -377,5 +377,10 @@ func _build_done_panel() -> CanvasLayer:
 	var line := HudTheme.label("Keep pedalling as long as you like.", HudTheme.BODY, HudTheme.MUTED)
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(line)
-	box.add_child(HudTheme.button("End session", Session.request_end, Color(0.45, 0.16, 0.2)))
+	box.add_child(HudTheme.button("End session", end_from_done_panel, Color(0.45, 0.16, 0.2)))
 	return layer
+
+
+## The open-ride "Game over" panel's End: confirmed first, like every other End.
+func end_from_done_panel() -> void:
+	pause_overlay.show_confirm()
