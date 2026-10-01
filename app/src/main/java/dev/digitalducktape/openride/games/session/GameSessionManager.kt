@@ -236,7 +236,7 @@ class GameSessionManager(
         recording = startRide(pid, built.planId)
         log("session_started ${built.planId} (${built.difficulty}, FTP ${ftp.watts} W, recording=$recording)")
         tracker?.start()
-        signals.sessionStarted(BridgeMessages.encode(built.toMessage()))
+        signals.sessionStarted(BridgeMessages.encode(built.toMessage(riderId = pid)))
         startSegment(0)
         val sessionScope = CoroutineScope(scope.coroutineContext + sessionJob!!)
         sessionScope.launch { rideSessionManager.state.collect { refreshPaused() } }

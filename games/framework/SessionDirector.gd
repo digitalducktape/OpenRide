@@ -63,6 +63,9 @@ func _ready() -> void:
 	pause_overlay = PauseOverlay.new()
 	pause_overlay.resume_pressed.connect(Session.request_resume)
 	pause_overlay.end_confirmed.connect(Session.request_end)
+	pause_overlay.option_changed.connect(func(key: String, value: String):
+		if game:
+			game.change_option(key, value))
 	add_child(pause_overlay)
 	summary_screen = SummaryScreen.new()
 	summary_screen.done_pressed.connect(Session.request_exit)
@@ -143,6 +146,7 @@ func _on_segment_started(new_segment: Dictionary) -> void:
 	hud.setup(info, segment)
 	hud.visible = false
 	game.hud = hud
+	pause_overlay.set_options(info.options, game.option)
 	game.prepare(segment)
 	game.set_paused(Session.paused)
 

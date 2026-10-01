@@ -30,6 +30,10 @@ var star_thresholds := {}
 ## When true, the thresholds are points per minute of gameplay, so the same stars fit a 90 s
 ## circuit slot and a 30-minute Just Ride.
 var stars_per_minute := false
+## The game's own options, shown in the shared pause screen's "Game options" card and
+## remembered per rider (`GameOptions`). Each is
+## {key, label, choices: [values], labels: [shown text], default}. Values are strings.
+var options: Array[Dictionary] = []
 
 
 ## Problems with the declaration, empty when it's valid. The registry test runs this for
@@ -62,7 +66,24 @@ func validate() -> PackedStringArray:
 			problems.append("star_thresholds.%s needs three scores" % difficulty)
 		elif not (float(t[0]) > 0.0 and float(t[0]) <= float(t[1]) and float(t[1]) <= float(t[2])):
 			problems.append("star_thresholds.%s must be positive and rising" % difficulty)
+	for option in options:
+		var choices: Array = option.get("choices", [])
+		var labels: Array = option.get("labels", choices)
+		if str(option.get("key", "")).is_empty() or str(option.get("label", "")).is_empty():
+			problems.append("an option needs a key and a label")
+		elif choices.size() < 2 or labels.size() != choices.size():
+			problems.append("option '%s' needs two or more choices, each with a label" % option.key)
+		elif not choices.has(option.get("default")):
+			problems.append("option '%s' default isn't one of its choices" % option.key)
 	return problems
+
+
+## The option declared as `key`, or {}.
+func option_spec(key: String) -> Dictionary:
+	for option in options:
+		if option.get("key") == key:
+			return option
+	return {}
 
 
 ## Whether this game uses the camera.

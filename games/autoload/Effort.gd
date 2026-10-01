@@ -58,6 +58,17 @@ func award(points: float) -> float:
 	return added
 
 
+## Takes `points` off the score, without the multiplier (a penalty, e.g. Dodge Ball's -50 for
+## a hit with the shield down). Returns what was taken: 0 while scoring is frozen. The score
+## never drops below zero.
+func penalize(points: float) -> float:
+	if points <= 0.0 or not is_scoring():
+		return 0.0
+	var taken := minf(points, _meter.score)
+	_meter.score -= taken
+	return taken
+
+
 ## `stats.effort_avg`: the average multiplier over the segment's scoring time.
 func average() -> float:
 	return _meter.average()

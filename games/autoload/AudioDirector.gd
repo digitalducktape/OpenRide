@@ -225,8 +225,35 @@ func begin_segment(segment: Dictionary) -> void:
 	sfx_volume = clampf(float(audio.get("sfx_volume", 1.0)), 0.0, 1.0)
 	intensity = 1.0
 	_apply_bus_volumes()
+	set_bus_effects(MUSIC_BUS, [])
+	set_bus_effects(SFX_BUS, [])
 	if not music_enabled:
 		stop_music()
+
+
+## A game's own effects chain on the `Music` or `SFX` bus (e.g. reverb and a glue compressor),
+## replacing any earlier chain there. Native `AudioEffect`s cost little next to doing the same
+## offline in GDScript. Every segment starts with both buses clean (`begin_segment`).
+func set_bus_effects(bus: String, effects: Array[AudioEffect]) -> void:
+	if bus not in [MUSIC_BUS, SFX_BUS]:
+		push_warning("AudioDirector: set_bus_effects only takes %s or %s" % [MUSIC_BUS, SFX_BUS])
+		return
+	var index := AudioServer.get_bus_index(bus)
+	if index == -1:
+		return
+	while AudioServer.get_bus_effect_count(index) > 0:
+		AudioServer.remove_bus_effect(index, 0)
+	for effect in effects:
+		AudioServer.add_bus_effect(index, effect)
+
+
+func bus_effects(bus: String) -> Array[AudioEffect]:
+	var out: Array[AudioEffect] = []
+	var index := AudioServer.get_bus_index(bus)
+	if index != -1:
+		for i in AudioServer.get_bus_effect_count(index):
+			out.append(AudioServer.get_bus_effect(index, i))
+	return out
 
 
 func set_paused(paused: bool) -> void:

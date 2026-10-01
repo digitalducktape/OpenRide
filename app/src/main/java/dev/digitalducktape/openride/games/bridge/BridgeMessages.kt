@@ -83,6 +83,8 @@ data class SessionPlanMessage(
     /** Total planned seconds, or -1 for an open-ended Just Ride. */
     @SerialName("total_sec") val totalSec: Int,
     val segments: List<PlanSegment>,
+    /** The active rider's profile id, or null with no active rider: games remember their options per rider. */
+    @SerialName("rider_id") val riderId: Long? = null,
 )
 
 @Serializable

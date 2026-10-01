@@ -102,12 +102,13 @@ data class SessionPlan(
         get() = if (segments.any { it.durationSec < 0 }) -1 else segments.sumOf { it.durationSec + introSec }
 
     /** `session_started`'s payload. */
-    fun toMessage() = SessionPlanMessage(
+    fun toMessage(riderId: Long? = null) = SessionPlanMessage(
         kind = kind,
         planId = planId,
         difficulty = difficulty,
         totalSec = totalSec,
         segments = segments.map { PlanSegment(it.gameId, it.role, it.durationSec) },
+        riderId = riderId,
     )
 
     companion object {

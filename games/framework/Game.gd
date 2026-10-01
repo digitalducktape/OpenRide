@@ -81,6 +81,12 @@ func _on_resume() -> void:
 	pass
 
 
+## The rider changed one of the game's options (`GameInfo.options`) on the pause screen.
+## The new value is already stored; `option(key)` returns it.
+func _on_option_changed(_key: String, _value: String) -> void:
+	pass
+
+
 ## The segment's timer ran out (or the rider ended the session). Wrap up and call
 ## `end_segment()` within 5 s; by default the game ends at once. After 4.5 s Session ends it
 ## anyway.
@@ -96,6 +102,12 @@ func award(points: float) -> float:
 	return Effort.award(points) if playing else 0.0
 
 
+## Takes `points` off the score, without the multiplier (= `Effort.penalize`). Returns what
+## was taken.
+func penalize(points: float) -> float:
+	return Effort.penalize(points) if playing else 0.0
+
+
 ## Ends the segment. In `end_mode: game` the game calls this when it's done (a race's finish
 ## line); otherwise only after `request_finish`. A game in a timed slot that finishes early
 ## starts another round instead (epic #31, "Short games fill their slot").
@@ -109,6 +121,11 @@ func end_segment() -> void:
 	_ended = true
 	playing = false
 	ended.emit()
+
+
+## The rider's choice for one of this game's options (`GameInfo.options`), or its default.
+func option(key: String) -> String:
+	return GameOptions.get_value(declared(), key)
 
 
 ## The score so far, multiplier included.
@@ -164,6 +181,12 @@ func set_paused(value: bool) -> void:
 		_on_pause()
 	else:
 		_on_resume()
+
+
+## Stores an option the rider changed and tells the game (the pause screen calls this).
+func change_option(key: String, value: String) -> void:
+	if GameOptions.set_value(declared(), key, value):
+		_on_option_changed(key, value)
 
 
 func request_finish() -> void:
