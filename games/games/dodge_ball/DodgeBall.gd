@@ -132,7 +132,7 @@ func _ready() -> void:
 	_banner = HudTheme.label("", HudTheme.BIG)
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner.size = Vector2(HudTheme.W, 140)
-	_banner.position = Vector2(0, 330)
+	_banner.position = Vector2(0, 560)  # over the road, clear of the HUD widgets
 	_banner.add_theme_constant_override("outline_size", 16)
 	_banner.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
 	_banner.visible = false

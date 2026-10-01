@@ -203,7 +203,9 @@ func set_time_of_day(tod: DodgeTimeOfDay) -> void:
 func hit_fx(x: float, kind: String) -> void:
 	var p := _bursts[_next_burst]
 	_next_burst = (_next_burst + 1) % _bursts.size()
-	p.position = Vector3(x, 0.6, RIDER_LINE_Z - 0.3)
+	# A little ahead of the bars, so the burst reads as the ball breaking up, not as debris in
+	# the rider's face.
+	p.position = Vector3(x, 0.5, RIDER_LINE_Z - 2.0)
 	p.color = BALL_COLORS.get(kind, BALL_COLORS.plain)
 	p.restart()
 	_shake = 1.0
@@ -214,7 +216,7 @@ func shield_fx(x: float, kind: String) -> void:
 	hit_fx(x, kind)
 	_shake = 0.6
 	_shield_flash = 1.0
-	_shards.position = Vector3(x, 0.9, RIDER_LINE_Z + 0.2)
+	_shards.position = Vector3(x, 0.9, RIDER_LINE_Z - 1.0)
 	_shards.restart()
 
 
@@ -513,7 +515,7 @@ func _build_balls() -> void:
 
 func _build_fx() -> void:
 	var chunk_mesh := BoxMesh.new()
-	chunk_mesh.size = Vector3.ONE * 0.12
+	chunk_mesh.size = Vector3.ONE * 0.06
 	var vc := StandardMaterial3D.new()
 	vc.vertex_color_use_as_albedo = true
 	vc.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
