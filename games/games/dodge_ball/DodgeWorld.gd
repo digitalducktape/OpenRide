@@ -41,6 +41,12 @@ const BALL_COLORS := {
 
 const MODELS := "res://games/dodge_ball/models/"
 
+## Dev switches from the tablet tuning file (`DodgeBall.TUNING_PATH`, [world] section), for
+## finding what costs frame time: sky, fog, scenery, verges, road, balls, rig (each true by
+## default). Set before the node enters the tree. (An instance property: assigning another
+## class's static var crashed the exported build on the tablet.)
+var tuning := {}
+
 ## Emitted when a bouncing ball lands near the rider (for its sound), with 0-1 loudness.
 signal ball_bounced(loudness: float)
 
@@ -76,15 +82,38 @@ var _anim_t := 0.0
 var _ghosts: Array[Dictionary] = []  # dodged balls rolling on past the bike: {x, z, kind, t, y}
 var _bounce_phase := {}  # ball id -> last bounce index, for the landing sound
 var _tod: DodgeTimeOfDay
+var _noise: ImageTexture
 
 
 func _ready() -> void:
+	_noise = _noise_texture()
 	_build_environment()
 	_build_road()
 	_build_scenery()
 	_build_rig()
 	_build_balls()
 	_build_fx()
+	_apply_tuning()
+
+
+## The dev switches in `tuning` (after everything is built).
+func _apply_tuning() -> void:
+	if not tuning.get("sky", true):
+		_env.environment.background_mode = Environment.BG_COLOR
+		_env.environment.background_color = Color(0.4, 0.5, 0.7)
+	if not tuning.get("fog", true):
+		_env.environment.fog_enabled = false
+	for chunk in _chunks:
+		chunk.visible = tuning.get("scenery", true)
+	for node in get_children():
+		if node is MeshInstance3D and node.material_override == _verge_mat:
+			node.visible = tuning.get("verges", true)
+		if node is MeshInstance3D and node.material_override == _road_mat:
+			node.visible = tuning.get("road", true)
+		if node is MultiMeshInstance3D:
+			node.visible = tuning.get("balls", true)
+	for node in camera.get_children():
+		node.visible = tuning.get("rig", true)
 
 
 # --- Feeding the view ---
@@ -152,11 +181,20 @@ func set_time_of_day(tod: DodgeTimeOfDay) -> void:
 	env.ambient_light_energy = tod.ambient_energy
 	env.fog_light_color = tod.fog_color
 	env.fog_density = tod.fog_density
+	# The road and verges light and fog themselves (see road.gdshader): a flat surface under
+	# the sun gets sin(elevation) of it, plus the ambient light.
+	var light := tod.ambient * tod.ambient_energy + tod.sun_color * tod.sun_energy * maxf(sin(e), 0.12)
+	for mat in [_road_mat, _verge_mat]:
+		mat.set_shader_parameter("light_color", Vector3(light.r, light.g, light.b))
+		mat.set_shader_parameter("fog_color", tod.fog_color)
+		mat.set_shader_parameter("fog_density", tod.fog_density if tuning.get("fog", true) else 0.0)
 	_road_mat.set_shader_parameter("headlight", tod.headlight)
 	_road_mat.set_shader_parameter("lamp_glow", tod.lamp_glow)
 	_halo_mat.albedo_color = Color(1.0, 0.8, 0.5, clampf(tod.lamp_glow, 0.0, 1.0))
 	for chunk in _chunks:
 		chunk.get_node("Halos").visible = tod.lamp_glow > 0.05
+	if not tuning.get("fog", true):
+		env.fog_enabled = false
 
 
 # --- Feedback ---
@@ -219,6 +257,9 @@ func _build_environment() -> void:
 	var env := Environment.new()
 	_sky_mat = ShaderMaterial.new()
 	_sky_mat.shader = load("res://games/dodge_ball/shaders/sky.gdshader")
+	_sky_mat.set_shader_parameter("noise_tex", _noise)
+	# Its own texture object: GLES3 keeps filtering per texture, and stars need nearest.
+	_sky_mat.set_shader_parameter("star_tex", _noise_texture())
 	var sky := Sky.new()
 	sky.sky_material = _sky_mat
 	sky.radiance_size = Sky.RADIANCE_SIZE_32
@@ -246,6 +287,7 @@ func _build_road() -> void:
 	_road_mat = ShaderMaterial.new()
 	_road_mat.shader = load("res://games/dodge_ball/shaders/road.gdshader")
 	_road_mat.set_shader_parameter("road_half", DodgeBallLogic.ROAD_HALF)
+	_road_mat.set_shader_parameter("noise_tex", _noise)
 	_road_mat.set_shader_parameter("lamp_side_x", DodgeBallLogic.ROAD_HALF + 1.2)
 	_road_mat.set_shader_parameter("lamp_spacing", LAMP_SPACING)
 	road.material_override = _road_mat
@@ -254,6 +296,7 @@ func _build_road() -> void:
 	_verge_mat = ShaderMaterial.new()
 	_verge_mat.shader = load("res://games/dodge_ball/shaders/verge.gdshader")
 	_verge_mat.set_shader_parameter("road_half", DodgeBallLogic.ROAD_HALF)
+	_verge_mat.set_shader_parameter("noise_tex", _noise)
 	for side in [-1.0, 1.0]:
 		var verge := MeshInstance3D.new()
 		var vp := PlaneMesh.new()
@@ -267,14 +310,14 @@ func _build_road() -> void:
 
 ## Each chunk: lamps both sides (staggered), trees, bushes and rocks, a few cones on the kerb.
 func _build_scenery() -> void:
-	var lamp := _model_mesh("light-curved.glb")
+	var lamp := _cheap(_model_mesh("light-curved.glb"))
 	var trees := [_recolor(_model_mesh("tree_default.glb"), Color(0.32, 0.56, 0.2)),
 		_recolor(_model_mesh("tree_oak.glb"), Color(0.26, 0.48, 0.17)),
 		_recolor(_model_mesh("tree_pineTallA.glb"), Color(0.16, 0.36, 0.2)),
 		_recolor(_model_mesh("tree_cone.glb"), Color(0.38, 0.6, 0.22))]
 	var bush := _recolor(_model_mesh("plant_bushLarge.glb"), Color(0.3, 0.52, 0.2))
-	var rock := _model_mesh("rock_largeA.glb")
-	var cone := _model_mesh("construction-cone.glb")
+	var rock := _recolor(_model_mesh("rock_largeA.glb"), Color(0.5, 0.5, 0.47), Color(0.42, 0.41, 0.39))
+	var cone := _cheap(_model_mesh("construction-cone.glb"))
 	_halo_mat = StandardMaterial3D.new()
 	_halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -378,11 +421,11 @@ func _build_rig() -> void:
 	camera.make_current()
 	# Handlebars, in the camera's frame so they stay put while the world rolls by.
 	var bars := Node3D.new()
-	bars.position = Vector3(0, -0.3, -0.58)
+	bars.position = Vector3(0, -0.335, -0.58)
 	bars.rotation_degrees.x = -CAMERA_PITCH
 	camera.add_child(bars)
 	var metal := StandardMaterial3D.new()
-	metal.albedo_color = Color(0.22, 0.24, 0.28)
+	metal.albedo_color = Color(0.4, 0.42, 0.46)
 	metal.metallic = 0.6
 	metal.roughness = 0.35
 	var rubber := StandardMaterial3D.new()
@@ -577,6 +620,20 @@ func _set_ball(i: int, pos: Vector3, kind: String, near: float, glow: float) -> 
 
 # --- Helpers ---
 
+## 64x64 random values; with linear filtering and repeat, sampling it is value noise for the
+## road, verge and sky shaders (cheaper on the tablet than hashing per pixel).
+static func _noise_texture() -> ImageTexture:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1337
+	var data := PackedByteArray()
+	data.resize(64 * 64)
+	for i in data.size():
+		data[i] = rng.randi_range(0, 255)
+	var img := Image.create_from_data(64, 64, false, Image.FORMAT_L8, data)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
+
+
 static func BALL_RADIUS() -> float:
 	return DodgeBallLogic.BALL_RADIUS
 
@@ -599,8 +656,9 @@ func _model_mesh(file: String) -> Mesh:
 
 
 ## A copy of a nature-kit mesh in this road's palette: leaves (the greener surfaces) in
-## `leaf`, the rest (trunks) bark brown.
-func _recolor(mesh: Mesh, leaf: Color) -> Mesh:
+## `leaf`, the rest (trunks) in `bark`. The kit's materials are fully metallic, which renders
+## near-black without reflections, so they become plain matte ones lit per vertex.
+func _recolor(mesh: Mesh, leaf: Color, bark := Color(0.42, 0.29, 0.19)) -> Mesh:
 	if mesh == null:
 		return null
 	var copy := mesh.duplicate() as Mesh
@@ -610,8 +668,29 @@ func _recolor(mesh: Mesh, leaf: Color) -> Mesh:
 			continue
 		var m := mat.duplicate() as StandardMaterial3D
 		var c := mat.albedo_color
-		m.albedo_color = leaf if c.g > c.r else Color(0.42, 0.29, 0.19)
+		m.albedo_color = leaf if c.g > c.r else bark
+		m.metallic = 0.0
 		m.roughness = 0.95
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+		m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+		copy.surface_set_material(s, m)
+	return copy
+
+
+## A copy of a model mesh lit per vertex, without specular: flat-shaded low-poly models look
+## the same, and the tablet's GPU does a fraction of the work.
+func _cheap(mesh: Mesh) -> Mesh:
+	if mesh == null:
+		return null
+	var copy := mesh.duplicate() as Mesh
+	for s in copy.get_surface_count():
+		var mat := copy.surface_get_material(s) as BaseMaterial3D
+		if mat == null:
+			continue
+		var m := mat.duplicate() as BaseMaterial3D
+		m.metallic = 0.0
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+		m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 		copy.surface_set_material(s, m)
 	return copy
 

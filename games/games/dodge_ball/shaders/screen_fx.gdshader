@@ -1,14 +1,14 @@
 // Full-screen feedback over the 3D view (under the HUD): a vignette that flashes on a hit
 // (`flash`, in `flash_color`) and glows gold at the edges while the power bonus is on
 // (`power`). Edges only, so the centre of the view never changes: comfortable on a stationary
-// bike.
+// bike. The game hides it while there is nothing to show (it's a full-screen blend).
 shader_type canvas_item;
 
 uniform float flash = 0.0;
 uniform vec4 flash_color : source_color = vec4(1.0, 0.15, 0.1, 1.0);
 uniform float power = 0.0;
 uniform vec4 power_color : source_color = vec4(1.0, 0.75, 0.2, 1.0);
-uniform float base_vignette = 0.25;
+uniform float base_vignette = 0.0;
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;

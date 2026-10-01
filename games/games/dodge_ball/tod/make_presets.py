@@ -12,7 +12,7 @@ PRESETS = {
                  lamp_glow=0.25, headlight=0.0, ball_glow=0.05),
     "day": dict(sky_top=(0.2, 0.46, 0.92), sky_horizon=(0.72, 0.84, 0.96), sky_ground=(0.3, 0.34, 0.3),
                 clouds=0.5, cloud_color=(1.0, 1.0, 1.0), stars=0.0, halo=0.35, sun_size=0.03,
-                sun_elevation=52.0, sun_azimuth=-28.0, sun_color=(1.0, 0.97, 0.9), sun_energy=1.15,
+                sun_elevation=52.0, sun_azimuth=150.0, sun_color=(1.0, 0.97, 0.9), sun_energy=1.15,
                 ambient=(0.6, 0.7, 0.85), ambient_energy=0.62, fog_color=(0.74, 0.84, 0.95), fog_density=0.0055,
                 lamp_glow=0.0, headlight=0.0, ball_glow=0.0),
     "dusk": dict(sky_top=(0.16, 0.13, 0.36), sky_horizon=(1.0, 0.42, 0.26), sky_ground=(0.2, 0.15, 0.18),

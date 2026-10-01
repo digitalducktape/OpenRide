@@ -8,6 +8,7 @@ const BAR_SIZE := Vector2(440, 26)
 const LIFE_RADIUS := 15.0
 
 var shield := 1.0
+var _drawn_shield := -1.0
 var draining := false
 var floor_rpm := 85.0
 var lives := -1  ## -1: no lives (circuit)
@@ -19,6 +20,9 @@ var _streak: Label
 var _lives_box: Control
 var _wave: Label
 var _t := 0.0
+var _bonus_on := false
+var _streak_count := -1
+var _wave_number := -1
 
 
 func _init(floor_value := 85.0, with_lives := false) -> void:
@@ -64,14 +68,24 @@ func set_state(value: float, below_floor: bool, bonus_on: bool, streak: int, liv
 	if below_floor != draining:
 		draining = below_floor
 		_refresh_caption()
-	_bonus.text = "×2" if bonus_on else "×1"
-	_bonus.add_theme_color_override("font_color", HudTheme.STAR_ON if bonus_on else HudTheme.MUTED)
-	_streak.text = "streak %d" % streak
+	# Only touch labels when they change: a theme override or new text re-lays out the HUD,
+	# which cost several ms a frame on the tablet when done every frame.
+	if bonus_on != _bonus_on:
+		_bonus_on = bonus_on
+		_bonus.text = "×2" if bonus_on else "×1"
+		_bonus.add_theme_color_override("font_color", HudTheme.STAR_ON if bonus_on else HudTheme.MUTED)
+	if streak != _streak_count:
+		_streak_count = streak
+		_streak.text = "streak %d" % streak
 	if lives >= 0 and lives_left != lives:
 		lives = lives_left
 		_lives_box.queue_redraw()
-	_wave.text = "wave %d" % wave
-	_bar.queue_redraw()
+	if wave != _wave_number:
+		_wave_number = wave
+		_wave.text = "wave %d" % wave
+	if absf(value - _drawn_shield) > 0.002:
+		_drawn_shield = value
+		_bar.queue_redraw()
 
 
 func _process(delta: float) -> void:

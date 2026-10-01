@@ -13,20 +13,14 @@ uniform float stars = 0.0;
 uniform float clouds = 0.5;
 uniform vec3 cloud_color : source_color = vec3(1.0, 1.0, 1.0);
 
-float hash(vec3 p) {
-	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-}
+// Value noise from a 64x64 random texture, filtered by the GPU: far cheaper on the tablet's
+// PowerVR than hashing with sin() per pixel. One unit of `p` is one texel.
+uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap;
 
 float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	f = f * f * (3.0 - 2.0 * f);
-	float a = hash(vec3(i, 0.0));
-	float b = hash(vec3(i + vec2(1.0, 0.0), 0.0));
-	float c = hash(vec3(i + vec2(0.0, 1.0), 0.0));
-	float d = hash(vec3(i + vec2(1.0, 1.0), 0.0));
-	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+	return texture(noise_tex, p / 64.0).r;
 }
+uniform sampler2D star_tex : repeat_enable, filter_nearest;
 
 void sky() {
 	vec3 dir = EYEDIR;
@@ -47,10 +41,10 @@ void sky() {
 	}
 	// Stars.
 	if (stars > 0.0 && h > 0.0) {
-		vec3 cell = floor(dir * 180.0);
-		float r = hash(cell);
-		float star = step(0.9975, r) * smoothstep(0.02, 0.25, h);
-		col += vec3(0.9, 0.92, 1.0) * star * stars * (0.5 + 0.5 * hash(cell + 3.1));
+		vec2 suv = dir.xz / (h + 0.35) * 3.0 + dir.y * 7.0;
+		float r = texture(star_tex, suv).r;
+		float star = step(0.993, r) * smoothstep(0.02, 0.25, h);
+		col += vec3(0.9, 0.92, 1.0) * star * stars * (0.5 + 0.5 * texture(star_tex, suv * 1.7).r);
 	}
 	COLOR = col;
 }

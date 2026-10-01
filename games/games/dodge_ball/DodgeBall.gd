@@ -18,6 +18,15 @@ const MUSIC_STYLE := {
 }
 const SPEED_PER_RPM := 0.11  ## road m/s per rpm: 90 rpm is about 36 km/h
 const SCREEN_FX_LAYER := 5  ## under the HUD (10)
+## The 3D view renders into a SubViewport at this share of the screen's resolution, drawn
+## scaled up under the HUD (which stays sharp): the tablet's GPU is fill-rate bound at full
+## 1080p. (Viewport.scaling_3d_scale below 1 hung the GL Compatibility renderer on the tablet.)
+const RENDER_SCALE := 0.67
+## MSAA 2x halved the frame rate on the tablet (measured), so it stays off.
+const MSAA := Viewport.MSAA_DISABLED
+## Overrides are read from here when the file exists (a dev aid), for tuning on the tablet without rebuilding:
+## [render] scale=0.75 msaa=0|1|2.
+const TUNING_PATH := "user://dodge_tuning.cfg"
 
 var logic: DodgeBallLogic
 var world: DodgeWorld
@@ -25,13 +34,17 @@ var world: DodgeWorld
 var _status: DodgeStatus
 var _fx_layer: CanvasLayer
 var _fx_mat: ShaderMaterial
+var _fx_rect: ColorRect
 var _banner: Label
 var _flash := 0.0
 var _power_glow := 0.0
 var _run_awarded := 0.0
 var _best_awarded := 0.0
 var _round_limit := -1.0  ## seconds, for a rounds Just Ride (end_mode game)
-var _previous_msaa := Viewport.MSAA_DISABLED
+var _view: SubViewport
+var _perf_usec := 0
+var _perf_frames := 0
+var _perf_left := 5.0
 
 
 func info() -> GameInfo:
@@ -78,9 +91,31 @@ func target_text(seg: Dictionary) -> String:
 
 func _ready() -> void:
 	DodgeAudioScript.register()
+	var tuning := ConfigFile.new()
+	var tuned := tuning.load(TUNING_PATH) == OK
 	world = DodgeWorldScript.new()
+	if tuned and tuning.has_section("world"):
+		for key in tuning.get_section_keys("world"):
+			world.tuning[key] = bool(tuning.get_value("world", key))
 	world.name = "World"
-	add_child(world)
+	var scale := clampf(float(tuning.get_value("render", "scale", RENDER_SCALE)) if tuned else RENDER_SCALE, 0.4, 1.0)
+	_view = SubViewport.new()
+	_view.name = "View3D"
+	_view.size = Vector2i(roundi(HudTheme.W * scale), roundi(HudTheme.H * scale))
+	_view.msaa_3d = int(tuning.get_value("render", "msaa", MSAA)) if tuned else MSAA
+	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_view.audio_listener_enable_3d = false
+	add_child(_view)
+	_view.add_child(world)
+	var shown := TextureRect.new()
+	shown.name = "View3DImage"
+	shown.texture = _view.get_texture()
+	shown.size = Vector2(HudTheme.W, HudTheme.H)
+	shown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shown.stretch_mode = TextureRect.STRETCH_SCALE
+	shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shown)
 	world.ball_bounced.connect(func(loud: float): AudioDirector.play_sfx("ball_bounce", linear_to_db(loud) - 6.0, randf_range(0.9, 1.1)))
 	_fx_layer = CanvasLayer.new()
 	_fx_layer.layer = SCREEN_FX_LAYER
@@ -91,7 +126,9 @@ func _ready() -> void:
 	_fx_mat = ShaderMaterial.new()
 	_fx_mat.shader = load("res://games/dodge_ball/shaders/screen_fx.gdshader")
 	rect.material = _fx_mat
+	rect.visible = false
 	_fx_layer.add_child(rect)
+	_fx_rect = rect
 	_banner = HudTheme.label("", HudTheme.BIG)
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner.size = Vector2(HudTheme.W, 140)
@@ -100,13 +137,8 @@ func _ready() -> void:
 	_banner.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
 	_banner.visible = false
 	_fx_layer.add_child(_banner)
-	_previous_msaa = get_viewport().msaa_3d
-	get_viewport().msaa_3d = Viewport.MSAA_2X
-
-
-func _exit_tree() -> void:
-	if is_inside_tree():
-		get_viewport().msaa_3d = _previous_msaa
+	print("OPENRIDE_GAMES dodge_ball render scale=%.2f size=%s msaa=%d tuned=%s world=%s" % [scale, _view.size,
+		_view.msaa_3d, tuned, world.tuning])
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -140,6 +172,24 @@ func _apply_options() -> void:
 
 
 func _on_frame(delta: float) -> void:
+	var started := Time.get_ticks_usec()
+	_frame(delta)
+	_perf_usec += Time.get_ticks_usec() - started
+	_perf_frames += 1
+	_perf_left -= delta
+	if _perf_left <= 0.0:
+		# For checking the 60 fps budget on the tablet (docs/GAMES.md, "Capturing logs").
+		print("OPENRIDE_GAMES dodge_ball perf game_ms=%.2f process_ms=%.2f draw_calls=%d objects=%d" % [
+			_perf_usec / 1000.0 / maxi(_perf_frames, 1),
+			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)])
+		_perf_usec = 0
+		_perf_frames = 0
+		_perf_left = 5.0
+
+
+func _frame(delta: float) -> void:
 	var cadence := InputBus.cadence
 	var power := InputBus.power
 	var events := logic.step(delta, InputBus.lean_x, cadence, power)
@@ -150,8 +200,11 @@ func _on_frame(delta: float) -> void:
 	var bonus_on := logic.power_multiplier(power) > 1.0
 	_power_glow = move_toward(_power_glow, 1.0 if bonus_on else 0.0, delta * 3.0)
 	_flash = maxf(0.0, _flash - delta * 2.2)
-	_fx_mat.set_shader_parameter("power", _power_glow * 0.6)
-	_fx_mat.set_shader_parameter("flash", _flash)
+	# The full-screen overlay costs fill rate on the tablet: draw it only while it shows something.
+	_fx_rect.visible = (_flash > 0.0 or _power_glow > 0.0) and world.tuning.get("screenfx", true)
+	if _fx_rect.visible:
+		_fx_mat.set_shader_parameter("power", _power_glow * 0.6)
+		_fx_mat.set_shader_parameter("flash", _flash)
 	_status.set_state(logic.shield, cadence < logic.cadence_floor, bonus_on, logic.streak, maxi(logic.lives, 0), logic.wave)
 	if logic.game_over_left > 0.0:
 		_banner.text = "Game over! Next run in %d" % ceili(logic.game_over_left)
