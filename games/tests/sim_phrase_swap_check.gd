@@ -37,18 +37,30 @@ func _run() -> void:
 	var target: String = director.music_key({"style": STYLE, "tempo_bpm": 170.0, "seed": 5})
 	await _until(func(): return director.pending_music_key() == target, 10.0)
 	_expect(director.pending_music_key() == target, "the newest tempo is pending")
-	var left := phrase - fposmod(first.get_playback_position(), phrase)
+	# Follow the old loop on the audio clock (its playback position, not wall-clock time, which
+	# stretches under CPU load): count the phrase boundaries it passes until the swap.
+	var left := phrase - _into_phrase(first, phrase)
 	var asked := Time.get_ticks_msec()
-	await _until(func(): return not swaps.is_empty(), phrase + 2.0)
+	var last := _into_phrase(first, phrase)
+	var boundaries := 0
+	while swaps.is_empty() and Time.get_ticks_msec() - asked < (phrase + 2.0) * 1000.0:
+		await process_frame
+		var now := _into_phrase(first, phrase)
+		if now < last - phrase / 2.0:
+			boundaries += 1
+		last = now
+	# The swap happens in the director's _process, after this frame's sample: sample once more.
+	if _into_phrase(first, phrase) < last - phrase / 2.0:
+		boundaries += 1
 	_expect(swaps.size() == 1, "one swap")
 	if swaps.size() == 1:
 		var since: float = swaps[0][1]
 		var waited: float = (int(swaps[0][2]) - asked) / 1000.0
-		print("swapped %.1f ms after the boundary, %.2f s after the render was ready (%.2f s were left in the phrase)"
-			% [since * 1000.0, waited, left])
+		print("swapped %.1f ms after the boundary, at the first boundary (%d passed); %.2f s of wall time for %.2f s left in the phrase"
+			% [since * 1000.0, boundaries, waited, left])
 		_expect(swaps[0][0] == target, "the swap plays the newest tempo")
 		_expect(since >= 0.0 and since < MAX_LATE_SEC, "the swap lands within %d ms of the boundary" % int(MAX_LATE_SEC * 1000))
-		_expect(absf(waited - left) < 0.25, "the swap waited for the boundary")
+		_expect(boundaries == 1, "the swap waited for the next boundary, not an earlier or later one (%d passed)" % boundaries)
 		_expect(director.current_music_key() == target, "the new tempo is current")
 		_expect(director._fade_sec == director.SWAP_FADE_SEC, "a short crossfade")
 		var second: AudioStreamPlayer = director._decks[director._deck]
@@ -64,6 +76,11 @@ func _run() -> void:
 		for f in _failures:
 			printerr("FAIL ", f)
 		quit(1)
+
+
+## Seconds since the player's last phrase boundary, on the audio clock (as AudioDirector reads it).
+func _into_phrase(player: AudioStreamPlayer, phrase: float) -> float:
+	return fposmod(player.get_playback_position() + AudioServer.get_time_since_last_mix(), phrase)
 
 
 func _until(condition: Callable, timeout: float) -> void:
