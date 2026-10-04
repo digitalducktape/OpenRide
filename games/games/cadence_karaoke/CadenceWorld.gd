@@ -1,24 +1,25 @@
 class_name CadenceWorld
 extends Node3D
-## Cadence Karaoke's 3D view (#42), first person down a neon tunnel. The target is a glowing
-## rail ahead whose height is the target cadence (changes rise and fall in the distance); your
-## cadence is an orb hovering at the same depth. Keep the orb on the rail. Beat rings fly past,
-## one a beat, and the tunnel's lines flare with the beat. All of it is procedural: shaders for the
-## tunnel and rings, boxes in MultiMeshes for the rail, nothing imported.
+## Cadence Karaoke's 3D view (#42), first person down a neon tunnel. Your orb rolls along the
+## floor. A lane is marked on the floor, a box with a bright beat line across its middle, and beat
+## rings fly down the tunnel toward the line, one landing on it every beat. When your cadence
+## matches the target the orb sits in the middle of the box on the line; the faster you pedal above
+## the target the further it moves in front of the box (further up the floor), the slower below it
+## the further it falls behind the box (nearer you, lower on the screen). Keep it inside the box.
+## All of it is procedural: shaders for the tunnel and rings, boxes for the lane, nothing imported.
 ##
 ## It only draws: `CadenceLogic` holds the rules. The tablet recipe (docs/GAMES.md, "On the
-## tablet") applies: unshaded surfaces, MultiMesh, and nothing laid out per frame beyond the
-## rail's 3 × 48 box transforms.
+## tablet") applies: unshaded surfaces, MultiMesh, and nothing laid out per frame beyond a dozen
+## ring transforms.
 
-const RAIL_POINTS := 48
-const ORB_Z := -6.0  ## the depth the orb and the rail's start sit at
-const LOOK_DIST := 44.0  ## how far ahead the rail reaches (LOOKAHEAD_SEC of target changes)
-const Y_PER_RPM := 0.045
-const MID_RPM := 80.0
+const ORB_Z := -18.0  ## the depth of the beat line
+const Z_RANGE := 10.0  ## metres the orb moves at full gap: in front of or behind the band
+const RING_SPACING := 7.0  ## metres between beat rings
 const CAMERA_Y := 2.2
-const CAMERA_PITCH := -9.0
-const SPEED := 3.6  ## m/s the tunnel flows past; LOOK_DIST / SPEED is the lookahead
-const RING_COUNT := 14
+const CAMERA_PITCH := -12.0
+const ORB_RADIUS := 0.6
+const LANE_HALF_W := 3.2  ## half the width of the lane the box is marked on
+const RING_COUNT := 18
 const RING_SIZE := Vector2(15.0, 7.4)
 const FLOOR_Y := -3.4
 const CEIL_Y := 4.2
@@ -43,14 +44,18 @@ var orb_flash := 0.0  ## 0-1, a red flash when the streak breaks
 var _grid_mats: Array[ShaderMaterial] = []
 var _ring_mat: ShaderMaterial
 var _ring_mm: MultiMesh
-var _rail_mm: MultiMesh
-var _band_mm: MultiMesh
+var _line: MeshInstance3D
+var _line_mat: StandardMaterial3D
+var _gates: Array[MeshInstance3D] = []
+var _gate_mat: StandardMaterial3D
+var _lane: MeshInstance3D
+var _lane_mat: StandardMaterial3D
 var _orb: MeshInstance3D
 var _orb_mat: StandardMaterial3D
 var _halo: MeshInstance3D
 var _halo_mat: StandardMaterial3D
 var _scroll := 0.0
-var _orb_y := 0.0
+var _orb_z := ORB_Z
 var _noise: ImageTexture
 
 
@@ -58,7 +63,7 @@ func _ready() -> void:
 	_build_environment()
 	_build_tunnel()
 	_build_rings()
-	_build_rail()
+	_build_line()
 	_build_orb()
 	camera = Camera3D.new()
 	camera.fov = 64.0
@@ -70,20 +75,25 @@ func _ready() -> void:
 	set_theme_color(theme_color)
 
 
-## Draws one frame. `targets` holds RAIL_POINTS target cadences from now to LOOKAHEAD_SEC ahead,
-## `cadence` the rider's, `tolerance` the band's half-width (rpm), `state` "in_bonus", "in_band",
-## "near" or "out" (the orb's colour), `frozen` whether scoring is frozen, `streak` 0-1 (how far
-## through the multiplier) and `beat_rate` beats per second.
-func update_view(delta: float, targets: PackedFloat32Array, cadence: float, tolerance: float, state: String, frozen: bool, streak: float, beat_rate: float) -> void:
-	_scroll += delta * SPEED
+## Draws one frame. `gap` is -1 to 1: 0 puts the orb on the line, 1 in front of the box and -1
+## behind it. `band` is the box's half-depth on that scale, `beat_phase` 0-1 through the current
+## beat (a ring lands on the line as it wraps), `state` "in_bonus", "in_band", "near" or "out"
+## (the orb's colour), `frozen` whether scoring is frozen, `streak` 0-1 (how far through the
+## multiplier) and `beat_rate` beats per second.
+func update_view(delta: float, gap: float, band: float, beat_phase: float, state: String, frozen: bool, streak: float, beat_rate: float) -> void:
+	_scroll += delta * beat_rate * RING_SPACING
 	for mat in _grid_mats:
 		mat.set_shader_parameter("scroll", _scroll)
 		mat.set_shader_parameter("beat", beat)
 	_ring_mat.set_shader_parameter("pulse", beat)
-	_update_rings(beat_rate)
-	_update_rail(targets, tolerance)
-	var want := clampf((cadence - MID_RPM) * Y_PER_RPM, -2.3, 2.3)
-	_orb_y = lerpf(_orb_y, want, minf(delta * 14.0, 1.0))
+	_line_mat.emission_energy_multiplier = 1.6 + beat * 1.6
+	_lane_mat.albedo_color = Color(theme_color, 0.16 + beat * 0.1)
+	_update_rings(beat_phase)
+	var reach := maxf(band * Z_RANGE, 0.4)  # the box's half-depth
+	_gates[0].position.z = ORB_Z - reach
+	_gates[1].position.z = ORB_Z + reach
+	_lane.scale = Vector3(1.0, 1.0, reach * 2.0)
+	_orb_z = lerpf(_orb_z, ORB_Z - gap * Z_RANGE, minf(delta * 8.0, 1.0))
 	orb_flash = maxf(orb_flash - delta * 2.5, 0.0)
 	var color := _orb_color(state, frozen)
 	color = color.lerp(Color(1.0, 0.15, 0.1), orb_flash)
@@ -91,10 +101,12 @@ func update_view(delta: float, targets: PackedFloat32Array, cadence: float, tole
 	_orb_mat.emission = color
 	_orb_mat.emission_energy_multiplier = 1.8 + beat * 1.5 + streak * 1.2
 	_halo_mat.albedo_color = Color(color, 0.5)
-	_orb.position = Vector3(0.0, _orb_y, ORB_Z)
-	_orb.scale = Vector3.ONE * (1.0 + beat * 0.12 + streak * 0.2)
+	_orb.position = Vector3(0.0, FLOOR_Y + ORB_RADIUS, _orb_z)
+	# Plain perspective: small and far when ahead, big and close when behind.
+	var size := 1.0 + beat * 0.12 + streak * 0.2
+	_orb.scale = Vector3.ONE * size
 	_halo.position = _orb.position
-	_halo.scale = Vector3.ONE * (1.0 + beat * 0.3 + streak * 0.6)
+	_halo.scale = Vector3.ONE * (size + beat * 0.3 + streak * 0.5)
 
 
 func set_theme_color(color: Color) -> void:
@@ -102,12 +114,9 @@ func set_theme_color(color: Color) -> void:
 	for mat in _grid_mats:
 		mat.set_shader_parameter("line_color", color)
 	_ring_mat.set_shader_parameter("ring_color", color)
-	var rail_mat := _rail_mm_material(_rail_mm)
-	rail_mat.albedo_color = color
-	rail_mat.emission = color
-	var band_mat := _rail_mm_material(_band_mm)
-	band_mat.albedo_color = Color(color, 0.22)
-	band_mat.emission = color
+	_gate_mat.albedo_color = color
+	_gate_mat.emission = color
+	_lane_mat.emission = color
 
 
 func _orb_color(state: String, frozen: bool) -> Color:
@@ -121,10 +130,6 @@ func _orb_color(state: String, frozen: bool) -> Color:
 		"near":
 			return Color(1.0, 0.85, 0.3)
 	return Color(1.0, 0.4, 0.35)
-
-
-func _rail_mm_material(mm: MultiMesh) -> StandardMaterial3D:
-	return (mm.get_meta("mat") as StandardMaterial3D)
 
 
 # --- Building ---
@@ -183,80 +188,63 @@ func _build_rings() -> void:
 	mmi.extra_cull_margin = 200.0
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
-	_update_rings(1.4)
+	_update_rings(0.0)
 
 
-## Beat rings: spaced one beat apart along the tunnel, all flowing toward the rider.
-func _update_rings(beat_rate: float) -> void:
-	var spacing := SPEED / maxf(beat_rate, 0.3)
-	var offset := fposmod(_scroll, spacing)
+## Beat rings: one a beat apart, flowing toward the rider. Ring k lands on the line when
+## `beat_phase` reaches 1 (k = 1), so the line flares as a ring arrives.
+func _update_rings(beat_phase: float) -> void:
 	for i in RING_COUNT:
-		var z := -(i * spacing) + offset - 1.0
+		var z := ORB_Z - (float(i - 1) - beat_phase) * RING_SPACING
 		_ring_mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(0.0, (FLOOR_Y + CEIL_Y) / 2.0, z)))
 
 
-func _build_rail() -> void:
-	var seg := BoxMesh.new()
-	seg.size = Vector3(1.0, 1.0, 1.0)
-	_rail_mm = _rail_multimesh(seg, "Rail", Color(1, 1, 1))
-	_band_mm = _rail_multimesh(seg, "Band", Color(1, 1, 1, 0.5))
+## The box on the floor: a translucent lane as deep as the band, a dim gate at each end, and the
+## beat line, a bright bar across the middle (white, so it is never mistaken for a ring).
+func _build_line() -> void:
+	_line_mat = _flat_material(Color(1, 1, 1), false)
+	_gate_mat = _flat_material(Color(1, 1, 1), false)
+	_lane_mat = _flat_material(Color(1, 1, 1, 0.2), true)
+	_line = _floor_bar("BeatLine", Vector3(LANE_HALF_W * 2.0 + 1.6, 0.12, 0.45), _line_mat, 0.07)
+	_line.position.z = ORB_Z
+	for gate_name in ["BoxFar", "BoxNear"]:
+		var gate := _floor_bar(gate_name, Vector3(LANE_HALF_W * 2.0 + 0.6, 0.1, 0.22), _gate_mat, 0.06)
+		_gates.append(gate)
+	_lane = _floor_bar("Lane", Vector3(LANE_HALF_W * 2.0, 0.03, 1.0), _lane_mat, 0.02)
+	_lane.position.z = ORB_Z
 
 
-func _rail_multimesh(mesh: Mesh, node_name: String, color: Color) -> MultiMesh:
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = mesh
-	mm.instance_count = RAIL_POINTS - 1
+func _floor_bar(bar_name: String, size: Vector3, mat: StandardMaterial3D, lift: float) -> MeshInstance3D:
+	var box := BoxMesh.new()
+	box.size = size
+	var mi := MeshInstance3D.new()
+	mi.name = bar_name
+	mi.mesh = box
+	mi.material_override = mat
+	mi.position = Vector3(0.0, FLOOR_Y + lift, ORB_Z)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	return mi
+
+
+func _flat_material(color: Color, see_through: bool) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color = color
 	mat.emission_enabled = true
 	mat.emission = color
-	mat.emission_energy_multiplier = 1.0
-	if color.a < 1.0:
+	mat.emission_energy_multiplier = 1.5
+	if see_through:
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 		mat.disable_receive_shadows = true
-	mm.set_meta("mat", mat)
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = node_name
-	mmi.multimesh = mm
-	mmi.material_override = mat
-	mmi.extra_cull_margin = 200.0
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mmi)
-	return mm
-
-
-## The rail is a chain of flat boxes along the targets; the band is the same chain, wider and
-## translucent, as tall as the tolerance.
-func _update_rail(targets: PackedFloat32Array, tolerance: float) -> void:
-	var count := mini(targets.size(), RAIL_POINTS)
-	if count < 2:
-		return
-	var band_h := maxf(tolerance * Y_PER_RPM * 2.0, 0.2)
-	var prev := _rail_point(0, targets[0])
-	for i in range(1, count):
-		var point := _rail_point(i, targets[i])
-		var d := point - prev
-		var len := d.length()
-		var q := Quaternion(Vector3.FORWARD, d / len)
-		var mid := (prev + point) * 0.5
-		var basis := Basis(q)
-		_rail_mm.set_instance_transform(i - 1, Transform3D(basis.scaled_local(Vector3(1.3, 0.09, len * 1.04)), mid))
-		_band_mm.set_instance_transform(i - 1, Transform3D(basis.scaled_local(Vector3(3.4, band_h, len * 1.04)), mid))
-		prev = point
-
-
-func _rail_point(i: int, rpm: float) -> Vector3:
-	var t := float(i) / (RAIL_POINTS - 1)
-	return Vector3(0.0, (rpm - MID_RPM) * Y_PER_RPM, ORB_Z - t * LOOK_DIST)
+	return mat
 
 
 func _build_orb() -> void:
 	var sphere := SphereMesh.new()
-	sphere.radius = 0.42
-	sphere.height = 0.84
+	sphere.radius = ORB_RADIUS
+	sphere.height = ORB_RADIUS * 2.0
 	sphere.radial_segments = 16
 	sphere.rings = 8
 	_orb_mat = StandardMaterial3D.new()
@@ -279,7 +267,7 @@ func _build_orb() -> void:
 	g.add_point(0.3, Color(1, 1, 1, 0.35))
 	glow.gradient = g
 	var quad := QuadMesh.new()
-	quad.size = Vector2(2.6, 2.6)
+	quad.size = Vector2(3.6, 3.6)
 	_halo_mat = StandardMaterial3D.new()
 	_halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
