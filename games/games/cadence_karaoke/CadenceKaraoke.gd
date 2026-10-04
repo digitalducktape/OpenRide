@@ -1,14 +1,15 @@
 extends Game
-## Cadence Karaoke (#42): a rhythm game for your legs. Pick your own pace (a target cadence) and
-## ride to it, adjusting it whenever you like with − and +. In first person down a neon tunnel, a
-## glowing rail ahead is the target and an orb is your cadence: keep the orb on the rail. The
-## music plays at exactly the target cadence, one beat per pedal stroke, and its lead only plays
-## while you're in the band, so staying on target completes the song.
+## Cadence Karaoke (#42): a rhythm game for your legs. The one speed number is the target rpm:
+## ride to it, and move it whenever you like with − and + (5 rpm a step; internally "pace"). In first person down a neon tunnel, the
+## beat is a line inside a box and an orb is you: on the line when your cadence matches the target,
+## in front of the box at 10 rpm or more above it, behind the box at 10 or more below. The music plays at exactly
+## the target cadence, one beat per pedal stroke, and its lead only plays while you're in the band,
+## so staying on the beat completes the song.
 ##
 ## Rules: `CadenceLogic` (tested headless). View: `CadenceWorld` (3D). Audio: `CadenceAudio`. This
-## scene wires them to the framework: declarations, the HUD widget and the pace buttons, scoring
+## scene wires them to the framework: declarations, the HUD widget and the target buttons, scoring
 ## through award() (no effort multiplier: this game rewards staying easy), music and effects
-## through AudioDirector, and the rider's options (profile, metronome, look) through `GameOptions`.
+## through AudioDirector, and the rider's options (metronome, look) through `GameOptions`.
 
 const CadenceAudioScript := preload("res://games/cadence_karaoke/CadenceAudio.gd")
 
@@ -40,7 +41,6 @@ var _pending_wait := 0.0
 var _message_left := 0.0
 var _seed := 0
 var _band_for := -1
-var _targets := PackedFloat32Array()
 var _circuit := false
 
 
@@ -48,7 +48,7 @@ func info() -> GameInfo:
 	var i := GameInfo.new()
 	i.id = "cadence_karaoke"
 	i.title = "Cadence Karaoke"
-	i.how_to = "Pick your pace and keep your cadence on the rail"
+	i.how_to = "Pedal with the beat and keep the ball on the line"
 	i.supports = ["minutes", "open"]
 	i.min_sec = 60
 	i.max_sec = 3600
@@ -67,8 +67,6 @@ func info() -> GameInfo:
 		"hard": [300, 1000, 1500],
 	}
 	i.options = [
-		{"key": "profile", "label": "Workout shape", "choices": ["steady", "pyramid", "builds", "spinups"],
-			"labels": ["Steady pace", "Pyramids", "Cadence builds", "Spin-ups"], "default": "steady"},
 		{"key": "metronome", "label": "Metronome", "choices": ["off", "on"],
 			"labels": ["Off", "On"], "default": "off"},
 		{"key": "look", "label": "Colour", "choices": ["auto", "cyan", "green", "violet", "pink"],
@@ -79,8 +77,8 @@ func info() -> GameInfo:
 
 func how_to_text(seg: Dictionary) -> String:
 	if seg.get("params", {}).has("cadence_profile"):
-		return "Keep your cadence on the rail. − and + shift the whole target if you need to"
-	return "Pick your pace with − and +, then keep your cadence on the rail"
+		return "Pedal to the target rpm and keep the ball in the box. − and + move the target 5 rpm"
+	return "Pedal to the target rpm and keep the ball in the box. − and + move the target 5 rpm"
 
 
 func target_text(seg: Dictionary) -> String:
@@ -110,8 +108,7 @@ func _ready() -> void:
 	shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shown)
-	_targets.resize(CadenceWorld.RAIL_POINTS)
-	# The pace buttons, along the bottom of the view.
+	# The target buttons (− and + 5 rpm), along the bottom of the view.
 	var layer := CanvasLayer.new()
 	layer.layer = CONTROLS_LAYER
 	add_child(layer)
@@ -127,12 +124,11 @@ func _ready() -> void:
 
 func _on_prepare(seg: Dictionary) -> void:
 	_circuit = params.has("cadence_profile")
-	var shape := "steady" if _circuit else option("profile")
 	var rules := params.duplicate()
 	if str(seg.get("role", "free")) == "free":
-		# A Just Ride caps only Endurance (steady), at 75% of FTP; the other shapes have none.
-		rules["power_cap_watts"] = float(params.get("ftp_watts", 0.0)) * 0.75 if shape == "steady" else 0.0
-	logic = CadenceLogic.new(difficulty, rules, shape)
+		# A Just Ride caps power at 75% of FTP (Endurance).
+		rules["power_cap_watts"] = float(params.get("ftp_watts", 0.0)) * 0.75
+	logic = CadenceLogic.new(difficulty, rules)
 	_seed = int(seg.get("seed", 0))
 	_beat_phase = 0.0
 	_pending_wait = 0.0
@@ -148,8 +144,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, CadenceAudioScript.sfx_effects())
 	if not AudioDirector.tempo_swapped.is_connected(_on_tempo_swapped):
 		AudioDirector.tempo_swapped.connect(_on_tempo_swapped)
-	_fill_targets()
-	world.update_view(0.0, _targets, 0.0, logic.tolerance, "out", false, 0.0, logic.target() / 60.0)
+	world.update_view(0.0, 0.0, logic.band_fraction(), 0.0, "out", false, 0.0, logic.target() / 60.0)
 	_update_status()
 
 
@@ -160,8 +155,6 @@ func _exit_tree() -> void:
 
 func _on_option_changed(_key: String, _value: String) -> void:
 	_apply_look()
-	if _key == "profile" and logic and not _circuit:
-		logic.shape = option("profile")
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -174,13 +167,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 ## The rider asks for a faster (+1) or slower (-1) pace, 5 rpm a step. It takes effect at the next
-## phrase boundary, together with the music's new tempo.
+## phase boundary, together with the music's new tempo.
 func adjust_pace(steps: int) -> void:
 	if logic == null or not logic.request_pace(steps):
 		return
 	_request_tempo(roundi(logic.target() + logic.pending_adjust))
 	_pending_wait = 0.0
-	_show_message("Pace → %d rpm at the next phrase" % (logic.pace() + logic.pending_adjust), 2.0)
+	_show_message("Target → %d rpm at the next phase" % roundi(logic.target() + logic.pending_adjust), 2.0)
 
 
 func _request_tempo(rpm: int) -> void:
@@ -191,7 +184,7 @@ func _request_tempo(rpm: int) -> void:
 func _on_tempo_swapped(_key: String, _since: float) -> void:
 	if logic and logic.apply_pending():
 		_pending_wait = 0.0
-		_show_message("Pace: %d rpm" % logic.pace(), 1.6)
+		_show_message("Target: %d rpm" % roundi(logic.target()), 1.6)
 
 
 func _apply_look() -> void:
@@ -209,17 +202,16 @@ func _on_frame(delta: float) -> void:
 		_handle(event)
 	_beat(delta)
 	_follow_the_music(delta)
-	_fill_targets()
 	var state := "out"
 	if logic.in_bonus:
 		state = "in_bonus"
 	elif logic.in_band:
 		state = "in_band"
-	elif absf(cadence - logic.target()) <= logic.tolerance * 2.0 and cadence > 0.0:
+	elif absf(logic.gap) <= logic.band_fraction() * 2.0 and cadence > 0.0:
 		state = "near"
 	var streak := clampf(logic.streak_sec / (CadenceLogic.STREAK_STEP_SEC * 4.0), 0.0, 1.0)
 	world.beat = _beat_flare
-	world.update_view(delta, _targets, cadence, logic.tolerance, state, logic.frozen, streak, logic.target() / 60.0)
+	world.update_view(delta, logic.gap, logic.band_fraction(), _beat_phase, state, logic.frozen, streak, logic.target() / 60.0)
 	_update_bands()
 	_update_status()
 	AudioDirector.set_intensity(1.0 if logic.in_band and not logic.frozen else 0.4)
@@ -280,12 +272,6 @@ func _follow_the_music(delta: float) -> void:
 			_request_tempo(want)
 
 
-func _fill_targets() -> void:
-	var n := CadenceWorld.RAIL_POINTS
-	for i in n:
-		_targets[i] = logic.target_at(logic.time + CadenceLogic.LOOKAHEAD_SEC * float(i) / (n - 1))
-
-
 func _update_bands() -> void:
 	var rpm := roundi(logic.target())
 	if rpm != _band_for:
@@ -294,16 +280,31 @@ func _update_bands() -> void:
 
 
 func _update_status() -> void:
-	# A circuit's profile moves the target, so show the target itself; a Just Ride shows the rider's pace.
-	var pace_text := "TARGET %d rpm" % roundi(logic.target()) if _circuit else "PACE %d rpm" % logic.pace()
-	var next_text := "→ %d next phrase" % (logic.pace() + logic.pending_adjust) if logic.pending_adjust != 0 else ""
+	# One speed number for the rider: the target rpm the ball follows. − and + shift it, and
+	# a circuit's profile moves it.
+	var target_text := "TARGET %d rpm" % roundi(logic.target())
+	var next_text := ""
+	if logic.pending_adjust != 0:
+		next_text = "→ %d rpm %s" % [roundi(logic.target() + logic.pending_adjust), _swap_eta_text()]
 	var info_text := "In band %d%% · streak ×%s" % [roundi(logic.pct_in_band()), String.num(logic.streak_multiplier(), 2)]
 	var alert := ""
 	if logic.frozen:
 		alert = "EASE OFF"
 	elif logic.cadence < 20.0:
 		alert = "Pedal"
-	_status.set_state(pace_text, next_text, info_text, alert)
+	elif not logic.in_band:
+		alert = "SLOW DOWN" if logic.gap > 0.0 else "SPEED UP"
+	_status.set_state(target_text, next_text, info_text, alert)
+
+
+## "in 7 s" until the pending pace takes effect, or "soon" while the new tempo is still rendering.
+func _swap_eta_text() -> String:
+	var left := AudioDirector.seconds_to_swap()
+	if not AudioDirector.is_music_playing():
+		left = NO_MUSIC_DELAY_SEC - _pending_wait
+	if left < 0.0:
+		return "soon"
+	return "in %d s" % maxi(ceili(left), 1)
 
 
 func _show_message(text: String, seconds: float, color := HudTheme.INK) -> void:

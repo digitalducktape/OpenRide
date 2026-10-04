@@ -1120,32 +1120,45 @@ recording.
 
 ## Cadence Karaoke (#42)
 
-A rhythm game for your legs, in first person down a neon tunnel. The target is a glowing rail
-ahead whose height is the target cadence, your cadence is an orb at the same depth, and beat
-rings fly past, one a beat. `CadenceLogic` holds the rules (headless-tested by
-`cadence_logic_test`), `CadenceWorld` the 3D view, `CadenceStatus` the HUD widget and
-`CadenceAudio` the sounds.
+A rhythm game for your legs, in first person down a neon tunnel. Your cadence is an orb that rolls
+along the floor. A box is marked on the floor, a translucent lane between two dim gates with a
+bright white beat line across its middle, and beat rings fly down the tunnel toward the line, one
+landing on it each beat. (The orb sits on the floor so its place against the line reads as plain
+up and down the screen; floating in the tunnel made depth hard to judge against the rings.)
+Your cadence is an orb with three places. While it matches the target (within the scoring
+tolerance, ±5 rpm on standard) the orb sits on the centre line inside the box; **10 rpm or more
+above** the target it is in front of the box (further up the floor); **10 or more below** it is
+behind the box (nearer you, lower on the screen). In between it travels out through the box's edge, so the box is
+exactly where you score. `CadenceLogic` holds the rules (headless-tested by `cadence_logic_test`),
+`CadenceWorld` the 3D view, `CadenceStatus` the HUD widget and `CadenceAudio` the sounds.
 
-**Pace.** The rider picks their own pace (the target cadence, 80 rpm to start) and can adjust
-it at any time with the − and + buttons under the view (5 rpm a step; `,` and `.` on the
+**The gap.** `gap` is -1 (behind the box) to 1 (in front of it), 0 inside the band, and depends
+on the cadence right now and nothing earlier. The target is always a multiple of 5 rpm (60 to start; a circuit's profile moves it in 5-rpm jumps). The HUD shows one speed number, the target rpm, and says "SLOW DOWN" or "SPEED UP" when out
+of the band. While a pace change waits for its boundary, whichever of the old and new targets is
+nearer the rider's cadence counts, so riding the new pace is never "ahead" of a beat that hasn't
+moved. **The bike reports a new cadence about once a second** (once a pedal revolution): the
+service streams frames at 5 Hz (`REPORT_RATE_MS` 200) but each rpm repeats for about four, so the
+orb steps with the readings. It is eased a little so it doesn't jump.
+
+**Target.** The rider's target cadence starts at 60 rpm (internally the "pace"; the player only
+ever sees the target rpm) and can adjust it at any time with the − and + buttons under the view (5 rpm a step; `,` and `.` on the
 desktop). The change waits for a phrase boundary: the game asks `AudioDirector` for the music at
 the new tempo (same style and seed), and applies the new target on its `tempo_swapped` signal, so
-the rail and the beat change together. A change that hears no swap applies after 16 s, or 1.5 s
+the beat changes with it. A change that hears no swap applies after 16 s, or 1.5 s
 with no music. A moving target (a profile) asks for a new tempo every 6 s when it has drifted 3 rpm.
 
-**Shapes.** A circuit segment sends `cadence_profile` (`[{t, rpm}]`: a warm-up ramp 70 to 90, a
-recovery of 80 to 85, a cool-down 85 to 65); the rider's pace shifts all of it, and it cycles if
-the segment runs longer. A Just Ride follows the rider's **Workout shape** option around their
-pace: Steady, Pyramids (±10 over six minutes), Cadence builds (+5 rpm a minute to +15) or Spin-ups
-(30 s up, 60 s easy).
+**Circuits.** A circuit segment sends `cadence_profile` (`[{t, rpm}]`: a warm-up ramp 70 to 90, a
+recovery of 80 to 85, a cool-down 85 to 65); the rider's adjustment shifts all of it, and it
+cycles if the segment runs longer. A Just Ride has no shapes: the target stays where the rider
+puts it.
 
 **Scoring.** Inside the band (±5 rpm; ±7 easy, ±4 hard) you earn 10 points a second, 15 in the
 ±2 bonus band, times a streak multiplier that grows by 0.25 every 10 s to 2.0. The streak
 survives 1 s outside the band (the cadence reading is noisy). The music's lead stem plays only
 while you are in the band. There is no effort multiplier.
 
-**Power cap.** Warm-up and cool-down 65% of FTP, recovery 60%; a Just Ride caps only Steady
-(Endurance) at 75%. Scoring freezes ("ease off") only when power, smoothed over about a second,
+**Power cap.** Warm-up and cool-down 65% of FTP, recovery 60%; a Just Ride caps at 75%
+(Endurance). Scoring freezes ("ease off") only when power, smoothed over about a second,
 stays over 1.25 times the cap, so ordinary pedalling never trips it.
 
 **Stars** (points a minute, the same for every difficulty): 300, 1000 and 1500. A rider whose
@@ -1153,7 +1166,7 @@ cadence stays within about ±2 rpm of the target earns about 1700, one who wande
 1100-1370, and one by ±12 under 900 (`cadence_logic_test`). Stats: `pct_in_band`, `longest_streak`,
 `avg_cadence`, `avg_power`, `pace`.
 
-**Options** (per rider): Workout shape, Metronome (a beat tick, off by default) and Colour (by
+**Options** (per rider): Metronome (a beat tick, off by default) and Colour (by
 workout part, or one fixed colour). The beat visuals run on the target's clock, which the music is
 rendered at; check their alignment with the music on the bike. `tests/capture_cadence.gd` plays a
 scripted ride for a recording.

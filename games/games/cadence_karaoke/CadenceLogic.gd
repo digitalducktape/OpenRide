@@ -1,10 +1,15 @@
 class_name CadenceLogic
 extends RefCounted
 ## Cadence Karaoke's rules (#42), apart from drawing so they're tested headless. The rider
-## picks a pace (a target cadence) and rides to it; the target line is that pace, shaped by a
-## profile, and a change to the pace lands on a phrase boundary together with the music's new
-## tempo. Points come while the cadence is inside a band around the target, more in a tight
-## bonus band, with a streak multiplier. Power well over the cap freezes scoring ("ease off").
+## picks a pace (a target cadence) and rides to it; the target is the beat (a circuit's profile moves it),
+## and a change to the pace lands on a phase boundary together with the music's new tempo.
+##
+## The ball has three places against the beat: on the centre line, inside the box, while the cadence
+## matches the target (within the tolerance); in front of the box when it is OFF_RPM or more above
+## the target; behind it when OFF_RPM or more below. In between it travels out through the box edge.
+## `gap` is that, -1 to 1 (positive = ahead of the beat); it depends on the cadence right now and
+## nothing earlier. Points come while the cadence is inside the band (the tolerance), more in a
+## tight bonus band, with a streak multiplier. Power well over the cap freezes scoring ("ease off").
 
 ## The band around the target, by difficulty (rpm).
 const BANDS := {"easy": 7.0, "standard": 5.0, "hard": 4.0}
@@ -18,20 +23,19 @@ const STREAK_MULT_MAX := 2.0
 ## only when power, smoothed over about a second, stays above POWER_HEADROOM times the cap.
 const POWER_HEADROOM := 1.25
 const POWER_SMOOTHING_SEC := 1.0
-const DEFAULT_PACE := 80
+const DEFAULT_PACE := 60
 const PACE_MIN := 50
 const PACE_MAX := 110
 const PACE_STEP := 5
 const TARGET_MIN := 40.0
 const TARGET_MAX := 120.0
-const LOOKAHEAD_SEC := 12.0
-const SHAPES := ["steady", "pyramid", "builds", "spinups"]
+const OFF_RPM := 10.0  ## this far above or below the target the ball is fully in front of / behind the box
+const BOX_EDGE := 0.4  ## the box's half-depth on the gap's scale; the ball is just outside it when out of the band
 
 var time := 0.0
 var base_pace := DEFAULT_PACE  ## the rider's pace before any adjustment
-var pace_adjust := 0  ## rpm added to every target, in steps of PACE_STEP, applied at a phrase boundary
+var pace_adjust := 0  ## rpm added to every target, in steps of PACE_STEP, applied at a phase boundary
 var pending_adjust := 0  ## requested, waiting for the boundary
-var shape := "steady"
 var profile: Array = []  ## [{t, rpm}] from the circuit; empty in Just Ride
 var tolerance := 5.0
 var power_cap := 0.0  ## watts; 0 = none
@@ -43,6 +47,7 @@ var streak_sec := 0.0
 var longest_streak := 0.0
 var last_points := 0.0  ## this step's points (the scene awards them)
 var cadence := 0.0
+var gap := 0.0  ## -1 (behind the box) to 1 (in front of it); 0 on the centre line
 var band_sec := 0.0
 var total_sec := 0.0
 var cadence_sum := 0.0
@@ -52,21 +57,21 @@ var _grace_left := 0.0
 var _next_streak_mark := STREAK_STEP_SEC
 
 
-func _init(difficulty := "standard", params := {}, new_shape := "steady") -> void:
+func _init(difficulty := "standard", params := {}) -> void:
 	tolerance = float(params.get("tolerance_rpm", BANDS.get(difficulty, BANDS.standard)))
 	power_cap = float(params.get("power_cap_watts", params.get("power_cap", 0.0)))
 	base_pace = int(params.get("pace", DEFAULT_PACE))
 	profile = params.get("cadence_profile", [])
-	shape = new_shape if new_shape in SHAPES else "steady"
 
 
-## The target at `at` seconds: the circuit's profile (interpolated) or the shape around the
-## rider's pace, plus the rider's adjustment.
+## The target at `at` seconds: the circuit's profile (interpolated) or the rider's pace, plus the
+## rider's adjustment, rounded to the nearest PACE_STEP (5 rpm).
 func target_at(at: float) -> float:
-	var rpm := float(base_pace) + _shape_offset(at)
+	var rpm := float(base_pace)
 	if not profile.is_empty():
 		rpm = _profile_rpm(at)
-	return clampf(rpm + pace_adjust, TARGET_MIN, TARGET_MAX)
+	# Always a multiple of PACE_STEP, so the number on screen is one the rider could have picked.
+	return clampf(snappedf(rpm + pace_adjust, float(PACE_STEP)), TARGET_MIN, TARGET_MAX)
 
 
 func target() -> float:
@@ -89,13 +94,18 @@ func request_pace(steps: int) -> bool:
 	return true
 
 
-## The phrase boundary (or a timeout) has arrived: the pending change takes effect.
+## The phase boundary (or a timeout) has arrived: the pending change takes effect.
 func apply_pending() -> bool:
 	if pending_adjust == 0:
 		return false
 	pace_adjust += pending_adjust
 	pending_adjust = 0
 	return true
+
+
+## The box's half-depth on the gap's scale (0-1).
+func band_fraction() -> float:
+	return BOX_EDGE
 
 
 func pct_in_band() -> float:
@@ -129,9 +139,15 @@ func step(delta: float, new_cadence: float, power: float) -> Array[Dictionary]:
 	frozen = power_cap > 0.0 and smoothed_power > power_cap * POWER_HEADROOM
 	if frozen != was_frozen:
 		events.append({"type": "ease_off" if frozen else "recovered"})
-	var error := absf(new_cadence - target())
-	in_band = new_cadence > 0.0 and error <= tolerance
-	in_bonus = in_band and error <= BONUS_BAND
+	# While a pace change waits for its boundary the rider is already riding the new pace, so
+	# whichever of the two targets is nearer counts: they aren't ahead of a beat that hasn't moved.
+	var aim := target()
+	if pending_adjust != 0 and absf(new_cadence - (aim + pending_adjust)) < absf(new_cadence - aim):
+		aim += pending_adjust
+	var error := new_cadence - aim
+	gap = _gap_for(error)
+	in_band = new_cadence > 0.0 and absf(error) <= tolerance
+	in_bonus = in_band and absf(error) <= BONUS_BAND
 	if frozen:
 		return events
 	if in_band:
@@ -153,16 +169,13 @@ func step(delta: float, new_cadence: float, power: float) -> Array[Dictionary]:
 	return events
 
 
-func _shape_offset(at: float) -> float:
-	match shape:
-		"pyramid":  # -10 up to +10 and back over six minutes
-			var phase := fposmod(at / 360.0, 1.0)
-			return -10.0 + 20.0 * (1.0 - absf(1.0 - 2.0 * phase))
-		"builds":  # +5 rpm a minute, to +15, then back to the start
-			return 5.0 * fposmod(at / 60.0, 3.0)
-		"spinups":  # 30 s up, 60 s easy
-			return 15.0 if fposmod(at, 90.0) < 30.0 else 0.0
-	return 0.0
+## Where the ball goes for a cadence `error` rpm over (+) or under (-) the target.
+func _gap_for(error: float) -> float:
+	var off := absf(error)
+	if off <= tolerance:
+		return 0.0
+	var t := clampf((off - tolerance) / maxf(OFF_RPM - tolerance, 0.001), 0.0, 1.0)
+	return signf(error) * lerpf(BOX_EDGE, 1.0, t)
 
 
 func _profile_rpm(at: float) -> float:

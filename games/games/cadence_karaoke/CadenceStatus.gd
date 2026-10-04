@@ -2,12 +2,12 @@ class_name CadenceStatus
 extends PanelContainer
 ## Cadence Karaoke's HUD widget, in the HUD's top-centre slot: two short rows.
 ##
-##   PACE 85 rpm  → 90 at the next phrase
+##   TARGET 85 rpm    → 90 rpm in 7 s
 ##   In band 78% · streak ×1.5            EASE OFF
 ##
 ## Labels only change with their values, so the HUD isn't re-laid out every frame.
 
-var _pace: Label
+var _target: Label
 var _next: Label
 var _info: Label
 var _alert: Label
@@ -27,9 +27,9 @@ func _init() -> void:
 	box.add_theme_constant_override("separation", 2)
 	add_child(box)
 	var top := _row(box)
-	_pace = HudTheme.label("", HudTheme.SMALL)
-	_pace.custom_minimum_size = Vector2(250, 0)
-	top.add_child(_pace)
+	_target = HudTheme.label("", HudTheme.SMALL)
+	_target.custom_minimum_size = Vector2(250, 0)
+	top.add_child(_target)
 	_next = HudTheme.label("", HudTheme.SMALL, HudTheme.WARN)
 	_next.custom_minimum_size = Vector2(330, 0)
 	top.add_child(_next)
@@ -51,9 +51,9 @@ func _row(parent: Control) -> HBoxContainer:
 	return row
 
 
-func set_state(pace_text: String, next_text: String, info_text: String, alert_text: String) -> void:
-	var values := [pace_text, next_text, info_text, alert_text]
-	var labels := [_pace, _next, _info, _alert]
+func set_state(target_text: String, next_text: String, info_text: String, alert_text: String) -> void:
+	var values := [target_text, next_text, info_text, alert_text]
+	var labels := [_target, _next, _info, _alert]
 	for i in 4:
 		if values[i] != _texts[i]:
 			_texts[i] = values[i]
