@@ -19,6 +19,7 @@ func _run() -> void:
 	var hud := true
 	var play_sec := 0.0
 	var intro := false
+	var bonus := false
 	var scenes := ["dawn", "day", "dusk", "night"]
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
@@ -33,6 +34,8 @@ func _run() -> void:
 			options.load("user://game_options.cfg")
 			options.set_value("guest/dodge_ball", "mode", arg.get_slice("=", 1))
 			options.save("user://game_options.cfg")
+		elif arg == "--bonus":
+			bonus = true
 		elif arg == "--intro":
 			intro = true
 		elif arg.begins_with("--play="):
@@ -62,6 +65,10 @@ func _run() -> void:
 		return
 	var game: Node = _director.game
 	_director.hud.visible = hud
+	if bonus:
+		# A power target under the simulator's power, so the bonus shows (a local plan has none).
+		game.logic.target_watts = 100.0
+		_director.hud.metrics.set_power_band(100.0)
 	var key := KEY_LEFT
 	if play_sec > 0.0:
 		game.change_option("scene", scenes[0])
