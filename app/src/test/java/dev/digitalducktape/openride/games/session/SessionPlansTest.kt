@@ -149,6 +149,18 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `Safe Cracker is a recovery game with a power cap and no effort multiplier`() {
+        val plan = SessionPlans.justRide(GameCatalog.SAFE_CRACKER, JustRideMode.Timed(20), Difficulty.HARD, ftp200)
+        val segment = plan.segments.single()
+        // Recovery scaling whatever the difficulty: a cap of 60% of FTP, and no effort badge.
+        assertEquals(120, segment.params.int("power_cap_watts"))
+        assertEquals(20, segment.params.int("res_min"))
+        assertEquals(45, segment.params.int("res_max"))
+        assertEquals(60, segment.params.int("cadence_min"))
+        assertFalse(segment.effort)
+    }
+
+    @Test
     fun `effort applies to Just Rides of games that declare it`() {
         assertTrue(SessionPlans.justRide(GameCatalog.DEMO, JustRideMode.Open, Difficulty.EASY, ftp200).segments.single().effort)
         assertFalse(SessionPlans.justRide(roundsGame, JustRideMode.Rounds(3), Difficulty.EASY, ftp200).segments.single().effort)

@@ -36,3 +36,9 @@ with Godot's default font.
 Tug of War (#40) adds no recorded asset: its trees, bushes and rocks are the Kenney nature-kit
 models listed above (loaded from `games/dodge_ball/models/`), its bots are named from plain
 material and animal words, and its music is the repo's own `heave` style.
+| `games/safe_cracker/sfx/*.tres` (5 `SfxPreset` parameter sets: tumbler_click, proximity_tick, soft_alarm, vault_open, door_creak; synth settings, no samples) | Written for this repo (#41) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| Every shape in `SafePlaces.gd`, `SafeBody.gd` and `SafeDial.gd` (six rooms, the safe, its dial and the gold, drawn in code) | Written for this repo (#41) | The OpenRide Authors | Apache-2.0, the repo's licence |
+
+Safe Cracker (#41) adds no recorded or imported asset: it draws everything in code, uses Godot's
+default font and the repo's own `noir` music style.
+

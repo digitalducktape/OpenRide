@@ -132,7 +132,35 @@ class GameCatalog(games: List<GameDeclaration>) {
             },
         )
 
+        /**
+         * Safe Cracker (#41), `games/games/safe_cracker/`: a recovery game played with the
+         * resistance knob. No effort multiplier, and a Just Ride is scaled as recovery, so its
+         * power cap is `power_cap_watts` (60% of FTP).
+         */
+        val SAFE_CRACKER = GameDeclaration(
+            id = "safe_cracker",
+            title = "Safe Cracker",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            // A round is one safe: about a minute to crack, with the door and the next safe.
+            roundSec = 75,
+            roles = setOf(SegmentRole.RECOVERY),
+            freeRideScaling = SegmentRole.RECOVERY,
+            params = { _, _, _ ->
+                // SafeLogic's defaults, sent so a tuning change doesn't need a new game build:
+                // the resistance range of the combinations and the dial's cadence floor.
+                mapOf(
+                    "res_min" to JsonPrimitive(20),
+                    "res_max" to JsonPrimitive(45),
+                    "cadence_min" to JsonPrimitive(60),
+                )
+            },
+        )
+
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER))
     }
 }

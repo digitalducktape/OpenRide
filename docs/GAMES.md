@@ -1083,6 +1083,41 @@ water lit by hand, per-vertex lit everything else, MultiMesh rope and crowd, CPU
 the splash). On the tablet it held 59-62 fps (mock build, 2026-10-03). `tests/capture_tug.gd`
 takes desktop screenshots and, with `--play=SECONDS`, plays rounds for a recording.
 
+## Safe Cracker (#41)
+
+A recovery game played with the resistance knob: dial it to each number of a combination and
+hold it there to click a tumbler. `SafeLogic` holds the rules (headless-tested by
+`safe_logic_test`); the picture is 2D shapes drawn in code (`SafePlaces` for the six rooms,
+`SafeBody` and `SafeDial` for the safe), `SafeStatus` is the HUD widget and `SafeAudio` the sounds.
+
+**Rules.** The dial shows the live `resistance` reading (0-100). Hold within the tolerance of
+the target for the hold time (easy ±3 and 1.2 s, standard ±2 and 1.5 s, hard ±2 and 2 s) to click
+a tumbler. Each number is at least 6 from the one before, drawn from `res_min`-`res_max` (20-45).
+Power over `power_cap_watts` (60% of FTP) for 2 s trips the alarm and resets the tumbler;
+cadence under `cadence_min` (60) dims the dial and pauses the hold.
+
+**Knob lag.** The reading lags the knob, so a slip off target keeps its progress for 0.4 s
+(`SafeLogic.GRACE_SEC`) and then drains at 1.5× the rate it filled. The needle always shows the
+reading as received. Tune the grace, tolerance and hold against the lag measured on the bike.
+
+**Safe after safe.** Cracking a safe swings the door open on the gold, then the next one slides
+in, in a different random place (a night office, bank vault, museum hall, ship's cabin,
+laboratory or old library; never the same twice in a row). Each is harder than the last: a
+longer combination (up to 6), a tighter tolerance (down to ±1), a shorter hold (down to 0.9 s),
+and the target hidden from the 4th safe (hard hides it from the start). A hidden target is found
+by ear: a proximity tick speeds up as the reading closes in. The goal is how many safes you crack.
+
+**Scoring and stars.** Each safe is worth `1000 − 5 × seconds − 100 × alarms` (floor 0) plus 200 for
+opening it; there is no effort multiplier. Stars are points a minute, so they follow how many safes
+you open: a careful rider turning the knob at 2 units/s earns 2 stars, and a quick, accurate one 3
+(`safe_logic_test` models both, with 0.6 s of lag). The thresholds are provisional until tuned on
+the bike.
+
+**Options** (per rider): Place (random or one fixed place), Target number (show or hide it) and
+Click sounds. Stats: `vaults`, `fastest_crack`, `alarms`, `avg_power`. `tests/capture_safe.gd`
+takes desktop screenshots and, with `--play=SECONDS`, cracks safes with a scripted rider for a
+recording.
+
 ## Originality and licensing
 
 Everything under `games/` is written for this project or permissively licensed. Assets are
