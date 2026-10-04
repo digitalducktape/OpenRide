@@ -47,7 +47,8 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Identical contract to [PelotonBikeDataSource]: [ConnectionState.Connected] only once a real
  * frame arrives, so a successful bind that never delivers data cannot masquerade as live
- * (PRD P0-9). [start] never throws on a non-bike device.
+ * (PRD P0-9). [start] never throws on a non-bike device. A dead or null binding is released and
+ * rebound with backoff, exactly as described there.
  */
 class PelotonBikeInterfaceDataSource(
     private val context: Context,
@@ -68,6 +69,12 @@ class PelotonBikeInterfaceDataSource(
     @Volatile
     var framesReceived: Long = 0L
         private set
+
+    /** True between [start] and [stop]; a rebind that fires outside that window does nothing. */
+    @Volatile
+    private var started = false
+
+    private val rebinder = ServiceRebinder { rebind() }
 
     private val callback = object : IBikeCallback.Stub() {
         override fun onSensorDataChange(bikeData: BikeData?) {
@@ -100,6 +107,7 @@ class PelotonBikeInterfaceDataSource(
             service = iface
             try {
                 iface.registerCallback(callback, CLIENT_ID)
+                rebinder.reset()
                 // Stay Unavailable until the first frame actually arrives.
             } catch (e: RemoteException) {
                 Log.w(TAG, "registerCallback failed", e)
@@ -117,11 +125,14 @@ class PelotonBikeInterfaceDataSource(
             Log.w(TAG, "affernet IBikeInterface binding died: $name")
             service = null
             _connectionState.value = ConnectionState.Unavailable
+            // Android never revives a dead binding; it has to be released and bound afresh.
+            scheduleRebind()
         }
 
         override fun onNullBinding(name: ComponentName?) {
             Log.w(TAG, "affernet IBikeInterface returned a null binding: $name")
             _connectionState.value = ConnectionState.Unavailable
+            scheduleRebind()
         }
     }
 
@@ -130,6 +141,12 @@ class PelotonBikeInterfaceDataSource(
      * bind is denied, this degrades to [ConnectionState.Unavailable] instead of throwing.
      */
     override fun start() {
+        started = true
+        bind()
+    }
+
+    /** Issues the bind. Returns whether Android accepted it; on refusal the state is Unavailable. */
+    private fun bind(): Boolean {
         try {
             val intent = Intent(SERVICE_ACTION).apply { setPackage(SERVICE_PACKAGE) }
             val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
@@ -137,12 +154,39 @@ class PelotonBikeInterfaceDataSource(
                 Log.w(TAG, "bindService returned false for $SERVICE_PACKAGE — service unavailable")
                 _connectionState.value = ConnectionState.Unavailable
             }
+            return bound
         } catch (e: SecurityException) {
             Log.w(TAG, "Bind denied for affernet IBikeInterface", e)
             _connectionState.value = ConnectionState.Unavailable
         } catch (e: Exception) {
             Log.w(TAG, "Unexpected failure binding affernet IBikeInterface", e)
             _connectionState.value = ConnectionState.Unavailable
+        }
+        return false
+    }
+
+    /**
+     * Releases the dead or null binding and schedules a fresh bind with capped exponential
+     * backoff (see [ServiceRebinder]). The backoff resets once a rebind registers its callback.
+     */
+    private fun scheduleRebind() {
+        unbindQuietly()
+        if (!started) return
+        val delayMs = rebinder.schedule()
+        Log.i(TAG, "rebinding $SERVICE_PACKAGE in ${delayMs}ms")
+    }
+
+    private fun rebind() {
+        if (!started) return
+        // A refused bind during recovery (service package mid-restart) is retried too.
+        if (!bind()) scheduleRebind()
+    }
+
+    private fun unbindQuietly() {
+        try {
+            context.unbindService(serviceConnection)
+        } catch (_: IllegalArgumentException) {
+            // Not currently bound — already released, or never bound (common off-bike).
         }
     }
 
@@ -178,12 +222,10 @@ class PelotonBikeInterfaceDataSource(
 
     /** Unbinds the service. Safe to call even if [start] never bound. */
     override fun stop() {
+        started = false
+        rebinder.cancel()
         runCatching { service?.unregisterCallback(callback, CLIENT_ID) }
-        try {
-            context.unbindService(serviceConnection)
-        } catch (_: IllegalArgumentException) {
-            // Never bound (common off-bike) — stop() stays a no-op rather than throwing.
-        }
+        unbindQuietly()
         service = null
         _connectionState.value = ConnectionState.Unavailable
     }
