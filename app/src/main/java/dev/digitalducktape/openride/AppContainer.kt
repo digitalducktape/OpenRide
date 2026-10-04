@@ -50,6 +50,8 @@ import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.toTrackerReading
 import dev.digitalducktape.openride.games.session.GameSessionManager
+import dev.digitalducktape.openride.games.session.GamesSettingsStore
+import dev.digitalducktape.openride.games.session.SharedPrefsGamesSettingsStore
 import dev.digitalducktape.openride.games.session.OtherMusicDetector
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
@@ -232,6 +234,12 @@ class AppContainer(private val applicationContext: Context) {
      * ride through [rideSessionManager] plus its game results. App-scoped, on the main thread,
      * so a session's ride is saved even after the games host has gone to the back.
      */
+    /** The Games hub's settings (#38): game audio and the camera-games switch. */
+    val gamesSettings: GamesSettingsStore by lazy { SharedPrefsGamesSettingsStore(applicationContext) }
+
+    /** Read by the Games hub for the rider's bests (#38). */
+    val gameResultDao get() = database.gameResultDao()
+
     val gameSessionManager: GameSessionManager by lazy {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val log: (String) -> Unit = { Log.i(GAMES_LOG_TAG, it) }
@@ -244,6 +252,7 @@ class AppContainer(private val applicationContext: Context) {
             profileFtp = { profileRepository.getProfile(it)?.ftp },
             tracker = TrackerLink(headTracker, gameBridge, scope, log),
             otherMusicActive = otherMusicDetector::otherMusicActive,
+            audioPrefs = { gamesSettings.settings.value.audio },
             log = log,
         )
     }

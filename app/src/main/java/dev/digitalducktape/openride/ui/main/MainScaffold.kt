@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -32,9 +33,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.digitalducktape.openride.AppContainer
+import kotlinx.coroutines.flow.map
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesScreen
 import dev.digitalducktape.openride.ui.classes.ClassesViewModel
+import dev.digitalducktape.openride.ui.games.GamesScreen
+import dev.digitalducktape.openride.ui.games.GamesViewModel
 import dev.digitalducktape.openride.ui.history.HistoryScreen
 import dev.digitalducktape.openride.ui.history.HistoryViewModel
 import dev.digitalducktape.openride.ui.home.HomeScreen
@@ -49,6 +53,7 @@ private data class TabSpec(val route: String, val label: String, val icon: Image
 private val TABS = listOf(
     TabSpec(MainTabs.Home, "Home", Icons.Filled.Home),
     TabSpec(MainTabs.Classes, "Classes", Icons.Filled.PlayArrow),
+    TabSpec(MainTabs.Games, "Games", Icons.Filled.Star),
     TabSpec(MainTabs.History, "History", Icons.Filled.DateRange),
     TabSpec(MainTabs.Profile, "Profile", Icons.Filled.Person),
 )
@@ -105,6 +110,7 @@ fun MainScaffold(
                     viewModel = viewModel,
                     onQuickStart = { outerNavController.navigate(Destinations.InRide) },
                     onOpenProfile = { navigateToTab(MainTabs.Profile) },
+                    onOpenGames = { navigateToTab(MainTabs.Games) },
                     updateVersionName = availableUpdate?.versionName?.takeUnless { bannerDismissed },
                     onOpenUpdate = { outerNavController.navigate(Destinations.AppUpdate) },
                     onDismissUpdate = { appContainer.dismissUpdateBanner() },
@@ -129,6 +135,28 @@ fun MainScaffold(
                     onOpenCreator = { sourceId ->
                         outerNavController.navigate(Destinations.creator(sourceId))
                     },
+                )
+            }
+            composable(MainTabs.Games) {
+                val viewModel: GamesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        GamesViewModel(
+                            catalog = dev.digitalducktape.openride.games.session.GameCatalog.DEFAULT,
+                            settingsStore = appContainer.gamesSettings,
+                            activeProfileId = appContainer.activeProfileHolder.activeProfileId,
+                            profileFtp = { id ->
+                                appContainer.profileRepository.observeProfiles().map { list -> list.firstOrNull { it.id == id }?.ftp }
+                            },
+                            personalBests = { id -> appContainer.gameResultDao.observePersonalBests(id) },
+                            circuitBest = { id, planId, difficulty ->
+                                appContainer.gameResultDao.planBest(id, planId, difficulty.name.lowercase(), -1L)
+                            },
+                        )
+                    },
+                )
+                GamesScreen(
+                    viewModel = viewModel,
+                    onEditProfile = { outerNavController.navigate(Destinations.ProfileEdit) },
                 )
             }
             composable(MainTabs.History) {

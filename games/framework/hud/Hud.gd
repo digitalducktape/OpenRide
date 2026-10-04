@@ -48,6 +48,7 @@ var ride_panel: PanelContainer
 var clock_panel: PanelContainer
 
 var frame: MarginContainer
+var circuit_strip: CircuitStrip
 var _widgets: HBoxContainer
 var _message: Label
 var _score_text := ""
@@ -82,6 +83,8 @@ func _init() -> void:
 
 	var centre := _box(VBoxContainer.new(), top, "Centre")
 	centre.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	circuit_strip = CircuitStrip.new()
+	centre.add_child(circuit_strip)
 	_widgets = _box(HBoxContainer.new(), centre, "Widgets")
 	_widgets.alignment = BoxContainer.ALIGNMENT_CENTER
 
@@ -128,10 +131,16 @@ func _init() -> void:
 	bottom.add_child(recalibrate_button)
 
 
+## A session starts: a circuit shows its progress strip, anything else hides it.
+func set_plan(plan: Dictionary) -> void:
+	circuit_strip.set_plan(plan)
+
+
 ## Fills the HUD for a new segment.
 func setup(info: GameInfo, segment: Dictionary) -> void:
 	clear_widgets()
 	recalibrate_button.visible = info.uses_camera()
+	circuit_strip.set_segment(int(segment.get("index", 0)), float(segment.get("duration_sec", 0)))
 
 
 ## Adds a game widget under the timer.

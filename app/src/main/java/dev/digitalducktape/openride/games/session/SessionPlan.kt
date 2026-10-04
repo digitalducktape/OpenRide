@@ -140,8 +140,17 @@ sealed interface SessionRequest {
     data class JustRide(val gameId: String, val mode: JustRideMode, override val difficulty: Difficulty = Difficulty.STANDARD) :
         SessionRequest
 
+    /**
+     * A circuit. With [cameraGames] false (the rider turned them off, or the camera isn't
+     * available), a slot that would be a camera game is played by the next game of the same role
+     * that doesn't need the camera (epic #31, "Circuit mode").
+     */
     @Serializable @SerialName("circuit")
-    data class Circuit(val presetId: String, override val difficulty: Difficulty = Difficulty.STANDARD) : SessionRequest
+    data class Circuit(
+        val presetId: String,
+        override val difficulty: Difficulty = Difficulty.STANDARD,
+        val cameraGames: Boolean = true,
+    ) : SessionRequest
 
     fun toJson(): String = json.encodeToString(serializer(), this)
 
@@ -237,7 +246,9 @@ object SessionPlans {
 
     /**
      * A circuit from [preset]. A slot whose game isn't in [catalog] yet plays [standIn]
-     * instead (the demo until the real games land, #37).
+     * instead. With [cameraGames] false, a camera game's slot goes to the next game of its role
+     * that doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role,
+     * length and the circuit's id, so its bests stay per length.
      */
     fun circuit(
         preset: CircuitPreset,
@@ -245,9 +256,13 @@ object SessionPlans {
         ftp: FtpBasis,
         catalog: GameCatalog,
         standIn: GameDeclaration = GameCatalog.DEMO,
+        cameraGames: Boolean = true,
     ): SessionPlan {
         val segments = preset.slots.map { slot ->
-            val game = catalog[slot.gameId] ?: standIn
+            val planned = catalog[slot.gameId] ?: standIn
+            val game = if (cameraGames || !planned.usesCamera) planned else {
+                catalog.games.firstOrNull { slot.role in it.roles && !it.usesCamera && it.id != planned.id } ?: standIn
+            }
             Segment(
                 gameId = game.id,
                 durationSec = slot.durationSec,
@@ -265,7 +280,9 @@ object SessionPlans {
         is SessionRequest.JustRide -> catalog[request.gameId]?.let { game ->
             runCatching { justRide(game, request.mode, request.difficulty, ftp) }.getOrNull()
         }
-        is SessionRequest.Circuit -> CircuitPresets[request.presetId]?.let { circuit(it, request.difficulty, ftp, catalog) }
+        is SessionRequest.Circuit -> CircuitPresets[request.presetId]?.let {
+            circuit(it, request.difficulty, ftp, catalog, cameraGames = request.cameraGames)
+        }
     }
 
     private data class JustRidePlan(val suffix: String, val durationSec: Int, val endMode: EndMode, val params: Map<String, JsonElement>)

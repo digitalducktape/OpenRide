@@ -294,7 +294,8 @@ func _update_bands() -> void:
 
 
 func _update_status() -> void:
-	var pace_text := "PACE %d rpm" % logic.pace()
+	# A circuit's profile moves the target, so show the target itself; a Just Ride shows the rider's pace.
+	var pace_text := "TARGET %d rpm" % roundi(logic.target()) if _circuit else "PACE %d rpm" % logic.pace()
 	var next_text := "→ %d next phrase" % (logic.pace() + logic.pending_adjust) if logic.pending_adjust != 0 else ""
 	var info_text := "In band %d%% · streak ×%s" % [roundi(logic.pct_in_band()), String.num(logic.streak_multiplier(), 2)]
 	var alert := ""

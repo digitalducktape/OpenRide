@@ -211,6 +211,39 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `without camera games a circuit swaps Dodge Ball for the next game of its role`() {
+        val withCamera = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT)
+        val without = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT, cameraGames = false)
+
+        assertTrue(withCamera.segments.any { it.gameId == "dodge_ball" })
+        assertFalse(without.segments.any { it.gameId == "dodge_ball" })
+        // Same shape: every slot keeps its role, length and effort; only the game changes.
+        assertEquals(withCamera.segments.map { it.role }, without.segments.map { it.role })
+        assertEquals(withCamera.segments.map { it.durationSec }, without.segments.map { it.durationSec })
+        assertEquals(withCamera.segments.map { it.effort }, without.segments.map { it.effort })
+        assertEquals(withCamera.planId, without.planId)
+        // Dodge Ball's work slots go to Tug of War.
+        val swapped = withCamera.segments.indices.filter { withCamera.segments[it].gameId == "dodge_ball" }
+        assertTrue(swapped.isNotEmpty())
+        swapped.forEach { assertEquals("tug_of_war", without.segments[it].gameId) }
+        // Never two work games back to back still holds, since a recovery game sits between.
+        without.segments.zipWithNext().forEach { (a, b) -> assertFalse(a.role == SegmentRole.WORK && b.role == SegmentRole.WORK) }
+    }
+
+    @Test
+    fun `a circuit request carries the camera setting and defaults to camera games`() {
+        val off = SessionRequest.Circuit("circuit-20", Difficulty.EASY, cameraGames = false)
+        assertEquals(off, SessionRequest.fromJson(off.toJson()))
+        assertTrue(SessionRequest.Circuit("circuit-20").cameraGames)
+        // A request saved before the setting existed still reads, with camera games on.
+        val saved = SessionRequest.Circuit("circuit-30", Difficulty.HARD).toJson()
+        val old = SessionRequest.fromJson(saved.replace(""","cameraGames":true""", ""))
+        assertTrue((old as SessionRequest.Circuit).cameraGames)
+        val plan = SessionPlans.forRequest(off, ftp200, GameCatalog.DEFAULT)!!
+        assertFalse(plan.segments.any { it.gameId == "dodge_ball" })
+    }
+
+    @Test
     fun `circuit games not in the catalog yet play the stand-in`() {
         val demoOnly = GameCatalog(listOf(GameCatalog.DEMO))
         val plan = SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, demoOnly)

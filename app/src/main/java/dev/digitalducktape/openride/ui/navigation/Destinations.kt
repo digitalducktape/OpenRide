@@ -52,6 +52,7 @@ object Destinations {
 object MainTabs {
     const val Home = "home"
     const val Classes = "classes"
+    const val Games = "games"
     const val History = "history"
     const val Profile = "profile"
 }

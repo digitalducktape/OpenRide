@@ -1158,6 +1158,40 @@ workout part, or one fixed colour). The beat visuals run on the target's clock, 
 rendered at; check their alignment with the music on the bike. `tests/capture_cadence.gd` plays a
 scripted ride for a recording.
 
+## Circuits and the Games hub (#37, #38)
+
+**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min Cadence Karaoke
+warm-up, N blocks of Tug of War 1:00, Safe Cracker 1:30, Dodge Ball 1:30 and Cadence Karaoke
+1:30, and a 3 min cool-down, each after a 10 s intro card (20 min = 2 blocks, 18:40; 30 min = 4,
+31:00; 45 min = 6, 43:20). It is one `SessionPlan`, recorded as one ride.
+
+- **Progress strip.** From `session_started`, `Hud.circuit_strip` (`CircuitStrip`) shows a pill
+  per segment above the game's widgets: as wide as the segment is long, in the role's colour (work
+  warm, recovery cool); done pills are dimmed, the current one is outlined and fills as it plays.
+  Its line says "3 of 10 · 14:02 left" (the rest of the segment plus every later segment and its
+  10 s card). A Just Ride hides it. `circuit_strip_test` pins the pills, the time and the layout.
+- **No camera.** `SessionRequest.Circuit.cameraGames = false` (the rider turned camera games off,
+  or refused the permission) swaps each camera game's slot for the next game of its role that
+  doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role, length and the
+  circuit's id.
+- **Already there from #34/#35:** the intro card with its Skip button, music across cards, the
+  per-segment summary and bests per circuit length (`GameResultDao.planBest`).
+- **Not built yet:** time in each role's target zone and average effort on the circuit summary.
+
+**The Games tab (beta).** A tab in the bottom bar (and a "Games · BETA" card on Home) that holds:
+circuit cards with a difficulty picker and the rider's best; a Just Ride card per game in
+`GameCatalog` (without the demo), so a new game appears without UI changes, with the modes the
+game supports, a length (5-60 min, or rounds) and a difficulty, and the rider's best for that
+plan and difficulty; an FTP nudge linking to the profile editor; and the settings: camera games
+on or off, game music (auto, on or off) and the music and effects volumes
+(`GamesSettings`, stored in SharedPreferences and read by the session manager at each segment).
+`GamesViewModel` (tested by `GamesViewModelTest`) holds the logic; `GamesScreen` draws it. Starting
+asks for the camera permission first when a camera game is involved (once); if it is refused,
+circuits play without camera games and Just Rides of camera games are not started.
+
+- **Not built yet:** the household leaderboard per game (the DAO has `leaderboard`), and the
+  camera explainer as a separate first-run card (the Games card describes it in the settings).
+
 ## Originality and licensing
 
 Everything under `games/` is written for this project or permissively licensed. Assets are

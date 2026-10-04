@@ -117,7 +117,8 @@ static func skipped_result(game_id: String) -> Dictionary:
 
 # --- Session signals ---
 
-func _on_session_started(_plan: Dictionary) -> void:
+func _on_session_started(plan: Dictionary) -> void:
+	hud.set_plan(plan)
 	results = []
 	segment = {}
 	calibrated_mode = ""
