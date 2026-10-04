@@ -1,26 +1,40 @@
 class_name RideMetrics
 extends PanelContainer
-## The shared ride readout every game shows in the HUD's ride panel (top left, under the effort
-## badge): cadence (big), power and resistance, readable at a glance while riding.
+## The shared ride readout in the HUD's ride panel (top left, under the effort badge): cadence,
+## power and resistance in three equal columns, each a number at the same size with the same
+## small unit underneath (rpm · W · %).
 ##
-## A game sets its cadence target with `set_cadence_band(low, high)` (e.g. Dodge Ball's floor)
-## and its power target with `set_power_band(low, high)`. The rpm turns green inside the band and
-## amber below it (red well below), and the band shows beside it ("floor 85"), so the rider knows
-## at once when they're under it. Values only touch the labels when they change: re-laying out
-## the HUD every frame cost frame time on the tablet.
+## A game sets its cadence floor or band with `set_cadence_band(low, high)` and its power target
+## with `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red
+## well under; the watts turn gold at the target. A slim tick gauge under a number shows where the
+## floor or target sits (filled to the current value, with a white tick at the line to cross):
+## self-explanatory without words, so no "floor 85" caption. Columns without a band keep the
+## gauge's space empty, so the units line up. Labels only change with their values: re-laying
+## out the HUD every frame cost frame time on the tablet.
 
 const UNDER_WARN := 5.0  ## rpm under the floor that still reads amber; below that, red
+const VALUE_SIZE := 72
+const COLUMN_WIDTH := 170.0
+const GAUGE_SIZE := Vector2(120, 8)
+const RPM_SCALE := 130.0  ## the rpm gauge's full scale
+const POWER_SCALE := 2.0  ## the watts gauge's full scale, × the target
 
 var cadence_low := -INF
 var cadence_high := INF
 var power_low := -INF
 var power_high := INF
 
+## The three value labels and their units, for layout checks.
+var values: Array[Label] = []
+var units: Array[Label] = []
+
 var _rpm: Label
-var _rpm_band: Label
 var _watts: Label
-var _watts_band: Label
 var _resistance: Label
+var _rpm_gauge: Control
+var _watts_gauge: Control
+var _cadence := 0.0
+var _power := 0.0
 var _shown := {}
 
 
@@ -30,25 +44,13 @@ func _init(framed := true) -> void:
 	add_theme_stylebox_override("panel", HudTheme.panel_style() if framed else StyleBoxEmpty.new())
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 28)
+	row.add_theme_constant_override("separation", 12)
 	add_child(row)
-	var rpm_box := _column(row)
-	_rpm = HudTheme.label("--", HudTheme.BIG)
-	_rpm.custom_minimum_size = Vector2(130, 0)
-	_rpm.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	rpm_box.add_child(_rpm)
-	_rpm_band = HudTheme.label("rpm", HudTheme.SMALL, HudTheme.MUTED)
-	_rpm_band.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	rpm_box.add_child(_rpm_band)
-	var watts_box := _column(row)
-	_watts = HudTheme.label("--", HudTheme.MEDIUM)
-	watts_box.add_child(_watts)
-	_watts_band = HudTheme.label("watts", HudTheme.SMALL, HudTheme.MUTED)
-	watts_box.add_child(_watts_band)
-	var res_box := _column(row)
-	_resistance = HudTheme.label("--", HudTheme.MEDIUM)
-	res_box.add_child(_resistance)
-	res_box.add_child(HudTheme.label("resist.", HudTheme.SMALL, HudTheme.MUTED))
+	_rpm_gauge = _gauge(_draw_rpm_gauge)
+	_rpm = _column(row, "rpm", _rpm_gauge)
+	_watts_gauge = _gauge(_draw_watts_gauge)
+	_watts = _column(row, "W", _watts_gauge)
+	_resistance = _column(row, "%", _gauge(Callable()))
 
 
 ## The cadence band the game asks for: `low` is a floor, `high` a ceiling (INF for none).
@@ -87,25 +89,21 @@ func _process(_delta: float) -> void:
 
 func refresh(cadence: float, power: float, resistance: float) -> void:
 	_show(_rpm, "rpm", str(roundi(cadence)), cadence_color(cadence))
-	var band := "rpm"
-	if cadence_low > -INF and cadence_high < INF:
-		band = "%d–%d rpm" % [roundi(cadence_low), roundi(cadence_high)]
-	elif cadence_low > -INF:
-		band = "floor %d rpm" % roundi(cadence_low)
-	_show(_rpm_band, "rpm_band", band, HudTheme.MUTED)
 	var watts_color := HudTheme.INK
 	if power_low > -INF and power >= power_low:
 		watts_color = HudTheme.STAR_ON
 	elif power_high < INF and power > power_high:
 		watts_color = HudTheme.WARN
 	_show(_watts, "watts", str(roundi(power)), watts_color)
-	var watts_band := "watts"
-	if power_low > -INF:
-		watts_band = "W · target %d" % roundi(power_low)
-	elif power_high < INF:
-		watts_band = "W · cap %d" % roundi(power_high)
-	_show(_watts_band, "watts_band", watts_band, HudTheme.MUTED)
-	_show(_resistance, "resistance", "%d%%" % roundi(resistance), HudTheme.INK)
+	_show(_resistance, "resistance", str(roundi(resistance)), HudTheme.INK)
+	_rpm_gauge.visible = cadence_low > -INF or cadence_high < INF
+	_watts_gauge.visible = power_low > -INF or power_high < INF
+	if roundi(cadence) != roundi(_cadence):
+		_cadence = cadence
+		_rpm_gauge.queue_redraw()
+	if roundi(power) != roundi(_power):
+		_power = power
+		_watts_gauge.queue_redraw()
 
 
 func _show(label: Label, key: String, text: String, color: Color) -> void:
@@ -117,10 +115,56 @@ func _show(label: Label, key: String, text: String, color: Color) -> void:
 	label.add_theme_color_override("font_color", color)
 
 
-func _column(row: HBoxContainer) -> VBoxContainer:
+## One column: the value, a slot for its gauge, and its unit, centred in an equal width.
+func _column(row: HBoxContainer, unit: String, gauge: Control) -> Label:
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 0)
-	box.alignment = BoxContainer.ALIGNMENT_END
+	box.add_theme_constant_override("separation", 2)
+	box.custom_minimum_size = Vector2(COLUMN_WIDTH, 0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(box)
-	return box
+	var value := HudTheme.label("--", VALUE_SIZE)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(value)
+	var slot := CenterContainer.new()
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.custom_minimum_size = Vector2(0, GAUGE_SIZE.y + 6)
+	slot.add_child(gauge)
+	box.add_child(slot)
+	var unit_label := HudTheme.label(unit, HudTheme.SMALL, HudTheme.MUTED)
+	unit_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(unit_label)
+	values.append(value)
+	units.append(unit_label)
+	return value
+
+
+func _gauge(draw: Callable) -> Control:
+	var gauge := Control.new()
+	gauge.custom_minimum_size = GAUGE_SIZE
+	gauge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gauge.visible = false
+	if draw.is_valid():
+		gauge.draw.connect(draw)
+	return gauge
+
+
+func _draw_rpm_gauge() -> void:
+	var low := cadence_low if cadence_low > -INF else 0.0
+	_draw_tick_gauge(_rpm_gauge, _cadence / RPM_SCALE, low / RPM_SCALE, cadence_color(_cadence))
+
+
+func _draw_watts_gauge() -> void:
+	var line := power_low if power_low > -INF else power_high
+	var scale := maxf(line * POWER_SCALE, 1.0)
+	var color := HudTheme.STAR_ON if power_low > -INF and _power >= power_low else HudTheme.MUTED
+	_draw_tick_gauge(_watts_gauge, _power / scale, line / scale, color)
+
+
+## A slim bar filled to `fill` (0-1) with a white tick at `tick` (0-1).
+func _draw_tick_gauge(gauge: Control, fill: float, tick: float, color: Color) -> void:
+	var s := gauge.size
+	gauge.draw_rect(Rect2(Vector2.ZERO, s), Color(1, 1, 1, 0.15))
+	gauge.draw_rect(Rect2(0, 0, s.x * clampf(fill, 0.0, 1.0), s.y), color)
+	var x := s.x * clampf(tick, 0.0, 1.0)
+	gauge.draw_rect(Rect2(x - 1.5, -4, 3, s.y + 8), HudTheme.INK)

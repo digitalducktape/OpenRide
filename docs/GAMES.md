@@ -462,7 +462,7 @@ horizon down to the bike:
 | Row | Left (expands) | Centre | Right (expands) |
 | --- | --- | --- | --- |
 | sensor banner | (full width, only on sensor loss) | | |
-| top bar | ride panel: effort ×, gauge, then rpm, watts, resistance | the game's own status widgets (`add_widget`), slim | time left over the score, Pause and End under it |
+| top bar | ride panel: effort ×, gauge, then rpm · W · % | the game's own status widgets (`add_widget`), slim | time left over the score, Pause and End under it |
 | middle | | a brief, translucent message (`show_message`) | |
 | status slot | | the camera strip ("Camera steering is off", …) | |
 | bottom bar | | | Recalibrate (camera games) |
@@ -470,10 +470,12 @@ horizon down to the bike:
 The game's title and role aren't shown during play: the intro card names the game (and, for
 Dodge Ball, the mode).
 
-- **Ride metrics** (`RideMetrics`) are shared by every game: cadence (big), watts and
-  resistance. A game sets its bands with `hud.metrics.set_cadence_band(low, high)` and
-  `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red
-  well under, with the band beside it ("floor 85 rpm"); the watts turn gold at the target.
+- **Ride metrics** (`RideMetrics`) are shared by every game: rpm, watts and resistance in three
+  equal columns, each value at the same size with the same small unit underneath (rpm · W · %).
+  A game sets its bands with `hud.metrics.set_cadence_band(low, high)` and
+  `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red well
+  under; the watts turn gold at the target. A slim gauge under a banded value fills to the current
+  value with a white tick at the floor or target, so no "floor 85" caption is needed.
 - `hud_layout_test` lays the HUD out at 1920x1080 while playing, with the power bonus, the
   camera strip, while calibrating and at game over, with the longest texts each element shows.
   It checks that no two elements overlap and that none covers the road. The road keep-clear

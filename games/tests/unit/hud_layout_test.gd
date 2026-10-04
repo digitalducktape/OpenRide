@@ -178,3 +178,17 @@ func test_calibrating_is_a_full_screen_card() -> void:
 	_assert_no_overlaps("calibrating", [overlay._full], 3)
 	# Under the calibration card (the game is paused), the HUD keeps the road clear too.
 	_assert_road_clear("calibrating", [hud])
+
+
+func test_ride_metrics_are_uniform_columns() -> void:
+	await _settle()
+	var m := hud.metrics
+	assert_int(m.values.size()).is_equal(3)
+	var size: int = m.values[0].get_theme_font_size("font_size")
+	var width: float = m.values[0].get_parent().size.x
+	for i in 3:
+		assert_int(m.values[i].get_theme_font_size("font_size")).is_equal(size)
+		assert_int(m.units[i].get_theme_font_size("font_size")).is_equal(m.units[0].get_theme_font_size("font_size"))
+		assert_float(m.values[i].get_parent().size.x).is_equal_approx(width, 0.5)
+	assert_array(m.units.map(func(u): return u.text)).is_equal(["rpm", "W", "%"])
+
