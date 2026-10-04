@@ -41,4 +41,9 @@ material and animal words, and its music is the repo's own `heave` style.
 
 Safe Cracker (#41) adds no recorded or imported asset: it draws everything in code, uses Godot's
 default font and the repo's own `noir` music style.
+| `games/cadence_karaoke/sfx/*.tres` (4 `SfxPreset` parameter sets: beat_tick, streak_up, band_exit, ease_off_chime; synth settings, no samples) | Written for this repo (#42) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `games/cadence_karaoke/shaders/grid.gdshader`, `ring.gdshader` and every mesh in `CadenceWorld.gd` (tunnel, beat rings, rail, orb and halo; shaders and primitive meshes, with a gradient texture made at runtime) | Written for this repo (#42) | The OpenRide Authors | Apache-2.0, the repo's licence |
+
+Cadence Karaoke (#42) adds no recorded or imported asset: it is drawn in code, uses Godot's
+default font and the repo's own `bright` music style.
 

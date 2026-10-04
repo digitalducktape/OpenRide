@@ -9,6 +9,7 @@ const GAMES := {
 	"dodge_ball": "res://games/dodge_ball/DodgeBall.tscn",
 	"tug_of_war": "res://games/tug_of_war/TugOfWar.tscn",
 	"safe_cracker": "res://games/safe_cracker/SafeCracker.tscn",
+	"cadence_karaoke": "res://games/cadence_karaoke/CadenceKaraoke.tscn",
 }
 
 static var _infos := {}

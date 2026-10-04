@@ -7,6 +7,7 @@ import dev.digitalducktape.openride.games.bridge.SessionKind
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -158,6 +159,22 @@ class SessionPlansTest {
         assertEquals(40, segment.params.int("res_max"))
         assertEquals(60, segment.params.int("cadence_min"))
         assertFalse(segment.effort)
+    }
+
+    @Test
+    fun `Cadence Karaoke sends circuit profiles and no effort, and a Just Ride sends none`() {
+        fun params(role: SegmentRole) = GameCatalog.CADENCE_KARAOKE.params(role, Difficulty.STANDARD, ftp200)
+        val warmup = params(SegmentRole.WARMUP)["cadence_profile"] as kotlinx.serialization.json.JsonArray
+        assertEquals(70, warmup.first().jsonObject["rpm"]!!.jsonPrimitive.int)
+        assertEquals(90, warmup.last().jsonObject["rpm"]!!.jsonPrimitive.int)
+        val cooldown = params(SegmentRole.COOLDOWN)["cadence_profile"] as kotlinx.serialization.json.JsonArray
+        assertEquals(85, cooldown.first().jsonObject["rpm"]!!.jsonPrimitive.int)
+        assertEquals(65, cooldown.last().jsonObject["rpm"]!!.jsonPrimitive.int)
+        assertTrue(params(SegmentRole.RECOVERY).containsKey("cadence_profile"))
+        assertTrue(params(SegmentRole.FREE).isEmpty())
+        val ride = SessionPlans.justRide(GameCatalog.CADENCE_KARAOKE, JustRideMode.Open, Difficulty.STANDARD, ftp200)
+        assertFalse(ride.segments.single().effort)
+        assertFalse(ride.segments.single().params.containsKey("cadence_profile"))
     }
 
     @Test

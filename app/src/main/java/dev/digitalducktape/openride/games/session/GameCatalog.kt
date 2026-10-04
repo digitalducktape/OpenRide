@@ -3,7 +3,9 @@ package dev.digitalducktape.openride.games.session
 import dev.digitalducktape.openride.games.bridge.Difficulty
 import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.SegmentRole
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.roundToInt
 
@@ -161,7 +163,41 @@ class GameCatalog(games: List<GameDeclaration>) {
             },
         )
 
+        /**
+         * Cadence Karaoke (#42), `games/games/cadence_karaoke/`: a rhythm game for the legs. The
+         * rider picks and adjusts their own pace; a circuit segment sends a `cadence_profile`
+         * (the shape of the target, which the rider's pace shifts as a whole). No effort
+         * multiplier. A Just Ride is scaled as recovery, and the game applies the Endurance cap
+         * itself.
+         */
+        val CADENCE_KARAOKE = GameDeclaration(
+            id = "cadence_karaoke",
+            title = "Cadence Karaoke",
+            supports = setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            roles = setOf(SegmentRole.WARMUP, SegmentRole.RECOVERY, SegmentRole.COOLDOWN),
+            freeRideScaling = SegmentRole.RECOVERY,
+            params = { role, _, _ ->
+                // The target's shape as (seconds, rpm) points: a warm-up ramp, a steady recovery
+                // and a cool-down ramp, each as long as its circuit slot (the game cycles it if
+                // the segment runs longer). A Just Ride sends none: the rider picks the pace.
+                val points = when (role) {
+                    SegmentRole.WARMUP -> listOf(0 to 70, 180 to 90)
+                    SegmentRole.RECOVERY -> listOf(0 to 80, 90 to 85)
+                    SegmentRole.COOLDOWN -> listOf(0 to 85, 180 to 65)
+                    else -> emptyList()
+                }
+                if (points.isEmpty()) emptyMap()
+                else mapOf(
+                    "cadence_profile" to JsonArray(points.map { (t, rpm) ->
+                        JsonObject(mapOf("t" to JsonPrimitive(t), "rpm" to JsonPrimitive(rpm)))
+                    }),
+                )
+            },
+        )
+
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE))
     }
 }

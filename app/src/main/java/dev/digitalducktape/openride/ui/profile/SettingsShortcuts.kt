@@ -68,6 +68,8 @@ private val PREVIEW_RIDES = listOf(
     "Tug of War · open-ended" to SessionRequest.JustRide("tug_of_war", JustRideMode.Open),
     "Safe Cracker · 20 min" to SessionRequest.JustRide("safe_cracker", JustRideMode.Timed(20)),
     "Safe Cracker · open-ended" to SessionRequest.JustRide("safe_cracker", JustRideMode.Open),
+    "Cadence Karaoke · 20 min" to SessionRequest.JustRide("cadence_karaoke", JustRideMode.Timed(20)),
+    "Cadence Karaoke · open-ended" to SessionRequest.JustRide("cadence_karaoke", JustRideMode.Open),
     "Demo · 20 min" to SessionRequest.JustRide("demo", JustRideMode.Timed(20)),
     "Demo · open-ended" to SessionRequest.JustRide("demo", JustRideMode.Open),
 )
