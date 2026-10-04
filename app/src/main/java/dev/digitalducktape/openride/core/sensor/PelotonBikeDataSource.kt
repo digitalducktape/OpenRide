@@ -133,8 +133,9 @@ class PelotonBikeDataSource(
             try {
                 iface.registerCallback(callback, CLIENT_ID)
                 rebinder.reset()
-                // Ask for a ~1 Hz-ish frame rate; the service returns the rate it applied.
-                // Best-effort — some firmware ignores this and streams at its own cadence.
+                // Ask for a fast frame rate (the games show cadence live, and a slow one lags the
+                // picture); the service returns the rate it applied. Best-effort — some firmware
+                // ignores this and streams at its own cadence.
                 runCatching { iface.setCallbackReportRate(REPORT_RATE_MS) }
                 // Stay Unavailable until the first frame actually arrives (see onSensorDataChange).
             } catch (e: RemoteException) {
@@ -249,7 +250,11 @@ class PelotonBikeDataSource(
         /** Free-form client tag the service logs against the registration. */
         const val CLIENT_ID = "OpenRide"
 
-        /** Requested frame interval; ~1 Hz is plenty for the in-ride metrics UI. */
-        const val REPORT_RATE_MS = 1000
+        /**
+         * Requested frame interval. 1 Hz was plenty for the metrics bar but made the games' live
+         * cadence lag by up to a second. Ride recording samples [metrics] on its own 1 s timer,
+         * so a faster feed doesn't add samples.
+         */
+        const val REPORT_RATE_MS = 200
     }
 }
