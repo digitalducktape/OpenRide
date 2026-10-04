@@ -54,8 +54,10 @@ import kotlinx.serialization.json.jsonPrimitive
  *   - `end_mode: game`: the game ends it, with a hard stop (`segment_ending`) at 1.5 ×;
  *   - after `segment_ending` the game has 5 s to report, or a zero result is recorded.
  * - Any `segment_finished` (a skip from the intro card included) advances at once.
- * - Pauses come from the rider (`request_pause`/`request_resume`, which pause the ride) and
- *   from the ride's own freewheel auto-pause; either freezes the clock and is signalled.
+ * - Pauses come from the rider (`request_pause`/`request_resume`, which pause the ride), from
+ *   the ride's own freewheel auto-pause, and from the head tracker while it calibrates (the
+ *   ride keeps recording then: the rider is still on the bike). Any of them freezes the clock and
+ *   is signalled; calibration resumes by itself when it completes or ends as unavailable.
  * - `request_end` asks the current game to finish (`segment_ending`), then ends the session.
  * - After the last segment a timed plan finishes by itself; an open-ended one waits for
  *   `request_end`.
@@ -104,6 +106,7 @@ class GameSessionManager(
     private var elapsedSec = 0
     private var gameplaySec = 0
     private var riderPaused = false
+    private var calibrationPaused = false
     private var paused = false
     private var endRequested = false
     private var exited = false
@@ -143,6 +146,7 @@ class GameSessionManager(
         elapsedSec = 0
         gameplaySec = 0
         riderPaused = false
+        calibrationPaused = false
         paused = false
         endRequested = false
         exited = false
@@ -240,6 +244,14 @@ class GameSessionManager(
         startSegment(0)
         val sessionScope = CoroutineScope(scope.coroutineContext + sessionJob!!)
         sessionScope.launch { rideSessionManager.state.collect { refreshPaused() } }
+        tracker?.let { link ->
+            sessionScope.launch {
+                link.calibrating.collect {
+                    calibrationPaused = it
+                    refreshPaused()
+                }
+            }
+        }
         sessionScope.launch { runClock() }
         if (endRequested) beginEnding()
     }
@@ -358,7 +370,8 @@ class GameSessionManager(
 
     /** Pauses from either source, signalled to Godot only when the combined state changes. */
     private fun refreshPaused() {
-        val now = riderPaused || (recording && rideSessionManager.state.value == RideSessionState.Paused)
+        val now = riderPaused || calibrationPaused ||
+            (recording && rideSessionManager.state.value == RideSessionState.Paused)
         if (now == paused) return
         paused = now
         if (phase !in PLAYABLE) return

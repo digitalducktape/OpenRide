@@ -5,6 +5,7 @@ import dev.digitalducktape.openride.core.camera.HeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
@@ -71,6 +72,8 @@ fun HeadTrackerState.toTrackerReading(): TrackerReading = TrackerReading(
  *   the first camera game of a session only re-takes the centre (3 s).
  * - `request_calibration(mode)` (the rider asked to recalibrate) runs every step.
  * - [stop] turns the camera off when the session ends or the rider leaves games.
+ * - [calibrating] is true while any calibration runs (automatic, requested or for depth); the
+ *   session pauses on it, so a game never plays on while the rider holds still for the camera.
  *
  * Not thread-safe: the session calls it from one thread. [HeadTracker] itself is thread-safe.
  */
@@ -81,6 +84,14 @@ class TrackerLink(
     private val log: (String) -> Unit = {},
 ) {
     private var progressJob: Job? = null
+
+    /**
+     * Whether a calibration is running: true from its start until it completes (`used_default`
+     * fallbacks included, since calibration moves on after them) or ends as unavailable.
+     */
+    val calibrating: Flow<Boolean> = tracker.state
+        .map { it.trackerState == CameraTrackerState.CALIBRATING }
+        .distinctUntilChanged()
 
     fun start() {
         progressJob?.cancel()

@@ -41,6 +41,7 @@ func _step(seconds: float) -> void:
 	while left > 0.0:
 		var dt := minf(left, 0.25)
 		local._process(dt)
+		director.calibration._process(dt)
 		director._process(dt)
 		left -= dt
 
@@ -66,7 +67,7 @@ func test_a_segment_loads_its_game_with_the_intro_card() -> void:
 
 func test_gameplay_starts_when_the_intro_ends() -> void:
 	_start(_plan([_seg()]))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	assert_int(director.phase).is_equal(SessionDirector.Phase.PLAYING)
 	assert_bool(director.intro_card.visible).is_false()
 	assert_bool(director.hud.visible).is_true()
@@ -76,7 +77,7 @@ func test_gameplay_starts_when_the_intro_ends() -> void:
 
 func test_the_timer_ends_the_segment_with_stars_in_the_result() -> void:
 	_start(_plan([_seg("demo", "work", 5)]))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.game.played_sec = 60.0
 	Effort.award(2000.0)
 	_step(5.1)  # segment_ending: the demo ends at once
@@ -106,7 +107,7 @@ func test_skipping_the_card_goes_to_the_next_segment() -> void:
 
 func test_skipping_during_gameplay_does_nothing() -> void:
 	_start(_plan([_seg("demo", "warmup"), _seg("demo", "work")]))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.skip()
 	assert_int(finished.size()).is_equal(0)
 
@@ -121,7 +122,7 @@ func test_the_only_segment_of_an_open_ride_cannot_be_skipped() -> void:
 
 func test_pause_and_resume() -> void:
 	_start(_plan([_seg()]))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.hud.pause_pressed.emit()
 	assert_bool(Session.paused).is_true()
 	assert_bool(director.game.paused).is_true()
@@ -139,16 +140,16 @@ func test_pause_and_resume() -> void:
 func test_pause_freezes_the_intro_countdown() -> void:
 	_start(_plan([_seg()]))
 	Session.request_pause()
-	_step(LocalSession.INTRO_SEC + 1.0)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 1.0)
 	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
 	Session.request_resume()
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	assert_int(director.phase).is_equal(SessionDirector.Phase.PLAYING)
 
 
 func test_end_asks_for_confirmation_then_shows_the_summary() -> void:
 	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.hud.end_pressed.emit()
 	assert_bool(director.pause_overlay.is_confirming()).is_true()
 	assert_bool(Session.active).is_true()
@@ -182,7 +183,7 @@ func test_summary_done_exits_and_the_desktop_starts_again() -> void:
 
 func test_an_open_ride_whose_game_ended_offers_to_end_the_session() -> void:
 	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.game.end_segment()  # an open-ended segment may end itself
 	assert_int(finished.size()).is_equal(1)
 	assert_bool(Session.active).is_true()
@@ -321,3 +322,54 @@ func test_an_unknown_game_is_skipped() -> void:
 	assert_bool(finished[0].skipped).is_true()
 	assert_str(finished[0].game_id).is_equal("no_such_game")
 	assert_str(director.game.game_id).is_equal("demo")
+
+
+# --- Calibration pauses the session ---
+
+func test_the_first_calibration_pauses_the_intro_card_without_the_pause_screen() -> void:
+	_start(_plan([_seg()]))
+	_step(0.5)
+	assert_bool(local.is_calibrating()).is_true()
+	assert_bool(Session.paused).is_true()
+	assert_bool(director.pause_overlay.visible).is_false()  # the calibration screen stands in
+	var intro_left: float = director._intro_left
+	_step(1.0)
+	assert_float(director._intro_left).is_equal(intro_left)  # the countdown waits
+	_step(local.calibration_left_sec())
+	assert_bool(local.is_calibrating()).is_false()
+	assert_bool(Session.paused).is_false()  # resumed by itself
+	_step(1.0)
+	assert_float(director._intro_left).is_less(intro_left)
+
+
+func test_recalibrating_pauses_gameplay_then_resumes() -> void:
+	_start(_plan([_seg()]))
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.5)
+	assert_int(director.phase).is_equal(SessionDirector.Phase.PLAYING)
+	director._recalibrate()
+	_step(0.5)
+	assert_bool(Session.paused).is_true()
+	assert_bool(director.game.paused).is_true()
+	assert_bool(Effort.is_scoring()).is_false()
+	assert_bool(director.pause_overlay.visible).is_false()
+	var played: float = local._played
+	_step(2.0)
+	assert_float(local._played).is_equal(played)  # the segment clock is frozen too
+	_step(local.calibration_left_sec())
+	assert_bool(Session.paused).is_false()
+	assert_bool(director.game.paused).is_false()
+	_step(0.5)
+	assert_float(local._played).is_greater(played)
+
+
+func test_a_riders_pause_outlasts_the_calibration_under_it() -> void:
+	_start(_plan([_seg()]))
+	_step(0.5)
+	Session.request_pause()
+	_step(local.calibration_left_sec() + 0.5)
+	assert_bool(Session.paused).is_true()
+	assert_bool(director.pause_overlay.visible).is_true()  # now the pause screen shows
+	Session.request_resume()
+	_step(0.1)
+	assert_bool(Session.paused).is_false()
+	assert_bool(director.pause_overlay.visible).is_false()

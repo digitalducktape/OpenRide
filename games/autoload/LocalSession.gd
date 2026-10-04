@@ -29,7 +29,8 @@ var _intro_left := 0.0
 var _played := 0.0
 var _grace_left := 0.0
 var _elapsed := 0.0
-var _paused := false
+var _paused := false  ## the combined pause, as signalled
+var _rider_paused := false
 var _end_requested := false
 var _results: Array = []
 var _default_game_id := ""
@@ -82,6 +83,7 @@ func start(plan: Dictionary = {}) -> void:
 	_phase = ""
 	_elapsed = 0.0
 	_paused = false
+	_rider_paused = false
 	_end_requested = false
 	_results = []
 	_calibration_steps = []
@@ -105,17 +107,30 @@ func segment_finished(result: Dictionary) -> void:
 
 
 func request_pause() -> void:
-	if _paused or _phase in ["", "finished"]:
+	if _rider_paused or _phase in ["", "finished"]:
 		return
-	_paused = true
-	_session._on_session_paused()
+	_rider_paused = true
+	_refresh_paused()
 
 
 func request_resume() -> void:
-	if not _paused:
+	if not _rider_paused:
 		return
-	_paused = false
-	_session._on_session_resumed()
+	_rider_paused = false
+	_refresh_paused()
+
+
+## As GameSessionManager.refreshPaused: the rider's pause or a running calibration pauses the
+## session; signalled only when the combined state changes.
+func _refresh_paused() -> void:
+	var now := _rider_paused or (is_calibrating() and _phase in ["intro", "playing", "ending"])
+	if now == _paused:
+		return
+	_paused = now
+	if now:
+		_session._on_session_paused()
+	else:
+		_session._on_session_resumed()
 
 
 ## As TrackerLink.setTrackerMode: a camera mode with no calibration this session starts one.
@@ -152,6 +167,17 @@ func is_calibrating() -> bool:
 	return not _calibration_steps.is_empty()
 
 
+## Seconds the running scripted calibration still takes (0 when none runs). The session is
+## paused meanwhile, so tests wait this out before the intro card counts down.
+func calibration_left_sec() -> float:
+	if _calibration_steps.is_empty():
+		return 0.0
+	var left := _calibration_step_left
+	for step in _calibration_steps.slice(1):
+		left += CALIBRATION_STEPS[step]
+	return left + 0.05
+
+
 ## Steps in the running (or last) calibration (for tests).
 func calibration_step_count() -> int:
 	return _calibration_count
@@ -175,6 +201,7 @@ func request_end() -> void:
 
 func _process(delta: float) -> void:
 	_calibrate(delta)
+	_refresh_paused()
 	if _paused or _phase in ["", "awaiting_end", "finished"]:
 		return
 	_elapsed += delta

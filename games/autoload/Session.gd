@@ -144,6 +144,13 @@ func local_tracker_state() -> int:
 	return _local.tracker_state() if _local else InputBus.TRACKER_OFF
 
 
+## Whether the head tracker is calibrating right now: Kotlin pauses the session meanwhile.
+func is_calibrating() -> bool:
+	if _local:
+		return _local.is_calibrating()
+	return InputBus.tracker_state == InputBus.TRACKER_CALIBRATING
+
+
 ## The current segment's gameplay seconds, pauses excluded (the HUD's count-up clock).
 func played_sec() -> float:
 	return director.played_sec() if director else 0.0

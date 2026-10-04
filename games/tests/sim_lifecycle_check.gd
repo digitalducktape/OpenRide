@@ -36,7 +36,8 @@ func _run() -> void:
 	session.segment_finished({"game_id": "demo", "score": 12, "stars": 1, "won": null, "skipped": false, "stats": {}})
 	_expect_true(session.active, "open-ended session waits for request_end")
 	session.request_end()
-	_expect(["session_started", "segment_started", "session_paused", "session_resumed", "session_finished"], "open-ended lifecycle")
+	# The rider's resume doesn't end the pause while the calibration still runs.
+	_expect(["session_started", "segment_started", "session_paused", "session_finished"], "open-ended lifecycle")
 	_expect_true(int(session.summary.totals.stars) == 1, "summary totals the stars")
 
 	# request_exit on a desktop restarts the local plan.
@@ -51,11 +52,16 @@ func _run() -> void:
 	session.segment_ending.disconnect(session.director._on_segment_ending)
 	session._local.start({"kind": "circuit", "plan_id": "check", "difficulty": "easy", "total_sec": 1,
 		"segments": [{"game_id": "demo", "role": "work", "duration_sec": 1}]})
+	# The calibration pauses the session (as GameSessionManager), so it runs first.
+	while session._local.is_calibrating():
+		session._local._process(0.5)
 	session._local._process(session._local.INTRO_SEC + 0.1)  # intro card
 	session._local._process(1.1)  # gameplay
-	_expect(["session_started", "segment_started", "segment_ending"], "timer ends the segment")
+	_expect(["session_started", "segment_started", "session_paused", "session_resumed", "segment_ending"],
+		"the calibration pauses, then the timer ends the segment")
 	session._local._process(session._local.GRACE_SEC + 0.1)
-	_expect(["session_started", "segment_started", "segment_ending", "session_finished"], "no result: zero, then finished")
+	_expect(["session_started", "segment_started", "session_paused", "session_resumed", "segment_ending",
+		"session_finished"], "no result: zero, then finished")
 	_expect_true(int(session.summary.totals.stars) == 0, "zero result recorded")
 	session.segment_ending.connect(session.director._on_segment_ending)
 

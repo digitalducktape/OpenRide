@@ -16,6 +16,9 @@ extends CanvasLayer
 signal recalibrate_requested
 
 const LAYER := 25
+const STRIP_HEIGHT := 100.0
+## The strip's width: the screen less the HUD's right-hand column (Recalibrate) and margins.
+const STRIP_WIDTH := HudTheme.W - 340.0 - 2.0 * HudTheme.MARGIN
 const RECENT_MSEC := 1000
 const CENTRE_COUNT := 3  ## the centre step's 3-2-1
 ## Modes in which a tap asks for a calibration; never "calibrating".
@@ -95,13 +98,17 @@ func _init() -> void:
 
 	_strip = PanelContainer.new()
 	_strip.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(0.35, 0.2, 0.05, 0.92), 0))
-	_strip.position = Vector2(0, HudTheme.H - 100)
-	_strip.custom_minimum_size = Vector2(HudTheme.W, 100)
+	# Stops short of the HUD's Recalibrate button (bottom right), which it used to cover.
+	_strip.position = Vector2(0, HudTheme.H - STRIP_HEIGHT)
+	_strip.custom_minimum_size = Vector2(STRIP_WIDTH, STRIP_HEIGHT)
 	_strip.mouse_filter = Control.MOUSE_FILTER_STOP
 	_strip.gui_input.connect(_on_gui_input)
 	add_child(_strip)
-	_strip_text = HudTheme.label("", HudTheme.BODY)
+	_strip_text = HudTheme.label("", HudTheme.SMALL)
 	_strip_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_strip_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_strip_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_strip_text.custom_minimum_size = Vector2(STRIP_WIDTH - 40, 0)
 	_strip.add_child(_strip_text)
 	_show("")
 

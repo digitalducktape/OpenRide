@@ -43,6 +43,9 @@ var _last_count := 0
 var calibrated_mode := ""
 
 var _log_left := FRAME_LOG_SEC
+var _pause_screen_up := false
+## The current pause began (or ran) under a calibration: its resume plays no cue.
+var _calibration_pause := false
 var _last_recalibrate_msec := -1
 
 
@@ -173,22 +176,45 @@ func _on_segment_ending() -> void:
 			game.request_finish()  # may end at once, reporting before this returns
 
 
+## Kotlin also pauses the session while the head tracker calibrates (docs/GAMES.md, "A session
+## on screen"). The calibration screen then stands in for the pause screen, and no pause or
+## resume cue plays: the pause screen appears only once calibration is over, if the session is
+## still paused.
 func _on_session_paused() -> void:
 	if game:
 		game.set_paused(true)
 	AudioDirector.set_paused(true)
-	AudioDirector.play_cue(AudioDirector.CUE_PAUSE)
+	if not is_calibrating():
+		AudioDirector.play_cue(AudioDirector.CUE_PAUSE)
 	hud.set_paused(true)
-	pause_overlay.set_paused(true)
+	_sync_pause_screen()
 
 
 func _on_session_resumed() -> void:
 	if game:
 		game.set_paused(false)
 	AudioDirector.set_paused(false)
-	AudioDirector.play_cue(AudioDirector.CUE_RESUME)
+	if not _calibration_pause:
+		AudioDirector.play_cue(AudioDirector.CUE_RESUME)
+	_calibration_pause = false
 	hud.set_paused(false)
-	pause_overlay.set_paused(false)
+	_sync_pause_screen()
+
+
+## Whether the head tracker is calibrating (the calibration screen is up).
+func is_calibrating() -> bool:
+	return Session.is_calibrating()
+
+
+## The pause screen shows while the session is paused, except under the calibration screen.
+func _sync_pause_screen() -> void:
+	var calibrating := Session.paused and is_calibrating()
+	if calibrating:
+		_calibration_pause = true
+	var want := Session.paused and not calibrating
+	if want != _pause_screen_up:
+		_pause_screen_up = want
+		pause_overlay.set_paused(want)
 
 
 func _on_session_finished(summary: Dictionary) -> void:
@@ -234,6 +260,8 @@ func _report(result: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	if Session.active:
+		_sync_pause_screen()
 	match phase:
 		Phase.INTRO:
 			if not Session.paused:

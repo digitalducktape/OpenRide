@@ -632,4 +632,59 @@ class GameSessionManagerTest {
             tracker.calls,
         )
     }
+
+    private fun pauseSignals() = signals.names.filter { it == "session_paused" || it == "session_resumed" }
+
+    @Test
+    fun `a recalibration pauses the session until it completes, and the ride keeps recording`() {
+        val tracker = FakeHeadTracker()
+        val m = manager(tracker = TrackerLink(tracker, signals, scope)).play(oneMinute)
+        m.call { onSetTrackerMode("lean_x") }
+        tracker.finishCalibration()
+        scope.runCurrent()
+        signals.events.clear()
+        seconds(15) // the 10 s intro card, then 5 s of play
+        assertEquals(55.0, m.segmentTimeLeftSec, 0.0)
+
+        m.call { onRequestCalibration("lean_x") }
+        assertEquals(listOf("session_paused"), pauseSignals())
+        seconds(10)
+        assertEquals(55.0, m.segmentTimeLeftSec, 0.0)
+        assertEquals(RideSessionState.Active, rides.state.value)
+
+        tracker.finishCalibration()
+        scope.runCurrent()
+        assertEquals(listOf("session_paused", "session_resumed"), pauseSignals())
+        seconds(5)
+        assertEquals(50.0, m.segmentTimeLeftSec, 0.0)
+    }
+
+    @Test
+    fun `the first calibration holds the intro card, and a calibration that fails still resumes`() {
+        val tracker = FakeHeadTracker()
+        val m = manager(tracker = TrackerLink(tracker, signals, scope)).play(oneMinute)
+        m.call { onSetTrackerMode("lean_x") } // the session's first camera mode calibrates at once
+        assertEquals("session_paused", pauseSignals().last())
+        seconds(30)
+        assertEquals(60.0, m.segmentTimeLeftSec, 0.0) // still on the intro card
+
+        tracker.failCalibration() // no face: camera steering is off
+        scope.runCurrent()
+        assertEquals(listOf("session_paused", "session_resumed"), pauseSignals())
+        seconds(15)
+        assertEquals(55.0, m.segmentTimeLeftSec, 0.0)
+    }
+
+    @Test
+    fun `a rider's pause outlasts a calibration that ends under it`() {
+        val tracker = FakeHeadTracker()
+        val m = manager(tracker = TrackerLink(tracker, signals, scope)).play(oneMinute)
+        m.call { onSetTrackerMode("lean_x") }
+        m.call { onRequestPause() }
+        tracker.finishCalibration()
+        scope.runCurrent()
+        assertEquals(listOf("session_paused"), pauseSignals())
+        m.call { onRequestResume() }
+        assertEquals(listOf("session_paused", "session_resumed"), pauseSignals())
+    }
 }

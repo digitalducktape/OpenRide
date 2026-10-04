@@ -43,6 +43,9 @@ func _run() -> void:
 	await _tap(KEY_SPACE)
 	_check(not _input_bus.standing, "Space again sits")
 
+	# A running calibration pauses the session by itself (as on the bike): wait it out first.
+	while _session.is_calibrating():
+		await process_frame
 	await _tap(KEY_P)
 	_check(_session.paused, "P pauses")
 	await _tap(KEY_P)

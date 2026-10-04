@@ -71,7 +71,7 @@ func _touch(at: Vector2) -> void:
 ## The intro card's countdown, after the scripted calibration has finished, so nothing but the
 ## card is on top.
 func _to_the_countdown() -> void:
-	_step(LocalSession.INTRO_SEC - 1.0)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC - 1.0)
 	assert_int(director.phase).is_equal(SessionDirector.Phase.INTRO)
 	assert_int(local.tracker_state()).is_not_equal(InputBus.TRACKER_CALIBRATING)
 
@@ -133,7 +133,7 @@ func test_touching_the_screen_while_a_segment_ends_never_ends_the_session() -> v
 
 func test_the_open_ride_done_panel_asks_before_ending() -> void:
 	_start(_plan([_seg("demo", "free", -1)], "just_ride"))
-	_step(LocalSession.INTRO_SEC + 0.1)
+	_step(local.calibration_left_sec() + LocalSession.INTRO_SEC + 0.1)
 	director.game.end_segment()
 	assert_bool(director.done_panel.visible).is_true()
 	_touch(Vector2(960, 540))  # anywhere but the button

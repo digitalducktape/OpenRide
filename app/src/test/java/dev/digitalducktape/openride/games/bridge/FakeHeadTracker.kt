@@ -48,6 +48,11 @@ class FakeHeadTracker : HeadTracker {
         mutableState.value = HeadTrackerState(mode = mutableState.value.mode, trackerState = TrackerState.TRACKING)
     }
 
+    /** The calibration in progress ends as unavailable (no face after two tries): camera off. */
+    fun failCalibration() {
+        mutableState.value = HeadTrackerState(mode = mutableState.value.mode, trackerState = TrackerState.OFF)
+    }
+
     override fun resetSession() {
         calls += "resetSession"
         calibratedThisSession = false
