@@ -4,6 +4,7 @@ extends PanelContainer
 
 var _value: Label
 var _caption: Label
+var _color := Color(-1, -1, -1)
 
 
 func _init(caption := "", value := "--", color := HudTheme.INK) -> void:
@@ -21,13 +22,19 @@ func _init(caption := "", value := "--", color := HudTheme.INK) -> void:
 	box.add_child(_caption)
 
 
+## The setters do nothing when the value is unchanged: callers set them every frame, and a theme
+## override re-lays out the HUD (frame time on the tablet).
 func set_value(text: String) -> void:
-	_value.text = text
+	if _value.text != text:
+		_value.text = text
 
 
 func set_caption(text: String) -> void:
-	_caption.text = text
+	if _caption.text != text:
+		_caption.text = text
 
 
 func set_color(color: Color) -> void:
-	_value.add_theme_color_override("font_color", color)
+	if color != _color:
+		_color = color
+		_value.add_theme_color_override("font_color", color)

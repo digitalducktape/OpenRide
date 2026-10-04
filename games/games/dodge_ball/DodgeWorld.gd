@@ -315,6 +315,20 @@ func _popup(x_at: float, points: float, _bonus: bool, color: Color) -> void:
 	tween.chain().tween_callback(func(): label.visible = false)
 
 
+## Fires every effect once in view, behind the intro card, so their shaders compile then and not
+## at the first hit (that hitch read 9 fps on the tablet).
+func prewarm() -> void:
+	var all: Array[CPUParticles3D] = []
+	all.append_array(_bursts)
+	all.append_array(_sparks)
+	all.append(_shards)
+	for p in all:
+		p.position = Vector3(_rig.position.x, 1.0, RIDER_LINE_Z - 6.0)
+		p.restart()
+	_streaks.emitting = true
+	_popup(_rig.position.x, 10.0, false, Color(1, 1, 1))
+
+
 func streak_fx() -> void:
 	var tween := create_tween()
 	tween.tween_method(func(v: float): _road_mat.set_shader_parameter("pulse", v), 1.0, 0.0, 0.8)

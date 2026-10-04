@@ -182,8 +182,9 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_intensity(0.6)
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, DodgeAudioScript.music_effects())
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, DodgeAudioScript.sfx_effects())
-	# Draw one frame of the road at rest behind the intro card.
+	# Draw one frame of the road at rest behind the intro card, and warm up the effects there.
 	world.update_view(0.0, logic, 0.0, 0.0)
+	world.prewarm()
 
 
 func _on_start() -> void:
