@@ -1176,6 +1176,7 @@ warm-up, N blocks of Tug of War 1:00, Safe Cracker 1:30, Dodge Ball 1:30 and Cad
   circuit's id.
 - **Already there from #34/#35:** the intro card with its Skip button, music across cards, the
   per-segment summary and bests per circuit length (`GameResultDao.planBest`).
+- **The summary.** A circuit lists every planned game: the ones the session never reached say "not played", and the heading reads "Session ended early" instead of "Circuit complete". The best line says "New personal best!" (with the best before it) or "Your best: 5400 points, 2 stars"; Kotlin sends `previous_score` and `previous_stars` alongside the beaten flags. A Just Ride shows its one game.
 - **Not built yet:** time in each role's target zone and average effort on the circuit summary.
 
 **The Games tab (beta).** A tab in the bottom bar (and a "Games · BETA" card on Home) that holds:

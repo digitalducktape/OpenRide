@@ -163,7 +163,7 @@ fun HomeScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "GAMES",
+                            text = "\uD83C\uDFAE  GAMES",
                             style = MetricTextStyles.SectionEyebrow,
                             color = MaterialTheme.colorScheme.primary,
                         )

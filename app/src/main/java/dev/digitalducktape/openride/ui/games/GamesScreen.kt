@@ -75,7 +75,7 @@ fun GamesScreen(viewModel: GamesViewModel, onEditProfile: () -> Unit, modifier: 
         ) {
             item {
                 Row(Modifier.padding(top = 32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("GAMES", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text("\uD83C\uDFAE GAMES", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     BetaBadge()
                 }
                 Text(

@@ -491,6 +491,9 @@ class GameSessionManager(
         val flags = buildMap {
             if (score > 0 && score > (previous.bestScore ?: 0.0)) put("score", JsonPrimitive(true))
             if (stars > 0 && stars > (previous.bestStars ?: 0)) put("stars", JsonPrimitive(true))
+            // The best before this session, so the summary can say what the rider is up against.
+            previous.bestScore?.let { put("previous_score", JsonPrimitive(it.toInt())) }
+            previous.bestStars?.let { put("previous_stars", JsonPrimitive(it)) }
         }
         return JsonObject(flags)
     }

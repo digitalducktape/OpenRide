@@ -269,7 +269,11 @@ class GameSessionManagerTest {
         seconds(70)
         m.report(score = 400.0, stars = 3)
 
-        assertEquals(setOf("stars"), signals.payload("session_finished")["bests"]!!.jsonObject.keys)
+        val bests = signals.payload("session_finished")["bests"]!!.jsonObject
+        // Only the stars were beaten; the summary also gets the best before this session.
+        assertEquals(setOf("stars", "previous_score", "previous_stars"), bests.keys)
+        assertEquals(500, bests.int("previous_score"))
+        assertEquals(2, bests.int("previous_stars"))
     }
 
     @Test

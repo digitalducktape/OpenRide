@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.digitalducktape.openride.ui.theme.OpenRideColors
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -48,12 +49,12 @@ import dev.digitalducktape.openride.ui.navigation.MainTabs
 import dev.digitalducktape.openride.ui.profile.ProfileTabScreen
 import dev.digitalducktape.openride.ui.profile.ProfileTabViewModel
 
-private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
+private data class TabSpec(val route: String, val label: String, val icon: ImageVector, val emoji: String? = null)
 
 private val TABS = listOf(
     TabSpec(MainTabs.Home, "Home", Icons.Filled.Home),
     TabSpec(MainTabs.Classes, "Classes", Icons.Filled.PlayArrow),
-    TabSpec(MainTabs.Games, "Games", Icons.Filled.Star),
+    TabSpec(MainTabs.Games, "Games", Icons.Filled.Star, emoji = "\uD83C\uDFAE"),
     TabSpec(MainTabs.History, "History", Icons.Filled.DateRange),
     TabSpec(MainTabs.Profile, "Profile", Icons.Filled.Person),
 )
@@ -225,7 +226,9 @@ fun MainScaffold(
                 NavigationBarItem(
                     selected = currentRoute == tab.route,
                     onClick = { navigateToTab(tab.route) },
-                    icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
+                    icon = {
+                        if (tab.emoji != null) Text(tab.emoji, fontSize = 24.sp) else Icon(imageVector = tab.icon, contentDescription = tab.label)
+                    },
                     label = { Text(text = tab.label) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,

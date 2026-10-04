@@ -75,10 +75,15 @@ func show_summary(summary: Dictionary, plan: Dictionary) -> void:
 		child.queue_free()
 	var results: Array = summary.get("results", [])
 	var planned: Array = plan.get("segments", [])
+	var is_circuit: bool = plan.get("kind", "") == "circuit"
 	for i in results.size():
 		var role := str(planned[i].get("role", "")) if i < planned.size() else ""
 		_rows.add_child(_row(i, results[i], role))
-	if results.is_empty():
+	# A circuit ended early still lists every game it planned: the ones not reached say so.
+	if is_circuit:
+		for i in range(results.size(), planned.size()):
+			_rows.add_child(_pending_row(i, planned[i]))
+	if results.is_empty() and not is_circuit:
 		_rows.add_child(HudTheme.label("No games finished this time.", HudTheme.BODY, HudTheme.MUTED))
 
 	var totals: Dictionary = summary.get("totals", {})
@@ -90,8 +95,15 @@ func show_summary(summary: Dictionary, plan: Dictionary) -> void:
 		HudTheme.clock(float(totals.get("elapsed_sec", 0)))]
 	_bests.text = bests_text(summary.get("bests", {}))
 	_bests.visible = not _bests.text.is_empty()
-	_title.text = "Circuit complete" if plan.get("kind", "") == "circuit" else "Ride complete"
+	_title.text = title_for(plan, results.size())
 	visible = true
+
+
+## The heading: a circuit that played every game is complete; one ended early says so.
+static func title_for(plan: Dictionary, played: int) -> String:
+	if plan.get("kind", "") != "circuit":
+		return "Ride complete"
+	return "Circuit complete" if played >= plan.get("segments", []).size() else "Session ended early"
 
 
 ## A section below the results, for circuit mode (#37) and later additions.
@@ -99,21 +111,23 @@ func add_section(section: Control) -> void:
 	_extra.add_child(section)
 
 
-## The bests the summary carries, one line. Kotlin (#35) sends `{"score": true}` and/or
-## `{"stars": true}` when the session beat the rider's best at this plan and difficulty; this
-## lists whatever keys are truthy ("Personal best: score, stars").
+## The line about the rider's best. Kotlin (#35) sends `{"score": true}` and/or `{"stars": true}`
+## when the session beat the rider's best at this plan and difficulty, and `previous_score` and
+## `previous_stars` for the best before it. So: "New personal best!" (with the one it beat), or
+## "Your best: 5400 points, 2 stars" when this session didn't beat it, or nothing on a first play
+## that scored nothing.
 static func bests_text(bests) -> String:
 	if not (bests is Dictionary) or bests.is_empty():
 		return ""
-	var names := PackedStringArray()
-	for key in bests:
-		var value = bests[key]
-		if value is bool:
-			if value:
-				names.append(str(key).replace("_", " "))
-		elif value != null:
-			names.append("%s %s" % [str(key).replace("_", " "), str(value)])
-	return "" if names.is_empty() else "Personal best: " + ", ".join(names)
+	var beat := bool(bests.get("score", false)) or bool(bests.get("stars", false))
+	var has_previous: bool = bests.has("previous_score")
+	var previous := ""
+	if has_previous:
+		var stars := int(bests.get("previous_stars", 0))
+		previous = "%d points, %d %s" % [int(bests.previous_score), stars, "star" if stars == 1 else "stars"]
+	if beat:
+		return "New personal best! (before: %s)" % previous if has_previous else "New personal best!"
+	return "Your best: %s" % previous if has_previous else ""
 
 
 func _row(index: int, result: Dictionary, role: String) -> Control:
@@ -134,4 +148,23 @@ func _row(index: int, result: Dictionary, role: String) -> Control:
 	else:
 		line.add_child(HudTheme.label("%d" % int(result.get("score", 0)), HudTheme.BODY))
 		line.add_child(StarRow.new(int(result.get("stars", 0)), 44.0))
+	return row
+
+
+## A planned game the session never got to: its name and role, and "not played".
+func _pending_row(index: int, segment: Dictionary) -> Control:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(1, 1, 1, 0.025), 14))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 32)
+	row.add_child(line)
+	var game_id := str(segment.get("game_id", ""))
+	var info := GameRegistry.info(game_id)
+	var name_label := HudTheme.label("%d.  %s" % [index + 1, info.title if info else game_id], HudTheme.BODY, HudTheme.MUTED)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(name_label)
+	var role := str(segment.get("role", ""))
+	if not role.is_empty():
+		line.add_child(HudTheme.label(HudTheme.role_name(role), HudTheme.SMALL, HudTheme.MUTED))
+	line.add_child(HudTheme.label("not played", HudTheme.BODY, HudTheme.MUTED))
 	return row
