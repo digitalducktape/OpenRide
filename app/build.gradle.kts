@@ -1,3 +1,7 @@
+import java.io.ByteArrayOutputStream
+import java.util.Properties
+import javax.inject.Inject
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -35,8 +39,16 @@ android {
     }
 
     buildTypes {
+        // Mini-games (#32): the Godot engine ships one native library per ABI (~26 MB compressed
+        // each). The bike tablets are arm64, so the builds that reach a bike carry only that;
+        // the mock debug build also keeps x86_64 so it still runs games on an x86 emulator.
+        debug {
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        }
+
         release {
             isMinifyEnabled = false
+            ndk { abiFilters += "arm64-v8a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -56,6 +68,11 @@ android {
             // This is the build published to the bike, so it updates from the `real` asset.
             buildConfigField("String", "UPDATE_APK_ASSET_INFIX", "\"real\"")
             matchingFallbacks += "debug"
+            // Bike-only build: arm64 alone (initWith copied debug's emulator ABI too).
+            ndk {
+                abiFilters.clear()
+                abiFilters += "arm64-v8a"
+            }
         }
     }
 
@@ -89,11 +106,121 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // Mini-games (#32): store native libraries compressed (extracted at install) rather
+        // than page-aligned and uncompressed, so the Godot engine adds ~26 MB to the APK the
+        // self-updater downloads instead of ~71 MB.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+/**
+ * Mini-games (#32): exports the Godot project in `games/` to `games.pck`, which lands at the
+ * root of the APK's assets where GameHostActivity loads it (`--main-pack res://games.pck`).
+ * Needs the Godot editor whose version matches the `org.godotengine:godot` library: set
+ * `GODOT_BIN` (or `godot.bin` in local.properties) to its binary. See docs/GAMES.md.
+ */
+abstract class ExportGamesPackTask @Inject constructor(
+    private val execOperations: ExecOperations,
+) : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val projectFiles: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val projectDir: DirectoryProperty
+
+    @get:Input
+    @get:Optional
+    abstract val godotBin: Property<String>
+
+    /** The `org.godotengine:godot` version; the editor must be the same release. */
+    @get:Input
+    abstract val godotVersion: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun export() {
+        val bin = godotBin.orNull?.takeIf { it.isNotBlank() }
+            ?: throw GradleException("GODOT_BIN is not set. ${installHelp()}")
+        if (!File(bin).canExecute()) {
+            throw GradleException("GODOT_BIN=$bin is not an executable file. ${installHelp()}")
+        }
+        val version = godot(bin, "--version").trim()
+        if (!version.startsWith(godotVersion.get())) {
+            throw GradleException(
+                "GODOT_BIN is Godot $version, but the app embeds Godot ${godotVersion.get()}; " +
+                    "the pack must be exported by the same release. ${installHelp()}",
+            )
+        }
+        val games = projectDir.get().asFile.path
+        val pack = outputDir.get().asFile.apply { deleteRecursively(); mkdirs() }.resolve("games.pck")
+        // Import first: a fresh checkout has no .godot/ import cache, and export needs it.
+        godot(bin, "--headless", "--path", games, "--import")
+        godot(bin, "--headless", "--path", games, "--export-pack", "Android", pack.path)
+        if (!pack.isFile || pack.length() == 0L) {
+            throw GradleException("Godot did not write $pack; see its output above.")
+        }
+    }
+
+    private fun godot(vararg args: String): String {
+        val out = ByteArrayOutputStream()
+        execOperations.exec {
+            commandLine(*args)
+            standardOutput = out
+        }
+        return out.toString()
+    }
+
+    private fun installHelp() =
+        "The mini-games need the Godot ${godotVersion.get()} editor to export games/: install it " +
+            "(`brew install --cask godot`, or https://godotengine.org/download/archive/), then " +
+            "`export GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot` (or add " +
+            "`godot.bin=...` to local.properties). See docs/GAMES.md."
+}
+
+/**
+ * APK/bundle packaging tasks of every variant. The pack is exported only when one of them is
+ * scheduled, or when exportGamesPack is asked for by name.
+ */
+val apkPackagingTasks = mutableSetOf<String>()
+var gamesPackNeeded = false
+gradle.taskGraph.whenReady {
+    gamesPackNeeded = allTasks.any { it.project == project && it.name in apkPackagingTasks } ||
+        gradle.startParameter.taskNames.any { it.substringAfterLast(':') == "exportGamesPack" }
+}
+
+val exportGamesPack = tasks.register<ExportGamesPackTask>("exportGamesPack") {
+    group = "build"
+    description = "Exports the Godot project in games/ to games.pck for the APK's assets."
+    val games = rootProject.layout.projectDirectory.dir("games")
+    projectDir.set(games)
+    projectFiles.from(fileTree(games) { exclude(".godot/**", "tests/**") })
+    val localGodotBin = rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->
+        Properties().apply { file.inputStream().use { load(it) } }.getProperty("godot.bin")
+    }
+    godotBin.set(providers.environmentVariable("GODOT_BIN").orElse(provider { localGodotBin }))
+    godotVersion.set(libs.versions.godot.get())
+    // Unit tests merge the variant's assets too, but must not need Godot: skip the export
+    // unless this build packages an APK or bundle (assemble*, install*, bundle*) or the task
+    // was asked for by name. Skipped, it leaves its output as it was.
+    onlyIf("an APK or bundle is being packaged") { gamesPackNeeded }
+}
+
+// Every variant's assets include the pack, so asset merging runs exportGamesPack first.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(exportGamesPack, ExportGamesPackTask::outputDir)
+        val name = variant.name.replaceFirstChar { it.uppercase() }
+        apkPackagingTasks += listOf("package$name", "package${name}Bundle")
+    }
 }
 
 dependencies {
@@ -110,6 +237,11 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
     implementation(libs.androidx.exifinterface)
+
+    // Mini-games (#32): the Godot engine as an Android library; GameHostActivity embeds it.
+    // Must match the editor version that exports games/ (checked by exportGamesPack).
+    implementation(libs.godot)
+    implementation(libs.androidx.fragment)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

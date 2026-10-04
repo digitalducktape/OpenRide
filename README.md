@@ -42,9 +42,10 @@ OpenRide isn't available in an app store — you install it onto the bike's tabl
 
 **Option A — download it (recommended):** grab the latest `openride-real-*.apk` from the [Releases page](https://github.com/digitalducktape/openride/releases/latest) and save it somewhere on your computer.
 
-**Option B — build it yourself:** if you'd rather build from source, you'll also need Java 21 and a copy of this repo (`git clone`, or download it as a ZIP from GitHub and unzip it). Then, in a terminal opened to that folder:
+**Option B — build it yourself:** if you'd rather build from source, you'll also need Java 21, the [Godot 4.7.2](https://godotengine.org/download/archive/) editor (the mini-games are a Godot project — see [docs/GAMES.md](docs/GAMES.md)), and a copy of this repo (`git clone`, or download it as a ZIP from GitHub and unzip it). Then, in a terminal opened to that folder:
 
 ```sh
+export GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot   # wherever Godot 4.7.2 is
 ./gradlew :app:assembleDebugReal
 ```
 
@@ -75,6 +76,7 @@ The rest of this section is technical detail for anyone contributing to the code
 - Sensor access sits behind a `BikeDataSource` abstraction with a `MockBikeDataSource` (simulated ride) so all UI/logic development runs in a standard emulator; only the real system-service binding needs the physical bike
 - Room database: `Profile` / `Ride` / `RideSample` (per-second samples — required for FIT/TCX export)
 - Content browser fetches per-channel YouTube RSS (`/feeds/videos.xml?channel_id=…`) on-device: no API key, no quota, no backend
+- Mini-games are a Godot 4.7.2 project in `games/`, embedded through `GameHostActivity` and the `OpenRideBridge` plugin; APK builds export it, so they need `GODOT_BIN` pointing at the Godot editor (unit tests don't) — see [docs/GAMES.md](docs/GAMES.md)
 
 ## License
 

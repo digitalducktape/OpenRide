@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
+import dev.digitalducktape.openride.core.files.OpenRideFileProvider
 import dev.digitalducktape.openride.core.profile.AvatarPhotoStore
 import dev.digitalducktape.openride.ui.common.ProfileAvatar
 import java.io.File
@@ -132,13 +132,7 @@ fun ProfileEditorScreen(
                     cameraError = cameraError,
                     onTakePhoto = {
                         try {
-                            takePicture.launch(
-                                FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    captureFile,
-                                ),
-                            )
+                            takePicture.launch(OpenRideFileProvider.uriFor(context, captureFile))
                         } catch (_: ActivityNotFoundException) {
                             cameraError = "No camera app available on this tablet"
                         }

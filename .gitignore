@@ -15,3 +15,7 @@ captures/
 docs/PRD.md
 docs/DECISIONS.md
 docs/superpowers/
+
+# Mini-games (docs/GAMES.md): Godot's import cache, and the exported pack (built by exportGamesPack)
+games/.godot/
+games.pck

@@ -2,9 +2,9 @@ package dev.digitalducktape.openride.core.update
 
 import android.content.Context
 import android.content.Intent
-import androidx.core.content.FileProvider
 import dev.digitalducktape.openride.core.content.FeedFetcher
 import dev.digitalducktape.openride.core.content.HttpUrlFeedFetcher
+import dev.digitalducktape.openride.core.files.OpenRideFileProvider
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -65,7 +65,7 @@ class UpdateRepository(
      * platform's own install confirmation — the user still has to accept there.
      */
     fun installIntentFor(apk: File): Intent {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+        val uri = OpenRideFileProvider.uriFor(context, apk)
         return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, APK_MIME_TYPE)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

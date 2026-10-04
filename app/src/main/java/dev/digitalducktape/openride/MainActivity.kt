@@ -17,12 +17,15 @@ import dev.digitalducktape.openride.ui.theme.OpenRideTheme
 import kotlinx.coroutines.launch
 
 /**
- * Single activity for the whole app (per project scaffold ticket). All screens are
- * destinations within [OpenRideNavHost] rather than separate Activities.
+ * The activity for the whole Compose app (per project scaffold ticket). All screens are
+ * destinations within [OpenRideNavHost] rather than separate Activities; the one exception is
+ * the mini-games host (`games.GameHostActivity`), which embeds the Godot engine.
+ *
+ * The [AppContainer] and the app-wide startup (auto-backup, update check, heart-rate manager)
+ * belong to [OpenRideApplication], so they are shared with the games host and run once per
+ * process rather than once per activity instance.
  */
 class MainActivity : ComponentActivity() {
-    private val appContainer: AppContainer by lazy { AppContainer(applicationContext) }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -36,24 +39,6 @@ class MainActivity : ComponentActivity() {
             if (insets.isVisible(WindowInsetsCompat.Type.systemBars())) hideSystemBars()
             insets
         }
-
-        // Rolling automatic backup + silent restore-on-empty (see AutoBackupManager) so an
-        // app update or reinstall never silently loses profiles and ride history.
-        appContainer.autoBackupManager.start()
-
-        // PRD #22/T22: best-effort check for a newer GitHub release on launch. Silent on any
-        // failure; if one is found the Home screen shows a dismissible banner. Never installs.
-        lifecycleScope.launch {
-            appContainer.refreshUpdateAvailability(
-                BuildConfig.VERSION_CODE,
-                BuildConfig.UPDATE_APK_ASSET_INFIX,
-            )
-        }
-
-        // PRD P1-4, T17: eagerly construct (the container property is `by lazy`) so the
-        // heart-rate manager starts observing the active profile's paired strap from launch,
-        // rather than only whenever a screen happens to reference it first.
-        appContainer.heartRateManager
 
         // PRD P0-10: keep the screen on for the duration of an active ride, and let normal
         // display timeout resume the instant it isn't. Driven from the activity (rather than

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Backs the FileProvider used by ExportShare.kt (PRD P1-1/P1-2): only the app's own
-     cache/exports subdirectory is exposed, nothing else under cacheDir or filesDir. -->
+<!-- Backs OpenRideFileProvider (${applicationId}.files), used by ExportShare.kt (PRD
+     P1-1/P1-2): only these cache subdirectories are exposed, nothing else under cacheDir or
+     filesDir. The Godot engine's own provider uses godot_provider_paths.xml from its AAR. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="exports" path="exports/" />
     <!-- Downloaded update APKs (PRD #22/T22), handed to the system package installer. -->

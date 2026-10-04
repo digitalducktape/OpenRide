@@ -52,6 +52,7 @@
     </queries>
 
     <application
+        android:name=".OpenRideApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -70,11 +71,38 @@
             </intent-filter>
         </activity>
 
+        <!-- Mini-games (#32): hosts the embedded Godot engine for game sessions. Landscape and
+             the configChanges Godot needs so the engine's surface is never torn down by a
+             config change; not exported, only the app itself starts it.
+
+             It lives as long as the process (destroying it ends the engine, and Godot then
+             kills the process), so it runs in its own task that leaving games moves to the
+             back; singleTask brings that one instance forward on the next entry.
+
+             Deliberately NOT excludeFromRecents: on the bike, an excluded task sitting in the
+             background was removed by the system (when Peloton's software brought up its own
+             activity at the display timeout), which destroyed the engine and the process.
+             See GameHostActivity and docs/GAMES.md. -->
+        <activity
+            android:name=".games.GameHostActivity"
+            android:exported="false"
+            android:taskAffinity="${applicationId}.games"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:resizeableActivity="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode|layoutDirection|locale"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <!-- Backs ExportShare.kt (PRD P1-1/P1-2, T14): hands exported TCX/CSV files to the
-             Android share sheet via a content:// URI instead of a raw file:// path. -->
+             Android share sheet via a content:// URI instead of a raw file:// path. Also the
+             self-updater's APK hand-off and avatar captures (see res/xml/file_paths.xml).
+
+             An app-owned subclass at its own authority: the Godot AAR declares the plain
+             androidx FileProvider at ${applicationId}.fileprovider with its own paths file,
+             and the two must coexist (see OpenRideFileProvider). -->
         <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+            android:name=".core.files.OpenRideFileProvider"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
