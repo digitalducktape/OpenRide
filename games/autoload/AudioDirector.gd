@@ -188,6 +188,15 @@ func pending_music_key() -> String:
 	return _pending_key
 
 
+## Seconds until the pending tempo change swaps in (the playing loop's next phrase boundary), or
+## -1.0 when none is waiting (not asked for, or its render isn't ready yet).
+func seconds_to_swap() -> float:
+	var phrase: float = _deck_phrase_sec[_deck]
+	if _pending_key.is_empty() or phrase <= 0.0:
+		return -1.0
+	return phrase - _seconds_into_phrase()
+
+
 ## 0-1: stems whose gate is at or below it play; the rest fade out.
 func set_intensity(value: float) -> void:
 	intensity = clampf(value, 0.0, 1.0)

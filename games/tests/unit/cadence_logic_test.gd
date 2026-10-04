@@ -15,11 +15,11 @@ func _types(events: Array[Dictionary]) -> Array:
 	return events.map(func(e): return e.type)
 
 
-func test_the_default_pace_is_80_and_steady_has_no_shape() -> void:
+func test_the_default_target_is_60_and_stays_put() -> void:
 	var logic := CadenceLogic.new()
-	assert_float(logic.target_at(0.0)).is_equal(80.0)
-	assert_float(logic.target_at(500.0)).is_equal(80.0)
-	assert_int(logic.pace()).is_equal(80)
+	assert_float(logic.target_at(0.0)).is_equal(60.0)
+	assert_float(logic.target_at(500.0)).is_equal(60.0)
+	assert_int(logic.pace()).is_equal(60)
 
 
 func test_profile_points_are_interpolated_and_the_last_is_held_or_cycled() -> void:
@@ -33,20 +33,17 @@ func test_profile_points_are_interpolated_and_the_last_is_held_or_cycled() -> vo
 	assert_float(logic.target_at(150.0)).is_equal(logic.target_at(30.0))  # an open-ended ride cycles it
 
 
-func test_the_shapes_move_around_the_riders_pace() -> void:
-	var pyramid := CadenceLogic.new("standard", {}, "pyramid")
-	assert_float(pyramid.target_at(0.0)).is_equal(70.0)
-	assert_float(pyramid.target_at(180.0)).is_equal(90.0)
-	assert_float(pyramid.target_at(360.0)).is_equal(70.0)
-	var builds := CadenceLogic.new("standard", {}, "builds")
-	assert_float(builds.target_at(0.0)).is_equal(80.0)
-	assert_float(builds.target_at(60.0)).is_equal(85.0)
-	assert_float(builds.target_at(120.0)).is_equal(90.0)
-	assert_float(builds.target_at(180.0)).is_equal(80.0)
-	var spinups := CadenceLogic.new("standard", {}, "spinups")
-	assert_float(spinups.target_at(10.0)).is_equal(95.0)
-	assert_float(spinups.target_at(40.0)).is_equal(80.0)
-	assert_float(spinups.target_at(95.0)).is_equal(95.0)
+func test_the_target_only_takes_multiples_of_five() -> void:
+	var points := [{"t": 0.0, "rpm": 70.0}, {"t": 60.0, "rpm": 90.0}]
+	var logic := CadenceLogic.new("standard", {"cadence_profile": points})
+	for i in 200:
+		var rpm: float = logic.target_at(float(i))
+		assert_float(fposmod(rpm, 5.0)).is_equal(0.0)
+	var steady := CadenceLogic.new()
+	assert_float(steady.target()).is_equal(60.0)
+	steady.request_pace(1)
+	steady.apply_pending()
+	assert_float(steady.target()).is_equal(65.0)
 
 
 func test_bands_follow_difficulty() -> void:
@@ -56,19 +53,68 @@ func test_bands_follow_difficulty() -> void:
 	assert_float(CadenceLogic.new("standard", {"tolerance_rpm": 3}).tolerance).is_equal(3.0)
 
 
+## A rider holding `cadence` for 15 s, long enough for the gap to settle.
+func _settled(cadence: float) -> CadenceLogic:
+	var logic := CadenceLogic.new()
+	_run(logic, 15.0, cadence)
+	return logic
+
+
+func test_the_ball_has_three_places_and_travels_between_them() -> void:
+	var logic := CadenceLogic.new()  # target 60, tolerance 5
+	logic.step(DT, 60.0, 50.0)
+	assert_float(logic.gap).is_equal(0.0)  # matching: the centre line
+	logic.step(DT, 63.0, 50.0)
+	assert_float(logic.gap).is_equal(0.0)  # 3 over still matches
+	logic.step(DT, 57.0, 50.0)
+	assert_float(logic.gap).is_equal(0.0)
+	logic.step(DT, 70.0, 50.0)
+	assert_float(logic.gap).is_equal(1.0)  # 10 over: in front of the box
+	logic.step(DT, 50.0, 50.0)
+	assert_float(logic.gap).is_equal(-1.0)  # 10 under: behind it
+	logic.step(DT, 90.0, 50.0)
+	assert_float(logic.gap).is_equal(1.0)
+	logic.step(DT, 20.0, 50.0)
+	assert_float(logic.gap).is_equal(-1.0)
+	logic.step(DT, 67.5, 50.0)  # half way between the tolerance and 10 over
+	assert_float(logic.gap).is_equal_approx(lerpf(CadenceLogic.BOX_EDGE, 1.0, 0.5), 0.001)
+	assert_float(logic.gap).is_greater(logic.band_fraction())  # outside the box
+	logic.step(DT, 60.0, 50.0)
+	assert_float(logic.gap).is_equal(0.0)  # no memory of the ride so far
+
+
+func test_a_stop_is_behind_the_box() -> void:
+	var logic := CadenceLogic.new()
+	logic.step(DT, 0.0, 0.0)
+	assert_float(logic.gap).is_equal(-1.0)
+	assert_bool(logic.in_band).is_false()
+
+
+func test_the_ball_is_inside_the_box_exactly_when_it_scores() -> void:
+	for difficulty in ["easy", "standard", "hard"]:
+		var logic := CadenceLogic.new(difficulty)
+		var tolerance := logic.tolerance
+		logic.step(DT, 60.0 + tolerance, 50.0)
+		assert_bool(logic.in_band).is_true()
+		assert_float(absf(logic.gap)).is_less_equal(logic.band_fraction())
+		logic.step(DT, 60.0 + tolerance + 0.5, 50.0)
+		assert_bool(logic.in_band).is_false()
+		assert_float(absf(logic.gap)).is_greater(logic.band_fraction())
+
+
 func test_points_come_only_inside_the_band_with_a_bonus_tier() -> void:
-	var inside := CadenceLogic.new()
-	_run(inside, 1.0, 84.0)  # 4 rpm off: in the band, not the bonus
-	assert_float(inside.band_sec).is_equal_approx(1.0, 0.02)
-	var outside := CadenceLogic.new()
-	_run(outside, 1.0, 90.0)
-	assert_float(outside.band_sec).is_equal(0.0)
-	var plain := CadenceLogic.new()
-	plain.step(1.0, 84.0, 50.0)
-	assert_float(plain.last_points).is_equal(CadenceLogic.POINTS_PER_SEC)
-	var bonus := CadenceLogic.new()
-	bonus.step(1.0, 81.0, 50.0)
-	assert_float(bonus.last_points).is_equal(CadenceLogic.POINTS_PER_SEC * CadenceLogic.BONUS_FACTOR)
+	var plain := _settled(64.0)  # 4 rpm off: in the band, not the bonus
+	assert_bool(plain.in_band).is_true()
+	assert_bool(plain.in_bonus).is_false()
+	plain.step(1.0, 64.0, 50.0)
+	assert_float(plain.last_points).is_equal(CadenceLogic.POINTS_PER_SEC * plain.streak_multiplier())
+	var bonus := _settled(61.0)
+	assert_bool(bonus.in_bonus).is_true()
+	bonus.step(1.0, 61.0, 50.0)
+	assert_float(bonus.last_points).is_equal(CadenceLogic.POINTS_PER_SEC * CadenceLogic.BONUS_FACTOR * bonus.streak_multiplier())
+	var outside := _settled(70.0)
+	outside.step(1.0, 70.0, 50.0)
+	assert_float(outside.last_points).is_equal(0.0)
 	var stopped := CadenceLogic.new()
 	stopped.step(1.0, 0.0, 0.0)
 	assert_float(stopped.last_points).is_equal(0.0)
@@ -76,12 +122,12 @@ func test_points_come_only_inside_the_band_with_a_bonus_tier() -> void:
 
 func test_the_streak_multiplier_grows_and_a_short_wobble_is_forgiven() -> void:
 	var logic := CadenceLogic.new()
-	var events := _run(logic, 21.0, 80.0)
+	var events := _run(logic, 21.0, 60.0)
 	assert_array(_types(events)).contains(["streak"])
 	assert_float(logic.streak_multiplier()).is_equal(1.5)
-	_run(logic, 0.6, 100.0)  # inside the 1 s grace
+	_run(logic, 0.6, 80.0)  # a short sprint: the gap is still in the band
 	assert_float(logic.streak_sec).is_greater(20.0)
-	events = _run(logic, 1.0, 100.0)
+	events = _run(logic, 2.0, 80.0)  # out of the band for over the 1 s grace
 	assert_array(_types(events)).contains(["band_exit"])
 	assert_float(logic.streak_sec).is_equal(0.0)
 	assert_float(logic.longest_streak).is_greater(20.0)
@@ -90,46 +136,63 @@ func test_the_streak_multiplier_grows_and_a_short_wobble_is_forgiven() -> void:
 
 func test_the_multiplier_stops_at_two() -> void:
 	var logic := CadenceLogic.new()
-	_run(logic, 80.0, 80.0)
+	_run(logic, 60.0, 60.0)
 	assert_float(logic.streak_multiplier()).is_equal(CadenceLogic.STREAK_MULT_MAX)
 
 
 func test_power_well_over_the_cap_freezes_scoring_and_recovers() -> void:
 	var logic := CadenceLogic.new("standard", {"power_cap_watts": 90.0})
-	_run(logic, 1.0, 80.0, 80.0)
+	_run(logic, 1.0, 60.0, 80.0)
 	var scored := logic.band_sec
 	assert_float(scored).is_greater(0.9)
-	var events := _run(logic, 3.0, 80.0, 200.0)  # far over 1.25 × 90 W, smoothed
+	var events := _run(logic, 3.0, 60.0, 200.0)  # far over 1.25 × 90 W, smoothed
 	assert_array(_types(events)).contains(["ease_off"])
 	assert_bool(logic.frozen).is_true()
 	assert_float(logic.band_sec).is_less(scored + 1.5)
-	events = _run(logic, 4.0, 80.0, 50.0)
+	events = _run(logic, 4.0, 60.0, 50.0)
 	assert_array(_types(events)).contains(["recovered"])
 	assert_bool(logic.frozen).is_false()
 
 
 func test_power_a_little_over_the_cap_is_fine() -> void:
 	var logic := CadenceLogic.new("standard", {"power_cap_watts": 90.0})
-	var events := _run(logic, 10.0, 80.0, 108.0)  # under 1.25 × 90 = 112.5
+	var events := _run(logic, 10.0, 60.0, 108.0)  # under 1.25 × 90 = 112.5
 	assert_array(_types(events)).not_contains(["ease_off"])
 
 
 func test_no_cap_never_freezes() -> void:
 	var logic := CadenceLogic.new()
-	_run(logic, 5.0, 80.0, 600.0)
+	_run(logic, 5.0, 60.0, 600.0)
 	assert_bool(logic.frozen).is_false()
 
 
 func test_a_pace_change_waits_for_the_boundary_then_shifts_every_target() -> void:
-	var logic := CadenceLogic.new("standard", {}, "pyramid")
+	var points := [{"t": 0.0, "rpm": 70.0}, {"t": 360.0, "rpm": 90.0}]
+	var logic := CadenceLogic.new("standard", {"cadence_profile": points})
 	var before := logic.target_at(180.0)
 	assert_bool(logic.request_pace(1)).is_true()
 	assert_float(logic.target_at(180.0)).is_equal(before)  # not yet
 	assert_int(logic.pending_adjust).is_equal(5)
 	assert_bool(logic.apply_pending()).is_true()
 	assert_float(logic.target_at(180.0)).is_equal(before + 5.0)
-	assert_int(logic.pace()).is_equal(85)
+	assert_int(logic.pace()).is_equal(65)
 	assert_bool(logic.apply_pending()).is_false()
+
+
+func test_riding_the_pending_pace_does_not_pull_ahead_while_the_change_waits() -> void:
+	var logic := CadenceLogic.new()
+	logic.request_pace(1)  # 60 -> 65, waiting for the boundary
+	_run(logic, 12.0, 65.0)
+	assert_float(logic.gap).is_equal_approx(0.0, 0.01)
+	assert_bool(logic.in_bonus).is_true()
+	logic.apply_pending()
+	_run(logic, 5.0, 65.0)
+	assert_float(logic.gap).is_equal_approx(0.0, 0.01)
+	# A rider who ignores the request and holds the old pace is on the beat too.
+	var holding := CadenceLogic.new()
+	holding.request_pace(1)
+	_run(holding, 12.0, 60.0)
+	assert_float(holding.gap).is_equal_approx(0.0, 0.01)
 
 
 func test_requests_stack_and_stay_in_range() -> void:
@@ -138,7 +201,7 @@ func test_requests_stack_and_stay_in_range() -> void:
 	logic.request_pace(1)
 	assert_int(logic.pending_adjust).is_equal(10)
 	logic.apply_pending()
-	assert_int(logic.pace()).is_equal(90)
+	assert_int(logic.pace()).is_equal(70)
 	for i in 20:
 		logic.request_pace(1)
 	logic.apply_pending()
@@ -152,10 +215,10 @@ func test_requests_stack_and_stay_in_range() -> void:
 
 func test_stats() -> void:
 	var logic := CadenceLogic.new()
-	_run(logic, 6.0, 80.0, 60.0)
-	_run(logic, 4.0, 110.0, 100.0)
+	_run(logic, 6.0, 60.0, 60.0)
+	_run(logic, 4.0, 90.0, 100.0)  # 30 rpm over: out of the band
 	assert_float(logic.pct_in_band()).is_equal_approx(60.0, 1.0)
-	assert_float(logic.avg_cadence()).is_equal_approx(92.0, 0.5)
+	assert_float(logic.avg_cadence()).is_equal_approx(72.0, 0.5)
 	assert_float(logic.avg_power()).is_equal_approx(76.0, 0.5)
 
 
