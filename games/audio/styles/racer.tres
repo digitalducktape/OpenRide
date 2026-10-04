@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_nyw4t"]
+
+[resource]
+script = ExtResource("1_nyw4t")
+name = "racer"
+description = "Upbeat racing electronica: busy breakbeat drums, off-beat bass, stabs and a bright saw lead (Kart Race). Ask for {\"transpose\": 2, \"energy\": 1.0} for the final lap."
+root = 43
+mode = "mixolydian"
+progressions = [[0, 6, 3, 0], [0, 3, 6, 3], [0, 4, 6, 3]]
+b_progressions = [[5, 6, 0, 0], [3, 3, 6, 6]]
+drums = "racer"
+bass = "offbeat"
+harmony = "stabs"
+energy = 0.9
+lead_high = 88
+lead_density = 0.6
+bass_voice = {
+"attack": 0.002,
+"cutoff": 550.0,
+"cutoff_env": 2000.0,
+"decay": 0.1,
+"detune": 8.0,
+"filter_decay": 0.06,
+"gain": 0.42,
+"release": 0.03,
+"sustain": 0.55,
+"wave": "saw",
+"wave2": "square"
+}
+harmony_voice = {
+"attack": 0.003,
+"cutoff": 2400.0,
+"cutoff_env": 1500.0,
+"decay": 0.12,
+"detune": 6.0,
+"filter_decay": 0.06,
+"gain": 0.13,
+"release": 0.04,
+"sustain": 0.35,
+"wave": "saw",
+"wave2": "square"
+}
+lead_voice = {
+"attack": 0.006,
+"cutoff": 3800.0,
+"decay": 0.1,
+"detune": 12.0,
+"gain": 0.14,
+"release": 0.05,
+"sustain": 0.7,
+"vibrato": 0.2,
+"vibrato_rate": 6.0,
+"wave": "saw",
+"wave2": "saw"
+}
+tempo_max = 120.0
+suggested_gates = {
+"drums": 0.2,
+"lead": 0.6
+}

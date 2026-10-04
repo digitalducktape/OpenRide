@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only tools, merged into the debug and debugReal builds (see sourceSets in
+     app/build.gradle.kts), never into release. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Head-tracker bench (#33): live lean/standing readout and fixture recording.
+             Exported so it can be started with `adb shell am start`; debug builds only. -->
+        <activity
+            android:name="dev.digitalducktape.openride.debug.HeadTrackerDebugActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+    </application>
+</manifest>

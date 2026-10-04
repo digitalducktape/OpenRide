@@ -128,7 +128,7 @@ func _simulate(delta: float) -> PackedFloat64Array:
 	f[I_LEAN_X] = _sim_lean_x
 	f[I_LEAN_DEPTH] = _sim_lean_depth
 	f[I_STANDING] = 1.0 if _sim_standing else 0.0
-	f[I_TRACKER_STATE] = TRACKER_TRACKING
+	f[I_TRACKER_STATE] = Session.local_tracker_state()
 	f[I_SEGMENT_TIME_LEFT] = Session.local_time_left()
 	f[I_SENSORS_OK] = 1.0
 	return f

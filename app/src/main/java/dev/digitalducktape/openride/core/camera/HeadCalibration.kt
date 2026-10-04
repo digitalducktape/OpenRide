@@ -1,0 +1,97 @@
+package dev.digitalducktape.openride.core.camera
+
+import java.time.Instant
+import java.time.ZoneId
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * A rider's measured lean extremes, saved per profile and reused while fresh (the same local
+ * day). The centre is deliberately *not* here: it is re-taken at the start of every session
+ * because seating position changes, and an off-centre silent calibration was the spike's worst
+ * failure.
+ *
+ * Extremes are offsets from that session's centre, so they stay valid when the centre moves.
+ * Stored as JSON (see [toJson]) in `Profile.headCalibration`.
+ *
+ * @param leftDx face-x offset (frame widths) of a comfortable lean to the rider's left.
+ * @param rightDx face-x offset of a comfortable lean to the right; opposite sign to [leftDx].
+ * @param inRatio face size when leaning in, over the centre size (> 1). `lean_2d` only.
+ * @param backRatio face size when sat back, over the centre size (< 1). `lean_2d` only.
+ * @param yawMinDeg / [yawMaxDeg] the head yaw seen while the rider held the centre and the leans
+ *   (keypoint estimate). The look-away gate allows this range plus a margin. Null in
+ *   calibrations saved before it existed; the session's centre step then supplies the range.
+ */
+@Serializable
+data class HeadCalibration(
+    val version: Int = CURRENT_VERSION,
+    val leftDx: Double,
+    val rightDx: Double,
+    val inRatio: Double? = null,
+    val backRatio: Double? = null,
+    val calibratedAtEpochMs: Long,
+    val yawMinDeg: Double? = null,
+    val yawMaxDeg: Double? = null,
+) {
+    val hasDepth: Boolean get() = inRatio != null && backRatio != null
+
+    /** Whether these extremes are enough for [mode] without a full calibration. */
+    fun covers(mode: TrackerMode): Boolean = when (mode) {
+        TrackerMode.OFF -> true
+        TrackerMode.LEAN_X, TrackerMode.LEAN_STAND -> true
+        TrackerMode.LEAN_2D -> hasDepth
+    }
+
+    /** Fresh = calibrated on the same local calendar day as [nowEpochMs]. */
+    fun isFreshAt(nowEpochMs: Long, zone: ZoneId): Boolean =
+        Instant.ofEpochMilli(calibratedAtEpochMs).atZone(zone).toLocalDate() ==
+            Instant.ofEpochMilli(nowEpochMs).atZone(zone).toLocalDate()
+
+    fun toJson(): String = json.encodeToString(serializer(), this)
+
+    companion object {
+        const val CURRENT_VERSION = 1
+
+        private val json = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+
+        /**
+         * Parses [text] from `Profile.headCalibration`. Anything missing, malformed or written by
+         * a newer schema reads as null (the rider simply calibrates again), never as an error.
+         */
+        fun fromJson(text: String?): HeadCalibration? {
+            if (text.isNullOrBlank()) return null
+            val parsed = try {
+                json.decodeFromString(serializer(), text)
+            } catch (_: SerializationException) {
+                return null
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
+            return parsed.takeIf { it.version == CURRENT_VERSION }
+        }
+    }
+}
+
+/**
+ * Where [HeadCalibration]s live, per profile. The app keeps them in `Profile.headCalibration`
+ * (JSON via [HeadCalibration.toJson]; [dev.digitalducktape.openride.core.data.ProfileHeadCalibrationStore]);
+ * [InMemoryHeadCalibrationStore] is for tests.
+ */
+interface HeadCalibrationStore {
+    suspend fun load(profileId: Long): HeadCalibration?
+    suspend fun save(profileId: Long, calibration: HeadCalibration)
+}
+
+class InMemoryHeadCalibrationStore : HeadCalibrationStore {
+    private val byProfile = mutableMapOf<Long, HeadCalibration>()
+
+    override suspend fun load(profileId: Long): HeadCalibration? = synchronized(byProfile) { byProfile[profileId] }
+
+    override suspend fun save(profileId: Long, calibration: HeadCalibration) {
+        synchronized(byProfile) { byProfile[profileId] = calibration }
+    }
+}

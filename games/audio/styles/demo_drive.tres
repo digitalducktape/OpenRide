@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_o4ufb"]
+
+[resource]
+script = ExtResource("1_o4ufb")
+name = "demo_drive"
+description = "The demo game's music: a lighter minor-key four-on-the-floor with a pad."
+root = 43
+mode = "dorian"
+progressions = [[0, 3, 0, 6], [0, 4, 3, 6]]
+b_progressions = [[2, 3, 4, 4]]
+bass = "offbeat"
+energy = 0.65
+lead_density = 0.45
+bass_voice = {
+"attack": 0.003,
+"cutoff": 500.0,
+"cutoff_env": 900.0,
+"decay": 0.1,
+"filter_decay": 0.06,
+"gain": 0.42,
+"release": 0.03,
+"sustain": 0.6,
+"wave": "square"
+}
+harmony_voice = {
+"attack": 0.1,
+"cutoff": 1500.0,
+"decay": 0.4,
+"detune": 10.0,
+"gain": 0.13,
+"release": 0.12,
+"sustain": 0.8,
+"wave": "saw",
+"wave2": "saw"
+}
+lead_voice = {
+"attack": 0.01,
+"cutoff": 3000.0,
+"decay": 0.1,
+"gain": 0.18,
+"release": 0.06,
+"sustain": 0.6,
+"vibrato": 0.12,
+"vibrato_rate": 5.0,
+"wave": "pulse"
+}
+tempo_max = 115.0
+suggested_gates = {
+"harmony": 0.5,
+"lead": 0.85
+}

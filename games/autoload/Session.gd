@@ -7,13 +7,23 @@ extends Node
 ## When the `OpenRideBridge` singleton is absent (the editor on a desktop), a LocalSession plays
 ## a local plan instead: a Just Ride of the open game by default. P pauses/resumes, Esc ends the
 ## session; `request_exit()` starts it again.
+##
+## Its `SessionDirector` child runs the session on screen: it loads each segment's game from
+## `GameRegistry`, shows the intro card, HUD, pause, calibration and summary, and reports the
+## game's result (docs/GAMES.md, "The framework").
 
 signal session_started(plan: Dictionary)
 signal segment_started(segment: Dictionary)
 signal segment_ending
 signal session_paused
 signal session_resumed
-signal calibration_progress(step: String, fraction: float)
+## While the head tracker calibrates (InputBus.tracker_state is TRACKER_CALIBRATING).
+## step: "centre", "left", "right", "in" or "back"; fraction: 0..1 through it (restarts on a retry);
+## step_index / step_count: 0-based position in this calibration (1 step when only the centre is
+## re-taken, 3 for lean_x, 5 for lean_2d); attempt: 1, then 2+ on retries; retry_reason: "" on a
+## first attempt, else "unstable", "no_face", "too_small" or "wrong_direction"; "used_default" when
+## the step failed 3 times and calibration moves on with the previous or default value.
+signal calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String)
 signal session_finished(summary: Dictionary)
 
 const BRIDGE := "OpenRideBridge"
@@ -24,6 +34,11 @@ var segment: Dictionary = {}  ## the current segment_started payload
 var summary: Dictionary = {}  ## the session_finished payload, once the session is over
 var active := false  ## between session_started and session_finished
 var paused := false
+var tracker_mode := "off"  ## the last set_tracker_mode
+## The last calibration_progress this session, as {step, fraction, step_index, step_count,
+## attempt, retry_reason, at_msec}; empty before the first.
+var calibration: Dictionary = {}
+var director: SessionDirector
 
 var _bridge: Object = null
 var _local: Node = null
@@ -31,6 +46,8 @@ var _local: Node = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	director = SessionDirector.new()
+	add_child(director)
 	if Engine.has_singleton(BRIDGE):
 		_bridge = Engine.get_singleton(BRIDGE)
 		_bridge.connect("session_started", func(json: String): _on_session_started(_parse(json)))
@@ -44,7 +61,7 @@ func _ready() -> void:
 		_local = LocalSession.new(self)
 		add_child(_local)
 		# Deferred, so every scene's _ready has connected its handlers first.
-		_local.start.call_deferred()
+		_local.autostart.call_deferred()
 
 
 func is_simulated() -> bool:
@@ -69,13 +86,18 @@ func request_calibration(mode: String) -> void:
 	print("OPENRIDE_GAMES -> request_calibration %s" % mode)
 	if _bridge:
 		_bridge.request_calibration(mode)
+	else:
+		_local.request_calibration(mode)
 
 
 ## mode: "off", "lean_x", "lean_2d" or "lean_stand". The camera only runs when not "off".
 func set_tracker_mode(mode: String) -> void:
 	print("OPENRIDE_GAMES -> set_tracker_mode %s" % mode)
+	tracker_mode = mode
 	if _bridge:
 		_bridge.set_tracker_mode(mode)
+	else:
+		_local.set_tracker_mode(mode)
 
 
 func request_pause() -> void:
@@ -117,6 +139,23 @@ func local_time_left() -> float:
 	return _local.time_left() if _local else -1.0
 
 
+## The simulator's tracker_state, for InputBus.
+func local_tracker_state() -> int:
+	return _local.tracker_state() if _local else InputBus.TRACKER_OFF
+
+
+## Whether the head tracker is calibrating right now: Kotlin pauses the session meanwhile.
+func is_calibrating() -> bool:
+	if _local:
+		return _local.is_calibrating()
+	return InputBus.tracker_state == InputBus.TRACKER_CALIBRATING
+
+
+## The current segment's gameplay seconds, pauses excluded (the HUD's count-up clock).
+func played_sec() -> float:
+	return director.played_sec() if director else 0.0
+
+
 # --- Kotlin → Godot (from the bridge, or LocalSession on a desktop) ---
 
 func _on_session_started(new_plan: Dictionary) -> void:
@@ -125,6 +164,7 @@ func _on_session_started(new_plan: Dictionary) -> void:
 	plan = new_plan
 	segment = {}
 	summary = {}
+	calibration = {}
 	active = true
 	paused = false
 	session_started.emit(plan)
@@ -153,8 +193,22 @@ func _on_session_resumed() -> void:
 	session_resumed.emit()
 
 
-func _on_calibration_progress(step: String, fraction: float) -> void:
-	calibration_progress.emit(step, fraction)
+func _on_calibration_progress(step: String, fraction: float, step_index: int, step_count: int, attempt: int, retry_reason: String) -> void:
+	# Progress arrives many times a second: log a step's start, its retries and its end.
+	var starting: bool = calibration.is_empty() or calibration.step != step or calibration.attempt != attempt
+	if starting or (fraction >= 1.0 and calibration.fraction < 1.0):
+		print("OPENRIDE_GAMES <- calibration_progress %s %d/%d attempt %d %s fraction %.2f" % [
+			step, step_index + 1, step_count, attempt, retry_reason, fraction])
+	calibration = {
+		"step": step,
+		"fraction": fraction,
+		"step_index": step_index,
+		"step_count": step_count,
+		"attempt": attempt,
+		"retry_reason": retry_reason,
+		"at_msec": Time.get_ticks_msec(),
+	}
+	calibration_progress.emit(step, fraction, step_index, step_count, attempt, retry_reason)
 
 
 func _on_session_finished(new_summary: Dictionary) -> void:

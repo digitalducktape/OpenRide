@@ -1,18 +1,21 @@
 package dev.digitalducktape.openride.core.data
 
 import android.content.Context
+import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.After
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Verifies [MIGRATION_1_2] (T17/#17 — BLE heart rate: adds `profiles.pairedHrDeviceAddress`
+ * Verifies the migrations, starting with [MIGRATION_1_2] (T17/#17 — BLE heart rate: adds `profiles.pairedHrDeviceAddress`
  * and `ride_samples.heartRateBpm`).
  *
  * Drives the migration directly against a real SQLite database built at the version-1 schema,
@@ -27,8 +30,11 @@ class DatabaseMigrationTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private var helper: SupportSQLiteOpenHelper? = null
 
-    /** Opens a fresh in-memory database created at the version-1 schema (verbatim from 1.json). */
-    private fun openV1Database(): SupportSQLiteDatabase {
+    /**
+     * Opens a fresh database created at the version-1 schema (verbatim from 1.json): in memory,
+     * or in the file [name].
+     */
+    private fun openV1Database(name: String? = null): SupportSQLiteDatabase {
         val callback = object : SupportSQLiteOpenHelper.Callback(1) {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -46,6 +52,7 @@ class DatabaseMigrationTest {
                         "FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) " +
                         "ON UPDATE NO ACTION ON DELETE CASCADE )",
                 )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_rides_profileId` ON `rides` (`profileId`)")
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `ride_samples` (`rideId` INTEGER NOT NULL, " +
                         "`tSec` INTEGER NOT NULL, `cadence` INTEGER NOT NULL, " +
@@ -60,7 +67,7 @@ class DatabaseMigrationTest {
             }
         }
         val config = SupportSQLiteOpenHelper.Configuration.builder(context)
-            .name(null) // in-memory
+            .name(name) // null: in-memory
             .callback(callback)
             .build()
         return FrameworkSQLiteOpenHelperFactory().create(config)
@@ -218,6 +225,122 @@ class DatabaseMigrationTest {
                 listOf("id", "sourceType", "youtubeId", "displayName", "category", "builtIn", "hidden", "position"),
                 columns,
             )
+        }
+    }
+
+    @Test
+    fun `migrate 5 to 6 adds the game columns and an empty game_results table`() {
+        val db = openV1Database()
+        MIGRATION_1_2.migrate(db)
+        MIGRATION_2_3.migrate(db)
+        MIGRATION_3_4.migrate(db)
+        MIGRATION_4_5.migrate(db)
+        db.execSQL(
+            "INSERT INTO profiles (id, name, avatarEmoji, avatarColor, weightKg, ftp) " +
+                "VALUES (1, 'Ed', '🚴', -16711936, 80.0, 220)",
+        )
+        db.execSQL(
+            "INSERT INTO rides (id, profileId, startEpochMs, durationSec, avgCadence, maxCadence, " +
+                "avgPower, maxPower, avgResistance, outputKj, calories, videoId) " +
+                "VALUES (1, 1, 1700000000000, 1800, 85, 100, 150, 300, 45, 270.0, 260, 'abc')",
+        )
+
+        MIGRATION_5_6.migrate(db)
+
+        db.query("SELECT ftp, headCalibration FROM profiles WHERE id = 1").use {
+            assertEquals(true, it.moveToFirst())
+            assertEquals(220, it.getInt(it.getColumnIndexOrThrow("ftp")))
+            assertEquals(true, it.isNull(it.getColumnIndexOrThrow("headCalibration")))
+        }
+        db.query("SELECT videoId, gamePlan FROM rides WHERE id = 1").use {
+            assertEquals(true, it.moveToFirst())
+            assertEquals("abc", it.getString(it.getColumnIndexOrThrow("videoId")))
+            assertEquals(true, it.isNull(it.getColumnIndexOrThrow("gamePlan")))
+        }
+        db.query("PRAGMA table_info(game_results)").use { cursor ->
+            val columns = buildList {
+                while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("name")))
+            }
+            assertEquals(
+                listOf(
+                    "rideId", "segmentIndex", "gameId", "role", "difficulty", "startSec", "durationSec",
+                    "score", "stars", "won", "skipped", "statsJson",
+                ),
+                columns,
+            )
+        }
+
+        // A result cascades away with its ride.
+        db.execSQL("PRAGMA foreign_keys = ON")
+        db.execSQL(
+            "INSERT INTO game_results (rideId, segmentIndex, gameId, role, difficulty, startSec, " +
+                "durationSec, score, stars, won, skipped, statsJson) " +
+                "VALUES (1, 0, 'demo', 'free', 'standard', 0, 1200, 900.0, 2, NULL, 0, '{}')",
+        )
+        db.execSQL("DELETE FROM rides WHERE id = 1")
+        db.query("SELECT COUNT(*) FROM game_results").use {
+            it.moveToFirst()
+            assertEquals(0, it.getInt(0))
+        }
+    }
+
+    @Test
+    fun `migrate 6 to 7 adds the variant column, empty for existing results`() {
+        val db = openV1Database()
+        MIGRATION_1_2.migrate(db)
+        MIGRATION_2_3.migrate(db)
+        MIGRATION_3_4.migrate(db)
+        MIGRATION_4_5.migrate(db)
+        MIGRATION_5_6.migrate(db)
+        db.execSQL(
+            "INSERT INTO profiles (id, name, avatarEmoji, avatarColor, weightKg, ftp) " +
+                "VALUES (1, 'Ed', '🚴', -16711936, 80.0, 220)",
+        )
+        db.execSQL(
+            "INSERT INTO rides (id, profileId, startEpochMs, durationSec, avgCadence, maxCadence, " +
+                "avgPower, maxPower, avgResistance, outputKj, calories, videoId) " +
+                "VALUES (1, 1, 1700000000000, 1800, 85, 100, 150, 300, 45, 270.0, 260, 'abc')",
+        )
+        db.execSQL(
+            "INSERT INTO game_results (rideId, segmentIndex, gameId, role, difficulty, startSec, " +
+                "durationSec, score, stars, won, skipped, statsJson) " +
+                "VALUES (1, 0, 'demo', 'free', 'standard', 0, 1200, 900.0, 2, NULL, 0, '{}')",
+        )
+
+        MIGRATION_6_7.migrate(db)
+
+        db.query("SELECT score, variant FROM game_results").use {
+            assertEquals(true, it.moveToFirst())
+            assertEquals(900.0, it.getDouble(0), 0.0)
+            assertEquals("", it.getString(1))
+        }
+    }
+
+    @Test
+    fun `a version-1 database migrates to the schema Room expects at version 7`() = runTest {
+        val name = "migration-chain-test.db"
+        context.deleteDatabase(name)
+        openV1Database(name).execSQL(
+            "INSERT INTO profiles (id, name, avatarEmoji, avatarColor, weightKg, ftp) " +
+                "VALUES (1, 'Ed', '🚴', -16711936, 80.0, 220)",
+        )
+        helper?.close()
+        helper = null
+
+        // Room validates every table against its entities on open, so a migration that misses
+        // a column, an index or a foreign key fails here.
+        val room = Room.databaseBuilder(context, OpenRideDatabase::class.java, name)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val profile = room.profileDao().getById(1)
+            assertEquals("Ed", profile?.name)
+            assertNull(profile?.headCalibration)
+            assertEquals(emptyList<GameResult>(), room.gameResultDao().getAllOnce())
+        } finally {
+            room.close()
+            context.deleteDatabase(name)
         }
     }
 }

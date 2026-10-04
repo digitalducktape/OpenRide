@@ -1,6 +1,8 @@
 package dev.digitalducktape.openride.ui.profile
 
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import dev.digitalducktape.openride.core.files.OpenRideFileProvider
 import dev.digitalducktape.openride.core.profile.AvatarPhotoStore
 import dev.digitalducktape.openride.ui.common.ProfileAvatar
@@ -55,7 +58,9 @@ import kotlinx.coroutines.withContext
  *
  * The avatar photo comes from the tablet's built-in camera (TakePicture into a
  * FileProvider'd cache file), which [AvatarPhotoStore.importCapture] then center-crops for
- * the circular avatar.
+ * the circular avatar. The app declares CAMERA for the mini-games head tracker, and Android
+ * refuses ACTION_IMAGE_CAPTURE from an app that declares CAMERA without holding it, so the photo
+ * button asks for the permission first when needed.
  */
 @Composable
 fun ProfileEditorScreen(
@@ -95,6 +100,19 @@ fun ProfileEditorScreen(
         }
     }
 
+    fun launchCamera() {
+        try {
+            takePicture.launch(OpenRideFileProvider.uriFor(context, captureFile))
+        } catch (_: ActivityNotFoundException) {
+            cameraError = "No camera app available on this tablet"
+        } catch (_: SecurityException) {
+            cameraError = "OpenRide needs camera access to take a photo"
+        }
+    }
+    val requestCameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) launchCamera() else cameraError = "OpenRide needs camera access to take a photo"
+    }
+
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 32.dp)) {
             // Save/Cancel live in the header, not under the fields: the tablet's on-screen
@@ -131,11 +149,9 @@ fun ProfileEditorScreen(
                     uiState = uiState,
                     cameraError = cameraError,
                     onTakePhoto = {
-                        try {
-                            takePicture.launch(OpenRideFileProvider.uriFor(context, captureFile))
-                        } catch (_: ActivityNotFoundException) {
-                            cameraError = "No camera app available on this tablet"
-                        }
+                        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                            PackageManager.PERMISSION_GRANTED
+                        if (granted) launchCamera() else requestCameraPermission.launch(Manifest.permission.CAMERA)
                     },
                     onRemovePhoto = viewModel::onPhotoRemoved,
                     onColorSelected = viewModel::onAvatarColorChange,

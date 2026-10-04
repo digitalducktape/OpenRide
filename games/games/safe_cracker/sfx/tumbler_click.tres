@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_sfx"]
+
+[resource]
+script = ExtResource("1_sfx")
+wave = 5
+attack = 0.001
+sustain = 0.004
+decay = 0.05
+highpass = 900.0
+lowpass_start = 5000.0
+lowpass_end = 2500.0
+repeats = 2
+repeat_gap = 0.07
+volume = 0.45

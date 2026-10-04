@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.digitalducktape.openride.ui.theme.OpenRideColors
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -32,9 +34,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dev.digitalducktape.openride.AppContainer
+import kotlinx.coroutines.flow.map
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesScreen
 import dev.digitalducktape.openride.ui.classes.ClassesViewModel
+import dev.digitalducktape.openride.ui.games.GamesScreen
+import dev.digitalducktape.openride.ui.games.GamesViewModel
 import dev.digitalducktape.openride.ui.history.HistoryScreen
 import dev.digitalducktape.openride.ui.history.HistoryViewModel
 import dev.digitalducktape.openride.ui.home.HomeScreen
@@ -44,11 +49,12 @@ import dev.digitalducktape.openride.ui.navigation.MainTabs
 import dev.digitalducktape.openride.ui.profile.ProfileTabScreen
 import dev.digitalducktape.openride.ui.profile.ProfileTabViewModel
 
-private data class TabSpec(val route: String, val label: String, val icon: ImageVector)
+private data class TabSpec(val route: String, val label: String, val icon: ImageVector, val emoji: String? = null)
 
 private val TABS = listOf(
     TabSpec(MainTabs.Home, "Home", Icons.Filled.Home),
     TabSpec(MainTabs.Classes, "Classes", Icons.Filled.PlayArrow),
+    TabSpec(MainTabs.Games, "Games", Icons.Filled.Star, emoji = "\uD83C\uDFAE"),
     TabSpec(MainTabs.History, "History", Icons.Filled.DateRange),
     TabSpec(MainTabs.Profile, "Profile", Icons.Filled.Person),
 )
@@ -105,6 +111,7 @@ fun MainScaffold(
                     viewModel = viewModel,
                     onQuickStart = { outerNavController.navigate(Destinations.InRide) },
                     onOpenProfile = { navigateToTab(MainTabs.Profile) },
+                    onOpenGames = { navigateToTab(MainTabs.Games) },
                     updateVersionName = availableUpdate?.versionName?.takeUnless { bannerDismissed },
                     onOpenUpdate = { outerNavController.navigate(Destinations.AppUpdate) },
                     onDismissUpdate = { appContainer.dismissUpdateBanner() },
@@ -129,6 +136,28 @@ fun MainScaffold(
                     onOpenCreator = { sourceId ->
                         outerNavController.navigate(Destinations.creator(sourceId))
                     },
+                )
+            }
+            composable(MainTabs.Games) {
+                val viewModel: GamesViewModel = viewModel(
+                    factory = viewModelFactory {
+                        GamesViewModel(
+                            catalog = dev.digitalducktape.openride.games.session.GameCatalog.DEFAULT,
+                            settingsStore = appContainer.gamesSettings,
+                            activeProfileId = appContainer.activeProfileHolder.activeProfileId,
+                            profileFtp = { id ->
+                                appContainer.profileRepository.observeProfiles().map { list -> list.firstOrNull { it.id == id }?.ftp }
+                            },
+                            personalBests = { id -> appContainer.gameResultDao.observePersonalBests(id) },
+                            circuitBest = { id, planId, difficulty ->
+                                appContainer.gameResultDao.planBest(id, planId, difficulty.name.lowercase(), -1L)
+                            },
+                        )
+                    },
+                )
+                GamesScreen(
+                    viewModel = viewModel,
+                    onEditProfile = { outerNavController.navigate(Destinations.ProfileEdit) },
                 )
             }
             composable(MainTabs.History) {
@@ -197,7 +226,9 @@ fun MainScaffold(
                 NavigationBarItem(
                     selected = currentRoute == tab.route,
                     onClick = { navigateToTab(tab.route) },
-                    icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
+                    icon = {
+                        if (tab.emoji != null) Text(tab.emoji, fontSize = 24.sp) else Icon(imageVector = tab.icon, contentDescription = tab.label)
+                    },
                     label = { Text(text = tab.label) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,

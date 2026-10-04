@@ -9,6 +9,7 @@ import dev.digitalducktape.openride.core.export.CsvExporter
 import dev.digitalducktape.openride.core.export.TcxExporter
 import dev.digitalducktape.openride.core.ride.FtpEstimator
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.games.session.GameLabels
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,14 @@ class RideSummaryViewModel(
     private val _samples = MutableStateFlow<List<RideSample>>(emptyList())
     val samples: StateFlow<List<RideSample>> = _samples.asStateFlow()
 
+    private val _gameResults = MutableStateFlow<List<GameLabels.ResultRow>>(emptyList())
+    /** A game session's segment results (#35), ready to show; empty for any other ride. */
+    val gameResults: StateFlow<List<GameLabels.ResultRow>> = _gameResults.asStateFlow()
+
+    private val _gameBadge = MutableStateFlow<String?>(null)
+    /** "Demo · 20 min" for a game ride, else null. */
+    val gameBadge: StateFlow<String?> = _gameBadge.asStateFlow()
+
     private val _suggestedFtp = MutableStateFlow<Int?>(null)
     /** Suggested FTP in watts, or `null` if the ride is shorter than 20 minutes. */
     val suggestedFtp: StateFlow<Int?> = _suggestedFtp.asStateFlow()
@@ -46,6 +55,8 @@ class RideSummaryViewModel(
     suspend fun load() {
         _ride.value = rideRepository.getRide(rideId)
         _samples.value = rideRepository.getSamples(rideId)
+        _gameBadge.value = GameLabels.planBadge(_ride.value?.gamePlan)
+        _gameResults.value = GameLabels.resultRows(rideRepository.getGameResults(rideId))
         _suggestedFtp.value = FtpEstimator.estimateFtp(_samples.value)
     }
 

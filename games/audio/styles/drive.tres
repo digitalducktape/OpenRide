@@ -1,0 +1,89 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_d0s0b"]
+
+[resource]
+script = ExtResource("1_d0s0b")
+name = "drive"
+description = "Energetic minor key, driving four-on-the-floor sampled drums, pumping eighth-note sampled bass, saw stabs and a sampled lead (Dodge Ball)."
+progressions = [[0, 5, 2, 6], [0, 6, 5, 6], [0, 3, 5, 4]]
+b_progressions = [[5, 6, 0, 0], [3, 4, 5, 6]]
+harmony = "stabs"
+energy = 0.85
+lead_low = 69
+lead_high = 86
+lead_density = 0.55
+bass_voice = {
+"attack": 0.003,
+"cutoff": 500.0,
+"cutoff_env": 1800.0,
+"decay": 0.1,
+"filter_decay": 0.07,
+"gain": 0.5,
+"release": 0.03,
+"sample": "res://audio/samples/tone_bass_d2.wav",
+"sample_hz": 73.5,
+"sustain": 0.65,
+"wave": "saw"
+}
+harmony_voice = {
+"attack": 0.003,
+"cutoff": 2400.0,
+"cutoff_env": 1500.0,
+"decay": 0.12,
+"detune": 6.0,
+"filter_decay": 0.06,
+"gain": 0.13,
+"release": 0.04,
+"sustain": 0.35,
+"wave": "saw",
+"wave2": "square"
+}
+lead_voice = {
+"attack": 0.006,
+"cutoff": 2600.0,
+"cutoff_env": 2500.0,
+"decay": 0.14,
+"filter_decay": 0.12,
+"gain": 0.2,
+"release": 0.08,
+"sample": "res://audio/samples/tone_lead_a4.wav",
+"sample_hz": 441.0,
+"sustain": 0.55,
+"wave": "square"
+}
+drum_samples = {
+"gain": 0.9,
+"hat": "res://audio/samples/hat_closed.wav",
+"kick": "res://audio/samples/kick_punchy.wav",
+"open_hat": "res://audio/samples/hat_open.wav",
+"snare": "res://audio/samples/snare_crack.wav"
+}
+stem_fx = {
+"bass": {
+"comp_ratio": 3.0,
+"comp_threshold": 0.5,
+"drive": 0.25,
+"highpass": 35.0
+},
+"drums": {
+"comp_ratio": 4.0,
+"comp_release": 0.06,
+"comp_threshold": 0.45,
+"drive": 0.15
+},
+"harmony": {
+"highpass": 180.0,
+"lowpass": 5000.0
+},
+"lead": {
+"highpass": 250.0,
+"comp_ratio": 2.5,
+"comp_threshold": 0.6
+}
+}
+tempo_max = 115.0
+suggested_gates = {
+"harmony": 0.3,
+"lead": 0.8
+}

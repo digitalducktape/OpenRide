@@ -16,6 +16,9 @@ import androidx.room.PrimaryKey
  * @param videoId the YouTube video this ride played in the in-app class player (v2), or
  *   `null` for a plain Quick Start ride. Drives the Classes tab's "taken on …" badges.
  *   Added in schema version 3 ([MIGRATION_2_3]).
+ * @param gamePlan the mini-games session plan this ride recorded (#35), e.g.
+ *   `just-ride:demo:minutes:20` or `circuit-20`, or `null` for any other ride. Its per-segment
+ *   results are [GameResult] rows. Added in schema version 6 ([MIGRATION_5_6]).
  */
 @Entity(
     tableName = "rides",
@@ -42,4 +45,5 @@ data class Ride(
     val outputKj: Double,
     val calories: Int?,
     val videoId: String? = null,
+    val gamePlan: String? = null,
 )

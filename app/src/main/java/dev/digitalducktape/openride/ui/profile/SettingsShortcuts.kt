@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import dev.digitalducktape.openride.games.GameHostActivity
 
 /**
  * Quick access to stock Android settings from within the app (PRD user story: "I want to
@@ -30,11 +29,6 @@ fun SettingsShortcutsRow(modifier: Modifier = Modifier) {
         }
         OutlinedButton(onClick = { launchSettings(context, Settings.ACTION_SETTINGS) }) {
             Text("Device Settings")
-        }
-        // Mini-games foundation (#32): a way into the Godot host until the Games hub (#38)
-        // replaces it with a real tab.
-        OutlinedButton(onClick = { context.startActivity(GameHostActivity.intent(context)) }) {
-            Text("Mini-games (preview)")
         }
     }
 }

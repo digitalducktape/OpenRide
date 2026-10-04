@@ -8,21 +8,30 @@ game and every builder depends on:
 
 - the **Bridge contract** between Kotlin and Godot, which is the source of truth from here on;
 - how the engine is hosted;
-- how to build, run and debug the games.
+- the **framework** every game is built on, and how to add a game;
+- the **AudioDirector** interface the audio generators plug into;
+- how to build, run, test and debug the games.
 
 ## Layout
 
 | Where | What |
 | --- | --- |
 | `games/` | The Godot 4.7.2 project (Compatibility renderer, 1920x1080, landscape) |
-| `games/Main.tscn` | Main scene. For now it is a placeholder that shows the live input frame and drives the session lifecycle by hand. The framework (#34) replaces it. |
+| `games/Main.tscn` | The idle scene: shown before a session's first game loads and behind the summary |
 | `games/autoload/InputBus.gd` | Polls the input frame every frame, or runs the keyboard simulator |
-| `games/autoload/Session.gd` | Session signals and methods, with JSON already parsed. On a desktop, `LocalSession.gd` plays a local plan. |
-| `games/tests/` | Headless checks (not exported) |
+| `games/autoload/Session.gd` | Session signals and methods, with JSON already parsed. Its `SessionDirector` child runs the session on screen. On a desktop, `LocalSession.gd` plays a local plan. |
+| `games/autoload/Effort.gd` | Scoring with the effort multiplier: games award points only through it |
+| `games/autoload/AudioDirector.gd` | Buses, music stems, effects and cues; the generators (#36) register with it |
+| `games/framework/` | `Game` (the base class), `GameInfo` (declarations), `SessionDirector`, `EffortMeter`, `Stars`, the HUD kit (`hud/`) and the intro card, pause, calibration and summary screens (`ui/`) |
+| `games/audio/` | Generated audio (#36): `SfxSynth` effects, `MusicGen` music, the styles, and `Cues.gd`, which registers them with `AudioDirector`. See "Generated audio". |
+| `games/games/` | One folder per game, and `Registry.gd`, which lists them. `demo/` is the reference game. |
+| `games/tests/unit/` | GdUnit4 suites (not exported) |
+| `games/tests/sim_*.gd` | Headless desktop playthroughs (not exported) |
+| `games/addons/gdUnit4/` | GdUnit4 6.2.1 (MIT), vendored for the tests (not exported) |
 | `games/assets/SOURCES.md` | Source, author and licence of every asset |
 | `app/.../games/GameHostActivity.kt` | Hosts the engine |
 | `app/.../games/bridge/` | The `OpenRideBridge` plugin, the app-scoped `GameBridge`, the input frame and the JSON messages |
-| `app/.../games/session/StubGameSession.kt` | Walks a plan over the bridge without recording anything, until `GameSessionManager` (#35) replaces it |
+| `app/.../games/session/` | `GameSessionManager` (runs and records sessions), `SessionPlan` and its builders, `GameCatalog` (Kotlin's copy of each game's declarations), `GameAudioPrefs` |
 
 Games talk to Kotlin only through the `InputBus` and `Session` autoloads, never through the
 `OpenRideBridge` singleton directly.
@@ -53,6 +62,10 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 
 - `session_started(plan_json)`: `{kind: circuit | just_ride, plan_id, difficulty, total_sec,
   segments:[{game_id, role, duration_sec}]}`. Sent once; it drives the circuit progress strip.
+  `total_sec` includes every intro card, and is `-1` for an open-ended plan.
+  - `rider_id`: the active rider's profile id, or null with no active rider. It was added after
+    v1 shipped and is optional; games use it only to remember their options per rider
+    (`GameOptions`).
 - `segment_started(segment_json)`: `{index, count, game_id, duration_sec, intro_sec, end_mode, role,
   difficulty, effort, seed, audio:{music, music_volume, sfx_volume}, params:{…}}`.
   - `intro_sec`: Godot shows the intro card for this long (10 s in circuits and at session start),
@@ -69,19 +82,50 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
   - `params` are game-specific and already scaled to FTP and difficulty by Kotlin.
 - `segment_ending()`: the timer ran out. The game must call `segment_finished` within 5 s, or Kotlin
   records a zero-score result.
-- `session_paused()`, `session_resumed()`: from auto-pause on freewheel or a rider's pause request.
-- `calibration_progress(step, fraction)`: drives the calibration UI.
+- `session_paused()`, `session_resumed()`: from auto-pause on freewheel, a rider's pause request,
+  or a running calibration. Kotlin pauses the session for any calibration (the automatic one,
+  a requested one or the depth one) from its start until it completes, falls back
+  (`used_default`) or ends unavailable, then resumes by itself. The ride keeps recording through
+  a calibration pause. A rider's pause outlasts a calibration that ends under it.
+- `calibration_progress(step, fraction, step_index, step_count, attempt, retry_reason)`: drives the
+  calibration UI, sent as the head tracker's calibration advances (while `tracker_state` is 2).
+  - `step` ∈ `centre | left | right | in | back`: the pose to hold ("sit centred", "lean
+    left", "lean right", and for `lean_2d` "lean in", "sit back").
+  - `fraction`: 0..1 through the current step. It restarts from 0 on a retry.
+  - `step_index`, `step_count`: the step's 0-based position in this calibration. `step_count`
+    is 1 when only the centre is re-taken (the rider's extremes from earlier today are reused),
+    3 for `lean_x` and 5 for `lean_2d`.
+  - `attempt`: 1 for the first try at this step, then 2, 3… on retries.
+  - `retry_reason`: `""` on a first attempt, otherwise why the step is repeated: `unstable`
+    (hold still), `no_face` (look at the screen), `too_small` (lean a bit further) or
+    `wrong_direction`.
+  - `used_default`: the step failed 3 times, so it won't be retried again. Calibration uses the
+    rider's previous value for it (or a default lean) and moves on after this is shown for 1.5 s
+    (`fraction` counts through that). Say so, e.g. "Using your usual lean — recalibrate any
+    time". No-face failures don't count towards this: two of those end calibration as
+    unavailable, as before.
+  - Calibration has ended when `tracker_state` leaves 2: 3 (tracking) on success, or 0 when the
+    camera is unavailable (no face found after two tries).
 - `session_finished(summary_json)`: `{ride_id, results:[…], totals, bests:{…}}`, sent after Kotlin has
   saved the ride. Godot shows the summary, then calls `request_exit()`.
+  - `ride_id` is null when nothing was recorded (no active rider, or another ride in progress).
+  - `results` are the `segment_finished` payloads in plan order, with zero results for games
+    that didn't report.
+  - `totals`: `{score, stars, segments, elapsed_sec}`; `elapsed_sec` is the ride's duration.
+  - `bests`: `{"score": true}` and/or `{"stars": true}` when the session's total beat the rider's
+    best at the same plan and difficulty (a first scoring session counts); `{}` otherwise.
 
 **Godot → Kotlin methods:**
 
 - `segment_finished(result_json)`: `{game_id, score, stars (0-3), won (bool|null), skipped (bool),
-  stats:{effort_avg, …}}`. A skip is reported as `skipped: true` during the intro card; Kotlin then
+  stats:{effort_avg, …}, variant}`. `variant` is optional (`""`): a game's own variant, such as
+  Dodge Ball's `catch` mode. A skip is reported as `skipped: true` during the intro card; Kotlin then
   advances to the next segment.
-- `request_calibration(mode)`: `mode` ∈ `lean_x | lean_2d`.
+- `request_calibration(mode)`: `mode` ∈ `lean_x | lean_2d`. The rider asked to recalibrate:
+  every step runs again.
 - `set_tracker_mode(mode)`: `off | lean_x | lean_2d | lean_stand`, sent by `Session` from each game's
-  declaration. The camera only runs when not `off`.
+  declaration. The camera only runs when not `off`. The first camera mode of a session starts a
+  calibration by itself (see "Head tracker" below).
 - `request_pause()`, `request_resume()`: the rider's pause button.
 - `request_end()`: the rider ends the session (early, or an open-ended Just Ride). Kotlin stops and saves
   the ride, then sends `session_finished`.
@@ -95,22 +139,34 @@ synthesises frames from the keyboard and `Session` plays a local plan (a Just Ri
 depth, `+`/`-` = cadence, `[`/`]` = resistance, Space = stand, P = pause, Esc = end session. Every game must be fully
 playable this way.
 
+**Head tracker** (`core/camera/`, #33), as the bridge sees it:
 
-### Proposed additions (pending spec update)
+- Fields 6-9 always show the tracker's latest state. They read `0`, with `tracker_state` 0 (off),
+  whenever the camera isn't running.
+- Every session starts by forgetting the last session's centre. The centre is re-taken in every
+  session, because a silently off-centre calibration was the camera spike's worst failure.
+- The first `set_tracker_mode` with a camera mode in a session starts a calibration at once
+  (`tracker_state` 2). It re-takes only the centre (3 s) if the rider's lean extremes were
+  measured earlier the same day, otherwise every step (about 8 s for `lean_x`). Later camera
+  games in the session track straight away.
+- `lean_2d` games that want depth call `request_calibration("lean_2d")`, unless depth was
+  calibrated earlier. Without depth extremes `lean_depth` reads 0 and left/right still work.
+- A calibration can't run away: each step gets at most 3 attempts before it falls back
+  (`used_default`). The worst case for `lean_x` is about 28 s. The fallback values are used but
+  never saved as the rider's.
+- The camera stops when the session finishes or the rider leaves games.
+- Face lost: the lean holds for 0.5 s, then eases to centre, and `tracker_state` becomes 4 after 3 s.
+- Looking away counts as face lost. The detector often keeps the face when the rider turns the head
+  from the screen. So a face frame counts as turned away when either:
+  - its yaw is more than 25° outside the range seen during calibration (turning right), or
+  - its pitch estimate is more than 20° above the calibrated centre (turning left distorts
+    the keypoints this way instead).
 
-These come from the HeadTracker work (#33). They are **not part of v1 yet**. The foundation
-does not implement them, and nothing may depend on them until the contract above is edited to
-include them.
-
-- `calibration_progress(step, fraction)` sends `step` as a string: `centre`, `left`, `right`,
-  `in` or `back`.
-- It should also carry:
-  - `step_index`
-  - `step_count`
-  - `attempt`
-  - `retry_reason`: `unstable`, `no_face`, `too_small` or `wrong_direction`
-
-Until the HeadTracker is wired in, bridge fields 6-9 read `0` and `tracker_state` reads `0` (off).
+  A face more than 0.1 of the frame height below the centre is exempt, so looking down at the
+  bike doesn't count. When 60% of the last 500 ms of face frames are turned away, steering
+  holds and eases to centre, and `tracker_state` becomes 4 as above. It resumes once the rider
+  has faced the screen for 300 ms.
+  Standing needs 0.5 s to enter and 1.5 s to leave.
 
 ### Implementation notes
 
@@ -119,7 +175,7 @@ These describe how the foundation (#32) implements v1. They don't change the con
 - **Wire format.** Each JSON payload is one `String` argument, and `Session` parses and
   stringifies it. Godot's JSON parser returns every number as a float (`1.0`), so Kotlin
   accepts whole numbers written either way (`"stars": 3.0`).
-  - `calibration_progress` is `(String, float)`.
+  - `calibration_progress` is `(String, float, int, int, int, String)`.
   - Plugin method names are the contract's snake_case names.
 - **Readiness.** The contract has no "ready" method. Kotlin sends `session_started` after the
   first `get_input_frame()` poll once a session is attached. By then the autoloads' `_ready`
@@ -135,9 +191,10 @@ These describe how the foundation (#32) implements v1. They don't change the con
   - It never quits (`application/config/quit_on_go_back=false`).
   - During a session it calls `request_pause()`.
   - After the summary it calls `request_exit()`.
-- **The stub.** Until #35, `StubGameSession` plays an open-ended Just Ride of the `placeholder`
-  game. It sends `ride_id: null` and records nothing. `request_calibration` and
-  `set_tracker_mode` are logged, not acted on.
+- **The session engine** is `GameSessionManager` (app-scoped, #35). Its tracker commands go
+  through `TrackerLink` (`games/bridge/`). See "Sessions and recording" below.
+- **Head-tracker fields** come from `AppContainer.headTracker` on every poll
+  (`HeadTrackerState.toTrackerReading()`).
 
 ## Hosting the engine
 
@@ -146,6 +203,13 @@ These describe how the foundation (#32) implements v1. They don't change the con
 - It is landscape, keeps the screen on and hides the system bars.
 - It loads the pack with `--main-pack res://games.pck`.
 - It registers the `OpenRideBridgePlugin` host plugin (`Engine.get_singleton("OpenRideBridge")`).
+- No Godot splash (#45). `games/project.godot` turns the boot splash image off and sets its
+  colour and the default clear colour to the app background (`#0C0C0E`). The host's theme
+  (`Theme.OpenRide.GameHost`) uses the same window background. On the engine's first start,
+  `GameHostActivity` covers it with a plain "Loading game…" view, which it removes in
+  `onGodotMainLoopStarted` (the main scene is loaded and about to draw). Re-entry skips it,
+  because the engine is already running. Cold entry on the bike takes about 4.8–5 s from tap to
+  the main scene, with or without the view.
 
 **Godot runs one engine per process, and it can't be restarted.** This was checked on the bike
 (Godot 4.7.2). Finishing the host activity destroys the engine. Godot then calls
@@ -173,9 +237,528 @@ So the foundation uses the spec's fallback: **the host stays alive for the app's
 The `OpenRideApplication` owns the `AppContainer`, so the games host shares the app's database,
 sensor binding and ride session.
 
+`GameHostActivity.intent(context, request)` starts games with a `SessionRequest` (a Just Ride
+or a circuit, and a difficulty). Each entry calls `GameSessionManager.begin(request)` and
+attaches it to the bridge. A session still running when games are entered again is finished
+and its ride saved first.
+
+## Sessions and recording
+
+`GameSessionManager` (`app/.../games/session/`, #35) is the Kotlin side of every session. It
+is app-scoped, so a ride is saved even after the host has gone to the back.
+
+**Plans.** When Godot is ready, it turns the request into a `SessionPlan` with the active
+rider's FTP (`SessionPlans`):
+
+| Request | Plan (`plan_id`, also `Ride.gamePlan`) | Segment |
+| --- | --- | --- |
+| Just Ride, timed N min | `just-ride:<game>:minutes:<N>` | `role: free`, N × 60 s, the game's `timedEndMode` (normally `timer`) |
+| Just Ride, N rounds | `just-ride:<game>:rounds:<N>` | `role: free`, N × the game's `roundSec`, `end_mode: game`, `params.rounds = N` |
+| Just Ride, open-ended | `just-ride:<game>:open` | `role: free`, `duration_sec: -1`, `end_mode: game` |
+| Circuit | `circuit-20`, `circuit-30`, `circuit-45` | the preset's slots (`CircuitPresets`), `end_mode: timer` |
+
+- Lengths are clamped to the game's limits; a mode the game doesn't support is refused.
+- Circuit presets are data. Until a preset's games exist, their slots play the demo (#37).
+- `effort` is true for work segments, and for Just Rides of games declaring
+  `effort_in_just_ride`.
+- Kotlin keeps its own copy of each game's declarations in `GameCatalog`. **Adding a game
+  means adding its `GameDeclaration` there too**, matching its `info()`.
+
+**Params.** Every segment's `params` carry `ftp_watts` and `ftp_is_default` (true when the
+rider has no FTP, so 150 W was used and the hub should nudge), plus one power figure:
+
+- work, and Just Rides of work games: `target_watts` = 90 / 105 / 120 % of FTP for easy /
+  standard / hard;
+- recovery: `power_cap_watts` = 60 % of FTP; warm-up and cool-down: 65 %. Difficulty never
+  moves a cap. Recovery games use their own params for difficulty.
+
+Game-specific params come from the game's `GameDeclaration.params` (the demo sends
+`cadence_floor`).
+
+**Audio.** `segment.audio` is decided at each segment's start from `GameAudioPrefs`, so music
+the rider starts or stops mid-session counts from the next segment. With game music on "auto"
+(the default), `music` is false while another app's music plays. Effects always play.
+
+- `AudioManager.isMusicActive()` alone can't tell, because Godot's own media player keeps it
+  true, and API 29-34 don't say which app a player belongs to (`getClientUid()` is a hidden
+  system API).
+- So `OtherMusicDetector` tells players apart by identity. The players that exist before the
+  engine starts are other apps'. Those that appear in the next 10 s are the engine's.
+- Known limit: another app's paused player still counts as its music while it exists. The hub (#38) will store the setting and volumes; until then the defaults apply.
+
+**Recording.** The ride goes through the app's own `RideSessionManager`, so it is an ordinary
+ride in History, exports and backups:
+
+- It starts when the session starts and records through intro cards.
+- Freewheel auto-pause applies. A rider's pause (`request_pause`) pauses the ride too. Either
+  kind freezes the session clock and sends `session_paused` / `session_resumed`.
+- A session with under a minute of gameplay (intro cards don't count), or with no pedalling
+  at all, is discarded rather than saved, and `session_finished` carries `ride_id: null`.
+  Normal rides have no such rule: they're only ever ended deliberately.
+- Otherwise, when the session finishes, the ride is saved with `gamePlan`, then one `game_results` row
+  per segment (`startSec` on the session clock, `durationSec` of gameplay). Then the ride
+  manager returns to idle, so the app's next ride can start.
+- `GameResultDao` answers personal bests per rider (per game, plan and difficulty), the
+  household leaderboard per game, and a plan's best session. Skipped segments never count.
+- The ride summary lists each segment's result, and History shows a game badge.
+- Room schema 6 adds these (`MIGRATION_5_6`), with `Profile.headCalibration` for the head
+  tracker's saved extremes.
+
 The Godot AAR declares androidx `FileProvider` at `${applicationId}.fileprovider`, and Godot's
 `GodotIO` hard-codes that authority. So the app's own provider is the `OpenRideFileProvider`
 subclass at `${applicationId}.files`, and each provider keeps its own paths file.
+
+## The framework
+
+Every game is a scene whose root extends `Game`. The framework (#34) does everything around it,
+so a game only plays. None of this changes the Bridge contract.
+
+### A session on screen
+
+`Session`'s child `SessionDirector` (`games/framework/SessionDirector.gd`) listens to
+`Session`'s signals:
+
+1. **`session_started`**: it clears the last session (the engine is reused, see above).
+2. **`segment_started`**: it does the following, in order.
+   - It loads `GameRegistry`'s scene for `game_id` and makes it the current scene. An unknown
+     `game_id` is reported as skipped.
+   - It calls `set_tracker_mode` with the game's `tracker_mode`. The session's first camera
+     mode starts the calibration on the Kotlin side (see "Head tracker"), so Godot doesn't
+     request one then: a `request_calibration` would force a second, full run. Godot asks only
+     when a `lean_2d` game follows a session calibrated for `lean_x` alone (depth needs its own
+     extremes), and when the rider taps to recalibrate.
+   - It starts the segment in `Effort` and `AudioDirector` (`segment.effort`, `segment.audio`).
+   - It calls `game.prepare(segment)`, then shows the **intro card** for `intro_sec`. The card
+     shows "Up next", the role, the game's `how_to` and `target_text()`, the previous result,
+     and a countdown ending 3-2-1.
+3. **Skipping**: the card's "Skip this game" button skips the game (`segment_finished` with
+   `skipped: true`). It shows only when another segment follows: skipping the last one would end
+   the session, so a one-segment Just Ride never offers it. Any other touch on the card does
+   nothing. On the bike, a touch on the countdown used to skip a timed Just Ride's only
+   segment, which ended the workout.
+   - **Only End, then its confirmation, ends a session.** Every touchable screen follows this:
+     the intro card, calibration (a tap only recalibrates, and never mid-run), the pause screen,
+     the open-ride "Game over" panel (its End asks first) and the summary (Done leaves only
+     after the ride is saved). `intro_touch_test.gd` pushes real touches at each of them.
+4. **Gameplay**: the HUD shows, `Effort` starts scoring, and it calls `game.start(segment)`.
+   `end_mode: game` games end themselves (`end_segment()`). Open-ended segments count the timer
+   up, and the game runs until Kotlin ends the session.
+5. **`segment_ending`**: it calls `game.request_finish()`, and the game has 5 s to call
+   `end_segment()`. After 4.5 s the director reports for it. A `segment_ending` during the intro
+   card reports the game as skipped.
+6. **The result**: this is `game.finish()`, with `stars` from the game's thresholds.
+   `segment_finished` then goes to Kotlin. When an open-ended plan's last game ends, it offers
+   **End session**.
+7. **Pause**: while the head tracker calibrates, the session is paused (see the contract) and
+   the calibration screen stands in for the pause screen, with no pause or resume cue. The
+   intro card's countdown waits for the session's first calibration.
+   Otherwise `session_paused` shows the pause screen (Resume, End session) and freezes the
+   game, whether the rider paused or Kotlin auto-paused. The HUD's Pause button calls
+   `request_pause`/`request_resume`. Its End button, and the pause screen's, ask for
+   confirmation, then call `request_end`.
+8. **`session_finished`**: it goes back to the idle scene, sets the tracker off, and shows the
+   **summary**: each segment's result and stars, the totals, and any bests. Its **Done** button
+   (or Android back) calls `request_exit`. Circuit mode (#37) adds its sections with
+   `SummaryScreen.add_section()`.
+
+### Adding a game
+
+A game is **one folder and one registry line**:
+
+1. Create `games/games/<game_id>/` with a scene whose root node's script extends `Game`.
+   `games/games/demo/` is the reference: `Demo.tscn`, `Demo.gd` (the scene) and `DemoLogic.gd`
+   (the rules).
+2. Add `"<game_id>": "res://games/<game_id>/<Name>.tscn"` to `GameRegistry.GAMES` in
+   `games/games/Registry.gd`.
+
+`registry_test.gd` then checks that the game loads and that its declarations are valid. The
+game is also playable on the desktop: run its scene with F6, or play the project.
+
+**Declarations.** `info()` returns a `GameInfo`:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `title`, `how_to` | The registry key; the name on cards and the summary; a one-line how-to for the intro card |
+| `supports` | Just Ride modes: any of `rounds`, `minutes`, `open` |
+| `min_sec`, `max_sec`, `min_rounds`, `max_rounds` | Duration limits |
+| `roles` | Circuit roles it can fill: `warmup`, `work`, `recovery`, `cooldown` |
+| `tracker_mode` | `off`, `lean_x`, `lean_2d` or `lean_stand`. `Session` sets it for the segment. |
+| `effort_in_just_ride` | Whether the effort multiplier applies in a Just Ride |
+| `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
+| `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
+| `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
+| `options` | The game's own settings, shown in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings. See "Game options". |
+
+For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
+1.0× must stay short of 3 stars (epic #31). `demo_logic_test.gd` checks this for the demo.
+
+**Hooks.** A game overrides the ones it needs. It never overrides `_process`.
+
+| Hook | When |
+| --- | --- |
+| `_on_prepare(segment)` | The scene is loaded and the intro card shows. `segment`, `params`, `difficulty`, `rng` (seeded from `seed`) and `hud` are set. Build the level, add HUD widgets, ask for music. |
+| `_on_start()` | Gameplay begins |
+| `_on_frame(delta)` | Every gameplay frame while not paused. Read `InputBus`. |
+| `_on_pause()`, `_on_resume()` | The scene's processing is also frozen while paused |
+| `_on_option_changed(key, value)` | The rider changed one of the game's options on the pause screen; `option(key)` already returns the new value |
+| `_on_finish_requested()` | The timer ran out: wrap up and call `end_segment()` within 5 s. By default the game ends at once. |
+| `target_text(segment)` | The intro card's target line, e.g. "Hold 250 W" |
+
+**What a game calls:**
+
+- `award(points)` scores through `Effort`. It returns what counted.
+- `penalize(points)` takes points off without the multiplier (`Effort.penalize`), for
+  penalties such as Dodge Ball's -50. The score never drops below zero.
+- `option(key)` reads one of the game's options for the current rider.
+- Set `variant` (e.g. Dodge Ball's `"catch"`) when the game has variants. The result carries it,
+  stars use the variant's thresholds, and Kotlin keeps bests and leaderboards per variant
+  (`game_results.variant`, schema 7).
+- Override `how_to_text(segment)` and `intro_visual()` to give the intro card a dynamic how-to
+  line and a small picture or animation (Dodge Ball shows its mode).
+- `end_segment()` ends the segment. It is honoured in `end_mode: game`, in open-ended
+  segments, and after `request_finish`. A game that finishes early in a timed slot starts another
+  round instead (epic #31, "Short games fill their slot").
+- Set `won` (true / false) for games with a winner, and add counts to `stats`. `effort_avg` and
+  `played_sec` are added for you.
+- `AudioDirector.play_music()`, `play_sfx()` and `set_intensity()` (see Audio below).
+
+**Rules:**
+
+- Keep the rules in a plain class (`RefCounted`) and test it headless with scripted inputs, like
+  `DemoLogic`. The scene only draws it.
+- Talk to Kotlin only through `InputBus`, `Session` and the framework. Never call
+  `get_tree().quit()`.
+- Reset in `_on_prepare`, not `_ready`: every segment gets a fresh instance of the scene, but
+  the autoloads live on.
+
+### Game options
+
+A game can declare its own settings in `GameInfo.options`, for example Dodge Ball's scene
+lighting and camera tilt. They're generic and framework-owned:
+
+- The pause screen shows a **Game options** button when the game declares any. Its card has one
+  button per option that steps through the choices; **Back** returns to the pause card.
+- `GameOptions` (`framework/GameOptions.gd`) stores the choices in `user://game_options.cfg`,
+  one section per rider and game (`<rider_id>/<game_id>`, `guest/…` with no active rider).
+  Unknown keys and values are ignored, and a missing value reads as the declared default.
+- The game reads them with `option(key)`, usually in `_on_prepare`, and hears changes through
+  `_on_option_changed`.
+
+### Effort
+
+The `Effort` autoload applies the epic's multiplier (maths in `EffortMeter`):
+
+- **The formula:** `1 + 0.5 × clamp((resistance − 30) / 30, 0, 1)`. It is 1.0× at ≤ 30% resistance
+  and 1.5× at ≥ 60%.
+- **The grinding guard:** the multiplier only applies while cadence is 60 rpm or more. Below
+  that it is 1.0×.
+- **`effort: false`:** the multiplier is always 1.0×, and the HUD badge is hidden.
+
+`Effort.award(points)` returns 0 outside gameplay: on the intro card, while paused, while
+`sensors_ok` is 0 and after the end. That is how "sensor loss freezes scoring" is enforced.
+`stats.effort_avg` is the multiplier's average, weighted by time, over the time scoring
+counted.
+
+### HUD kit
+
+`Hud` (`games/framework/hud/`) goes over every game. Every element sits in a container slot,
+so nothing overlaps and nothing has a hand-placed position. Everything persistent sits above the
+horizon or at the screen's edges, so the playfield (Dodge Ball's road) stays clear from the
+horizon down to the bike:
+
+| Row | Left (expands) | Centre | Right (expands) |
+| --- | --- | --- | --- |
+| sensor banner | (full width, only on sensor loss) | | |
+| top bar | ride panel: effort ×, gauge, then rpm · W · % | the game's own status widgets (`add_widget`), slim | time left over the score, Pause and End under it |
+| middle | | a brief, translucent message (`show_message`) | |
+| status slot | | the camera strip ("Camera steering is off", …) | |
+| bottom bar | | | Recalibrate (camera games) |
+
+The game's title and role aren't shown during play: the intro card names the game (and, for
+Dodge Ball, the mode).
+
+- **Ride metrics** (`RideMetrics`) are shared by every game: rpm, watts and resistance in three
+  equal columns, each value at the same size with the same small unit underneath (rpm · W · %).
+  A game sets its bands with `hud.metrics.set_cadence_band(low, high)` and
+  `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red well
+  under; the watts turn gold at the target. A slim gauge under a banded value fills to the current
+  value with a white tick at the floor or target, so no "floor 85" caption is needed.
+- `hud_layout_test` lays the HUD out at 1920x1080 while playing, with the power bonus, the
+  camera strip, while calibrating and at game over, with the longest texts each element shows.
+  It checks that no two elements overlap and that none covers the road. The road keep-clear
+  area is derived from Dodge Ball's camera (eye height 1.45 m, pitch −7°, both ends of its 62-72°
+  field of view) and road edges (6 m either side, the bike anywhere within 4.4 m of the centre):
+  a point is road when its ray meets the ground inside that band. Each element is grown by 12 px
+  for the camera's roll. Recalibrate, the camera strip and brief messages are exempt by design.
+- Widgets only touch their labels when a value changes: a theme override or new text re-lays
+  out the HUD, which cost frame time on the tablet when done every frame.
+
+It is sized for a 1920x1080 canvas read from about 1 m away (`HudTheme`). Numbers are 96 px,
+text is never below 34 px, and buttons are 110 px tall.
+
+Games add their own widgets to the top-centre slot with `hud.add_widget()`. Keep them slim (a
+row or two of small text, as Dodge Ball's status) so they stay above the horizon, for example a
+`TargetBand` (a cadence floor or a power cap) or a `BigNumber`. `StarRow` draws stars as
+shapes, so no font needs the glyph. Everything uses Godot's default font.
+
+### Calibration UI
+
+`CalibrationOverlay` shows only in camera games:
+
+- **While calibrating** (`tracker_state` 2, or `calibration_progress` in the last second), it
+  prompts each step: centre, with a 3-2-1 from `fraction`, then left, right, and in / back for
+  `lean_2d`. It shows a progress bar.
+  The header reads "Step 2 of 3" (`step_index`, `step_count`; left out for a centre-only
+  run), and "Try 2" from `attempt`. `retry_reason` becomes a hint: "Hold still for a moment",
+  "Can't see you. Face the screen: is the room bright enough?" (on the bike, a dark room was
+  the usual cause), "Lean a little further" or "Other way!". For `used_default` it shows "Using
+  your usual range; recalibrate later if steering feels off" (no 3-2-1 over it).
+- **When the tracker needs calibration** (`tracker_state` 1), it offers "Tap to calibrate".
+- **When the face is lost** (`tracker_state` 4), it shows a slim "Can't see you" strip.
+- **When a calibration ended in `tracker_state` 0** (no face found after two tries), it shows
+  a slim "Camera steering is off" strip.
+
+Tapping "tap to calibrate", "can't see you" or "camera off" calls `request_calibration`, and so
+does the HUD's Recalibrate button; both run every step. A tap during a running calibration is
+ignored (on the bike, stray taps restarted runs mid-step), and requests within 1 s of the last
+one are dropped (a double tap sent two). `Session.calibration` holds the session's latest progress, with all six
+fields.
+
+## Audio: the `AudioDirector` interface
+
+The `AudioDirector` autoload owns playback, and generators plug into it (#36: `SfxSynth`,
+`MusicGen`, under `games/audio/`). **Until something registers, every call plays silence** and
+logs `OPENRIDE_GAMES audio: nothing provides '<name>' yet; silent` once per name.
+
+**Buses:** `Master`, then `Music`, `SFX` and `Cues`, which all send to `Master`. They are created
+at startup.
+
+- `segment.audio.music_volume` sets `Music`.
+- `sfx_volume` sets `SFX` and `Cues`.
+- `audio.music: false` fades the music out for that segment. A game's `play_music` is then kept
+  but not played.
+- `Music` ducks by 10 dB under every cue.
+
+### Registration (for generators)
+
+Call these at startup. `res://audio/Cues.gd` is an optional hook: if that script exists,
+`AudioDirector` instantiates it once in its `_ready` and calls its `register(director)`, so
+generators can register without an autoload of their own.
+
+| Method | Contract |
+| --- | --- |
+| `register_sound(name: String, stream: AudioStream)` | A named effect or cue, rendered ahead of time. It replaces any earlier sound of that name. |
+| `register_sound_factory(factory: Callable)` | `factory(name: String) -> AudioStream` (or `null`). It is asked on the main thread the first time an unregistered name plays, and the answer is cached. Use it for lazy rendering of presets. |
+| `register_music_generator(generator: Callable)` | `generator(request: Dictionary) -> Dictionary`, mapping each stem name to a **looping** `AudioStream`, all the same length. `request` is `{style, tempo_bpm, seed}`. It **runs on a `WorkerThreadPool` thread**, so it must not touch the scene tree. Disk caching (`user://audio_cache/`) is the generator's job; `AudioDirector` keeps the last 4 renders in memory. |
+
+### Playback (for games)
+
+| Method | Behaviour |
+| --- | --- |
+| `play_music(style: Dictionary, tempo_bpm: float, seed := 0)` | `style` belongs to the game and is passed to the generator as is. The one key `AudioDirector` reads is `stem_gates`: `{stem_name: intensity}`, the intensity at which a stem plays (0 by default). The music renders off the main thread, which the intro card covers, then **crossfades in over 2 s**. The old music plays until then. Asking again for the same request changes nothing. Tempo = the segment's target cadence (one beat per pedal stroke). The same style and seed at a new tempo is a **tempo change**: it swaps in on the next phrase boundary instead (see "Tempo changes on a phrase boundary"). |
+| `set_intensity(value: float)` | 0-1. Stems fade in or out over 1.5 s as `value` crosses their gate. |
+| `stop_music(fade_sec := 2.0)` | Fades the music out |
+| `play_sfx(name, volume_db := 0.0, pitch := 1.0) -> bool` | An effect on `SFX`, from 8 voices. `false` means silence. |
+| `play_cue(name) -> bool` | A cue on `Cues`, which ducks the music |
+| `set_bus_effects(bus, effects: Array[AudioEffect])` | The game's own effect chain on `Music` or `SFX` (for example a room reverb and a glue compressor), replacing any earlier one. Every segment starts with both buses clean. Native effects cost little, unlike offline reverb in GDScript. |
+
+**Cue names the framework plays** (#36 provides them; see "Generated audio"):
+
+| Name | When |
+| --- | --- |
+| `countdown` | Each of the intro card's 3, 2, 1 |
+| `go` | Gameplay starts |
+| `segment_end` | A segment's result is in |
+| `pause`, `resume` | The session pauses and resumes |
+| `summary` | The summary appears |
+
+The demo asks for `dodge` and `hit` effects and for music with the style
+`{"name": "demo_drive", "stem_gates": {"harmony": 0.5, "lead": 0.85}}`.
+
+`Session` handles the rest:
+
+- `begin_session()` and `begin_segment(segment)` apply the settings above.
+- `set_paused()` pauses the music and effects, but not cues.
+- `end_session()` fades the music out after the last segment.
+- The music keeps playing across the intro card until the next game asks for its own.
+
+`sound_played(name, bus)` and `music_started(key)` are there for tests and debugging.
+
+## Generated audio (`games/audio/`)
+
+All game music and effects are generated in code (#36). Since #39 the generator can also play
+a few recorded CC0 one-shots (`audio/samples/`, listed in `assets/SOURCES.md`): see "Sampled
+instruments and stem effects". `res://audio/Cues.gd` is the single entry point: `AudioDirector` calls its
+`register(director)` at startup, which:
+
+- builds the wavetables and loads the styles on the main thread;
+- registers `SfxSynth` as the sound factory, so effects and cues render on first use;
+- registers `MusicGen.generate` as the music generator.
+
+| File | What |
+| --- | --- |
+| `Cues.gd` | The entry point above. `countdown` maps to the `countdown_beep` preset; every other name is a preset name. |
+| `SfxSynth.gd`, `SfxPreset.gd` | The effects generator and its preset resource |
+| `sfx/<name>.tres` | The starter presets |
+| `MusicGen.gd`, `MusicStyle.gd` | The composer and synth, and the style resource |
+| `styles/<name>.tres` | The styles |
+| `Dsp.gd` | Shared oscillators, noise, filters and the float → PCM conversion |
+| `gallery/StyleGallery.tscn` | The desktop audition scene |
+| `tools/make_library.gd` | Regenerates the starter presets and styles from its tables |
+
+### Effects (`SfxSynth`)
+
+An sfxr-style generator with these settings per `SfxPreset`:
+
+- a sine, triangle, saw, square, pulse or noise oscillator, with optional noise mixed in;
+- an attack / sustain / decay envelope with punch;
+- a start → end pitch sweep, vibrato and a pitch jump;
+- low-pass (swept) and high-pass filters;
+- repeats, and seamless looping for continuous sounds such as an engine hum.
+
+Each preset renders once to a 22.05 kHz mono `AudioStreamWAV` and is cached.
+
+- **Starter library:** `whoosh`, `thud`, `click`, `chime`, `alarm_soft`, `boost`,
+  `countdown_beep`, `go`.
+- **Framework cues:** `segment_end`, `pause`, `resume`, `summary`.
+- **Demo:** `dodge`, `hit`.
+
+A game adds its own presets in either of two ways:
+
+```gdscript
+SfxSynth.add_preset_dir("res://games/dodge_ball/sfx")  # <name>.tres files; later dirs win
+SfxSynth.add_preset("launch_whoosh", preset)           # or in code
+AudioDirector.play_sfx("launch_whoosh")
+```
+
+Tune presets in the inspector, or by ear in the gallery.
+
+### Music (`MusicGen`)
+
+A game asks for music by style name through `AudioDirector.play_music`. `MusicGen` composes a
+seeded 16-bar loop in A A' B A form: four-bar phrases, one chord per bar, the B phrase on its
+own progression, and the last phrase the same as the first. It renders four looping stems, all
+exactly the same length: `drums`, `bass`, `harmony` and `lead`.
+
+- **Deterministic.** The same style, seed, tempo and bars always give the same samples. The
+  tune depends only on the style and the seed, so a tempo change keeps the same tune.
+- **Seamless.** Every bar starts and ends at silence, so the loop point never clicks.
+- **Stem lengths.** A stem is `bars × round(4 × 60 × 22050 / tempo)` samples; see
+  `MusicGen.loop_samples()`.
+- **Overrides.** Any other key in the game's style dictionary overrides that `MusicStyle`
+  property. For example, `{"name": "racer", "transpose": 2, "energy": 1.0}` gives Kart
+  Race's final lap. `bars` sets the loop length (16 by default). `AudioDirector` reads
+  `stem_gates` itself.
+- **Speed.** A bar that repeats is rendered once and copied. The four stems render in
+  parallel on `WorkerThreadPool` threads. Godot's WAV loader converts the float samples to
+  16-bit natively.
+  - On an M-series Mac, a 16-bar, 4-stem loop at 90 bpm (42.7 s of audio) renders in
+    60-125 ms (130-270 ms on one thread).
+  - On the Gen 2 tablet (4 cores), with the demo running, each style's 16-bar render at
+    90 bpm took 0.78-1.18 s on a `WorkerThreadPool` thread (budget: 5 s). The 14 effects
+    took 0.2 s. The game held 56-61 fps throughout (measured 2026-09-30, mock build,
+    `user://audio_bench`).
+- **Disk cache.** Renders are cached in `user://audio_cache/<sha256>.stems`.
+  - The key covers the style's musical content, the tempo, the seed, the bars and
+    `MusicGen.VERSION`. Editing a style never plays a stale render; bump `VERSION` when
+    the generator's output changes.
+  - The cache is pruned to 50 MB, oldest first.
+
+| Style (`styles/*.tres`) | Game | Character |
+| --- | --- | --- |
+| `drive` | Dodge Ball | Minor key, four-on-the-floor, pumping eighth-note bass, stabs |
+| `heave` | Tug of War | Phrygian, heavy half-time drums, a bass that builds phrase by phrase |
+| `noir` | Safe Cracker | Harmonic minor sevenths, brushes and ride, walking bass, swung comping, sparse vibes |
+| `bright` | Cadence Karaoke | Major sevenths, backbeat, root-fifth bass, sixteenth-note arpeggio |
+| `racer` | Kart Race | Mixolydian, busy breakbeat, off-beat bass, stabs, detuned saw lead |
+| `demo_drive` | the demo | Dorian four-on-the-floor with a pad |
+
+Each style's `suggested_gates` is a starting point for the game's `stem_gates`.
+
+#### Tempo: where it comes from and how to tune it
+
+Styles have **no base BPM of their own**. The tempo comes from the game:
+
+1. **The game passes `tempo_bpm`** to `play_music`: the segment's target cadence in rpm,
+   so one beat = one pedal stroke. The demo passes `cadence_floor + 20`
+   (`games/games/demo/Demo.gd`).
+2. **`MusicGen` plays at `tempo_bpm × tempo_scale`**, clamped to 30-240 bpm
+   (`MusicGen.music_tempo()`).
+   - `tempo_scale` is a property of each style, in `games/audio/styles/<style>.tres`
+     (the "Tempo" group in the inspector). It is `1.0` for every style today.
+   - `2.0` is double time: one beat per leg, still locked to pedalling.
+   - A game can also override it per request, e.g. `{"name": "drive", "tempo_scale": 2.0}`.
+3. **`tempo_min` / `tempo_max`** in each style only set the gallery's slider. The gallery
+   starts at their midpoint. They don't affect games.
+
+To make a style feel faster everywhere, raise its `tempo_scale` (try `2.0` in the gallery
+first). Cadence Karaoke keeps `1.0`, since its target line is the beat.
+
+#### Style gallery
+
+Open `res://audio/gallery/StyleGallery.tscn` in the editor and press F6.
+
+- Pick a style, tempo, tempo scale, seed and length, then **Render and play**. The status
+  line shows how long the render took.
+- **Intensity** gates the stems at the style's `suggested_gates`; the checkboxes mute stems
+  by hand.
+- **Change tempo at next phrase** renders the new tempo while the old loop plays, then
+  switches on the next phrase boundary, as described below.
+- The buttons at the bottom play every effect preset.
+
+It plays through its own players, not `AudioDirector`, so it needs no session.
+
+### Sampled instruments and stem effects
+
+`Samples.gd` decodes recorded one-shots once and caches them as mono floats at 22.05 kHz.
+They must be imported uncompressed (`compress/mode=0` in the `.import` file), because GDScript
+can't decode QOA. `MusicGen` loads a style's samples before its threaded render starts. A style
+uses them through three `MusicStyle` properties:
+
+- `drum_samples`: `{drum: "res://audio/samples/….wav", "gain": 0.8}` replaces those
+  synthesised drums with recordings. The others stay synthesised.
+- A voice's `sample` and `sample_hz` (in `bass_voice`, `harmony_voice` or `lead_voice`) play a
+  recorded tone at any pitch. It is resampled from `sample_hz`, holds on a sustain loop between
+  two rising zero crossings, and has the voice's ADSR and swept low-pass (`Dsp.render_sampled_note`).
+- `stem_fx`: `{stem: {highpass, lowpass, drive, comp_threshold, comp_ratio, comp_release}}`
+  runs one-pole filters, tanh saturation and a peak compressor on each rendered bar
+  (`Dsp.apply_fx`), before the bar's edge fades, so loops stay seamless.
+
+Reverb and bus compression are the game's, through `AudioDirector.set_bus_effects`. The `drive`
+style (Dodge Ball) uses all of this.
+
+### Tempo changes on a phrase boundary
+
+Between games, new music crossfades in over 2 s as soon as it renders. Within a game, a **tempo
+change** lands on a phrase boundary instead, with no gap and the beat grid unbroken. Cadence
+Karaoke's target changes and Kart Race's cadence-following rely on this. `AudioDirector` does
+it:
+
+1. **A tempo change** is a `play_music` request with the same style and seed as the playing
+   music but another `tempo_bpm`. Any other request crossfades as before.
+2. **It waits, pending.** When its render is ready, it isn't started: `pending_music_key()`
+   returns it.
+   - A newer request replaces it; asking for the playing tempo again cancels it.
+   - `stop_music()`, `audio.music: false` and a new session drop it.
+3. **The phrase length comes from the playing stream**, not the tempo, because `tempo_scale`
+   and per-bar rounding change it: `phrase_seconds() = stem length / (bars / 4)`, with `bars`
+   from the style request (16 by default).
+4. **Each frame** (not while paused), the director computes the time since the last boundary:
+   `fposmod(position + AudioServer.get_time_since_last_mix(), phrase)`. The first frame in
+   which it wraps (drops by more than half a phrase, so a few ms of mix jitter doesn't count)
+   is just past the boundary.
+5. **The swap.** The new tempo starts that far into its loop (`play(since)`), so its beat grid
+   starts exactly on the boundary despite frame timing. It crossfades over 30 ms
+   (`SWAP_FADE_SEC`), and each stem keeps its current level, with no gate fade-in. The
+   director emits `tempo_swapped(key, since_boundary)`, then `music_started(key)`.
+6. **In games:** call `play_music` with the new tempo (same style and seed) a few seconds before
+   the change is due. The render (about 1 s on the tablet) must finish before the boundary,
+   or the swap waits for the next one.
+
+`sim_phrase_swap_check` plays a 4-bar loop at 180 bpm with the real `MusicGen`, then asks for
+160 and 170 bpm. The 170 replaces the 160, waits out the phrase and swaps in 5.5 ms after the
+boundary. The gallery (`StyleGallery.gd`) does the same with its own players. A live tempo
+change is still to be checked on the bike.
 
 ## Setting up
 
@@ -206,7 +789,8 @@ or `exportGamesPack` by name. In those builds the task fails with setup instruct
 build without packaging skips the export. A contributor without Godot can still run
 `./gradlew :app:testDebugUnitTest`.
 
-`games.pck` and `games/.godot/` are git-ignored.
+`games.pck`, `games/.godot/` and `games/reports/` are git-ignored. The pack leaves out
+`tests/` and `addons/gdUnit4/` (`games/export_presets.cfg`).
 
 ```sh
 ./gradlew :app:assembleDebugReal   # bike build; exports the pack first
@@ -239,37 +823,375 @@ Open `games/project.godot` in the Godot 4.7.2 editor and press Play. With no bri
 | P | pause / resume |
 | Esc | end session |
 
-On a desktop, `request_exit()` restarts the local plan. A scene run on its own (F6) that
-declares a `game_id` property gets a Just Ride of that game.
+On a desktop:
 
-To check the simulator headless (session lifecycle, then the keys above through injected key
-events):
+- The local Just Ride is of the demo game.
+- `request_exit()` (the summary's Done) restarts the local plan.
+- A game scene run on its own (F6) gets a Just Ride of that game.
+- The simulator also stands in for the head tracker and `TrackerLink`. `tracker_state`
+  follows the game's tracker mode. The session's first camera mode plays a scripted
+  calibration as `calibration_progress`: centre, left and right (plus in and back for
+  `lean_2d`), or the centre alone once an earlier run in the same process covered the mode.
+  `request_calibration` plays every step.
+- Just Rides of games that declare `effort_in_just_ride` have the multiplier.
+
+Under a `-s` script (the headless checks and GdUnit4), the local plan doesn't start by itself.
+The script calls `Session._local.start(plan)`.
+
+## Tests
+
+**GdUnit4 suites** (`games/tests/unit/`) cover `Effort` (the curve, the grinding guard at 59
+vs. 60 rpm, `effort: false`, `effort_avg`, the freezes), stars, the `Game` base class, the
+registry and every game's declarations, the demo's rules, `AudioDirector`, and
+`SessionDirector` against the local session. Import once on a fresh checkout, then run them
+headless:
 
 ```sh
-$GODOT_BIN --headless --path games -s res://tests/sim_lifecycle_check.gd
-$GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd
+$GODOT_BIN --headless --path games --import
+$GODOT_BIN --headless --path games -s -d --remote-debug tcp://127.0.0.1:0 \
+  res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests/unit --ignoreHeadlessMode
 ```
+
+- The exit code is 0 when everything passes.
+- Reports land in `games/reports/`, which is git-ignored.
+- `-a` also takes a single suite, e.g. `res://tests/unit/effort_meter_test.gd`.
+- The `--remote-debug` address keeps a script error from dropping into Godot's interactive
+  debugger. The "Unable to connect" errors it prints are expected.
+- `--ignoreHeadlessMode` is needed because the suites simulate no GUI input.
+
+**Headless desktop playthroughs** drive the simulator and print PASS or FAIL:
+
+```sh
+$GODOT_BIN --headless --path games -s res://tests/sim_lifecycle_check.gd  # session lifecycle
+$GODOT_BIN --headless --path games -s res://tests/sim_keyboard_check.gd   # the keys above
+$GODOT_BIN --headless --path games -s res://tests/sim_demo_check.gd       # the demo, end to end
+```
+
+For generated audio (#36):
+
+- **GdUnit4 suites:**
+  - `sfx_synth_test` covers every preset: clean, deterministic, and repeats, loops and
+    overrides working.
+  - `music_gen_test` checks that the same seed gives the same music, that loops and bar
+    joins don't click, that stem lengths fit the tempo and bars, levels and ranges, the form,
+    serial vs. parallel renders, overrides and `tempo_scale`, the director contract on a
+    worker thread, the phrase clock and the disk cache.
+  - `audio_hook_test` plays every framework cue and the demo's music through `AudioDirector`.
+  - `audio_director_phrase_test` covers tempo changes: pending until the boundary, the phrase
+    length from the stream, jitter, the carried stem levels, replacement, music off, pause, and
+    other music still crossfading at once.
+- **Headless checks:**
+
+  ```sh
+  $GODOT_BIN --headless --path games -s res://tests/sim_gallery_check.gd       # gallery + phrase switch
+  $GODOT_BIN --headless --path games -s res://tests/sim_phrase_swap_check.gd   # AudioDirector's tempo swap
+  $GODOT_BIN --headless --path games -s res://tests/audio_bench.gd -- --tempo=90 [--wav=DIR]
+  ```
+
+  `audio_bench` times every style's 16-bar render, serial and parallel. With `--wav`, it
+  writes a mix of each style and every effect as `.wav` files to listen to.
+- **On the tablet:** every music render logs
+  `OPENRIDE_GAMES music <style> <bpm> bpm <bars> bars: rendered in <ms> ms` (or `cache hit`).
+  To time every style with a game running, create the flag file in a debuggable build's
+  `user://`, then open the games host:
+
+  ```sh
+  adb shell run-as dev.digitalducktape.openride touch files/audio_bench   # mock build
+  adb logcat -s godot | grep -E "audio_bench|music|frame fps"
+  ```
+
+  15 s after the engine starts, `Cues.gd` deletes the flag and times each style's uncached
+  16-bar render at 90 bpm on a `WorkerThreadPool` thread
+  (`OPENRIDE_GAMES audio_bench style=… ms=…`). The `frame fps=` lines show the game's frame
+  rate meanwhile.
+
+Dodge Ball (#39):
+
+- `dodge_ball_logic_test` covers the rules: collision, the 0.8 s warning, arrival spacing,
+  shield drain and refill, the power bonus, lives and runs, circuit penalties, waves, streaks,
+  the stars and the time of day.
+- `dodge_ball_scene_test` covers pause, per-rider options and the result's stats.
+- `tests/capture_dodge.gd` takes desktop screenshots in each lighting (it needs a window). With
+  `--play=SECONDS`, add `--write-movie FILE.avi --fixed-fps 30` to record the game's own mix,
+  bus effects included, without playing a sound.
+
+`sim_demo_check` plays a three-segment local circuit at 4× speed:
+
+- the intro card and calibration;
+- a warm-up played with the arrow keys, which must score;
+- a tap on the work segment's card, which must do nothing, then its "Skip this game" button;
+- pause and resume with P;
+- Esc to end, then the summary and Done.
 
 ## Running on the bike
 
 1. Install with `adb install -r app/build/outputs/apk/debugReal/app-debugReal.apk`. The `-r`
    keeps the rider's data, so never uninstall.
-2. On the tablet, open **Profile → Mini-games (preview)**. The Games hub (#38) replaces this
-   entry point.
+2. On the tablet, open **Profile → Mini-games (preview)** and pick a Just Ride of the demo
+   (20 minutes or open-ended). Both record a ride for the active rider. The Games hub (#38)
+   replaces this entry point.
+3. The demo is a `lean_x` game, so the camera starts and calibrates during the first intro
+   card. The camera needs the CAMERA permission. Until the hub asks
+   for it (#38), grant it with
+   `adb shell pm grant dev.digitalducktape.openride.real android.permission.CAMERA`.
 
-The tablet logs at level W, so Godot's `print` output is invisible until you raise the level:
+### Capturing logs on the bike
+
+The tablet logs at level W (`getprop log.tag` prints `W`), so every app `Log.i`/`Log.v` and
+every Godot `print` is dropped unless its tag is raised. Four things have silently lost a
+capture:
+
+- **`log.tag.*` doesn't survive a reboot.** Set the tags after every boot, and check them with
+  `getprop`. No app restart is needed: the app and Godot re-check the tag on every line.
+- **The ring buffer is 256 KiB, and logd prunes the chattiest app first.** With
+  `HeadTrackerFrames` on (30 lines a second), OpenRide is the chattiest app, so a capture taken
+  with `logcat -d` after the ride can contain only other apps' W lines. Enlarge the buffer, and
+  record while riding.
+- **A live `adb logcat` over wireless ADB stops when ADB drops.** Record to a file on the
+  tablet instead.
+- **`HeadTrackerFrames` exists only in debuggable builds** (`debugReal`, `debug`). A release
+  build never writes it.
+
+The recipe, in order:
 
 ```sh
+# 1. After every boot: raise the tags, then confirm they're set.
 adb shell setprop log.tag.godot VERBOSE
 adb shell setprop log.tag.OpenRideGames VERBOSE
-adb logcat -s godot OpenRideGames GodotActivity Godot
+adb shell setprop log.tag.HeadTracker VERBOSE
+adb shell setprop log.tag.HeadTrackerFrames VERBOSE   # per-frame raw/filtered lean + face row
+adb shell getprop | grep log.tag
+
+# 2. A bigger ring buffer.
+adb logcat -G 16M
+
+# 3. Record on the tablet, so a dropped ADB connection doesn't end the capture.
+adb shell 'nohup logcat -v threadtime -f /sdcard/Download/openride-run.log -r 8192 -n 8 \
+  godot:V OpenRideGames:V HeadTracker:V HeadTrackerFrames:V GodotActivity:V "*:S" \
+  > /dev/null 2>&1 &'
+
+# ... ride ...
+
+# 4. Stop the recorder and pull the files (openride-run.log, .1, .2, ...).
+adb shell pkill -f openride-run.log
+for f in $(adb shell ls /sdcard/Download/ | grep openride-run.log); do adb pull "/sdcard/Download/$f"; done
 ```
+
+To follow along live instead, run `adb logcat -s godot OpenRideGames HeadTracker`. It stops
+if ADB drops, so keep the on-tablet recorder running too.
+
+`HeadTrackerFrames` lines carry `fixture=<row>` in the `HeadFixtureCsv` format. Collect those
+rows into a CSV file under `app/src/test/resources/headtracker/` to replay the ride in the unit
+tests.
 
 What to look for in the log:
 
 - Every signal and call is logged as `OPENRIDE_GAMES <- signal` or `OPENRIDE_GAMES -> method`.
-- The placeholder prints an `OPENRIDE_GAMES frame fps=… cadence=…` line every 5 s.
+- `SessionDirector` prints an `OPENRIDE_GAMES frame fps=… phase=… tracker=… lean_x=…
+  lean_depth=… standing=… score=… effort=…` line every 5 s, and every second while the
+  camera runs.
+- `Session` logs each calibration step as it starts, retries and completes
+  (`OPENRIDE_GAMES <- calibration_progress left 2/3 attempt 1 …`).
 - `OpenRideGames` lines come from the Kotlin side of the session.
+
+## Dodge Ball (#39)
+
+**Modes** (the per-rider "Mode" option): **Dodge** keeps away from danger-red balls; **Catch**
+steers into shimmering gold ones. A ball caught with the shield down is fumbled (no points,
+streak lost); a miss costs the streak, and three in a row a life in a Just Ride. Nothing is ever
+taken off in Catch, and every catch ball arrives within reach of the last. The result's
+`variant` is the mode played longest (`""` for Dodge, `"catch"`).
+
+**Speed** follows cadence: `0.0018·rpm² + 0.04·rpm` m/s (9 m/s at 60 rpm, 22 at 100, stopped at
+0), eased at up to 7 m/s². Cadence rather than power, because it's what the rider feels and it
+answers at once; power has its own reward. The view widens a little with speed, streaks rush
+past above about 90 rpm, and wind rises with speed. Each ball keeps the approach speed it was
+thrown at, so arrivals stay timed in seconds and the 0.8 s warning holds at any speed.
+
+**Stars** (points a minute): a perfect ride at 1.0× reaches 2 stars without the power bonus; 3
+stars needs the bonus and some effort multiplier, in 90 s circuit slots and two-minute Just Rides
+(`dodge_ball_logic_test`).
+
+### On the tablet
+
+Dodge Ball is the first 3D game. What holding 60 fps on the Gen 2 tablet (PowerVR GX6250,
+GL Compatibility) took, measured with the mock build:
+
+- **It is fill-rate bound.** The 3D view renders into a `SubViewport` at 0.67 of 1080p, drawn
+  scaled under the HUD, which stays sharp. `Viewport.scaling_3d_scale` below 1 hung the
+  renderer on the tablet.
+- **No MSAA:** 2x halved the frame rate.
+- **The road and verges are unshaded**, lit and fogged by hand. They cover most of the screen,
+  and the engine's per-pixel light and fog cost about a third of the frame.
+- **Shaders sample a 64×64 noise texture** instead of hashing with `sin()` per pixel.
+- **Scenery is lit per vertex, without specular.** The Kenney nature-kit materials are fully
+  metallic (near-black without reflections), so they're replaced by matte ones.
+- **The full-screen effect overlay is hidden while idle**, and HUD labels only change when
+  their value does. A theme override every frame re-laid-out the HUD.
+- **Release builds don't check for null.** A GDScript call on a null node crashed the exported
+  build with SIGSEGV instead of an error, so test on the tablet as well as the editor.
+
+The render scale is now 0.62, for headroom with face tracking on the bike (it read 55-57 fps
+at 0.67 with the effort badge re-laying out the HUD every frame, since fixed).
+
+For measuring, set `DEV_TUNING` in `DodgeBall.gd` (off in every build). The game then logs
+`OPENRIDE_GAMES dodge_ball perf game_ms=… process_ms=… draw_calls=…` every 5 s, and if
+`user://dodge_tuning.cfg` exists, it overrides the render settings
+(`[render] scale=0.67 msaa=0`) and switches parts off (`[world] sky=false road=false
+verges=false scenery=false balls=false rig=false fog=false screenfx=false`). Write it with
+`adb shell run-as dev.digitalducktape.openride …`.
+
+## Tug of War (#40)
+
+Your watts against a bot's over a rope across a river, in first person. `TugLogic` holds the
+rules (headless-tested by `tug_logic_test`), `TugWorld` the 3D view, `TugStatus` the HUD widget
+and `TugAudio` the sounds; `TugOfWar.gd` wires them to the framework.
+
+**The rope.** The marker `p` runs from -1 to +1: `dp/dt = 0.25 × (power − bot) / FTP`. Equal
+watts is a stalemate, and holding 20% of FTP above the bot wins in 20 s. A round ends when `p`
+reaches either end, or at the buzzer (60 s), where `p > 0` wins (a dead heat is a loss).
+
+**The bot** holds 60% of FTP (`bot_watts`; 50% easy, 70% hard) and surges 20% of FTP above that (`surge_watts`) for 5 s, at
+most one surge every 12 s, telegraphed a second early by a drum roll and a bracing pose. A surge
+counts as answered if `p` never fell more than 0.2 during it (`surges_answered`).
+
+**Modes.** A circuit or timed Just Ride plays rounds back to back until the timer ends. An open
+or rounds Just Ride plays the rider's **Mode** option: **Match** (best of 3 or 5, or the rounds
+the plan asks for) or **Ladder** (each win faces a bot 5% of FTP stronger, with a new name and
+colour; the first loss ends it). A 60 s recovery card between rounds shows the next bot's watts.
+The result's `variant` is `"ladder"` for the ladder and `""` otherwise.
+
+**Scoring.** Every round won awards 1000, and every watt over the bot awards 0.15 points a
+second, both through `Effort.award`. Stars are points a minute: a perfect ride (15% of FTP over
+the bot all the time) earns about 2250 a minute at 1.0×, which is 2 stars, and 3 stars needs
+about 1.3× effort (`tug_logic_test` checks this for every difficulty).
+
+**Options** (per rider): Mode, Match length, Scene (time of day, shared with Dodge Ball's
+presets) and **Brace lean**.
+
+**Brace lean** is optional and off by default. With it on, leaning in (`lean_depth` above 0.5)
+during a surge makes the rope slip at 75% of its speed. It never helps a gain, and it isn't
+counted in `effort_avg`. Because the camera should run only for riders who use it, the game
+overrides `Game.tracker_mode_for_segment`: `lean_2d` with brace lean on, otherwise `off`.
+`SessionDirector` applies that mode (a copy of the declarations from
+`GameInfo.with_tracker_mode`) for the segment, and the Calibrate button shows only then.
+
+**Look.** The rider stands at the end of a pier, the bot on the far pier, a flag on the rope
+between them. Winning hauls the bot off its pier into the river; losing pulls the camera in. The
+view follows the Dodge Ball recipe for the tablet (a scaled `SubViewport`, no MSAA, unshaded
+water lit by hand, per-vertex lit everything else, MultiMesh rope and crowd, CPUParticles3D for
+the splash). On the tablet it held 59-62 fps (mock build, 2026-10-03). `tests/capture_tug.gd`
+takes desktop screenshots and, with `--play=SECONDS`, plays rounds for a recording.
+
+## Safe Cracker (#41)
+
+A recovery game played with the resistance knob: dial it to each number of a combination and
+hold it there to click a tumbler. `SafeLogic` holds the rules (headless-tested by
+`safe_logic_test`); the picture is 2D shapes drawn in code (`SafePlaces` for the six rooms,
+`SafeBody` and `SafeDial` for the safe), `SafeStatus` is the HUD widget and `SafeAudio` the sounds.
+
+**Rules.** The dial shows the live `resistance` reading (0-100). Hold within the tolerance of
+the target for the hold time (easy ±3 and 1.2 s, standard ±2 and 1.5 s, hard ±2 and 2 s) to click
+a tumbler. Each number is at least 6 from the one before, drawn from `res_min`-`res_max` (15-40).
+The alarm trips when power, smoothed over about a second, stays over 1.25 times `power_cap_watts` (60% of FTP) for 2.5 s; it resets the tumbler. It is easy-going on purpose: the first version tripped for ordinary pedalling.
+cadence under `cadence_min` (60) dims the dial and pauses the hold.
+
+**Knob lag.** The reading lags the knob, so a slip off target keeps its progress for 0.4 s
+(`SafeLogic.GRACE_SEC`) and then drains at 1.5× the rate it filled. The needle always shows the
+reading as received. Tune the grace, tolerance and hold against the lag measured on the bike.
+
+**Safe after safe.** Cracking a safe swings the door open on the gold, then the next one slides
+in, in a different random place (a night office, bank vault, museum hall, ship's cabin,
+laboratory or old library; never the same twice in a row). Each is harder than the last: a
+longer combination (up to 6), a tighter tolerance (down to ±1), a shorter hold (down to 0.9 s),
+and the target hidden from the 4th safe (hard hides it from the start). A hidden target is found
+by ear: a proximity tick speeds up as the reading closes in. The goal is how many safes you crack.
+
+**Scoring and stars.** Each safe is worth `1000 − 5 × seconds − 100 × alarms` (floor 0) plus 200 for
+opening it; there is no effort multiplier. Stars are points a minute, so they follow how many safes
+you open: a careful rider turning the knob at 2 units/s earns 2 stars, and a quick, accurate one 3
+(`safe_logic_test` models both, with 0.6 s of lag). The thresholds are provisional until tuned on
+the bike.
+
+**Options** (per rider): Place (random or one fixed place), Target number (show or hide it) and
+Click sounds. Stats: `vaults`, `fastest_crack`, `alarms`, `avg_power`. `tests/capture_safe.gd`
+takes desktop screenshots and, with `--play=SECONDS`, cracks safes with a scripted rider for a
+recording.
+
+## Cadence Karaoke (#42)
+
+A rhythm game for your legs, in first person down a neon tunnel. The target is a glowing rail
+ahead whose height is the target cadence, your cadence is an orb at the same depth, and beat
+rings fly past, one a beat. `CadenceLogic` holds the rules (headless-tested by
+`cadence_logic_test`), `CadenceWorld` the 3D view, `CadenceStatus` the HUD widget and
+`CadenceAudio` the sounds.
+
+**Pace.** The rider picks their own pace (the target cadence, 80 rpm to start) and can adjust
+it at any time with the − and + buttons under the view (5 rpm a step; `,` and `.` on the
+desktop). The change waits for a phrase boundary: the game asks `AudioDirector` for the music at
+the new tempo (same style and seed), and applies the new target on its `tempo_swapped` signal, so
+the rail and the beat change together. A change that hears no swap applies after 16 s, or 1.5 s
+with no music. A moving target (a profile) asks for a new tempo every 6 s when it has drifted 3 rpm.
+
+**Shapes.** A circuit segment sends `cadence_profile` (`[{t, rpm}]`: a warm-up ramp 70 to 90, a
+recovery of 80 to 85, a cool-down 85 to 65); the rider's pace shifts all of it, and it cycles if
+the segment runs longer. A Just Ride follows the rider's **Workout shape** option around their
+pace: Steady, Pyramids (±10 over six minutes), Cadence builds (+5 rpm a minute to +15) or Spin-ups
+(30 s up, 60 s easy).
+
+**Scoring.** Inside the band (±5 rpm; ±7 easy, ±4 hard) you earn 10 points a second, 15 in the
+±2 bonus band, times a streak multiplier that grows by 0.25 every 10 s to 2.0. The streak
+survives 1 s outside the band (the cadence reading is noisy). The music's lead stem plays only
+while you are in the band. There is no effort multiplier.
+
+**Power cap.** Warm-up and cool-down 65% of FTP, recovery 60%; a Just Ride caps only Steady
+(Endurance) at 75%. Scoring freezes ("ease off") only when power, smoothed over about a second,
+stays over 1.25 times the cap, so ordinary pedalling never trips it.
+
+**Stars** (points a minute, the same for every difficulty): 300, 1000 and 1500. A rider whose
+cadence stays within about ±2 rpm of the target earns about 1700, one who wanders by ±6 about
+1100-1370, and one by ±12 under 900 (`cadence_logic_test`). Stats: `pct_in_band`, `longest_streak`,
+`avg_cadence`, `avg_power`, `pace`.
+
+**Options** (per rider): Workout shape, Metronome (a beat tick, off by default) and Colour (by
+workout part, or one fixed colour). The beat visuals run on the target's clock, which the music is
+rendered at; check their alignment with the music on the bike. `tests/capture_cadence.gd` plays a
+scripted ride for a recording.
+
+## Circuits and the Games hub (#37, #38)
+
+**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min Cadence Karaoke
+warm-up, N blocks of Tug of War 1:00, Safe Cracker 1:30, Dodge Ball 1:30 and Cadence Karaoke
+1:30, and a 3 min cool-down, each after a 10 s intro card (20 min = 2 blocks, 18:40; 30 min = 4,
+31:00; 45 min = 6, 43:20). It is one `SessionPlan`, recorded as one ride.
+
+- **Progress strip.** From `session_started`, `Hud.circuit_strip` (`CircuitStrip`) shows a pill
+  per segment above the game's widgets: as wide as the segment is long, in the role's colour (work
+  warm, recovery cool); done pills are dimmed, the current one is outlined and fills as it plays.
+  Its line says "3 of 10 · 14:02 left" (the rest of the segment plus every later segment and its
+  10 s card). A Just Ride hides it. `circuit_strip_test` pins the pills, the time and the layout.
+- **No camera.** `SessionRequest.Circuit.cameraGames = false` (the rider turned camera games off,
+  or refused the permission) swaps each camera game's slot for the next game of its role that
+  doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role, length and the
+  circuit's id.
+- **Already there from #34/#35:** the intro card with its Skip button, music across cards, the
+  per-segment summary and bests per circuit length (`GameResultDao.planBest`).
+- **The summary.** A circuit lists every planned game: the ones the session never reached say "not played", and the heading reads "Session ended early" instead of "Circuit complete". The best line says "New personal best!" (with the best before it) or "Your best: 5400 points, 2 stars"; Kotlin sends `previous_score` and `previous_stars` alongside the beaten flags. A Just Ride shows its one game.
+- **Not built yet:** time in each role's target zone and average effort on the circuit summary.
+
+**The Games tab (beta).** A tab in the bottom bar (and a "Games · BETA" card on Home) that holds:
+circuit cards with a difficulty picker and the rider's best; a Just Ride card per game in
+`GameCatalog` (without the demo), so a new game appears without UI changes, with the modes the
+game supports, a length (5-60 min, or rounds) and a difficulty, and the rider's best for that
+plan and difficulty; an FTP nudge linking to the profile editor; and the settings: camera games
+on or off, game music (auto, on or off) and the music and effects volumes
+(`GamesSettings`, stored in SharedPreferences and read by the session manager at each segment).
+`GamesViewModel` (tested by `GamesViewModelTest`) holds the logic; `GamesScreen` draws it. Starting
+asks for the camera permission first when a camera game is involved (once); if it is refused,
+circuits play without camera games and Just Rides of camera games are not started.
+
+- **Not built yet:** the household leaderboard per game (the DAO has `leaderboard`), and the
+  camera explainer as a separate first-run card (the Games card describes it in the settings).
 
 ## Originality and licensing
 

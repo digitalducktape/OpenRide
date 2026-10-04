@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="SfxPreset" format=3]
+
+[ext_resource type="Script" path="res://audio/SfxPreset.gd" id="1_bjlue"]
+
+[resource]
+script = ExtResource("1_bjlue")
+wave = 1
+attack = 0.02
+sustain = 0.12
+decay = 0.1
+freq_start = 660.0
+freq_end = 620.0
+vibrato_depth = 0.3
+vibrato_rate = 8.0
+lowpass_start = 2500.0
+volume = 0.35
+repeats = 2
+repeat_gap = 0.32

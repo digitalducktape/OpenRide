@@ -1,0 +1,76 @@
+[gd_resource type="Resource" script_class="MusicStyle" format=3]
+
+[ext_resource type="Script" path="res://audio/MusicStyle.gd" id="1_k1o32"]
+
+[resource]
+script = ExtResource("1_k1o32")
+name = "noir"
+description = "Calm, sparse jazz noir: brushed drums and ride, walking bass, swung comping (Safe Cracker, 70-80 bpm)."
+root = 38
+mode = "harmonic_minor"
+progressions = [[1, 4, 0, 0], [0, 3, 1, 4], [0, 5, 1, 4]]
+b_progressions = [[3, 3, 0, 0], [5, 4, 0, 4]]
+chord_size = 4
+drums = "brushes"
+bass = "walking"
+harmony = "comp"
+swing = 0.33
+swing_grid = 8
+energy = 0.35
+loudness = 0.8
+lead_low = 62
+lead_high = 79
+lead_density = 0.28
+bass_voice = {
+"attack": 0.006,
+"cutoff": 700.0,
+"cutoff_env": 500.0,
+"decay": 0.3,
+"filter_decay": 0.05,
+"gain": 0.55,
+"mix2": 0.5,
+"release": 0.06,
+"sustain": 0.45,
+"wave": "triangle",
+"wave2": "sine"
+}
+harmony_voice = {
+"attack": 0.004,
+"cutoff": 3000.0,
+"decay": 0.5,
+"gain": 0.1,
+"mix2": 0.25,
+"octave2": 1.0,
+"release": 0.12,
+"sustain": 0.35,
+"tremolo": 0.25,
+"tremolo_rate": 4.5,
+"wave": "sine",
+"wave2": "sine"
+}
+lead_voice = {
+"attack": 0.003,
+"cutoff": 4000.0,
+"decay": 0.6,
+"gain": 0.2,
+"mix2": 0.15,
+"octave2": 2.0,
+"release": 0.2,
+"sustain": 0.3,
+"tremolo": 0.35,
+"tremolo_rate": 5.0,
+"wave": "sine",
+"wave2": "triangle"
+}
+drum_levels = {
+"brush": 1.0,
+"crash": 0.0,
+"kick": 0.6,
+"ride": 1.0
+}
+tempo_min = 65.0
+tempo_max = 85.0
+suggested_gates = {
+"harmony": 0.3,
+"lead": 0.6
+}

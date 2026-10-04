@@ -83,6 +83,8 @@ data class SessionPlanMessage(
     /** Total planned seconds, or -1 for an open-ended Just Ride. */
     @SerialName("total_sec") val totalSec: Int,
     val segments: List<PlanSegment>,
+    /** The active rider's profile id, or null with no active rider: games remember their options per rider. */
+    @SerialName("rider_id") val riderId: Long? = null,
 )
 
 @Serializable
@@ -130,6 +132,8 @@ data class SegmentResult(
     val won: Boolean?,
     val skipped: Boolean,
     val stats: JsonObject,
+    /** The game's variant, e.g. Dodge Ball's `catch`; `""` (or absent) for none. */
+    val variant: String = "",
 ) {
     companion object {
         /** Recorded when a game fails to report within the grace period, or reports garbage. */

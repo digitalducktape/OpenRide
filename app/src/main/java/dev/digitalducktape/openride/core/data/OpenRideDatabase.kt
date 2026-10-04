@@ -7,14 +7,15 @@ import dev.digitalducktape.openride.core.content.ContentSource
 import dev.digitalducktape.openride.core.content.ContentSourceDao
 
 @Database(
-    entities = [Profile::class, Ride::class, RideSample::class, ContentSource::class],
-    version = 5,
+    entities = [Profile::class, Ride::class, RideSample::class, ContentSource::class, GameResult::class],
+    version = 7,
     exportSchema = true,
 )
 abstract class OpenRideDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao
     abstract fun rideDao(): RideDao
     abstract fun contentSourceDao(): ContentSourceDao
+    abstract fun gameResultDao(): GameResultDao
 
     companion object {
         const val DATABASE_NAME = "openride.db"
@@ -80,5 +81,41 @@ val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
             "CREATE UNIQUE INDEX IF NOT EXISTS `index_content_sources_youtubeId` " +
                 "ON `content_sources` (`youtubeId`)",
         )
+    }
+}
+
+/**
+ * Mini-games recording (#35, with #33's head tracker): a session records as one ride plus one
+ * `game_results` row per segment.
+ * - [Ride.gamePlan]: which session plan a ride recorded; `null` for every existing ride.
+ * - [Profile.headCalibration]: the rider's camera lean extremes as JSON; `null` until the
+ *   first calibration, which is exactly "not calibrated yet".
+ * - `game_results`, created empty, cascading with its ride.
+ */
+val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE rides ADD COLUMN gamePlan TEXT")
+        db.execSQL("ALTER TABLE profiles ADD COLUMN headCalibration TEXT")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `game_results` (" +
+                "`rideId` INTEGER NOT NULL, `segmentIndex` INTEGER NOT NULL, " +
+                "`gameId` TEXT NOT NULL, `role` TEXT NOT NULL, `difficulty` TEXT NOT NULL, " +
+                "`startSec` INTEGER NOT NULL, `durationSec` INTEGER NOT NULL, " +
+                "`score` REAL NOT NULL, `stars` INTEGER NOT NULL, `won` INTEGER, " +
+                "`skipped` INTEGER NOT NULL, `statsJson` TEXT NOT NULL, " +
+                "PRIMARY KEY(`rideId`, `segmentIndex`), FOREIGN KEY(`rideId`) REFERENCES " +
+                "`rides`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_gameId` ON `game_results` (`gameId`)")
+    }
+}
+
+/**
+ * Game variants (#39): `game_results.variant` holds a game's own variant, such as Dodge Ball's
+ * `catch` mode, so bests and leaderboards are kept per variant. Existing rows are `""`.
+ */
+val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE game_results ADD COLUMN variant TEXT NOT NULL DEFAULT ''")
     }
 }

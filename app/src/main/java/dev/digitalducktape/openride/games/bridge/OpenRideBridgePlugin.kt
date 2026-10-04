@@ -58,8 +58,15 @@ class OpenRideBridgePlugin(godot: Godot, private val bridge: GameBridge) : Godot
     override fun segmentEnding() = emitSignal(SEGMENT_ENDING.name)
     override fun sessionPaused() = emitSignal(SESSION_PAUSED.name)
     override fun sessionResumed() = emitSignal(SESSION_RESUMED.name)
-    override fun calibrationProgress(step: String, fraction: Double) =
-        emitSignal(CALIBRATION_PROGRESS.name, step, fraction)
+    override fun calibrationProgress(progress: CalibrationProgressSignal) = emitSignal(
+        CALIBRATION_PROGRESS.name,
+        progress.step,
+        progress.fraction,
+        progress.stepIndex,
+        progress.stepCount,
+        progress.attempt,
+        progress.retryReason,
+    )
     override fun sessionFinished(summaryJson: String) = emitSignal(SESSION_FINISHED.name, summaryJson)
 
     companion object {
@@ -70,8 +77,15 @@ class OpenRideBridgePlugin(godot: Godot, private val bridge: GameBridge) : Godot
         private val SEGMENT_ENDING = SignalInfo("segment_ending")
         private val SESSION_PAUSED = SignalInfo("session_paused")
         private val SESSION_RESUMED = SignalInfo("session_resumed")
-        private val CALIBRATION_PROGRESS =
-            SignalInfo("calibration_progress", String::class.java, Double::class.javaObjectType)
+        private val CALIBRATION_PROGRESS = SignalInfo(
+            "calibration_progress",
+            String::class.java, // step
+            Double::class.javaObjectType, // fraction
+            Int::class.javaObjectType, // step_index
+            Int::class.javaObjectType, // step_count
+            Int::class.javaObjectType, // attempt
+            String::class.java, // retry_reason
+        )
         private val SESSION_FINISHED = SignalInfo("session_finished", String::class.java)
 
         private val SIGNALS = setOf(

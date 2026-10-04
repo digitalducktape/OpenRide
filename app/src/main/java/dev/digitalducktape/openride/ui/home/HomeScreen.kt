@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.digitalducktape.openride.core.ride.RideGoal
 import dev.digitalducktape.openride.ui.common.ProfileAvatar
+import dev.digitalducktape.openride.ui.games.BetaBadge
 import dev.digitalducktape.openride.ui.theme.MetricTextStyles
 
 /**
@@ -42,6 +43,7 @@ fun HomeScreen(
     onQuickStart: () -> Unit,
     onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGames: () -> Unit = {},
     updateVersionName: String? = null,
     onOpenUpdate: () -> Unit = {},
     onDismissUpdate: () -> Unit = {},
@@ -146,6 +148,42 @@ fun HomeScreen(
                         Text(if (goal == RideGoal.None) "Set goal" else "Change goal")
                     }
                 }
+            }
+
+            // Games (beta): workouts that play like games, advertised right under the quick start.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+                    .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(20.dp))
+                    .clickable(onClick = onOpenGames)
+                    .padding(horizontal = 28.dp, vertical = 22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "\uD83C\uDFAE  GAMES",
+                            style = MetricTextStyles.SectionEyebrow,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        BetaBadge(modifier = Modifier.padding(start = 12.dp))
+                    }
+                    Text(
+                        text = "Play your workout",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Text(
+                        text = "Circuits and games for every ride, from warm-up to cool-down. New, and still being tuned.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                OutlinedButton(onClick = onOpenGames) { Text("Open Games") }
             }
         }
     }
