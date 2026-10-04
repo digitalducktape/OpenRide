@@ -14,6 +14,8 @@ data class GamePersonalBest(
     val bestScore: Double,
     val bestStars: Int,
     val plays: Int,
+    /** The game's variant ([GameResult.variant]), `""` for games without one. */
+    val variant: String = "",
 )
 
 /** One row of [GameResultDao.leaderboard]: one household rider's best at a game. */
@@ -44,41 +46,44 @@ interface GameResultDao {
 
     /** The rider's personal bests: per game, per plan (mode and length) and per difficulty. */
     @Query(
-        "SELECT g.gameId AS gameId, r.gamePlan AS gamePlan, g.difficulty AS difficulty, " +
+        "SELECT g.gameId AS gameId, g.variant AS variant, r.gamePlan AS gamePlan, g.difficulty AS difficulty, " +
             "MAX(g.score) AS bestScore, MAX(g.stars) AS bestStars, COUNT(*) AS plays " +
             "FROM game_results g JOIN rides r ON r.id = g.rideId " +
             "WHERE r.profileId = :profileId AND g.skipped = 0 AND r.gamePlan IS NOT NULL " +
-            "GROUP BY g.gameId, r.gamePlan, g.difficulty ORDER BY g.gameId, r.gamePlan, g.difficulty",
+            "GROUP BY g.gameId, g.variant, r.gamePlan, g.difficulty " +
+            "ORDER BY g.gameId, g.variant, r.gamePlan, g.difficulty",
     )
     fun observePersonalBests(profileId: Long): Flow<List<GamePersonalBest>>
 
     /**
      * The household leaderboard for [gameId] at [difficulty]: each rider's best score, highest
      * first. [gamePlan] narrows it to one plan (e.g. the 20-minute Just Ride); null takes every
-     * plan the game was played in.
+     * plan the game was played in. [variant] keeps it to one variant of the game.
      */
     @Query(
         "SELECT p.id AS profileId, p.name AS profileName, " +
             "MAX(g.score) AS bestScore, MAX(g.stars) AS bestStars " +
             "FROM game_results g JOIN rides r ON r.id = g.rideId JOIN profiles p ON p.id = r.profileId " +
             "WHERE g.gameId = :gameId AND g.difficulty = :difficulty AND g.skipped = 0 " +
-            "AND (:gamePlan IS NULL OR r.gamePlan = :gamePlan) " +
+            "AND (:gamePlan IS NULL OR r.gamePlan = :gamePlan) AND g.variant = :variant " +
             "GROUP BY p.id ORDER BY bestScore DESC, p.name ASC LIMIT :limit",
     )
-    suspend fun leaderboard(gameId: String, difficulty: String, gamePlan: String?, limit: Int = 10): List<LeaderboardEntry>
+    suspend fun leaderboard(gameId: String, difficulty: String, gamePlan: String?, variant: String = "", limit: Int = 10): List<LeaderboardEntry>
 
     /**
      * The rider's best whole session of [gamePlan] at [difficulty], leaving out [excludeRideId]
-     * (the ride just saved, so the summary can say whether it beat the old best).
+     * (the ride just saved, so the summary can say whether it beat the old best). A non-null
+     * [variant] only compares sessions played wholly in that variant (e.g. Dodge Ball's `catch`).
      */
     @Query(
         "SELECT MAX(totalScore) AS bestScore, MAX(totalStars) AS bestStars FROM (" +
             "SELECT SUM(g.score) AS totalScore, SUM(g.stars) AS totalStars " +
             "FROM game_results g JOIN rides r ON r.id = g.rideId " +
             "WHERE r.profileId = :profileId AND r.gamePlan = :gamePlan AND g.difficulty = :difficulty " +
-            "AND r.id != :excludeRideId GROUP BY r.id)",
+            "AND r.id != :excludeRideId GROUP BY r.id " +
+            "HAVING :variant IS NULL OR SUM(g.variant != :variant) = 0)",
     )
-    suspend fun planBest(profileId: Long, gamePlan: String, difficulty: String, excludeRideId: Long): PlanBest
+    suspend fun planBest(profileId: Long, gamePlan: String, difficulty: String, excludeRideId: Long, variant: String? = null): PlanBest
 
     // --- Backup & restore (PRD P1-8) --------------------------------------------------------
 

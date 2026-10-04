@@ -8,7 +8,7 @@ import dev.digitalducktape.openride.core.content.ContentSourceDao
 
 @Database(
     entities = [Profile::class, Ride::class, RideSample::class, ContentSource::class, GameResult::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class OpenRideDatabase : RoomDatabase() {
@@ -107,5 +107,15 @@ val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
                 "`rides`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_game_results_gameId` ON `game_results` (`gameId`)")
+    }
+}
+
+/**
+ * Game variants (#39): `game_results.variant` holds a game's own variant, such as Dodge Ball's
+ * `catch` mode, so bests and leaderboards are kept per variant. Existing rows are `""`.
+ */
+val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE game_results ADD COLUMN variant TEXT NOT NULL DEFAULT ''")
     }
 }

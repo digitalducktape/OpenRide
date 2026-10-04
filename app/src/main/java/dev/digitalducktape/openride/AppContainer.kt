@@ -30,6 +30,7 @@ import dev.digitalducktape.openride.core.data.MIGRATION_2_3
 import dev.digitalducktape.openride.core.data.MIGRATION_3_4
 import dev.digitalducktape.openride.core.data.MIGRATION_4_5
 import dev.digitalducktape.openride.core.data.MIGRATION_5_6
+import dev.digitalducktape.openride.core.data.MIGRATION_6_7
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.ProfileHeadCalibrationStore
 import dev.digitalducktape.openride.core.data.ProfileRepository
@@ -83,7 +84,7 @@ class AppContainer(private val applicationContext: Context) {
             applicationContext,
             OpenRideDatabase::class.java,
             OpenRideDatabase.DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build()
     }
 
     /** Rider avatar photos on disk (camera capture feature); paths live on [dev.digitalducktape.openride.core.data.Profile.avatarPhotoPath]. */

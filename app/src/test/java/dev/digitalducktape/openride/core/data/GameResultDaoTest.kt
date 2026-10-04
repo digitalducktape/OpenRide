@@ -42,7 +42,7 @@ class GameResultDaoTest {
     private fun profile(name: String) =
         Profile(name = name, avatarEmoji = "🚴", avatarColor = 0, weightKg = null, ftp = 200)
 
-    private suspend fun gameRide(profileId: Long, plan: String?, vararg results: Pair<Double, Int>, difficulty: String = "standard", gameId: String = "demo", skipped: Boolean = false): Long {
+    private suspend fun gameRide(profileId: Long, plan: String?, vararg results: Pair<Double, Int>, difficulty: String = "standard", gameId: String = "demo", skipped: Boolean = false, variant: String = ""): Long {
         val rideId = rides.saveRide(
             Ride(
                 profileId = profileId, startEpochMs = 0, durationSec = 60, avgCadence = 80, maxCadence = 90,
@@ -52,7 +52,7 @@ class GameResultDaoTest {
         )
         dao.insertAll(
             results.mapIndexed { i, (score, stars) ->
-                GameResult(rideId, i, gameId, "free", difficulty, i * 60, 60, score, stars, null, skipped, "{}")
+                GameResult(rideId, i, gameId, "free", difficulty, i * 60, 60, score, stars, null, skipped, "{}", variant)
             },
         )
         return rideId
@@ -150,5 +150,22 @@ class GameResultDaoTest {
         db.profileDao().setHeadCalibration(ed, "{not json")
 
         assertNull(ProfileHeadCalibrationStore(db.profileDao()).load(ed))
+    }
+
+    @Test
+    fun `bests, leaderboards and plan bests are kept per variant`() = runTest {
+        val plan = "just-ride:dodge_ball:minutes:20"
+        gameRide(ed, plan, 900.0 to 2, gameId = "dodge_ball", variant = "")
+        val catchRide = gameRide(ed, plan, 400.0 to 1, gameId = "dodge_ball", variant = "catch")
+
+        val bests = dao.observePersonalBests(ed).first().filter { it.gameId == "dodge_ball" }
+        assertEquals(mapOf("" to 900.0, "catch" to 400.0), bests.associate { it.variant to it.bestScore })
+        assertEquals(400.0, dao.leaderboard("dodge_ball", "standard", plan, variant = "catch").single().bestScore, 0.0)
+        assertEquals(900.0, dao.leaderboard("dodge_ball", "standard", plan).single().bestScore, 0.0)
+
+        val newCatch = gameRide(ed, plan, 500.0 to 2, gameId = "dodge_ball", variant = "catch")
+        assertEquals(400.0, dao.planBest(ed, plan, "standard", newCatch, variant = "catch").bestScore!!, 0.0)
+        assertEquals(900.0, dao.planBest(ed, plan, "standard", newCatch, variant = "").bestScore!!, 0.0)
+        assertEquals(900.0, dao.planBest(ed, plan, "standard", catchRide).bestScore!!, 0.0) // no variant: all sessions
     }
 }

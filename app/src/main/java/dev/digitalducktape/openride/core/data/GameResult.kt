@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.core.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -21,6 +22,8 @@ import androidx.room.Index
  * @param durationSec gameplay seconds actually played, intro card excluded.
  * @param won null for games without a winner.
  * @param statsJson the game's `stats` object as JSON text (`effort_avg`, `played_sec`, …).
+ * @param variant the game's own variant, such as Dodge Ball's `catch` mode, or `""`. Bests and
+ *   leaderboards are kept per variant. Added in schema version 7 ([MIGRATION_6_7]).
  */
 @Entity(
     tableName = "game_results",
@@ -48,4 +51,5 @@ data class GameResult(
     val won: Boolean?,
     val skipped: Boolean,
     val statsJson: String,
+    @ColumnInfo(defaultValue = "") val variant: String = "",
 )

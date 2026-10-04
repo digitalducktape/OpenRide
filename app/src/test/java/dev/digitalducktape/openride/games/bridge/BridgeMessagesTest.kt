@@ -146,7 +146,7 @@ class BridgeMessagesTest {
         assertEquals(setOf("ride_id", "results", "totals", "bests"), json.keys)
         assertEquals(JsonNull, json["ride_id"])
         val encodedResult = json["results"]!!.jsonArray.single().jsonObject
-        assertEquals(setOf("game_id", "score", "stars", "won", "skipped", "stats"), encodedResult.keys)
+        assertEquals(setOf("game_id", "score", "stars", "won", "skipped", "stats", "variant"), encodedResult.keys)
         assertEquals(JsonNull, encodedResult["won"])
         assertEquals(JsonPrimitive(75), json["totals"]!!.jsonObject["elapsed_sec"])
         assertEquals(result, BridgeMessages.parseResult(encodedResult.toString()))

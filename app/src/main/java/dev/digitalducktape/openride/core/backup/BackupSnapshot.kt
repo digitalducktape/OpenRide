@@ -85,13 +85,15 @@ data class GameResultBackup(
     val won: Boolean?,
     val skipped: Boolean,
     val statsJson: String,
+    /** Added with schema 7; older backups read as `""`. */
+    val variant: String = "",
 )
 
 fun GameResult.toBackup() = GameResultBackup(
-    rideId, segmentIndex, gameId, role, difficulty, startSec, durationSec, score, stars, won, skipped, statsJson,
+    rideId, segmentIndex, gameId, role, difficulty, startSec, durationSec, score, stars, won, skipped, statsJson, variant,
 )
 fun GameResultBackup.toEntity() = GameResult(
-    rideId, segmentIndex, gameId, role, difficulty, startSec, durationSec, score, stars, won, skipped, statsJson,
+    rideId, segmentIndex, gameId, role, difficulty, startSec, durationSec, score, stars, won, skipped, statsJson, variant,
 )
 
 fun RideSample.toBackup() = RideSampleBackup(rideId, tSec, cadence, resistance, power, heartRateBpm)

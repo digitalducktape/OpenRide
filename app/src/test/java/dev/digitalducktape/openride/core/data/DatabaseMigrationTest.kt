@@ -285,7 +285,39 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun `a version-1 database migrates to the schema Room expects at version 6`() = runTest {
+    fun `migrate 6 to 7 adds the variant column, empty for existing results`() {
+        val db = openV1Database()
+        MIGRATION_1_2.migrate(db)
+        MIGRATION_2_3.migrate(db)
+        MIGRATION_3_4.migrate(db)
+        MIGRATION_4_5.migrate(db)
+        MIGRATION_5_6.migrate(db)
+        db.execSQL(
+            "INSERT INTO profiles (id, name, avatarEmoji, avatarColor, weightKg, ftp) " +
+                "VALUES (1, 'Ed', '🚴', -16711936, 80.0, 220)",
+        )
+        db.execSQL(
+            "INSERT INTO rides (id, profileId, startEpochMs, durationSec, avgCadence, maxCadence, " +
+                "avgPower, maxPower, avgResistance, outputKj, calories, videoId) " +
+                "VALUES (1, 1, 1700000000000, 1800, 85, 100, 150, 300, 45, 270.0, 260, 'abc')",
+        )
+        db.execSQL(
+            "INSERT INTO game_results (rideId, segmentIndex, gameId, role, difficulty, startSec, " +
+                "durationSec, score, stars, won, skipped, statsJson) " +
+                "VALUES (1, 0, 'demo', 'free', 'standard', 0, 1200, 900.0, 2, NULL, 0, '{}')",
+        )
+
+        MIGRATION_6_7.migrate(db)
+
+        db.query("SELECT score, variant FROM game_results").use {
+            assertEquals(true, it.moveToFirst())
+            assertEquals(900.0, it.getDouble(0), 0.0)
+            assertEquals("", it.getString(1))
+        }
+    }
+
+    @Test
+    fun `a version-1 database migrates to the schema Room expects at version 7`() = runTest {
         val name = "migration-chain-test.db"
         context.deleteDatabase(name)
         openV1Database(name).execSQL(
@@ -298,7 +330,7 @@ class DatabaseMigrationTest {
         // Room validates every table against its entities on open, so a migration that misses
         // a column, an index or a foreign key fails here.
         val room = Room.databaseBuilder(context, OpenRideDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
         try {

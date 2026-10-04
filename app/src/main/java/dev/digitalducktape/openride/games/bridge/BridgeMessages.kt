@@ -132,6 +132,8 @@ data class SegmentResult(
     val won: Boolean?,
     val skipped: Boolean,
     val stats: JsonObject,
+    /** The game's variant, e.g. Dodge Ball's `catch`; `""` (or absent) for none. */
+    val variant: String = "",
 ) {
     companion object {
         /** Recorded when a game fails to report within the grace period, or reports garbage. */

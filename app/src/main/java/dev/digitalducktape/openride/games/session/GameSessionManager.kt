@@ -453,6 +453,7 @@ class GameSessionManager(
                 won = p.result.won,
                 skipped = p.result.skipped,
                 statsJson = p.result.stats.toString(),
+                variant = p.result.variant,
             )
         }
         try {
@@ -472,8 +473,13 @@ class GameSessionManager(
      * best at the same plan and difficulty (or is their first to score). Empty otherwise.
      */
     private suspend fun bests(pid: Long, rideId: Long, finishedPlan: SessionPlan, played: List<Played>): JsonObject {
+        // Sessions played in one variant throughout compare only with sessions in that variant.
+        val variants = played.filterNot { it.result.skipped }.map { it.result.variant }.distinct()
+        val variant = variants.singleOrNull()
         val previous = try {
-            gameResultDao.planBest(pid, finishedPlan.planId, wire(Difficulty.serializer(), finishedPlan.difficulty), rideId)
+            gameResultDao.planBest(
+                pid, finishedPlan.planId, wire(Difficulty.serializer(), finishedPlan.difficulty), rideId, variant,
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
