@@ -118,12 +118,13 @@ class GameCatalog(games: List<GameDeclaration>) {
             roles = setOf(SegmentRole.WORK),
             effortInJustRide = true,
             params = { _, difficulty, ftp ->
-                // TugLogic: the bot holds 100 / 110 / 120% of FTP and surges 20% of FTP above
-                // that, in watts (the game adds 5% of FTP a rung on the ladder).
+                // TugLogic: the bot holds 50 / 60 / 70% of FTP and surges 20% of FTP above that,
+                // in watts (the game adds 5% of FTP a rung on the ladder). Low on purpose: the
+                // first version, at 100-120%, asked more than a person can give.
                 val bot = when (difficulty) {
-                    Difficulty.EASY -> 1.0
-                    Difficulty.STANDARD -> 1.1
-                    Difficulty.HARD -> 1.2
+                    Difficulty.EASY -> 0.5
+                    Difficulty.STANDARD -> 0.6
+                    Difficulty.HARD -> 0.7
                 }
                 mapOf(
                     "bot_watts" to JsonPrimitive((ftp.watts * bot).roundToInt()),
@@ -153,8 +154,8 @@ class GameCatalog(games: List<GameDeclaration>) {
                 // SafeLogic's defaults, sent so a tuning change doesn't need a new game build:
                 // the resistance range of the combinations and the dial's cadence floor.
                 mapOf(
-                    "res_min" to JsonPrimitive(20),
-                    "res_max" to JsonPrimitive(45),
+                    "res_min" to JsonPrimitive(15),
+                    "res_max" to JsonPrimitive(40),
                     "cadence_min" to JsonPrimitive(60),
                 )
             },

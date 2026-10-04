@@ -1051,7 +1051,7 @@ and `TugAudio` the sounds; `TugOfWar.gd` wires them to the framework.
 watts is a stalemate, and holding 20% of FTP above the bot wins in 20 s. A round ends when `p`
 reaches either end, or at the buzzer (60 s), where `p > 0` wins (a dead heat is a loss).
 
-**The bot** holds 110% of FTP (`bot_watts`) and surges to 130% (`surge_watts`) for 5 s, at
+**The bot** holds 60% of FTP (`bot_watts`; 50% easy, 70% hard) and surges 20% of FTP above that (`surge_watts`) for 5 s, at
 most one surge every 12 s, telegraphed a second early by a drum roll and a bracing pose. A surge
 counts as answered if `p` never fell more than 0.2 during it (`surges_answered`).
 
@@ -1092,8 +1092,8 @@ hold it there to click a tumbler. `SafeLogic` holds the rules (headless-tested b
 
 **Rules.** The dial shows the live `resistance` reading (0-100). Hold within the tolerance of
 the target for the hold time (easy ±3 and 1.2 s, standard ±2 and 1.5 s, hard ±2 and 2 s) to click
-a tumbler. Each number is at least 6 from the one before, drawn from `res_min`-`res_max` (20-45).
-Power over `power_cap_watts` (60% of FTP) for 2 s trips the alarm and resets the tumbler;
+a tumbler. Each number is at least 6 from the one before, drawn from `res_min`-`res_max` (15-40).
+The alarm trips when power, smoothed over about a second, stays over 1.25 times `power_cap_watts` (60% of FTP) for 2.5 s; it resets the tumbler. It is easy-going on purpose: the first version tripped for ordinary pedalling.
 cadence under `cadence_min` (60) dims the dial and pauses the hold.
 
 **Knob lag.** The reading lags the knob, so a slip off target keeps its progress for 0.4 s

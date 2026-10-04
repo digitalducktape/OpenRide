@@ -25,7 +25,7 @@ func test_combinations_stay_in_range_and_apart() -> void:
 		var logic := SafeLogic.new(seed_value, "hard", {})
 		assert_int(logic.combo.size()).is_equal(5)
 		for i in logic.combo.size():
-			assert_int(logic.combo[i]).is_between(20, 45)
+			assert_int(logic.combo[i]).is_between(15, 40)
 			if i > 0:
 				assert_int(absi(logic.combo[i] - logic.combo[i - 1])).is_greater_equal(6)
 
@@ -89,23 +89,30 @@ func test_an_unpowered_dial_pauses_the_hold() -> void:
 	assert_int(logic.tumbler).is_equal(0)
 
 
-func test_power_over_the_cap_trips_the_alarm_and_resets_the_tumbler() -> void:
+func test_power_well_over_the_cap_trips_the_alarm_and_resets_the_tumbler() -> void:
 	var logic := _logic()
-	var target := float(logic.target())
-	_run(logic, 0.8, target, 80.0, 60.0)
-	assert_float(logic.progress).is_greater(0.7)
-	var events := _run(logic, 2.1, target, 80.0, 120.0)
+	logic.progress = 0.7
+	# Resistance far from the target, so no tumbler clicks; power at twice the cap.
+	var events := _run(logic, 4.0, 90.0, 80.0, 180.0)
 	assert_array(_types(events)).contains(["alarm"])
 	assert_int(logic.alarms).is_equal(1)
 	assert_float(logic.alarm_left).is_greater(0.0)
-	assert_float(logic.progress).is_less(0.5)
+	assert_float(logic.progress).is_equal(0.0)
 
 
-func test_a_burst_over_the_cap_shorter_than_two_seconds_is_forgiven() -> void:
+func test_ordinary_pedalling_a_little_over_the_cap_doesnt_trip_it() -> void:
+	# The cap is 90 W; the alarm needs power over 25% above it (112 W), smoothed.
 	var logic := _logic()
-	var events := _run(logic, 1.5, float(logic.target()), 80.0, 120.0)
+	var events := _run(logic, 20.0, 90.0, 80.0, 105.0)
 	assert_array(_types(events)).not_contains(["alarm"])
-	_run(logic, 3.0, 20.0, 80.0, 60.0)
+
+
+func test_a_burst_over_the_alarm_level_is_forgiven() -> void:
+	var logic := _logic()
+	_run(logic, 3.0, 90.0, 80.0, 60.0)
+	var events := _run(logic, 2.0, 90.0, 80.0, 200.0)  # a short spike, smoothed away
+	assert_array(_types(events)).not_contains(["alarm"])
+	_run(logic, 5.0, 90.0, 80.0, 60.0)
 	assert_float(logic.over_sec).is_equal(0.0)
 
 

@@ -21,12 +21,17 @@ const LEVELS := {
 const CIRCUIT_LENGTH := 3
 const MAX_LENGTH := 6
 const MIN_GAP := 6.0  ## each number is at least this far from the one before
-const DEFAULT_RES_MIN := 20.0
-const DEFAULT_RES_MAX := 45.0
+const DEFAULT_RES_MIN := 15.0
+const DEFAULT_RES_MAX := 40.0
 const DEFAULT_CADENCE_MIN := 60.0
 const GRACE_SEC := 0.4  ## a slip off target this short costs nothing (the knob's lag)
 const FADE_RATE := 1.5  ## after the grace, progress drains this many times as fast as it filled
-const ALARM_AFTER := 2.0  ## seconds over the power cap
+## The alarm is easy-going on purpose (the first version tripped for ordinary pedalling at the
+## resistances the dial asks for): it trips when power, smoothed over about a second, stays
+## over ALARM_HEADROOM times the recovery cap for ALARM_AFTER seconds.
+const ALARM_HEADROOM := 1.25
+const ALARM_AFTER := 2.5
+const POWER_SMOOTHING_SEC := 1.0
 const ALARM_SHOW_SEC := 2.5
 const OPEN_SEC := 2.6  ## the door swings open this long
 const HIDDEN_FROM_VAULT := 4
@@ -54,6 +59,7 @@ var total_alarms := 0
 var alarms := 0  ## this vault's
 var alarm_left := 0.0  ## the alarm light's remaining seconds
 var over_sec := 0.0
+var smoothed_power := -1.0  ## power smoothed over POWER_SMOOTHING_SEC; -1 before the first sample
 var vault_sec := 0.0
 var fastest := -1.0
 var phase_left := 0.0
@@ -114,6 +120,7 @@ func step(delta: float, resistance: float, cadence: float, power: float) -> Arra
 	reading = resistance
 	powered = cadence >= cadence_min
 	alarm_left = maxf(alarm_left - delta, 0.0)
+	smoothed_power = power if smoothed_power < 0.0 else lerpf(smoothed_power, power, minf(delta / POWER_SMOOTHING_SEC, 1.0))
 	avg_power_sum += power * delta
 	avg_power_sec += delta
 	if phase == Phase.OPENING:
@@ -123,13 +130,13 @@ func step(delta: float, resistance: float, cadence: float, power: float) -> Arra
 			events.append({"type": "new_vault", "vault": vault, "length": combo.size()})
 		return events
 	vault_sec += delta
-	_update_alarm(delta, power, events)
+	_update_alarm(delta, events)
 	_update_hold(delta, events)
 	return events
 
 
-func _update_alarm(delta: float, power: float, events: Array[Dictionary]) -> void:
-	if power_cap > 0.0 and power > power_cap:
+func _update_alarm(delta: float, events: Array[Dictionary]) -> void:
+	if power_cap > 0.0 and smoothed_power > power_cap * ALARM_HEADROOM:
 		over_sec += delta
 		if over_sec >= ALARM_AFTER:
 			over_sec = 0.0

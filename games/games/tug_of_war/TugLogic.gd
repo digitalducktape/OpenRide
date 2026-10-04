@@ -17,8 +17,11 @@ enum Phase { ROUND, ROUND_END, RECOVERY, MATCH_END }
 ## = 20 s; holding exactly its watts is a stalemate.
 const K := 0.25
 const DEFAULT_FTP := 200.0
-const BOT_FACTOR := 1.1  ## the bot's watts as a share of FTP
-const SURGE_FACTOR := 1.3
+## The bot's watts as a share of FTP. Deliberately low: a person pedalling along comfortably
+## makes about half their FTP, so beating the bot takes a little more than that, not an effort
+## at threshold (the rider's feedback on the first version, whose bot held 110%).
+const BOT_FACTOR := 0.6
+const SURGE_FACTOR := 0.8
 const SURGE_SEC := 5.0
 const TELEGRAPH_SEC := 1.0
 const SURGE_GAP_MIN := 12.0  ## at least this long between two surges' starts
