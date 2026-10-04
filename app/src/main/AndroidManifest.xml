@@ -100,7 +100,7 @@
             android:screenOrientation="landscape"
             android:resizeableActivity="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode|layoutDirection|locale"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+            android:theme="@style/Theme.OpenRide.GameHost" />
 
         <!-- Mini-games head tracker (#33): MediaPipe Tasks' tasks-core reports usage statistics to
              Google (TasksStatsProtoLogger → RemoteLoggingClient → datatransport's "cct" backend,

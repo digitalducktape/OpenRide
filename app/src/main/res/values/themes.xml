@@ -1,3 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.OpenRide" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- OpenRideColors.Background (ui/theme/Color.kt), for views outside Compose. -->
+    <color name="openride_background">#FF0C0C0E</color>
+    <color name="openride_accent">#FFE8442D</color>
+    <color name="openride_on_surface_variant">#FFA4A4AA</color>
+
+    <!-- The game host (#45): full screen, and the window (the starting preview and what shows
+         while the engine boots) is the app's background rather than black. -->
+    <style name="Theme.OpenRide.GameHost" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/openride_background</item>
+        <item name="android:colorBackground">@color/openride_background</item>
+        <item name="android:colorAccent">@color/openride_accent</item>
+        <item name="android:navigationBarColor">@color/openride_background</item>
+    </style>
 </resources>

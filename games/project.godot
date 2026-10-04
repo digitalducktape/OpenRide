@@ -11,6 +11,10 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 ; The Android back button must never quit: quitting the engine kills the app's whole process.
 ; Session handles the go-back request instead.
 config/quit_on_go_back=false
+; No engine logo while the engine starts (#45): a flat OpenRide background (OpenRideColors.Background,
+; #0C0C0E) under the host's own loading view, which GameHostActivity removes when the main loop starts.
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.0470588, 0.0470588, 0.054902, 1)
 
 [autoload]
 
@@ -35,5 +39,6 @@ window/handheld/orientation=0
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.0470588, 0.0470588, 0.054902, 1)
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true

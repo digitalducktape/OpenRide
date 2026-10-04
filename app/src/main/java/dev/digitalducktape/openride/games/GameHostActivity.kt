@@ -4,10 +4,19 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import dev.digitalducktape.openride.R
 import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.OpenRideBridgePlugin
@@ -37,6 +46,8 @@ import org.godotengine.godot.plugin.GodotPlugin
  * task (e.g. swiping it out of recents) still ends the process; see docs/GAMES.md.
  */
 class GameHostActivity : GodotActivity() {
+    private var loadingView: View? = null
+
     private val bridge: GameBridge
         get() = appContainer.gameBridge
 
@@ -50,7 +61,50 @@ class GameHostActivity : GodotActivity() {
         startSession(intent)
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        hideSystemBars()
+        showLoadingView()
         Log.i(TAG, "game host created")
+    }
+
+    /**
+     * The engine's first start takes a few seconds (setup, then the main scene). Its boot
+     * splash is turned off in `games/project.godot` (#45), so until the main loop starts this
+     * plain OpenRide loading view covers the engine's surface. Re-entry needs none: the engine
+     * keeps running, so only [onCreate] adds it.
+     */
+    private fun showLoadingView() {
+        val dp = { v: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics).toInt() }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            addView(ProgressBar(this@GameHostActivity).apply { isIndeterminate = true }, LinearLayout.LayoutParams(dp(48f), dp(48f)))
+            addView(
+                TextView(this@GameHostActivity).apply {
+                    text = getString(R.string.games_loading)
+                    setTextColor(getColor(R.color.openride_on_surface_variant))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                    setPadding(0, dp(16f), 0, 0)
+                },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT),
+            )
+        }
+        val overlay = FrameLayout(this).apply {
+            setBackgroundColor(getColor(R.color.openride_background))
+            // Swallow touches meant for the engine while it loads.
+            isClickable = true
+            addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        }
+        addContentView(overlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        loadingView = overlay
+    }
+
+    /** Called on the render thread once the main scene is loaded, just before its first frame. */
+    override fun onGodotMainLoopStarted() {
+        Log.i(TAG, "engine main loop started")
+        runOnUiThread {
+            loadingView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            loadingView = null
+        }
     }
 
     /** Entering games again: the engine is already running, so only the session is new. */

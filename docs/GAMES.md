@@ -203,6 +203,13 @@ These describe how the foundation (#32) implements v1. They don't change the con
 - It is landscape, keeps the screen on and hides the system bars.
 - It loads the pack with `--main-pack res://games.pck`.
 - It registers the `OpenRideBridgePlugin` host plugin (`Engine.get_singleton("OpenRideBridge")`).
+- No Godot splash (#45). `games/project.godot` turns the boot splash image off and sets its
+  colour and the default clear colour to the app background (`#0C0C0E`). The host's theme
+  (`Theme.OpenRide.GameHost`) uses the same window background. On the engine's first start,
+  `GameHostActivity` covers it with a plain "Loading game…" view, which it removes in
+  `onGodotMainLoopStarted` (the main scene is loaded and about to draw). Re-entry skips it,
+  because the engine is already running. Cold entry on the bike takes about 4.8–5 s from tap to
+  the main scene, with or without the view.
 
 **Godot runs one engine per process, and it can't be restarted.** This was checked on the bike
 (Godot 4.7.2). Finishing the host activity destroys the engine. Godot then calls
