@@ -82,7 +82,11 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
   - `params` are game-specific and already scaled to FTP and difficulty by Kotlin.
 - `segment_ending()`: the timer ran out. The game must call `segment_finished` within 5 s, or Kotlin
   records a zero-score result.
-- `session_paused()`, `session_resumed()`: from auto-pause on freewheel or a rider's pause request.
+- `session_paused()`, `session_resumed()`: from auto-pause on freewheel, a rider's pause request,
+  or a running calibration. Kotlin pauses the session for any calibration (the automatic one,
+  a requested one or the depth one) from its start until it completes, falls back
+  (`used_default`) or ends unavailable, then resumes by itself. The ride keeps recording through
+  a calibration pause. A rider's pause outlasts a calibration that ends under it.
 - `calibration_progress(step, fraction, step_index, step_count, attempt, retry_reason)`: drives the
   calibration UI, sent as the head tracker's calibration advances (while `tracker_state` is 2).
   - `step` ∈ `centre | left | right | in | back`: the pose to hold ("sit centred", "lean
@@ -114,7 +118,8 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 **Godot → Kotlin methods:**
 
 - `segment_finished(result_json)`: `{game_id, score, stars (0-3), won (bool|null), skipped (bool),
-  stats:{effort_avg, …}}`. A skip is reported as `skipped: true` during the intro card; Kotlin then
+  stats:{effort_avg, …}, variant}`. `variant` is optional (`""`): a game's own variant, such as
+  Dodge Ball's `catch` mode. A skip is reported as `skipped: true` during the intro card; Kotlin then
   advances to the next segment.
 - `request_calibration(mode)`: `mode` ∈ `lean_x | lean_2d`. The rider asked to recalibrate:
   every step runs again.
@@ -337,7 +342,10 @@ so a game only plays. None of this changes the Bridge contract.
 6. **The result**: this is `game.finish()`, with `stars` from the game's thresholds.
    `segment_finished` then goes to Kotlin. When an open-ended plan's last game ends, it offers
    **End session**.
-7. **Pause**: `session_paused` shows the pause screen (Resume, End session) and freezes the
+7. **Pause**: while the head tracker calibrates, the session is paused (see the contract) and
+   the calibration screen stands in for the pause screen, with no pause or resume cue. The
+   intro card's countdown waits for the session's first calibration.
+   Otherwise `session_paused` shows the pause screen (Resume, End session) and freezes the
    game, whether the rider paused or Kotlin auto-paused. The HUD's Pause button calls
    `request_pause`/`request_resume`. Its End button, and the pause screen's, ask for
    confirmation, then call `request_end`.
@@ -371,6 +379,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `effort_in_just_ride` | Whether the effort multiplier applies in a Just Ride |
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
+| `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
 | `options` | The game's own settings, shown in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
@@ -394,6 +403,11 @@ For work games, set the thresholds so that 3 stars needs about 1.3× effort. A p
 - `penalize(points)` takes points off without the multiplier (`Effort.penalize`), for
   penalties such as Dodge Ball's -50. The score never drops below zero.
 - `option(key)` reads one of the game's options for the current rider.
+- Set `variant` (e.g. Dodge Ball's `"catch"`) when the game has variants. The result carries it,
+  stars use the variant's thresholds, and Kotlin keeps bests and leaderboards per variant
+  (`game_results.variant`, schema 7).
+- Override `how_to_text(segment)` and `intro_visual()` to give the intro card a dynamic how-to
+  line and a small picture or animation (Dodge Ball shows its mode).
 - `end_segment()` ends the segment. It is honoured in `end_mode: game`, in open-ended
   segments, and after `request_finish`. A game that finishes early in a timed slot starts another
   round instead (epic #31, "Short games fill their slot").
@@ -440,19 +454,32 @@ counted.
 
 ### HUD kit
 
-`Hud` (`games/framework/hud/`) goes over every game. It shows:
+`Hud` (`games/framework/hud/`) goes over every game. Every element sits in a container slot,
+so nothing overlaps and nothing has a hand-placed position; the middle of the screen stays
+clear for the game:
 
-- the game's title and role;
-- the effort badge (`EffortBadge`: "Effort ×1.3" and a resistance gauge that marks 30% and 60%);
-- the segment timer (`SegmentTimer`);
-- the score, with Pause and End;
-- Recalibrate, for camera games;
-- the sensor banner (`SensorBanner`).
+| Row | Left (expands) | Centre | Right (expands) |
+| --- | --- | --- | --- |
+| sensor banner | (full width, only on sensor loss) | | |
+| top bar | title · role, effort badge | segment timer, then the game's widgets | score, Pause and End |
+| middle | | a centred message (`show_message`) | |
+| status slot | | the camera strip ("Camera steering is off", …) | |
+| bottom bar | ride metrics | | Recalibrate (camera games) |
+
+- **Ride metrics** (`RideMetrics`) are shared by every game: cadence (big), watts and
+  resistance. A game sets its bands with `hud.metrics.set_cadence_band(low, high)` and
+  `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red
+  well under, with the band beside it ("floor 85 rpm"); the watts turn gold at the target.
+- `hud_layout_test` lays the HUD out at 1920x1080 while playing, with the power bonus, the
+  camera strip, while calibrating and at game over, and checks that no two elements overlap.
+- Widgets only touch their labels when a value changes: a theme override or new text re-lays
+  out the HUD, which cost frame time on the tablet when done every frame.
 
 It is sized for a 1920x1080 canvas read from about 1 m away (`HudTheme`). Numbers are 96 px,
 text is never below 34 px, and buttons are 110 px tall.
 
-Games add their own widgets under the timer with `hud.add_widget()`, for example a
+Games add their own widgets under the timer with `hud.add_widget()` (keep them compact: the
+slot sits between the effort badge and the score), for example a
 `TargetBand` (a cadence floor or a power cap) or a `BigNumber`. `StarRow` draws stars as
 shapes, so no font needs the glyph. Everything uses Godot's default font.
 
@@ -949,7 +976,25 @@ What to look for in the log:
   (`OPENRIDE_GAMES <- calibration_progress left 2/3 attempt 1 …`).
 - `OpenRideGames` lines come from the Kotlin side of the session.
 
-## Dodge Ball on the tablet (#39)
+## Dodge Ball (#39)
+
+**Modes** (the per-rider "Mode" option): **Dodge** keeps away from danger-red balls; **Catch**
+steers into shimmering gold ones. A ball caught with the shield down is fumbled (no points,
+streak lost); a miss costs the streak, and three in a row a life in a Just Ride. Nothing is ever
+taken off in Catch, and every catch ball arrives within reach of the last. The result's
+`variant` is the mode played longest (`""` for Dodge, `"catch"`).
+
+**Speed** follows cadence: `0.0018·rpm² + 0.04·rpm` m/s (9 m/s at 60 rpm, 22 at 100, stopped at
+0), eased at up to 7 m/s². Cadence rather than power, because it's what the rider feels and it
+answers at once; power has its own reward. The view widens a little with speed, streaks rush
+past above about 90 rpm, and wind rises with speed. Each ball keeps the approach speed it was
+thrown at, so arrivals stay timed in seconds and the 0.8 s warning holds at any speed.
+
+**Stars** (points a minute): a perfect ride at 1.0× reaches 2 stars without the power bonus; 3
+stars needs the bonus and some effort multiplier, in 90 s circuit slots and two-minute Just Rides
+(`dodge_ball_logic_test`).
+
+### On the tablet
 
 Dodge Ball is the first 3D game. What holding 60 fps on the Gen 2 tablet (PowerVR GX6250,
 GL Compatibility) took, measured with the mock build:
@@ -968,10 +1013,12 @@ GL Compatibility) took, measured with the mock build:
 - **Release builds don't check for null.** A GDScript call on a null node crashed the exported
   build with SIGSEGV instead of an error, so test on the tablet as well as the editor.
 
-The result: 58-61 fps, and 51-61 while the camera searches for a face (`tracker_state` 2).
+The render scale is now 0.62, for headroom with face tracking on the bike (it read 55-57 fps
+at 0.67 with the effort badge re-laying out the HUD every frame, since fixed).
 
-For measuring, the game logs `OPENRIDE_GAMES dodge_ball perf game_ms=… process_ms=…
-draw_calls=…` every 5 s. If `user://dodge_tuning.cfg` exists, it overrides the render settings
+For measuring, set `DEV_TUNING` in `DodgeBall.gd` (off in every build). The game then logs
+`OPENRIDE_GAMES dodge_ball perf game_ms=… process_ms=… draw_calls=…` every 5 s, and if
+`user://dodge_tuning.cfg` exists, it overrides the render settings
 (`[render] scale=0.67 msaa=0`) and switches parts off (`[world] sky=false road=false
 verges=false scenery=false balls=false rig=false fog=false screenfx=false`). Write it with
 `adb shell run-as dev.digitalducktape.openride …`.

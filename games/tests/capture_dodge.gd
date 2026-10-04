@@ -18,6 +18,7 @@ func _run() -> void:
 	var out := "user://captures"
 	var hud := true
 	var play_sec := 0.0
+	var intro := false
 	var scenes := ["dawn", "day", "dusk", "night"]
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
@@ -26,6 +27,14 @@ func _run() -> void:
 			hud = false
 		elif arg.begins_with("--scenes="):
 			scenes = arg.get_slice("=", 1).split(",")
+		elif arg.begins_with("--mode="):
+			# Written straight to the options file: a -s script can't name classes that use autoloads.
+			var options := ConfigFile.new()
+			options.load("user://game_options.cfg")
+			options.set_value("guest/dodge_ball", "mode", arg.get_slice("=", 1))
+			options.save("user://game_options.cfg")
+		elif arg == "--intro":
+			intro = true
 		elif arg.begins_with("--play="):
 			play_sec = float(arg.get_slice("=", 1))
 	DirAccess.make_dir_recursive_absolute(out)
@@ -34,6 +43,15 @@ func _run() -> void:
 	Engine.time_scale = 4.0
 	_session._local.start({"kind": "just_ride", "plan_id": "capture", "difficulty": "standard", "total_sec": -1,
 		"segments": [{"game_id": "dodge_ball", "role": "free", "duration_sec": -1}]})
+	if intro:
+		# The intro card, once the calibration has run.
+		Engine.time_scale = 1.0
+		while _session.is_calibrating():
+			await process_frame
+		await create_timer(1.5).timeout
+		root.get_viewport().get_texture().get_image().save_png("%s/dodge_intro.png" % out)
+		print("CAPTURE %s/dodge_intro.png" % out)
+		Engine.time_scale = 4.0
 	var deadline := Time.get_ticks_msec() + 20000
 	while _director.phase_name() != "PLAYING" and Time.get_ticks_msec() < deadline:
 		await process_frame
