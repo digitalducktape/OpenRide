@@ -3,8 +3,11 @@ package dev.digitalducktape.openride.ui.update
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -80,15 +83,6 @@ fun UpdateScreen(
                 )
             }
 
-            uiState.available?.notes?.let { notes ->
-                Text(
-                    text = notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.padding(top = 16.dp),
@@ -115,7 +109,24 @@ fun UpdateScreen(
                 }
             }
 
-            OutlinedButton(onClick = onDone, modifier = Modifier.padding(top = 32.dp)) {
+            // Release notes can be arbitrarily long; only this block scrolls, so the action
+            // buttons above and Done below stay on screen.
+            val notes = uiState.available?.notes
+            if (notes != null) {
+                Text(
+                    text = notes,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 16.dp),
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            OutlinedButton(onClick = onDone, modifier = Modifier.padding(top = 16.dp)) {
                 Text("Done")
             }
         }
