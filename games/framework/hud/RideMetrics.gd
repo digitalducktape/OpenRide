@@ -1,7 +1,7 @@
 class_name RideMetrics
 extends PanelContainer
-## The shared ride readout every game shows in the HUD's bottom-left corner: cadence (big),
-## power and resistance, readable at a glance while riding.
+## The shared ride readout every game shows in the HUD's ride panel (top left, under the effort
+## badge): cadence (big), power and resistance, readable at a glance while riding.
 ##
 ## A game sets its cadence target with `set_cadence_band(low, high)` (e.g. Dodge Ball's floor)
 ## and its power target with `set_power_band(low, high)`. The rpm turns green inside the band and
@@ -24,9 +24,10 @@ var _resistance: Label
 var _shown := {}
 
 
-func _init() -> void:
+## `framed`: false inside a shared panel (the HUD's ride panel).
+func _init(framed := true) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_theme_stylebox_override("panel", HudTheme.panel_style())
+	add_theme_stylebox_override("panel", HudTheme.panel_style() if framed else StyleBoxEmpty.new())
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 28)

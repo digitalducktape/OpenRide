@@ -455,31 +455,40 @@ counted.
 ### HUD kit
 
 `Hud` (`games/framework/hud/`) goes over every game. Every element sits in a container slot,
-so nothing overlaps and nothing has a hand-placed position; the middle of the screen stays
-clear for the game:
+so nothing overlaps and nothing has a hand-placed position. Everything persistent sits above the
+horizon or at the screen's edges, so the playfield (Dodge Ball's road) stays clear from the
+horizon down to the bike:
 
 | Row | Left (expands) | Centre | Right (expands) |
 | --- | --- | --- | --- |
 | sensor banner | (full width, only on sensor loss) | | |
-| top bar | title · role, effort badge | segment timer, then the game's widgets | score, Pause and End |
-| middle | | a centred message (`show_message`) | |
+| top bar | ride panel: effort ×, gauge, then rpm, watts, resistance | the game's own status widgets (`add_widget`), slim | time left over the score, Pause and End under it |
+| middle | | a brief, translucent message (`show_message`) | |
 | status slot | | the camera strip ("Camera steering is off", …) | |
-| bottom bar | ride metrics | | Recalibrate (camera games) |
+| bottom bar | | | Recalibrate (camera games) |
+
+The game's title and role aren't shown during play: the intro card names the game (and, for
+Dodge Ball, the mode).
 
 - **Ride metrics** (`RideMetrics`) are shared by every game: cadence (big), watts and
   resistance. A game sets its bands with `hud.metrics.set_cadence_band(low, high)` and
   `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red
   well under, with the band beside it ("floor 85 rpm"); the watts turn gold at the target.
 - `hud_layout_test` lays the HUD out at 1920x1080 while playing, with the power bonus, the
-  camera strip, while calibrating and at game over, and checks that no two elements overlap.
+  camera strip, while calibrating and at game over, with the longest texts each element shows.
+  It checks that no two elements overlap and that none covers the road. The road keep-clear
+  area is derived from Dodge Ball's camera (eye height 1.45 m, pitch −7°, both ends of its 62-72°
+  field of view) and road edges (6 m either side, the bike anywhere within 4.4 m of the centre):
+  a point is road when its ray meets the ground inside that band. Each element is grown by 12 px
+  for the camera's roll. Recalibrate, the camera strip and brief messages are exempt by design.
 - Widgets only touch their labels when a value changes: a theme override or new text re-lays
   out the HUD, which cost frame time on the tablet when done every frame.
 
 It is sized for a 1920x1080 canvas read from about 1 m away (`HudTheme`). Numbers are 96 px,
 text is never below 34 px, and buttons are 110 px tall.
 
-Games add their own widgets under the timer with `hud.add_widget()` (keep them compact: the
-slot sits between the effort badge and the score), for example a
+Games add their own widgets to the top-centre slot with `hud.add_widget()`. Keep them slim (a
+row or two of small text, as Dodge Ball's status) so they stay above the horizon, for example a
 `TargetBand` (a cadence floor or a power cap) or a `BigNumber`. `StarRow` draws stars as
 shapes, so no font needs the glyph. Everything uses Godot's default font.
 

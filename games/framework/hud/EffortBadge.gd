@@ -12,13 +12,14 @@ var _shown_multiplier := -1.0
 var _shown_resistance := -1
 
 
-func _init() -> void:
+## `framed`: false inside a shared panel (the HUD's ride panel).
+func _init(framed := true) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_theme_stylebox_override("panel", HudTheme.panel_style())
+	add_theme_stylebox_override("panel", HudTheme.panel_style() if framed else StyleBoxEmpty.new())
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(box)
-	_badge = HudTheme.label("Effort ×1.0", HudTheme.MEDIUM, HudTheme.EFFORT)
+	_badge = HudTheme.label("Effort ×1.0", HudTheme.BODY, HudTheme.EFFORT)
 	box.add_child(_badge)
 	_gauge = Control.new()
 	_gauge.custom_minimum_size = GAUGE_SIZE

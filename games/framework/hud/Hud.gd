@@ -3,46 +3,49 @@ extends CanvasLayer
 ## The standard in-game HUD that Session puts over every game (docs/GAMES.md, "HUD kit").
 ##
 ## Every element sits in a container slot, so nothing overlaps in any state and nothing has a
-## hand-placed position. The middle of the screen stays clear for the game:
+## hand-placed position. Everything persistent sits above the horizon or at the edges, so the
+## road (or any game's playfield) stays clear from the horizon down:
 ##
 ##   Frame (MarginContainer, full screen)
 ##   └ Rows (VBox)
-##     ├ sensor banner                          (only on sensor loss)
+##     ├ sensor banner                       (only on sensor loss)
 ##     ├ TopBar (HBox)
-##     │  ├ Left  (expand):  title · role, effort badge
-##     │  ├ Centre:          segment timer, then the game's widgets (`add_widget`)
-##     │  └ Right (expand):  score, Pause | End
-##     ├ Middle (expand):    a centred message (`show_message`), e.g. "Game over"
+##     │  ├ Left (expand):   the ride panel: effort multiplier and gauge, then rpm (with the
+##     │  │                  game's floor or band), watts and resistance
+##     │  ├ Centre:          the game's own status widgets (`add_widget`), compact
+##     │  └ Right (expand):  time left over the score in one panel, Pause | End under it
+##     ├ Middle (expand):    a brief centred message (`show_message`), translucent
 ##     ├ status slot:        the camera strip ("Camera steering is off", …), when showing
-##     └ BottomBar (HBox)
-##        ├ ride metrics:    rpm with the game's band, watts, resistance
-##        ├ spacer (expand)
-##        └ Recalibrate      (camera games)
+##     └ BottomBar (HBox):   Recalibrate on the right (camera games)
 ##
-## Left and Right expand equally, so the centre column stays centred. Games reach the HUD as
-## `hud`: they add widgets in `_on_prepare`, set the metrics' bands, and show messages; Session
-## clears all three when the game leaves.
+## Left and Right expand equally, so the centre column stays centred. The game's title and
+## role aren't shown during play: the intro card names the game. Games reach the HUD as `hud`:
+## they add widgets in `_on_prepare`, set the metrics' bands, and show messages; Session clears
+## all three when the game leaves.
 
 signal pause_pressed
 signal end_pressed
 signal recalibrate_pressed
 
 const LAYER := 10
-const GAP := 20
+const GAP := 16
 const SIDE_BUTTON_WIDTH := 160.0
+const MESSAGE_ALPHA := 0.85
 
-var title: Label
-var role: Label
 var timer: SegmentTimer
 var score: BigNumber
 var effort: EffortBadge
+var metrics: RideMetrics
 var sensor_banner: SensorBanner
 var pause_button: Button
 var end_button: Button
 var recalibrate_button: Button
-var metrics: RideMetrics
 ## Where the calibration overlay's camera strip lives during play (see CalibrationOverlay).
 var status_slot: HBoxContainer
+## The persistent panels (for layout checks): the ride panel, the clock-and-score panel, the
+## buttons and the game's widget row.
+var ride_panel: PanelContainer
+var clock_panel: PanelContainer
 
 var frame: MarginContainer
 var _widgets: HBoxContainer
@@ -69,37 +72,37 @@ func _init() -> void:
 	var top := _box(HBoxContainer.new(), rows, "TopBar")
 	var left := _box(VBoxContainer.new(), top, "Left")
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title_row := _box(HBoxContainer.new(), left, "TitleRow")
-	title = HudTheme.label("", HudTheme.MEDIUM)
-	title_row.add_child(title)
-	role = HudTheme.label("", HudTheme.SMALL, HudTheme.MUTED)
-	role.size_flags_vertical = Control.SIZE_SHRINK_END
-	title_row.add_child(role)
-	effort = EffortBadge.new()
-	effort.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	left.add_child(effort)
+	ride_panel = _panel(left, "RidePanel")
+	ride_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var ride := _box(VBoxContainer.new(), ride_panel, "Ride")
+	effort = EffortBadge.new(false)
+	ride.add_child(effort)
+	metrics = RideMetrics.new(false)
+	ride.add_child(metrics)
 
 	var centre := _box(VBoxContainer.new(), top, "Centre")
 	centre.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	timer = SegmentTimer.new()
-	timer.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	centre.add_child(timer)
 	_widgets = _box(HBoxContainer.new(), centre, "Widgets")
 	_widgets.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var right := _box(VBoxContainer.new(), top, "Right")
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	score = BigNumber.new("score", "0")
-	score.size_flags_horizontal = Control.SIZE_SHRINK_END
-	score.custom_minimum_size = Vector2(2 * SIDE_BUTTON_WIDTH + GAP, 0)
-	right.add_child(score)
+	clock_panel = _panel(right, "ClockPanel")
+	clock_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	clock_panel.custom_minimum_size = Vector2(2 * SIDE_BUTTON_WIDTH + GAP, 0)
+	var clock := _box(VBoxContainer.new(), clock_panel, "Clock")
+	clock.add_theme_constant_override("separation", 0)
+	timer = SegmentTimer.new(true)
+	clock.add_child(timer)
+	score = BigNumber.new("score", "0", HudTheme.INK, true)
+	clock.add_child(score)
 	var buttons := _box(HBoxContainer.new(), right, "Buttons")
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_END
 	pause_button = HudTheme.button("Pause", func(): pause_pressed.emit())
-	pause_button.custom_minimum_size.x = SIDE_BUTTON_WIDTH
+	pause_button.custom_minimum_size = Vector2(SIDE_BUTTON_WIDTH, HudTheme.BUTTON_HEIGHT * 0.8)
 	buttons.add_child(pause_button)
 	end_button = HudTheme.button("End", func(): end_pressed.emit(), Color(0.45, 0.16, 0.2))
-	end_button.custom_minimum_size.x = SIDE_BUTTON_WIDTH
+	end_button.custom_minimum_size = Vector2(SIDE_BUTTON_WIDTH, HudTheme.BUTTON_HEIGHT * 0.8)
 	buttons.add_child(end_button)
 
 	var middle := CenterContainer.new()
@@ -110,6 +113,7 @@ func _init() -> void:
 	_message = HudTheme.label("", HudTheme.BIG)
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_message.add_theme_constant_override("outline_size", 16)
+	_message.modulate.a = MESSAGE_ALPHA
 	_message.visible = false
 	middle.add_child(_message)
 
@@ -117,13 +121,7 @@ func _init() -> void:
 	status_slot.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var bottom := _box(HBoxContainer.new(), rows, "BottomBar")
-	metrics = RideMetrics.new()
-	metrics.size_flags_vertical = Control.SIZE_SHRINK_END
-	bottom.add_child(metrics)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bottom.add_child(spacer)
+	bottom.alignment = BoxContainer.ALIGNMENT_END
 	recalibrate_button = HudTheme.button("Recalibrate", func(): recalibrate_pressed.emit())
 	recalibrate_button.size_flags_vertical = Control.SIZE_SHRINK_END
 	recalibrate_button.visible = false
@@ -133,13 +131,6 @@ func _init() -> void:
 ## Fills the HUD for a new segment.
 func setup(info: GameInfo, segment: Dictionary) -> void:
 	clear_widgets()
-	title.text = info.title
-	var role_id := str(segment.get("role", "free"))
-	var count := int(segment.get("count", 1))
-	role.text = HudTheme.role_name(role_id)
-	if count > 1:
-		role.text += "  ·  %d of %d" % [int(segment.get("index", 0)) + 1, count]
-	role.add_theme_color_override("font_color", HudTheme.role_color(role_id))
 	recalibrate_button.visible = info.uses_camera()
 
 
@@ -179,6 +170,15 @@ func _process(_delta: float) -> void:
 	if shown != _score_text:
 		_score_text = shown
 		score.set_value(shown)
+
+
+func _panel(parent: Control, node_name: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name
+	panel.add_theme_stylebox_override("panel", HudTheme.panel_style())
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(panel)
+	return panel
 
 
 func _box(box: BoxContainer, parent: Control, node_name: String) -> BoxContainer:

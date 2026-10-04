@@ -1,26 +1,33 @@
 class_name DodgeStatus
 extends PanelContainer
-## Dodge Ball's one HUD widget, compact enough to sit under the timer between the effort badge
-## and the score: the shield bar (drains under the cadence floor), the power bonus, the streak
-## and, in a Just Ride, the lives (drawn as balls, so no font glyph is needed) and the wave.
+## Dodge Ball's HUD widget, in the HUD's top-centre slot. Slim, so it sits above the horizon
+## and never covers the road: two short rows.
+##
+##   DODGE  shield ▕████▁▁▁▁▏
+##   ×2   streak 12   ●●○   wave 2
+##
+## The mode in its colour (danger red / reward gold); the shield bar drains under the cadence
+## floor (amber, "pedal up!") and pulses red when empty; the power bonus, the streak and, in a
+## Just Ride, the lives (drawn as balls, so no font glyph is needed) and the wave. Labels only
+## change with their values: re-laying out the HUD every frame cost frame time on the tablet.
 
-const BAR_SIZE := Vector2(400, 24)
-const LIFE_RADIUS := 15.0
+const BAR_SIZE := Vector2(300, 22)
+const LIFE_RADIUS := 12.0
 
 var shield := 1.0
-var _drawn_shield := -1.0
 var draining := false
 var floor_rpm := 85.0
 var lives := -1  ## -1: no lives (circuit)
 
-var _caption: Label
 var _mode: Label
+var _caption: Label
 var _bar: Control
 var _bonus: Label
 var _streak: Label
 var _lives_box: Control
 var _wave: Label
 var _t := 0.0
+var _drawn_shield := -1.0
 var _bonus_on := false
 var _streak_count := -1
 var _wave_number := -1
@@ -30,43 +37,45 @@ func _init(floor_value := 85.0, with_lives := false, is_catch := false) -> void:
 	floor_rpm = floor_value
 	lives = DodgeBallLogic.LIVES if with_lives else -1
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_theme_stylebox_override("panel", HudTheme.panel_style())
+	var style := HudTheme.panel_style()
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	style.content_margin_left = 20
+	style.content_margin_right = 20
+	add_theme_stylebox_override("panel", style)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 2)
 	add_child(box)
-	var head := HBoxContainer.new()
-	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	head.add_theme_constant_override("separation", 16)
-	box.add_child(head)
+
+	var top := _row(box)
 	_mode = HudTheme.label("", HudTheme.SMALL)
-	head.add_child(_mode)
+	top.add_child(_mode)
 	_caption = HudTheme.label("", HudTheme.SMALL, HudTheme.MUTED)
-	head.add_child(_caption)
+	_caption.custom_minimum_size = Vector2(150, 0)
+	top.add_child(_caption)
 	_bar = Control.new()
 	_bar.custom_minimum_size = BAR_SIZE
+	_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bar.draw.connect(_draw_bar)
-	box.add_child(_bar)
-	var row := HBoxContainer.new()
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 28)
-	box.add_child(row)
-	_bonus = HudTheme.label("×1", HudTheme.MEDIUM, HudTheme.MUTED)
-	row.add_child(_bonus)
-	_streak = HudTheme.label("streak 0", HudTheme.MEDIUM)
-	row.add_child(_streak)
+	top.add_child(_bar)
+
+	var bottom := _row(box)
+	_bonus = HudTheme.label("×1", HudTheme.SMALL, HudTheme.MUTED)
+	bottom.add_child(_bonus)
+	_streak = HudTheme.label("streak 0", HudTheme.SMALL)
+	bottom.add_child(_streak)
 	_lives_box = Control.new()
-	_lives_box.custom_minimum_size = Vector2(LIFE_RADIUS * 2.0 * 3 + 20, LIFE_RADIUS * 2.0 + 10)
+	_lives_box.custom_minimum_size = Vector2(LIFE_RADIUS * 2.0 * 3 + 16, LIFE_RADIUS * 2.0 + 4)
 	_lives_box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_lives_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_lives_box.draw.connect(_draw_lives)
 	_lives_box.visible = with_lives
-	row.add_child(_lives_box)
+	bottom.add_child(_lives_box)
 	_wave = HudTheme.label("", HudTheme.SMALL, HudTheme.MUTED)
-	_wave.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_wave.visible = with_lives
-	row.add_child(_wave)
+	bottom.add_child(_wave)
 	_refresh_caption()
 	set_catch(is_catch)
 
@@ -82,8 +91,6 @@ func set_state(value: float, below_floor: bool, bonus_on: bool, streak: int, liv
 	if below_floor != draining:
 		draining = below_floor
 		_refresh_caption()
-	# Only touch labels when they change: a theme override or new text re-lays out the HUD,
-	# which cost several ms a frame on the tablet when done every frame.
 	if bonus_on != _bonus_on:
 		_bonus_on = bonus_on
 		_bonus.text = "×2" if bonus_on else "×1"
@@ -109,8 +116,16 @@ func _process(delta: float) -> void:
 
 
 func _refresh_caption() -> void:
-	_caption.text = "shield draining: pedal up!" if draining else "shield"
+	_caption.text = "pedal up!" if draining else "shield"
 	_caption.add_theme_color_override("font_color", HudTheme.WARN if draining else HudTheme.MUTED)
+
+
+func _row(parent: Container) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 18)
+	parent.add_child(row)
+	return row
 
 
 func _draw_bar() -> void:
@@ -128,7 +143,7 @@ func _draw_bar() -> void:
 
 func _draw_lives() -> void:
 	for i in DodgeBallLogic.LIVES:
-		var c := Vector2(LIFE_RADIUS + i * (LIFE_RADIUS * 2.0 + 10.0), LIFE_RADIUS + 5.0)
+		var c := Vector2(LIFE_RADIUS + i * (LIFE_RADIUS * 2.0 + 8.0), LIFE_RADIUS + 2.0)
 		if i < lives:
 			_lives_box.draw_circle(c, LIFE_RADIUS, Color(0.98, 0.32, 0.2))
 			_lives_box.draw_arc(c, LIFE_RADIUS * 0.6, -0.6, 0.9, 12, Color(1, 1, 1, 0.5), 3.0)

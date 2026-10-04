@@ -6,8 +6,8 @@ extends BigNumber
 const WARN_SEC := 10.0
 
 
-func _init() -> void:
-	super("time left", "--:--")
+func _init(compact := false) -> void:
+	super("time left", "--:--", HudTheme.INK, compact)
 
 
 func _process(_delta: float) -> void:
