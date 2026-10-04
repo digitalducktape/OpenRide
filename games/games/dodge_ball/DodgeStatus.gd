@@ -4,7 +4,7 @@ extends PanelContainer
 ## and the score: the shield bar (drains under the cadence floor), the power bonus, the streak
 ## and, in a Just Ride, the lives (drawn as balls, so no font glyph is needed) and the wave.
 
-const BAR_SIZE := Vector2(440, 26)
+const BAR_SIZE := Vector2(400, 24)
 const LIFE_RADIUS := 15.0
 
 var shield := 1.0
@@ -14,6 +14,7 @@ var floor_rpm := 85.0
 var lives := -1  ## -1: no lives (circuit)
 
 var _caption: Label
+var _mode: Label
 var _bar: Control
 var _bonus: Label
 var _streak: Label
@@ -25,7 +26,7 @@ var _streak_count := -1
 var _wave_number := -1
 
 
-func _init(floor_value := 85.0, with_lives := false) -> void:
+func _init(floor_value := 85.0, with_lives := false, is_catch := false) -> void:
 	floor_rpm = floor_value
 	lives = DodgeBallLogic.LIVES if with_lives else -1
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -34,8 +35,14 @@ func _init(floor_value := 85.0, with_lives := false) -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_theme_constant_override("separation", 6)
 	add_child(box)
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_theme_constant_override("separation", 16)
+	box.add_child(head)
+	_mode = HudTheme.label("", HudTheme.SMALL)
+	head.add_child(_mode)
 	_caption = HudTheme.label("", HudTheme.SMALL, HudTheme.MUTED)
-	box.add_child(_caption)
+	head.add_child(_caption)
 	_bar = Control.new()
 	_bar.custom_minimum_size = BAR_SIZE
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -61,6 +68,13 @@ func _init(floor_value := 85.0, with_lives := false) -> void:
 	_wave.visible = with_lives
 	row.add_child(_wave)
 	_refresh_caption()
+	set_catch(is_catch)
+
+
+## Shows the mode, in its colour: DODGE in danger red, CATCH in reward gold.
+func set_catch(is_catch: bool) -> void:
+	_mode.text = "CATCH" if is_catch else "DODGE"
+	_mode.add_theme_color_override("font_color", Color(1.0, 0.8, 0.18) if is_catch else Color(0.98, 0.32, 0.25))
 
 
 func set_state(value: float, below_floor: bool, bonus_on: bool, streak: int, lives_left: int, wave: int) -> void:
@@ -95,7 +109,7 @@ func _process(delta: float) -> void:
 
 
 func _refresh_caption() -> void:
-	_caption.text = ("Pedal above %d rpm!" if draining else "Shield  ·  above %d rpm") % roundi(floor_rpm)
+	_caption.text = "shield draining: pedal up!" if draining else "shield"
 	_caption.add_theme_color_override("font_color", HudTheme.WARN if draining else HudTheme.MUTED)
 
 

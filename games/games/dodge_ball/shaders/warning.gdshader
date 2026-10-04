@@ -1,11 +1,13 @@
 // A ball's warning (one MultiMesh of flat quads on the road): a glowing lane strip at the
 // rider's line where the ball will arrive, with chevrons running towards the rider. It
 // brightens as the ball nears (INSTANCE_CUSTOM.r = urgency 0-1). Unshaded and additive, so it
-// reads in every light.
+// reads in every light. INSTANCE_CUSTOM.b picks the colour: danger red to avoid (Dodge) or
+// gold to steer into (Catch).
 shader_type spatial;
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled;
 
-uniform vec3 tint : source_color = vec3(1.0, 0.35, 0.15);
+uniform vec3 tint : source_color = vec3(1.0, 0.3, 0.12);  // Dodge: danger
+uniform vec3 reward_tint : source_color = vec3(1.0, 0.82, 0.2);  // Catch: steer here
 
 varying vec4 custom;
 
@@ -23,5 +25,5 @@ void fragment() {
 	float a = edge * along * (0.25 + 0.35 * chevron) * (0.35 + 0.65 * urgency);
 	// A bright bar at the arrival line.
 	a += smoothstep(0.9, 0.97, UV.y) * smoothstep(1.0, 0.97, UV.y) * (0.6 + 0.4 * urgency) * edge;
-	ALBEDO = tint * a * custom.a;
+	ALBEDO = mix(tint, reward_tint, custom.b) * a * custom.a;
 }

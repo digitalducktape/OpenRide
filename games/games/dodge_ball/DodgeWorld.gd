@@ -27,16 +27,29 @@ const CHUNKS := 3
 const LAMP_SPACING := 25.0
 const SCROLL_WRAP := 450.0  ## a multiple of every road pattern's period (9, 2, 25 and 45 m)
 const ROLL_SPEED := 6.0  ## m/s a ball rolls at the rider, on top of road speed
-const MAX_ACCEL := 2.0  ## m/s² cap on the road speed's change, so ball spacing never reverses
+## m/s² cap on the road speed's change: quick enough that a burst of pedalling shows at once,
+## smooth enough that stopping eases the bike to a halt. (Balls keep the approach speed they
+## were thrown at, so this never bunches or reverses them.)
+const MAX_ACCEL := 7.0
+const FOV_SLOW := 62.0
+const FOV_FAST := 72.0  ## a slight widening at speed
+const FAST_SPEED := 25.0  ## m/s where the FOV is widest and the speed streaks are thickest
+const STREAKS_FROM := 17.0  ## m/s (about 90 rpm) where speed streaks start
 const BALLS_MAX := 32
 const BOUNCE_PERIOD := 0.55
 const BOUNCE_HEIGHT := 0.7
 const GHOST_SEC := 0.6
 
+## Dodge: danger reds. Catch: reward golds, so the mode is unmistakable at a glance.
 const BALL_COLORS := {
-	"plain": Color(0.98, 0.32, 0.2),
-	"curve": Color(0.7, 0.35, 1.0),
-	"double": Color(0.1, 0.82, 0.75),
+	"plain": Color(0.98, 0.22, 0.16),
+	"curve": Color(0.85, 0.15, 0.45),
+	"double": Color(1.0, 0.42, 0.1),
+}
+const CATCH_COLORS := {
+	"plain": Color(1.0, 0.8, 0.18),
+	"curve": Color(1.0, 0.62, 0.1),
+	"double": Color(0.95, 0.9, 0.35),
 }
 
 const MODELS := "res://games/dodge_ball/models/"
@@ -81,6 +94,9 @@ var _shake_t := 0.0
 var _anim_t := 0.0
 var _ghosts: Array[Dictionary] = []  # dodged balls rolling on past the bike: {x, z, kind, t, y}
 var _bounce_phase := {}  # ball id -> last bounce index, for the landing sound
+var _ball_speed := {}  # ball id -> its approach speed (m/s), fixed when it was thrown
+var _streaks: CPUParticles3D
+var _speed_feel := 0.0  ## 0-1: how fast the ride looks (FOV, streaks), smoothed
 var _tod: DodgeTimeOfDay
 var _noise: ImageTexture
 
@@ -123,6 +139,13 @@ func _apply_tuning() -> void:
 func update_view(delta: float, logic: DodgeBallLogic, cadence_speed: float, lean: float) -> void:
 	_anim_t += delta
 	road_speed = move_toward(road_speed, cadence_speed, MAX_ACCEL * delta)
+	_speed_feel = clampf(road_speed / FAST_SPEED, 0.0, 1.0)
+	camera.fov = lerpf(FOV_SLOW, FOV_FAST, _speed_feel * _speed_feel)
+	var streaks := clampf((road_speed - STREAKS_FROM) / (FAST_SPEED + 5.0 - STREAKS_FROM), 0.0, 1.0)
+	_streaks.emitting = streaks > 0.0 and tuning.get("streaks", true)
+	_streaks.color = Color(1, 1, 1, 0.08 + 0.2 * streaks)
+	_streaks.initial_velocity_min = road_speed * 1.6
+	_streaks.initial_velocity_max = road_speed * 2.0
 	distance += road_speed * delta
 	var scroll := fmod(distance, SCROLL_WRAP)
 	_road_mat.set_shader_parameter("scroll", scroll)
@@ -154,9 +177,21 @@ func approach_speed() -> float:
 	return road_speed + ROLL_SPEED
 
 
+## A new ball: it keeps the approach speed of this moment, so it closes at a steady speed and
+## arrives exactly when the rules say, however the rider's cadence changes meanwhile.
+func note_spawn(ball: Dictionary) -> void:
+	_ball_speed[ball.id] = approach_speed()
+
+
 ## The z a ball with `eta` seconds to go is at.
-func z_for_eta(eta: float) -> float:
-	return RIDER_LINE_Z - eta * approach_speed()
+func z_for_eta(eta: float, speed := -1.0) -> float:
+	return RIDER_LINE_Z - eta * (speed if speed > 0.0 else approach_speed())
+
+
+## A ball's colour: danger red when dodging, reward gold when catching.
+static func ball_color(kind: String, catch_mode: bool) -> Color:
+	var table: Dictionary = CATCH_COLORS if catch_mode else BALL_COLORS
+	return table.get(kind, table.plain)
 
 
 func set_time_of_day(tod: DodgeTimeOfDay) -> void:
@@ -200,15 +235,36 @@ func set_time_of_day(tod: DodgeTimeOfDay) -> void:
 # --- Feedback ---
 
 ## A hit: the ball bursts at `x`, the screen nudges sideways.
-func hit_fx(x: float, kind: String) -> void:
+func hit_fx(x: float, kind: String, catch_mode := false, shake := 1.0) -> void:
 	var p := _bursts[_next_burst]
 	_next_burst = (_next_burst + 1) % _bursts.size()
 	# A little ahead of the bars, so the burst reads as the ball breaking up, not as debris in
 	# the rider's face.
 	p.position = Vector3(x, 0.5, RIDER_LINE_Z - 2.0)
-	p.color = BALL_COLORS.get(kind, BALL_COLORS.plain)
+	p.color = ball_color(kind, catch_mode)
 	p.restart()
-	_shake = 1.0
+	_shake = shake
+
+
+## Catch: a caught ball bursts into gold sparks at the bike, and the points float up.
+func catch_fx(ball: Dictionary, points: float, bonus: bool) -> void:
+	var p := _sparks[_next_spark]
+	_next_spark = (_next_spark + 1) % _sparks.size()
+	p.position = Vector3(ball.x1, 0.7, RIDER_LINE_Z - 1.0)
+	p.color = Color(1.0, 0.85, 0.3)
+	p.restart()
+	_shield_flash = maxf(_shield_flash, 0.35)
+	_popup(ball.x1, points, true if bonus else false, Color(1.0, 0.85, 0.3))
+
+
+## Catch: a missed ball rolls on past the bike.
+func miss_fx(ball: Dictionary) -> void:
+	_ghost(ball)
+
+
+## Catch: a fumbled ball (caught with the shield down) knocks against the bike and rolls away.
+func fumble_fx(ball: Dictionary) -> void:
+	hit_fx(ball.x1, ball.kind, true, 0.4)
 
 
 ## The shield takes a hit: a flash and shards off the shield.
@@ -229,22 +285,34 @@ func dodge_fx(ball: Dictionary, points: float, bonus: bool) -> void:
 	var p := _sparks[_next_spark]
 	_next_spark = (_next_spark + 1) % _sparks.size()
 	p.position = Vector3(ball.x1, 0.5, RIDER_LINE_Z)
+	p.color = Color(0.6, 0.95, 1.0)
 	p.restart()
-	_ghosts.append({"x": ball.x1, "z": RIDER_LINE_Z, "kind": ball.kind, "t": 0.0, "y": BALL_RADIUS()})
-	if points > 0.0:
-		var label := _popups[_next_popup]
-		_next_popup = (_next_popup + 1) % _popups.size()
-		label.text = "+%d" % roundi(points)
-		label.modulate = Color(1.0, 0.82, 0.25) if bonus else Color(1, 1, 1)
-		label.outline_modulate = Color(0, 0, 0, 0.8)
-		var x := clampf(lerpf(ball.x1, _rig.position.x, 0.5), _rig.position.x - 1.2, _rig.position.x + 1.2)
-		label.position = Vector3(x, 0.9, RIDER_LINE_Z - 3.0)
-		label.visible = true
-		var tween := label.create_tween()
-		tween.set_parallel()
-		tween.tween_property(label, "position:y", 1.35, 0.7).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-		tween.tween_property(label, "modulate:a", 0.0, 0.7).set_delay(0.2)
-		tween.chain().tween_callback(func(): label.visible = false)
+	_ghost(ball)
+	_popup(ball.x1, points, bonus, Color(1.0, 0.82, 0.25) if bonus else Color(1, 1, 1))
+
+
+func _ghost(ball: Dictionary) -> void:
+	_ghosts.append({"x": ball.x1, "z": RIDER_LINE_Z, "kind": ball.kind, "t": 0.0, "y": BALL_RADIUS(),
+		"v": _ball_speed.get(ball.id, approach_speed()), "catch": ball.get("mode", "") == "catch"})
+	_ball_speed.erase(ball.id)
+
+
+func _popup(x_at: float, points: float, _bonus: bool, color: Color) -> void:
+	if points <= 0.0:
+		return
+	var label := _popups[_next_popup]
+	_next_popup = (_next_popup + 1) % _popups.size()
+	label.text = "+%d" % roundi(points)
+	label.modulate = color
+	label.outline_modulate = Color(0, 0, 0, 0.8)
+	var x := clampf(lerpf(x_at, _rig.position.x, 0.5), _rig.position.x - 1.2, _rig.position.x + 1.2)
+	label.position = Vector3(x, 0.9, RIDER_LINE_Z - 3.0)
+	label.visible = true
+	var tween := label.create_tween()
+	tween.set_parallel()
+	tween.tween_property(label, "position:y", 1.35, 0.7).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(label, "modulate:a", 0.0, 0.7).set_delay(0.2)
+	tween.chain().tween_callback(func(): label.visible = false)
 
 
 func streak_fx() -> void:
@@ -553,6 +621,35 @@ func _build_fx() -> void:
 	_shards.direction = Vector3(0, 0.4, 1)
 	_shards.spread = 80.0
 	_shards.color = Color(0.4, 0.85, 1.0)
+	# Speed streaks: thin bright lines rushing past the edges of the view at high cadence.
+	var line := BoxMesh.new()
+	line.size = Vector3(0.012, 0.012, 1.4)
+	var line_mat := StandardMaterial3D.new()
+	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	line_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	line_mat.vertex_color_use_as_albedo = true
+	line_mat.disable_fog = true
+	line.material = line_mat
+	_streaks = CPUParticles3D.new()
+	_streaks.mesh = line
+	_streaks.amount = 40
+	_streaks.lifetime = 0.5
+	_streaks.local_coords = true
+	_streaks.emitting = false
+	# A ring around the line of sight, so the streaks rush past the edges and never cross the
+	# middle of the road.
+	_streaks.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	_streaks.emission_ring_axis = Vector3(0, 0, 1)
+	_streaks.emission_ring_height = 6.0
+	_streaks.emission_ring_radius = 4.6
+	_streaks.emission_ring_inner_radius = 3.0
+	_streaks.direction = Vector3(0, 0, 1)
+	_streaks.spread = 0.0
+	_streaks.gravity = Vector3.ZERO
+	_streaks.color = Color(1, 1, 1, 0.22)
+	_streaks.position = Vector3(0, 0, -9.0)
+	camera.add_child(_streaks)
 	for i in 4:
 		var label := Label3D.new()
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -574,7 +671,8 @@ func _draw_balls(delta: float, logic: DodgeBallLogic) -> void:
 	for ball in logic.balls:
 		if n >= BALLS_MAX:
 			break
-		var z := z_for_eta(ball.eta)
+		var catch_mode: bool = ball.get("mode", "") == "catch"
+		var z := z_for_eta(ball.eta, _ball_speed.get(ball.id, -1.0))
 		var x := DodgeBallLogic.ball_x(ball)
 		var y := BALL_RADIUS()
 		if ball.kind != "double" and int(ball.id) % 2 == 1:
@@ -586,21 +684,21 @@ func _draw_balls(delta: float, logic: DodgeBallLogic) -> void:
 				ball_bounced.emit(clampf(1.0 - ball.eta / 1.6, 0.1, 1.0))
 			_bounce_phase[ball.id] = landing
 		var near := clampf(1.0 - ball.eta / 1.2, 0.0, 1.0)
-		_set_ball(n, Vector3(x, y, z), ball.kind, near, glow)
+		_set_ball(n, Vector3(x, y, z), ball.kind, near, glow, catch_mode)
 		_blob_mm.set_instance_transform(n, Transform3D(Basis(), Vector3(x, 0.015, z)))
 		_blob_mm.set_instance_custom_data(n, Color(clampf(1.2 - (y - BALL_RADIUS()) * 0.8, 0.2, 1.0), 0, 0, 0))
 		n += 1
 		# The warning strip in the lane where it will arrive.
 		var urgency := clampf(1.0 - ball.eta / ball.eta0, 0.0, 1.0)
 		_warn_mm.set_instance_transform(w, Transform3D(Basis(), Vector3(ball.x1, 0.02, RIDER_LINE_Z - 5.2)))
-		_warn_mm.set_instance_custom_data(w, Color(urgency, _anim_t, 0, 1))
+		_warn_mm.set_instance_custom_data(w, Color(urgency, _anim_t, 1.0 if catch_mode else 0.0, 1))
 		w += 1
 	var kept: Array[Dictionary] = []
 	for ghost in _ghosts:
 		ghost.t += delta
-		ghost.z += approach_speed() * delta
+		ghost.z += float(ghost.v) * delta
 		if ghost.t < GHOST_SEC and n < BALLS_MAX:
-			_set_ball(n, Vector3(ghost.x, ghost.y, ghost.z), ghost.kind, 0.0, glow)
+			_set_ball(n, Vector3(ghost.x, ghost.y, ghost.z), ghost.kind, 0.0, glow, ghost.catch)
 			_blob_mm.set_instance_transform(n, Transform3D(Basis(), Vector3(ghost.x, 0.015, ghost.z)))
 			_blob_mm.set_instance_custom_data(n, Color(1, 0, 0, 0))
 			n += 1
@@ -611,13 +709,20 @@ func _draw_balls(delta: float, logic: DodgeBallLogic) -> void:
 	_warn_mm.visible_instance_count = w
 	if _bounce_phase.size() > 64:
 		_bounce_phase.clear()
+	if _ball_speed.size() > 64:
+		# Balls that arrived without a ghost (hits, catches): keep only the live ones.
+		var live := {}
+		for ball in logic.balls:
+			if _ball_speed.has(ball.id):
+				live[ball.id] = _ball_speed[ball.id]
+		_ball_speed = live
 
 
-func _set_ball(i: int, pos: Vector3, kind: String, near: float, glow: float) -> void:
+func _set_ball(i: int, pos: Vector3, kind: String, near: float, glow: float, catch_mode := false) -> void:
 	var spin := Basis(Vector3.RIGHT, (pos.z - distance) / BALL_RADIUS())
 	_ball_mm.set_instance_transform(i, Transform3D(spin, pos))
-	_ball_mm.set_instance_color(i, BALL_COLORS.get(kind, BALL_COLORS.plain))
-	_ball_mm.set_instance_custom_data(i, Color(near, glow, 0, 0))
+	_ball_mm.set_instance_color(i, ball_color(kind, catch_mode))
+	_ball_mm.set_instance_custom_data(i, Color(near, glow, 1.0 if catch_mode else 0.0, 0))
 
 
 # --- Helpers ---
