@@ -5,6 +5,7 @@ import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.SegmentRole
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.math.roundToInt
 
 /** Just Ride modes a game supports (`GameInfo.supports`). */
 enum class JustRideSupport { ROUNDS, MINUTES, OPEN }
@@ -99,7 +100,39 @@ class GameCatalog(games: List<GameDeclaration>) {
             },
         )
 
+        /**
+         * Tug of War (#40), `games/games/tug_of_war/`: a work game of watts against a bot's.
+         * The camera only runs with the rider's "Brace lean" option, which Godot decides per
+         * segment, so [GameDeclaration.usesCamera] stays false.
+         */
+        val TUG_OF_WAR = GameDeclaration(
+            id = "tug_of_war",
+            title = "Tug of War",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            // A best-of-N match: rounds of up to 60 s with a 60 s recovery between them.
+            roundSec = 120,
+            roles = setOf(SegmentRole.WORK),
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                // TugLogic: the bot holds 100 / 110 / 120% of FTP and surges 20% of FTP above
+                // that, in watts (the game adds 5% of FTP a rung on the ladder).
+                val bot = when (difficulty) {
+                    Difficulty.EASY -> 1.0
+                    Difficulty.STANDARD -> 1.1
+                    Difficulty.HARD -> 1.2
+                }
+                mapOf(
+                    "bot_watts" to JsonPrimitive((ftp.watts * bot).roundToInt()),
+                    "surge_watts" to JsonPrimitive((ftp.watts * (bot + 0.2)).roundToInt()),
+                )
+            },
+        )
+
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR))
     }
 }

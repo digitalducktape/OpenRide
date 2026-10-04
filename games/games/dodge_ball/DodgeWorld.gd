@@ -759,7 +759,7 @@ static func BALL_RADIUS() -> float:
 	return DodgeBallLogic.BALL_RADIUS
 
 
-func _model_mesh(file: String) -> Mesh:
+static func _model_mesh(file: String) -> Mesh:
 	var scene := load(MODELS + file) as PackedScene
 	if scene == null:
 		push_warning("DodgeWorld: can't load %s" % file)
@@ -779,7 +779,7 @@ func _model_mesh(file: String) -> Mesh:
 ## A copy of a nature-kit mesh in this road's palette: leaves (the greener surfaces) in
 ## `leaf`, the rest (trunks) in `bark`. The kit's materials are fully metallic, which renders
 ## near-black without reflections, so they become plain matte ones lit per vertex.
-func _recolor(mesh: Mesh, leaf: Color, bark := Color(0.42, 0.29, 0.19)) -> Mesh:
+static func _recolor(mesh: Mesh, leaf: Color, bark := Color(0.42, 0.29, 0.19)) -> Mesh:
 	if mesh == null:
 		return null
 	var copy := mesh.duplicate() as Mesh
@@ -800,7 +800,7 @@ func _recolor(mesh: Mesh, leaf: Color, bark := Color(0.42, 0.29, 0.19)) -> Mesh:
 
 ## A copy of a model mesh lit per vertex, without specular: flat-shaded low-poly models look
 ## the same, and the tablet's GPU does a fraction of the work.
-func _cheap(mesh: Mesh) -> Mesh:
+static func _cheap(mesh: Mesh) -> Mesh:
 	if mesh == null:
 		return null
 	var copy := mesh.duplicate() as Mesh
@@ -816,7 +816,7 @@ func _cheap(mesh: Mesh) -> Mesh:
 	return copy
 
 
-func _multimesh(mesh: Mesh, transforms: Array[Transform3D], node_name: String) -> MultiMeshInstance3D:
+static func _multimesh(mesh: Mesh, transforms: Array[Transform3D], node_name: String) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = mesh
@@ -841,7 +841,7 @@ func _dynamic_mm(mesh: Mesh, colors: bool) -> MultiMesh:
 	return mm
 
 
-func _part(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3) -> MeshInstance3D:
+static func _part(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = mat

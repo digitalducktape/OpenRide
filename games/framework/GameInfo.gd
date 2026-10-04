@@ -99,6 +99,17 @@ func option_spec(key: String) -> Dictionary:
 	return {}
 
 
+## A copy of these declarations with another camera mode, for a game that picks its camera
+## per segment (`Game.tracker_mode_for_segment`).
+func with_tracker_mode(mode: String) -> GameInfo:
+	var copy := GameInfo.new()
+	for prop in get_property_list():
+		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			copy.set(prop.name, get(prop.name))
+	copy.tracker_mode = mode
+	return copy
+
+
 ## Whether this game uses the camera.
 func uses_camera() -> bool:
 	return tracker_mode != "off"

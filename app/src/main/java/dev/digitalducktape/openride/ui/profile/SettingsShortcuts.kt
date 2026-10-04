@@ -64,6 +64,8 @@ fun SettingsShortcutsRow(modifier: Modifier = Modifier) {
 private val PREVIEW_RIDES = listOf(
     "Dodge Ball · 20 min" to SessionRequest.JustRide("dodge_ball", JustRideMode.Timed(20)),
     "Dodge Ball · open-ended" to SessionRequest.JustRide("dodge_ball", JustRideMode.Open),
+    "Tug of War · 20 min" to SessionRequest.JustRide("tug_of_war", JustRideMode.Timed(20)),
+    "Tug of War · open-ended" to SessionRequest.JustRide("tug_of_war", JustRideMode.Open),
     "Demo · 20 min" to SessionRequest.JustRide("demo", JustRideMode.Timed(20)),
     "Demo · open-ended" to SessionRequest.JustRide("demo", JustRideMode.Open),
 )

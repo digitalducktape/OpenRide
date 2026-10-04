@@ -69,6 +69,13 @@ func target_text(_segment: Dictionary) -> String:
 	return ""
 
 
+## The camera mode for this segment: `info().tracker_mode` unless the game decides per segment
+## (Tug of War runs the camera only when the rider turned brace lean on). Called before
+## `_on_prepare`, once the rider's options can be read.
+func tracker_mode_for_segment(_segment: Dictionary) -> String:
+	return declared().tracker_mode
+
+
 # --- Hooks: override the ones you need ---
 
 ## The scene is loaded and the intro card is showing: build the level, add HUD widgets, ask

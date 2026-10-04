@@ -30,3 +30,9 @@ with Godot's default font.
 | `games/dodge_ball/models/tree_default.glb`, `tree_oak.glb`, `tree_pineTallA.glb`, `tree_cone.glb`, `plant_bushLarge.glb`, `rock_largeA.glb` (unchanged; recoloured at runtime) | https://kenney.nl/assets/nature-kit | Kenney (www.kenney.nl) | CC0 1.0 (pack `License.txt`) |
 | `games/dodge_ball/sfx/*.tres` (7 `SfxPreset` parameter sets) and `tod/*.tres` (4 lighting presets), with the scripts that write them | Written for this repo (#39) | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/dodge_ball/shaders/*.gdshader` (road, verge, sky, ball, warning, shadow, shield, screen effects) | Written for this repo (#39) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `games/tug_of_war/sfx/*.tres` (6 `SfxPreset` parameter sets: rope_creak, crowd_swell, surge_drumroll, win_sting, lose_sting, splash; synth settings, no samples) | Written for this repo (#40) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `games/tug_of_war/shaders/water.gdshader` and every mesh in `TugWorld.gd` (piers, bot, crowd, rope, flag, hands, splash; built from boxes, cylinders, spheres and capsules in code, with a plank texture generated at runtime) | Written for this repo (#40) | The OpenRide Authors | Apache-2.0, the repo's licence |
+
+Tug of War (#40) adds no recorded asset: its trees, bushes and rocks are the Kenney nature-kit
+models listed above (loaded from `games/dodge_ball/models/`), its bots are named from plain
+material and animal words, and its music is the repo's own `heave` style.

@@ -1041,6 +1041,48 @@ For measuring, set `DEV_TUNING` in `DodgeBall.gd` (off in every build). The game
 verges=false scenery=false balls=false rig=false fog=false screenfx=false`). Write it with
 `adb shell run-as dev.digitalducktape.openride …`.
 
+## Tug of War (#40)
+
+Your watts against a bot's over a rope across a river, in first person. `TugLogic` holds the
+rules (headless-tested by `tug_logic_test`), `TugWorld` the 3D view, `TugStatus` the HUD widget
+and `TugAudio` the sounds; `TugOfWar.gd` wires them to the framework.
+
+**The rope.** The marker `p` runs from -1 to +1: `dp/dt = 0.25 × (power − bot) / FTP`. Equal
+watts is a stalemate, and holding 20% of FTP above the bot wins in 20 s. A round ends when `p`
+reaches either end, or at the buzzer (60 s), where `p > 0` wins (a dead heat is a loss).
+
+**The bot** holds 110% of FTP (`bot_watts`) and surges to 130% (`surge_watts`) for 5 s, at
+most one surge every 12 s, telegraphed a second early by a drum roll and a bracing pose. A surge
+counts as answered if `p` never fell more than 0.2 during it (`surges_answered`).
+
+**Modes.** A circuit or timed Just Ride plays rounds back to back until the timer ends. An open
+or rounds Just Ride plays the rider's **Mode** option: **Match** (best of 3 or 5, or the rounds
+the plan asks for) or **Ladder** (each win faces a bot 5% of FTP stronger, with a new name and
+colour; the first loss ends it). A 60 s recovery card between rounds shows the next bot's watts.
+The result's `variant` is `"ladder"` for the ladder and `""` otherwise.
+
+**Scoring.** Every round won awards 1000, and every watt over the bot awards 0.15 points a
+second, both through `Effort.award`. Stars are points a minute: a perfect ride (15% of FTP over
+the bot all the time) earns about 2250 a minute at 1.0×, which is 2 stars, and 3 stars needs
+about 1.3× effort (`tug_logic_test` checks this for every difficulty).
+
+**Options** (per rider): Mode, Match length, Scene (time of day, shared with Dodge Ball's
+presets) and **Brace lean**.
+
+**Brace lean** is optional and off by default. With it on, leaning in (`lean_depth` above 0.5)
+during a surge makes the rope slip at 75% of its speed. It never helps a gain, and it isn't
+counted in `effort_avg`. Because the camera should run only for riders who use it, the game
+overrides `Game.tracker_mode_for_segment`: `lean_2d` with brace lean on, otherwise `off`.
+`SessionDirector` applies that mode (a copy of the declarations from
+`GameInfo.with_tracker_mode`) for the segment, and the Calibrate button shows only then.
+
+**Look.** The rider stands at the end of a pier, the bot on the far pier, a flag on the rope
+between them. Winning hauls the bot off its pier into the river; losing pulls the camera in. The
+view follows the Dodge Ball recipe for the tablet (a scaled `SubViewport`, no MSAA, unshaded
+water lit by hand, per-vertex lit everything else, MultiMesh rope and crowd, CPUParticles3D for
+the splash). On the tablet it held 59-62 fps (mock build, 2026-10-03). `tests/capture_tug.gd`
+takes desktop screenshots and, with `--play=SECONDS`, plays rounds for a recording.
+
 ## Originality and licensing
 
 Everything under `games/` is written for this project or permissively licensed. Assets are

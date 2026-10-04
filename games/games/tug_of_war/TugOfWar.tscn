@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://games/tug_of_war/TugOfWar.gd" id="1_tug"]
+
+[node name="TugOfWar" type="Node2D"]
+script = ExtResource("1_tug")

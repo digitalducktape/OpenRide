@@ -142,6 +142,9 @@ func _on_segment_started(new_segment: Dictionary) -> void:
 		_report(skipped_result(game_id))
 		return
 	_show_game(next)
+	var camera_mode := next.tracker_mode_for_segment(segment)
+	if camera_mode != info.tracker_mode:
+		info = info.with_tracker_mode(camera_mode)
 	Session.set_tracker_mode(info.tracker_mode)
 	calibration.camera_game = info.uses_camera()
 	_calibrate_for(info)

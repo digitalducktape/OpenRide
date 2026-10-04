@@ -7,6 +7,7 @@ extends RefCounted
 const GAMES := {
 	"demo": "res://games/demo/Demo.tscn",
 	"dodge_ball": "res://games/dodge_ball/DodgeBall.tscn",
+	"tug_of_war": "res://games/tug_of_war/TugOfWar.tscn",
 }
 
 static var _infos := {}

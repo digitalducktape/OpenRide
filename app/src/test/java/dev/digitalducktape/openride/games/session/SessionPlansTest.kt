@@ -133,6 +133,22 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `Tug of War sends the bot's watts as a share of FTP, surging 20 percent of FTP above it`() {
+        fun params(d: Difficulty) =
+            SessionPlans.justRide(GameCatalog.TUG_OF_WAR, JustRideMode.Timed(20), d, ftp200).segments.single().params
+        assertEquals(200, params(Difficulty.EASY).int("bot_watts"))
+        assertEquals(240, params(Difficulty.EASY).int("surge_watts"))
+        assertEquals(220, params(Difficulty.STANDARD).int("bot_watts"))
+        assertEquals(260, params(Difficulty.STANDARD).int("surge_watts"))
+        assertEquals(240, params(Difficulty.HARD).int("bot_watts"))
+        assertEquals(280, params(Difficulty.HARD).int("surge_watts"))
+        assertEquals(200, params(Difficulty.STANDARD).int("ftp_watts"))
+        // A Just Ride earns the effort multiplier, as the issue asks.
+        assertTrue(SessionPlans.justRide(GameCatalog.TUG_OF_WAR, JustRideMode.Open, Difficulty.STANDARD, ftp200)
+            .segments.single().effort)
+    }
+
+    @Test
     fun `effort applies to Just Rides of games that declare it`() {
         assertTrue(SessionPlans.justRide(GameCatalog.DEMO, JustRideMode.Open, Difficulty.EASY, ftp200).segments.single().effort)
         assertFalse(SessionPlans.justRide(roundsGame, JustRideMode.Rounds(3), Difficulty.EASY, ftp200).segments.single().effort)
