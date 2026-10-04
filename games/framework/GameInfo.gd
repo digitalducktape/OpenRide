@@ -30,6 +30,9 @@ var star_thresholds := {}
 ## When true, the thresholds are points per minute of gameplay, so the same stars fit a 90 s
 ## circuit slot and a 30-minute Just Ride.
 var stars_per_minute := false
+## Star thresholds for a game's variants, by variant: {"catch": {"easy": […], …}}. A variant not
+## listed uses `star_thresholds`.
+var variant_star_thresholds := {}
 ## The game's own options, shown in the shared pause screen's "Game options" card and
 ## remembered per rider (`GameOptions`). Each is
 ## {key, label, choices: [values], labels: [shown text], default}. Values are strings.
@@ -60,12 +63,17 @@ func validate() -> PackedStringArray:
 			problems.append("unknown role '%s'" % role)
 	if tracker_mode not in TRACKER_MODES:
 		problems.append("unknown tracker_mode '%s'" % tracker_mode)
-	for difficulty in DIFFICULTIES:
-		var t = star_thresholds.get(difficulty)
-		if not (t is Array) or t.size() != 3:
-			problems.append("star_thresholds.%s needs three scores" % difficulty)
-		elif not (float(t[0]) > 0.0 and float(t[0]) <= float(t[1]) and float(t[1]) <= float(t[2])):
-			problems.append("star_thresholds.%s must be positive and rising" % difficulty)
+	var tables := {"star_thresholds": star_thresholds}
+	for v in variant_star_thresholds:
+		tables["variant_star_thresholds.%s" % v] = variant_star_thresholds[v]
+	for table_name in tables:
+		var table: Dictionary = tables[table_name]
+		for difficulty in DIFFICULTIES:
+			var t = table.get(difficulty)
+			if not (t is Array) or t.size() != 3:
+				problems.append("%s.%s needs three scores" % [table_name, difficulty])
+			elif not (float(t[0]) > 0.0 and float(t[0]) <= float(t[1]) and float(t[1]) <= float(t[2])):
+				problems.append("%s.%s must be positive and rising" % [table_name, difficulty])
 	for option in options:
 		var choices: Array = option.get("choices", [])
 		var labels: Array = option.get("labels", choices)
@@ -76,6 +84,11 @@ func validate() -> PackedStringArray:
 		elif not choices.has(option.get("default")):
 			problems.append("option '%s' default isn't one of its choices" % option.key)
 	return problems
+
+
+## The star thresholds for `variant` (its own, or the game's).
+func thresholds_for(variant: String) -> Dictionary:
+	return variant_star_thresholds.get(variant, star_thresholds)
 
 
 ## The option declared as `key`, or {}.

@@ -17,6 +17,8 @@ var can_skip := false
 var _title: Label
 var _role: Label
 var _how_to: Label
+## Holds the game's own small picture or animation (`Game.intro_visual()`), e.g. Dodge Ball's mode.
+var _visual_slot: CenterContainer
 var _target: Label
 var _count: Label
 var _previous: Label
@@ -51,6 +53,9 @@ func _init() -> void:
 
 	_role = _centred(box, HudTheme.SMALL, HudTheme.MUTED)
 	_title = _centred(box, HudTheme.BIG)
+	_visual_slot = CenterContainer.new()
+	_visual_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_visual_slot)
 	_how_to = _centred(box, HudTheme.BODY)
 	_how_to.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_target = _centred(box, HudTheme.BODY, HudTheme.GOOD)
@@ -70,7 +75,10 @@ func _init() -> void:
 
 
 ## Shows the card for a segment. `previous` is the last result (or empty), with its title.
-func show_segment(info: GameInfo, segment: Dictionary, target: String, previous: Dictionary, previous_title: String, skippable: bool) -> void:
+## `how_to` replaces the game's static how-to line (`Game.how_to_text`), and `visual` is the
+## game's own small picture for the card, or null.
+func show_segment(info: GameInfo, segment: Dictionary, target: String, previous: Dictionary, previous_title: String,
+		skippable: bool, how_to := "", visual: Control = null) -> void:
 	var role := str(segment.get("role", "free"))
 	var count := int(segment.get("count", 1))
 	_role.text = HudTheme.role_name(role).to_upper()
@@ -78,7 +86,12 @@ func show_segment(info: GameInfo, segment: Dictionary, target: String, previous:
 		_role.text += "  ·  %d OF %d" % [int(segment.get("index", 0)) + 1, count]
 	_role.add_theme_color_override("font_color", HudTheme.role_color(role))
 	_title.text = "Up next: %s" % info.title
-	_how_to.text = info.how_to
+	_how_to.text = how_to if not how_to.is_empty() else info.how_to
+	for child in _visual_slot.get_children():
+		child.queue_free()
+	if visual:
+		_visual_slot.add_child(visual)
+	_visual_slot.visible = visual != null
 	_target.text = target
 	_target.visible = not target.is_empty()
 	var has_previous := not previous.is_empty()

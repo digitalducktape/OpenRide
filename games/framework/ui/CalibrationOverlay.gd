@@ -16,9 +16,7 @@ extends CanvasLayer
 signal recalibrate_requested
 
 const LAYER := 25
-const STRIP_HEIGHT := 100.0
-## The strip's width: the screen less the HUD's right-hand column (Recalibrate) and margins.
-const STRIP_WIDTH := HudTheme.W - 340.0 - 2.0 * HudTheme.MARGIN
+const STRIP_HEIGHT := 80.0
 const RECENT_MSEC := 1000
 const CENTRE_COUNT := 3  ## the centre step's 3-2-1
 ## Modes in which a tap asks for a calibration; never "calibrating".
@@ -47,6 +45,11 @@ var mode := ""  ## "", "calibrating", "needs", "lost" or "unavailable": what is 
 
 var _full: Control
 var _strip: PanelContainer
+## The HUD's status slot: the strip lives there while the HUD shows, so it takes a row of its own
+## above the HUD's bottom bar and never covers Recalibrate. Otherwise (the intro card) it sits in
+## this layer's own bottom slot.
+var strip_host: Container
+var _own_slot: VBoxContainer
 var _strip_text: Label
 var _prompt: Label
 var _count: Label
@@ -96,25 +99,34 @@ func _init() -> void:
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_bar)
 
+	var own_frame := MarginContainer.new()
+	own_frame.size = Vector2(HudTheme.W, HudTheme.H)
+	own_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right", "top", "bottom"]:
+		own_frame.add_theme_constant_override("margin_" + side, int(HudTheme.MARGIN))
+	add_child(own_frame)
+	_own_slot = VBoxContainer.new()
+	_own_slot.alignment = BoxContainer.ALIGNMENT_END
+	_own_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	own_frame.add_child(_own_slot)
 	_strip = PanelContainer.new()
-	_strip.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(0.35, 0.2, 0.05, 0.92), 0))
-	# Stops short of the HUD's Recalibrate button (bottom right), which it used to cover.
-	_strip.position = Vector2(0, HudTheme.H - STRIP_HEIGHT)
-	_strip.custom_minimum_size = Vector2(STRIP_WIDTH, STRIP_HEIGHT)
+	_strip.add_theme_stylebox_override("panel", HudTheme.panel_style(Color(0.35, 0.2, 0.05, 0.92), 18))
+	_strip.custom_minimum_size = Vector2(0, STRIP_HEIGHT)
+	_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_strip.mouse_filter = Control.MOUSE_FILTER_STOP
 	_strip.gui_input.connect(_on_gui_input)
-	add_child(_strip)
+	_own_slot.add_child(_strip)
 	_strip_text = HudTheme.label("", HudTheme.SMALL)
 	_strip_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_strip_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_strip_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_strip_text.custom_minimum_size = Vector2(STRIP_WIDTH - 40, 0)
 	_strip.add_child(_strip_text)
 	_show("")
 
 
 func _process(_delta: float) -> void:
 	_show(_mode_now())
+	_place_strip()
 	if mode == "calibrating":
 		_update_progress(Session.calibration)
 
@@ -135,6 +147,18 @@ func _mode_now() -> String:
 		# Calibration ended in 0: the camera is unavailable (no face found after two tries).
 		return "unavailable"
 	return ""
+
+
+## The strip goes in the HUD's slot while the HUD is up, else in this layer's own.
+func _place_strip() -> void:
+	var host: Container = strip_host if strip_host and strip_host.is_visible_in_tree() else _own_slot
+	if _strip.get_parent() != host:
+		_strip.reparent(host, false)
+
+
+## The strip, for layout checks.
+func strip() -> Control:
+	return _strip
 
 
 func _show(new_mode: String) -> void:

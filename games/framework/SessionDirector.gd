@@ -61,6 +61,7 @@ func _ready() -> void:
 	intro_card.skip_requested.connect(skip)
 	add_child(intro_card)
 	calibration = CalibrationOverlay.new()
+	calibration.strip_host = hud.status_slot
 	calibration.recalibrate_requested.connect(_recalibrate)
 	add_child(calibration)
 	pause_overlay = PauseOverlay.new()
@@ -156,7 +157,8 @@ func _on_segment_started(new_segment: Dictionary) -> void:
 	var previous: Dictionary = results.back() if not results.is_empty() else {}
 	var previous_info := GameRegistry.info(str(previous.get("game_id", ""))) if not previous.is_empty() else null
 	intro_card.show_segment(info, segment, game.target_text(segment), previous,
-		previous_info.title if previous_info else str(previous.get("game_id", "")), can_skip())
+		previous_info.title if previous_info else str(previous.get("game_id", "")), can_skip(),
+		game.how_to_text(segment), game.intro_visual())
 	phase = Phase.INTRO
 	_intro_left = float(segment.get("intro_sec", 0))
 	_last_count = ceili(_intro_left) + 1

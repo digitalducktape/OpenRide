@@ -31,6 +31,9 @@ var played_sec := 0.0  ## gameplay seconds, pauses excluded
 var won = null
 ## Extra `stats` for the result; `effort_avg` and `played_sec` are added for you.
 var stats := {}
+## The game's variant for the result (e.g. Dodge Ball's "catch" mode), or "". Bests,
+## leaderboards and stars are kept per variant.
+var variant := ""
 
 ## The registry key, from `info()`.
 var game_id: String:
@@ -48,6 +51,17 @@ var _ended := false
 func info() -> GameInfo:
 	push_error("Game %s does not override info()" % get_script().resource_path)
 	return GameInfo.new()
+
+
+## The intro card's how-to line; `info().how_to` unless the game says more (e.g. a mode).
+func how_to_text(_segment: Dictionary) -> String:
+	return declared().how_to
+
+
+## A small picture or animation for the intro card (a Control, freed with the card's next
+## segment), or null. Called after `_on_prepare`.
+func intro_visual() -> Control:
+	return null
 
 
 ## The intro card's target line, e.g. "Hold 250 W" or "Keep cadence above 70 rpm".
@@ -162,6 +176,7 @@ func prepare(new_segment: Dictionary) -> void:
 	played_sec = 0.0
 	won = null
 	stats = {}
+	variant = ""
 	set_paused(false)
 	_on_prepare(segment)
 
@@ -196,7 +211,8 @@ func request_finish() -> void:
 	_on_finish_requested()
 
 
-## The contract's segment result: {game_id, score, stars, won, skipped, stats: {effort_avg, …}}.
+## The contract's segment result: {game_id, score, stars, won, skipped, stats: {effort_avg, …},
+## variant}.
 func finish() -> Dictionary:
 	playing = false
 	_ended = true
@@ -207,10 +223,11 @@ func finish() -> Dictionary:
 	return {
 		"game_id": game_id,
 		"score": roundi(total),
-		"stars": Stars.for_score(total, declared(), difficulty, played_sec),
+		"stars": Stars.for_score(total, declared(), difficulty, played_sec, variant),
 		"won": won,
 		"skipped": false,
 		"stats": result_stats,
+		"variant": variant,
 	}
 
 

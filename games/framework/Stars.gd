@@ -6,9 +6,11 @@ extends RefCounted
 
 ## thresholds: [one, two, three], the minimum score for each star. With `per_minute`, they are
 ## points per minute of gameplay and `played_sec` scales them. Unknown difficulties fall back
-## to "standard".
-static func for_score(score: float, info: GameInfo, difficulty: String, played_sec := 0.0) -> int:
-	var thresholds = info.star_thresholds.get(difficulty, info.star_thresholds.get("standard", []))
+## to "standard". A game's `variant` (e.g. Dodge Ball's catch mode) uses its own thresholds
+## when the game declares them (`GameInfo.variant_star_thresholds`).
+static func for_score(score: float, info: GameInfo, difficulty: String, played_sec := 0.0, variant := "") -> int:
+	var table: Dictionary = info.thresholds_for(variant)
+	var thresholds = table.get(difficulty, table.get("standard", []))
 	var value := score
 	if info.stars_per_minute:
 		if played_sec <= 0.0:

@@ -10,7 +10,7 @@ func _init(caption := "", value := "--", color := HudTheme.INK) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_theme_stylebox_override("panel", HudTheme.panel_style())
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", -8)
+	box.add_theme_constant_override("separation", 0)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(box)
 	_value = HudTheme.label(value, HudTheme.BIG, color)
