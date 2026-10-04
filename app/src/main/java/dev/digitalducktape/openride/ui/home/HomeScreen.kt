@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -53,7 +55,14 @@ fun HomeScreen(
     var showGoalDialog by remember { mutableStateOf(false) }
 
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 36.dp)) {
+        // Scrolls so the update banner (or a larger font) can't squeeze the last card: without
+        // it the Games card was left with ~9dp of height and showed only a dash.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 48.dp, vertical = 36.dp),
+        ) {
             // PRD #22/T22: launch-time update check surfaces here as a dismissible banner that
             // taps through to the App updates screen. Nothing installs without an explicit tap.
             if (updateVersionName != null) {
