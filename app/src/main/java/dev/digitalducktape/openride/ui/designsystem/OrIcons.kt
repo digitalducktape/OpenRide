@@ -3,6 +3,7 @@ package dev.digitalducktape.openride.ui.designsystem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -29,6 +30,7 @@ object OrIcons {
     val Profile: ImageVector = Icons.Filled.Person
     val Settings: ImageVector = Icons.Filled.Settings
     val Add: ImageVector = Icons.Filled.Add
+    val Check: ImageVector = Icons.Filled.Check
     val Info: ImageVector = Icons.Filled.Info
     val Warning: ImageVector = Icons.Filled.Warning
     val Chevron: ImageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight

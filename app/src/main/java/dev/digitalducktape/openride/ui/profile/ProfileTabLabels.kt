@@ -19,4 +19,17 @@ object ProfileTabLabels {
 
     /** The heart-rate row's value. */
     fun heartRateStrap(paired: Boolean): String = if (paired) "Paired" else "Not paired"
+
+    /** The music picker's "no app" choice. */
+    const val NO_MUSIC_APP = "None"
+
+    /**
+     * The Music app row's value: the chosen app's name, a prompt when none is chosen, or a note
+     * when the chosen app has been uninstalled ([chosenLabel] null with a [chosenPackage]).
+     */
+    fun musicApp(chosenPackage: String?, chosenLabel: String?): String = when {
+        chosenPackage == null -> "Adds a Music button to the top bar"
+        chosenLabel == null -> "No longer installed"
+        else -> chosenLabel
+    }
 }

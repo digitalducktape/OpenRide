@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.music.MusicAppStore
+import dev.digitalducktape.openride.core.music.MusicApps
 import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.ui.common.ExportShare
 import dev.digitalducktape.openride.core.data.Profile
@@ -63,9 +65,12 @@ fun ProfileTabScreen(
     onManageAppUpdates: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
+    musicAppStore: MusicAppStore,
     modifier: Modifier = Modifier,
 ) {
     val activeRoute by routeHolder.activeRoute.collectAsState()
+    val musicApp by musicAppStore.packageName.collectAsState()
+    var pickingMusicApp by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -163,6 +168,15 @@ fun ProfileTabScreen(
                     onClick = { launchSettings(context, Settings.ACTION_SETTINGS) },
                 )
                 OrSettingsDivider()
+                // The top bar's Music button opens this app, so music is a tap away mid-ride.
+                val musicAppLabel = musicApp?.let { MusicApps.label(context, it) }
+                OrSettingsRow(
+                    title = "Music app",
+                    value = ProfileTabLabels.musicApp(musicApp, musicAppLabel),
+                    valueColor = if (musicApp != null && musicAppLabel == null) OrColors.Warning else OrColors.OnSurfaceMuted,
+                    onClick = { pickingMusicApp = true },
+                )
+                OrSettingsDivider()
                 OrSettingsRow(title = "App updates", onClick = onManageAppUpdates)
             }
         }
@@ -196,6 +210,17 @@ fun ProfileTabScreen(
                 modifier = Modifier.padding(horizontal = OrSpacing.md),
             )
         }
+    }
+
+    if (pickingMusicApp) {
+        MusicAppPickerDialog(
+            current = musicApp,
+            onPick = {
+                musicAppStore.set(it)
+                pickingMusicApp = false
+            },
+            onDismiss = { pickingMusicApp = false },
+        )
     }
 
     // Destructive confirmation (tap-to-confirm, matching the End Ride pattern elsewhere in the

@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import dev.digitalducktape.openride.AppContainer
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesRoute
+import dev.digitalducktape.openride.core.music.MusicApps
 import dev.digitalducktape.openride.core.sensor.offlineFor
 import dev.digitalducktape.openride.ui.designsystem.OrColors
 import dev.digitalducktape.openride.ui.designsystem.OrSpacing
@@ -120,6 +121,9 @@ fun MainScaffold(
     val availableUpdate by appContainer.updateAvailability.collectAsState()
     val updateBannerDismissed by appContainer.updateBannerDismissed.collectAsState()
     val currentTab = TopLevelDestination.fromRoute(currentRoute) ?: TopLevelDestination.Start
+    val musicApp by appContainer.musicAppStore.packageName.collectAsState()
+    // Looked up again when the choice changes; null hides the button (none chosen, or uninstalled).
+    val musicAppLabel = remember(musicApp) { musicApp?.let { MusicApps.label(context, it) } }
 
     Column(modifier = modifier.fillMaxSize().background(OrColors.Background)) {
         OrTopBar(
@@ -150,6 +154,11 @@ fun MainScaffold(
                     horizontalArrangement = Arrangement.spacedBy(OrSpacing.lg),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // The rider's music app (Profile → Music app), on every tab.
+                    val app = musicApp
+                    if (app != null && musicAppLabel != null) {
+                        OrSecondaryButton(text = musicAppLabel, onClick = { MusicApps.open(context, app) })
+                    }
                     SensorStatus(offline = sensorsOffline)
                     HeartRateStatus(
                         paired = activeProfile?.pairedHrDeviceAddress != null,
@@ -238,6 +247,7 @@ fun MainScaffold(
                         outerNavController.navigate(Destinations.ContentSources)
                     },
                     routeHolder = appContainer.routeHolder,
+                    musicAppStore = appContainer.musicAppStore,
                 )
             }
         }
