@@ -33,4 +33,11 @@ class ProfileTabLabelsTest {
         assertEquals("Paired", ProfileTabLabels.heartRateStrap(true))
         assertEquals("Not paired", ProfileTabLabels.heartRateStrap(false))
     }
+
+    @Test
+    fun `the music row names the chosen app, prompts when there's none, and flags one that's gone`() {
+        assertEquals("Apple Music", ProfileTabLabels.musicApp("com.apple.android.music", "Apple Music"))
+        assertEquals("Adds a Music button to the top bar", ProfileTabLabels.musicApp(null, null))
+        assertEquals("No longer installed", ProfileTabLabels.musicApp("com.spotify.music", null))
+    }
 }
