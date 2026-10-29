@@ -29,6 +29,19 @@ data class TrackerReading(
 }
 
 /**
+ * The controllers' contribution to the input frame (indices 13-15, issue #68).
+ *
+ * @param steer −1..+1 while a connected controller steers, `null` while none does.
+ * @param itemPresses how many times Use item has been pressed since the app started: a count, not
+ *   a flag, so a press between two frames is never lost. Godot acts when it goes up.
+ */
+data class ControllerReading(val steer: Double?, val itemPresses: Int) {
+    companion object {
+        val NONE = ControllerReading(steer = null, itemPresses = 0)
+    }
+}
+
+/**
  * The v1 input frame that `InputBus` polls every frame via `get_input_frame()`, arriving in
  * GDScript as a `PackedFloat64Array`. The index layout is the Bridge contract in
  * `docs/GAMES.md` and must only change together with that file (and [VERSION]).
@@ -50,8 +63,12 @@ object InputFrame {
     const val SENSORS_OK = 11
     /** Added after v1, at the end so the version stays 1: Godot reads it only when present. */
     const val RIDER_MUSIC = 12
+    /** Added for OpenBikeControl controllers (#68), at the end too: Godot reads them only when present. */
+    const val CONTROLLER_STEER = 13
+    const val CONTROLLER_STEERING = 14
+    const val CONTROLLER_ITEM_PRESSES = 15
 
-    const val SIZE = 13
+    const val SIZE = 16
 
     /** [HEART_RATE] when no strap is connected. */
     const val NO_HEART_RATE = -1.0
@@ -63,6 +80,7 @@ object InputFrame {
         tracker: TrackerReading,
         segmentTimeLeftSec: Double,
         riderMusic: Boolean = false,
+        controller: ControllerReading = ControllerReading.NONE,
     ): DoubleArray = DoubleArray(SIZE).apply {
         this[VERSION_INDEX] = VERSION.toDouble()
         this[CADENCE] = metrics.cadenceRpm.toDouble()
@@ -77,5 +95,8 @@ object InputFrame {
         this[SEGMENT_TIME_LEFT] = segmentTimeLeftSec
         this[SENSORS_OK] = if (sensorsOk) 1.0 else 0.0
         this[RIDER_MUSIC] = if (riderMusic) 1.0 else 0.0
+        this[CONTROLLER_STEER] = controller.steer?.coerceIn(-1.0, 1.0) ?: 0.0
+        this[CONTROLLER_STEERING] = if (controller.steer != null) 1.0 else 0.0
+        this[CONTROLLER_ITEM_PRESSES] = controller.itemPresses.toDouble()
     }
 }

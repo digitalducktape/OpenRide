@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.controller.ControllerStatus
+import dev.digitalducktape.openride.core.sensor.ConnectionState
 import dev.digitalducktape.openride.core.music.MusicApp
 import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.ui.common.ExportShare
@@ -63,6 +65,9 @@ fun ProfileTabScreen(
     onEditProfile: () -> Unit,
     onRestoreComplete: () -> Unit,
     onManageHeartRateStrap: () -> Unit,
+    /** The paired OpenBikeControl controllers and their connections (#68). */
+    controllers: List<ControllerStatus>,
+    onManageControllers: () -> Unit,
     onManageAppUpdates: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
@@ -139,6 +144,14 @@ fun ProfileTabScreen(
                     value = ProfileTabLabels.heartRateStrap(paired),
                     valueColor = if (paired) OrColors.Success else OrColors.OnSurfaceMuted,
                     onClick = onManageHeartRateStrap,
+                )
+                OrSettingsDivider()
+                val controllersLive = controllers.any { it.connection == ConnectionState.Connected }
+                OrSettingsRow(
+                    title = "Controllers",
+                    value = ProfileTabLabels.controllers(controllers.size, controllers.count { it.connection == ConnectionState.Connected }),
+                    valueColor = if (controllersLive) OrColors.Success else OrColors.OnSurfaceMuted,
+                    onClick = onManageControllers,
                 )
                 OrSettingsDivider()
                 // GPX route import (PRD #21/T21).

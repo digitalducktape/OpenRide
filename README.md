@@ -71,6 +71,19 @@ Good to know:
 - **Players disappear when music stops for a while.** Most apps let go of their session after a pause, and the player goes with it. Press play in the music app and it's back.
 - **In the games**, the **♪** button in the hub and in each game opens the player (a game pauses until you tap **Done**), and game music turns itself off while your music plays.
 
+## Controllers (OpenBikeControl)
+
+OpenRide takes button presses from controllers that speak [OpenBikeControl](https://openbikecontrol.org/), an open protocol for shifters, buttons and steering. That includes bikes with it built in, like the Stages SB200, and [BikeControl](https://bikecontrol.app/) on a phone, which turns Zwift Click and Play, game controllers and many other remotes into one. They connect over Bluetooth or over your Wi-Fi.
+
+**To set one up**, open **Profile → Controllers**. OpenRide searches as the screen opens; tap **Pair** next to yours. Paired controllers connect by themselves whenever OpenRide is in use, and the screen shows the last button you pressed, so you can check one works.
+
+What the buttons do:
+
+- **Pause** and **Resume** pause and resume your ride, or the game you're playing.
+- **Steer left / right**, or a steering angle, steer the kart in **Kart Race** instead of leaning your head.
+- **Power-up 1-3** use your item in Kart Race.
+- **Shift up / down** and **Increase / decrease difficulty** change the resistance on a smart trainer. On a Peloton, the knob does that.
+
 ## Mini-games (BETA)
 
 > [!IMPORTANT]

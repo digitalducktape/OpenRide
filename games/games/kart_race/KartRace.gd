@@ -468,6 +468,8 @@ func _build_hud() -> void:
 	if _tuned:
 		_kart_hud.visible = bool(_tuning.get_value("world", "hud", true))
 	_kart_hud.item_pressed.connect(_on_item_pressed)
+	if not InputBus.controller_item.is_connected(_on_item_pressed):
+		InputBus.controller_item.connect(_on_item_pressed)  # a controller's Use item (#68)
 	_board = KartRaceBoard.new()
 	_board.portrait_maker = _kart_hud.portrait_rect
 	add_child(_board)
@@ -934,10 +936,11 @@ func _read_rider() -> KartInput:
 		return test_input
 	_rider_input.power_w = InputBus.power
 	_rider_input.cadence = InputBus.cadence
-	_rider_input.lean = InputBus.lean_x
+	_rider_input.lean = InputBus.steer_x()  # a steering controller's level, else head lean (#68)
 	_rider_input.resistance = InputBus.resistance
 	_rider_input.standing = InputBus.standing
-	_rider_input.tracking = InputBus.tracker_state != InputBus.TRACKER_FACE_LOST  # handling: no drifts on face loss
+	# handling: no drifts on face loss (a steering controller never loses the face)
+	_rider_input.tracking = InputBus.controller_steering or InputBus.tracker_state != InputBus.TRACKER_FACE_LOST
 	_rider_input.use_item = _item_edge
 	_item_edge = false
 	return _rider_input

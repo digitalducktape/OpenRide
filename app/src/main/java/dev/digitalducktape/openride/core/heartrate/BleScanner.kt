@@ -13,7 +13,8 @@ interface BleScanner {
     fun isBluetoothAvailable(): Boolean
 
     /**
-     * Starts scanning for devices advertising the Heart Rate Service (`0x180D`). [onDeviceFound]
+     * Starts scanning for devices advertising the scanner's service (the Heart Rate Service,
+     * `0x180D`, unless it was built for another, issue #68). [onDeviceFound]
      * fires once per newly-seen device (by address); [onScanFailed] fires at most once, with a
      * human-readable reason, if the scan can't start or is stopped by the system.
      */

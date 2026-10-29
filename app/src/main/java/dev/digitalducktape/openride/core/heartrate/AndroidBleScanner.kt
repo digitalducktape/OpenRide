@@ -26,7 +26,13 @@ import java.util.UUID
  * sensor — but confirming an actual strap shows up in [startScan]'s results requires real
  * hardware in real proximity, which someone with a strap needs to verify.
  */
-class AndroidBleScanner(private val context: Context) : BleScanner {
+class AndroidBleScanner(
+    private val context: Context,
+    /** The service the scan looks for: heart rate here, and the controllers' and trainers' (#68). */
+    private val serviceUuid: UUID = HEART_RATE_SERVICE_UUID,
+    /** Offer LE devices already connected to the tablet, which have stopped advertising (see [startScan]). */
+    private val offerConnected: Boolean = true,
+) : BleScanner {
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
@@ -57,7 +63,7 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
         // A strap already connected to this tablet (by OpenRide's other build, say) stops
         // advertising, so no scan finds it (rider, 2026-10-27). Android shares that link with
         // any app that connects, so it's offered too.
-        connectedDevices().forEach { device ->
+        if (offerConnected) connectedDevices().forEach { device ->
             if (seenAddresses.add(device.address)) onDeviceFound(device)
         }
         val callback = object : ScanCallback() {
@@ -81,7 +87,7 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
         scanCallback = callback
 
         val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(HEART_RATE_SERVICE_UUID))
+            .setServiceUuid(ParcelUuid(serviceUuid))
             .build()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -123,8 +129,8 @@ class AndroidBleScanner(private val context: Context) : BleScanner {
         scanCallback = null
     }
 
-    private companion object {
-        const val TAG = "AndroidBleScanner"
+    companion object {
+        private const val TAG = "AndroidBleScanner"
 
         /** Standard Bluetooth SIG Heart Rate Service UUID (0x180D), 16-bit UUID base form. */
         val HEART_RATE_SERVICE_UUID: UUID = UUID.fromString("0000180D-0000-1000-8000-00805F9B34FB")

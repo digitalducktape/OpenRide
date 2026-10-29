@@ -41,6 +41,9 @@ class OpenRideApplication : Application() {
         // heart-rate manager starts observing the active profile's paired strap from launch,
         // rather than only whenever a screen happens to reference it first.
         appContainer.heartRateManager
+
+        // Issue #68: the paired controllers connect from launch too, and their presses are routed.
+        appContainer.controllerRouter
     }
 }
 

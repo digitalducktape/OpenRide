@@ -90,6 +90,8 @@ class GameBridge(
     private val riderMusic: () -> Boolean = { false },
     /** The hub's music card: `play_pause`, `next` or `previous`, for the rider's music app. */
     private val musicControl: (String) -> Unit = {},
+    /** Input frame fields 13-15: OpenBikeControl steering and Use item (#68). */
+    private val controllerReading: () -> ControllerReading = { ControllerReading.NONE },
 ) : GameSignals {
     /** The latest `now_playing`, sent again when Godot is (re)ready, since the engine drops signals before then. */
     @Volatile
@@ -102,6 +104,9 @@ class GameBridge(
     /** Godot's side of the signals: the registered plugin, once the engine has started. */
     @Volatile
     var emitter: GameSignals? = null
+
+    /** Whether a games host has a session attached: a controller's Pause goes to it, not the ride. */
+    val hasSession: Boolean get() = session != null
 
     fun attach(session: GameSession) {
         this.session = session
@@ -131,6 +136,7 @@ class GameBridge(
             tracker = trackerReading(),
             segmentTimeLeftSec = current?.segmentTimeLeftSec ?: -1.0,
             riderMusic = riderMusic(),
+            controller = controllerReading(),
         )
     }
 

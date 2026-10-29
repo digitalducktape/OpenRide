@@ -20,6 +20,13 @@ object ProfileTabLabels {
     /** The heart-rate row's value. */
     fun heartRateStrap(paired: Boolean): String = if (paired) "Paired" else "Not paired"
 
+    /** The controllers row's value (#68). */
+    fun controllers(paired: Int, connected: Int): String = when {
+        paired == 0 -> "Shifters, buttons, BikeControl"
+        connected == 0 -> "$paired paired"
+        else -> "$connected of $paired connected"
+    }
+
     /** The home-screen row's value. */
     fun homeScreen(isHome: Boolean): String = if (isHome) "On" else "Off"
 
