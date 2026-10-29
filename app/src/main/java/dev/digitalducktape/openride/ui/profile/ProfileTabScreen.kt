@@ -123,6 +123,8 @@ fun ProfileTabScreen(
         if (text != null) pendingRestoreContent = text
     }
 
+    // Each column scrolls only where it doesn't fit: never on the bike, but on a phone's shorter
+    // screen the lower rows (Controllers among them, #68) were out of reach.
     // One page, no scrolling (the rider's ask, 2026-10-21): three columns of groups under the
     // shared top bar, which carries the rider and Switch rider; Edit profile is a setting like
     // the rest. The tallest column is about 360 dp of the 528 between the bars, leaving room for
@@ -133,7 +135,7 @@ fun ProfileTabScreen(
             .padding(start = OrSpacing.ScreenGutter, end = OrSpacing.ScreenGutter, top = OrSpacing.sm, bottom = OrSpacing.lg),
         horizontalArrangement = Arrangement.spacedBy(OrSpacing.lg),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             OrSettingsGroup(title = "Rider") {
                 OrSettingsRow(
                     title = "Edit profile",
@@ -189,7 +191,7 @@ fun ProfileTabScreen(
             }
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             // PRD P1-5 (T12): stock Android settings, for when OpenRide is the tablet's launcher.
             OrSettingsGroup(title = "Device") {
                 OrSettingsRow(
@@ -242,7 +244,7 @@ fun ProfileTabScreen(
             }
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             // The music player's two settings (rider's ask, 2026-10-27): which app its button
             // opens, and the permission that lets it show what's playing. Here, not under Device:
             // with the Home screen row, the middle column outgrew the page.

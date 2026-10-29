@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -71,12 +72,15 @@ fun ProfileSelectScreen(
     onAddRider: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(OrColors.Background)
             .padding(OrSpacing.xl),
     ) {
+        // A phone's landscape screen is about 400 dp tall, not the bike's 1008 px: there the
+        // avatars shrink and Add rider follows them, rather than sitting on the riders' names.
+        val compact = maxHeight < CompactHeight
         Text(
             text = "OPENRIDE",
             fontSize = 28.sp,
@@ -111,17 +115,25 @@ fun ProfileSelectScreen(
                     )
                 } else {
                     LazyRow(
-                        modifier = Modifier.fillMaxWidth().padding(top = OrSpacing.xxl),
+                        modifier = Modifier.fillMaxWidth().padding(top = if (compact) OrSpacing.md else OrSpacing.xxl),
                         horizontalArrangement = Arrangement.spacedBy(OrSpacing.xl, Alignment.CenterHorizontally),
                     ) {
                         items(profiles, key = { it.id }) { profile ->
-                            RiderAvatar(profile = profile, onClick = { onSelectProfile(profile.id) })
+                            RiderAvatar(profile = profile, compact = compact, onClick = { onSelectProfile(profile.id) })
                         }
+                    }
+                    if (compact) {
+                        OrSecondaryButton(
+                            text = "Add rider",
+                            icon = OrIcons.Add,
+                            onClick = onAddRider,
+                            modifier = Modifier.padding(top = OrSpacing.md),
+                        )
                     }
                 }
             }
 
-            if (profiles.isNotEmpty()) {
+            if (profiles.isNotEmpty() && !compact) {
                 OrSecondaryButton(
                     text = "Add rider",
                     icon = OrIcons.Add,
@@ -134,16 +146,20 @@ fun ProfileSelectScreen(
 }
 
 @Composable
-private fun RiderAvatar(profile: Profile, onClick: () -> Unit) {
+private fun RiderAvatar(profile: Profile, compact: Boolean, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(RiderCellWidth)
+            .width(if (compact) CompactRiderCellWidth else RiderCellWidth)
             .clip(OrShapes.Large)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(OrSpacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ProfileAvatar(profile = profile, size = AvatarSize, emojiSize = 72.sp)
+        ProfileAvatar(
+            profile = profile,
+            size = if (compact) CompactAvatarSize else AvatarSize,
+            emojiSize = if (compact) 48.sp else 72.sp,
+        )
         Text(
             text = profile.name,
             style = OrType.Subtitle,
@@ -158,6 +174,11 @@ private fun RiderAvatar(profile: Profile, onClick: () -> Unit) {
 
 private val AvatarSize = 176.dp
 private val RiderCellWidth = 208.dp
+private val CompactAvatarSize = 112.dp
+private val CompactRiderCellWidth = 144.dp
+
+/** Below this the screen is a phone's, not the bike's (about 650 dp tall there). */
+private val CompactHeight = 560.dp
 
 private fun previewRider(id: Long, name: String, emoji: String, color: Long) =
     Profile(id = id, name = name, avatarEmoji = emoji, avatarColor = color.toInt(), weightKg = null, ftp = null)

@@ -167,14 +167,20 @@ fun ControllersScreen(
                     }
                 }
                 OrTile(modifier = Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {
-                        OrAccentButton(
-                            text = ControllersLabels.scanAction(uiState.isScanning),
-                            onClick = { if (uiState.isScanning) onStopScan() else onStartScan() },
-                        )
-                        if (uiState.isScanning) {
+                    // The button alone on its row, the progress under it: beside it, on a phone's narrower
+                    // column, the label wrapped a few letters to a line.
+                    OrAccentButton(
+                        text = ControllersLabels.scanAction(uiState.isScanning),
+                        onClick = { if (uiState.isScanning) onStopScan() else onStartScan() },
+                    )
+                    if (uiState.isScanning) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(OrSpacing.md),
+                            modifier = Modifier.padding(top = OrSpacing.md),
+                        ) {
                             OrSpinner()
-                            Text(text = "Searching…", style = OrType.Body, color = OrColors.OnSurfaceMuted)
+                            Text(text = "Searching…", style = OrType.Body, color = OrColors.OnSurfaceMuted, maxLines = 1)
                         }
                     }
                     uiState.error?.let {

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -132,7 +134,10 @@ fun BikeSourceScreen(
                 .padding(start = OrSpacing.ScreenGutter, end = OrSpacing.ScreenGutter, top = OrSpacing.sm, bottom = OrSpacing.lg),
             horizontalArrangement = Arrangement.spacedBy(OrSpacing.lg),
         ) {
-            Column(modifier = Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+            Column(
+                modifier = Modifier.weight(2f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(OrSpacing.lg),
+            ) {
                 OrSettingsGroup(title = "Numbers from") {
                     val builtin = uiState.source == BikeSource.Builtin
                     OrSettingsRow(
@@ -154,14 +159,20 @@ fun BikeSourceScreen(
                 }
                 if (granted) {
                     OrTile(modifier = Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {
-                            OrAccentButton(
-                                text = BikeSourceLabels.scanAction(uiState.isScanning),
-                                onClick = { if (uiState.isScanning) onStopScan() else onStartScan() },
-                            )
-                            if (uiState.isScanning) {
+                        // The button alone on its row, the progress under it: beside it, on a phone's narrower
+                        // column, the label wrapped a few letters to a line.
+                        OrAccentButton(
+                            text = BikeSourceLabels.scanAction(uiState.isScanning),
+                            onClick = { if (uiState.isScanning) onStopScan() else onStartScan() },
+                        )
+                        if (uiState.isScanning) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(OrSpacing.md),
+                                modifier = Modifier.padding(top = OrSpacing.md),
+                            ) {
                                 OrSpinner()
-                                Text(text = "Scanning…", style = OrType.Body, color = OrColors.OnSurfaceMuted)
+                                Text(text = "Scanning…", style = OrType.Body, color = OrColors.OnSurfaceMuted, maxLines = 1)
                             }
                         }
                         uiState.error?.let {
