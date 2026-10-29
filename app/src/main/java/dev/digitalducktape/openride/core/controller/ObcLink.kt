@@ -72,6 +72,8 @@ class BleObcLink(
                 val service = gatt.getService(ObcProtocol.SERVICE_UUID) ?: return false
                 val buttons = service.getCharacteristic(ObcProtocol.BUTTON_STATE_UUID) ?: return false
                 hapticCharacteristic = service.getCharacteristic(ObcProtocol.HAPTIC_UUID)
+                // First, so App Information (30-odd bytes) goes in one write, not fragments.
+                connection.requestMtu { ok -> if (!ok) Log.w(TAG, "Controller $address kept the default MTU") }
                 connection.enableNotifications(buttons) { ok ->
                     if (ok) {
                         Log.w(TAG, "Controller $address connected")
@@ -81,7 +83,9 @@ class BleObcLink(
                     }
                 }
                 service.getCharacteristic(ObcProtocol.APP_INFO_UUID)?.let {
-                    connection.write(it, openRideAppInfo(appVersion))
+                    connection.write(it, openRideAppInfo(appVersion)) { ok ->
+                        Log.w(TAG, "Controller $address: App Information ${if (ok) "sent" else "write failed"}")
+                    }
                 }
                 return true
             }

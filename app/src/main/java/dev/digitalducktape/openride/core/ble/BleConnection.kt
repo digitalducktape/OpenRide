@@ -100,6 +100,10 @@ class BleConnection(
         override fun onDescriptorWrite(g: BluetoothGatt?, descriptor: BluetoothGattDescriptor?, status: Int) {
             handler.post { if (g === gatt) finishOp(status, null) }
         }
+
+        override fun onMtuChanged(g: BluetoothGatt?, mtu: Int, status: Int) {
+            handler.post { if (g === gatt) finishOp(status, null) }
+        }
     }
 
     /** Starts connecting, and keeps reconnecting until [stop]. */
@@ -168,6 +172,19 @@ class BleConnection(
                     g.writeCharacteristic(characteristic)
                 }
             },
+            onDone = { status, _ -> onDone(status == BluetoothGatt.GATT_SUCCESS) },
+        ),
+    )
+
+    /**
+     * Asks for a larger MTU. Without one a write carries at most 20 bytes, and a longer one goes as
+     * a prepared ("long") write, which some peripherals receive as separate fragments: BikeControl
+     * on a phone took OpenRide's 30-byte App Information that way and never parsed it (#68).
+     * [onDone] gets whether the stack agreed; writes work either way.
+     */
+    fun requestMtu(mtu: Int = PREFERRED_MTU, onDone: (Boolean) -> Unit = {}) = enqueue(
+        Op(
+            run = { g -> g.requestMtu(mtu) },
             onDone = { status, _ -> onDone(status == BluetoothGatt.GATT_SUCCESS) },
         ),
     )
@@ -361,6 +378,9 @@ class BleConnection(
     companion object {
         /** Between attempts, and between scan starts (Android allows five per 30 s). */
         const val RETRY_MS = 8_000L
+
+        /** The MTU to ask for: the most a BLE 4.2+ link carries in one packet. */
+        const val PREFERRED_MTU = 247
 
         /** A GATT operation with no callback by then is given up, so the queue never sticks. */
         const val OP_TIMEOUT_MS = 5_000L
