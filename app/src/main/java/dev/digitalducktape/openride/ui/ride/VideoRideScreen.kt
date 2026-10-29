@@ -110,6 +110,7 @@ fun VideoRideScreen(
             RideMetricsBar(
                 uiState = uiState,
                 translucent = true,
+                onStepResistance = viewModel::stepResistance,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         } else {

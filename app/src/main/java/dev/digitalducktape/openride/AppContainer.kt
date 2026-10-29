@@ -78,7 +78,11 @@ import dev.digitalducktape.openride.games.session.NowPlayingFeed
 import dev.digitalducktape.openride.games.session.OtherMusicDetector
 import dev.digitalducktape.openride.core.music.NowPlayingMonitor
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
-import dev.digitalducktape.openride.core.sensor.BikeDataSource
+import dev.digitalducktape.openride.core.sensor.BikeSourceStore
+import dev.digitalducktape.openride.core.sensor.SharedPrefsBikeSourceStore
+import dev.digitalducktape.openride.core.sensor.SwitchableBikeDataSource
+import dev.digitalducktape.openride.core.trainer.FtmsBikeDataSource
+import dev.digitalducktape.openride.core.trainer.FtmsProtocol
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
 import java.io.File
 import dev.digitalducktape.openride.core.data.Profile
@@ -103,7 +107,7 @@ import kotlinx.coroutines.flow.stateIn
  * [OpenRideApplication] so [MainActivity], the games host and Compose screens can pull their
  * dependencies from one place via constructor injection.
  *
- * [bikeDataSource] is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
+ * [bikeDataSource]'s built-in source is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
  * (default `false`) switches it to [AffernetBikeDataSource] — the real system-service binding,
  * which races the two affernet sensor interfaces and keeps whichever one the board actually
  * feeds (Gen 2 streams over `IV1Interface`, Bike+ over `IBikeInterface`). Every other layer
@@ -173,12 +177,35 @@ class AppContainer(private val applicationContext: Context) {
         )
     }
 
-    val bikeDataSource: BikeDataSource by lazy {
-        if (BuildConfig.USE_REAL_BIKE_SENSOR) {
-            AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
-        } else {
-            MockBikeDataSource(scope = containerScope)
-        }
+    /** Which bike source the rider chose (#68): the built-in one, or a smart trainer. */
+    val bikeSourceStore: BikeSourceStore by lazy { SharedPrefsBikeSourceStore(applicationContext) }
+
+    /** Finds FTMS smart trainers for the bike-source screen (#68). */
+    val trainerScanner: BleScanner by lazy {
+        AndroidBleScanner(applicationContext, FtmsProtocol.SERVICE_UUID, offerConnected = false)
+    }
+
+    /**
+     * The bike's live numbers, from whichever source [bikeSourceStore] holds (#68). The built-in
+     * one is the build's: [AffernetBikeDataSource] when [BuildConfig.USE_REAL_BIKE_SENSOR], else
+     * [MockBikeDataSource]. A trainer is [FtmsBikeDataSource], connected while OpenRide is in use.
+     * On [containerScope], not the main thread: its wanted-flow reads [rideSessionManager], which
+     * is built from this, so it must not be collected while this is still being built.
+     */
+    val bikeDataSource: SwitchableBikeDataSource by lazy {
+        SwitchableBikeDataSource(
+            store = bikeSourceStore,
+            builtin = {
+                if (BuildConfig.USE_REAL_BIKE_SENSOR) {
+                    AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
+                } else {
+                    MockBikeDataSource(scope = containerScope)
+                }
+            },
+            trainerFactory = { address -> FtmsBikeDataSource(applicationContext, address) },
+            scope = containerScope,
+            wanted = accessoriesWanted(),
+        )
     }
 
     /**
@@ -338,6 +365,12 @@ class AppContainer(private val applicationContext: Context) {
             rideState = { rideSessionManager.state.value },
             pauseRide = { rideSessionManager.pause() },
             resumeRide = { rideSessionManager.resume() },
+            stepResistance = { steps ->
+                if (bikeDataSource.adjustable.value) {
+                    bikeDataSource.stepResistance(steps)
+                    controllerManager.haptic(ObcProtocol.HAPTIC_SHORT)
+                }
+            },
         )
     }
 

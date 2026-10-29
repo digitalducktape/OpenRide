@@ -151,6 +151,12 @@ session's pause and resume as `request_pause()` / `request_resume()` would
 (`ControllerRouter`), so games need nothing for them. Kart Race steers with `InputBus.steer_x()`
 and fires its item on `InputBus.controller_item`.
 
+**Smart trainers (#68):** with an FTMS trainer as the bike source, `resistance` is OpenRide's
+virtual resistance (`SwitchableBikeDataSource`), which the rider steps and Kotlin sends to the
+trainer. The game host draws its **+** and **−** as native views at the right edge, over the
+engine, while the trainer takes targets, so games need nothing for it; keep that edge's middle
+clear of game controls.
+
 **Sensor loss:** while `sensors_ok` is 0, games freeze scoring and show the "sensors not detected"
 banner. The ride keeps recording exactly as it does today.
 

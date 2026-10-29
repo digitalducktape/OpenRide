@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
 import dev.digitalducktape.openride.core.controller.ControllerStatus
+import dev.digitalducktape.openride.core.sensor.BikeSource
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.BuildConfig
 import dev.digitalducktape.openride.core.music.MusicApp
 import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.ui.common.ExportShare
@@ -68,6 +70,9 @@ fun ProfileTabScreen(
     /** The paired OpenBikeControl controllers and their connections (#68). */
     controllers: List<ControllerStatus>,
     onManageControllers: () -> Unit,
+    /** Where the bike's numbers come from (#68). */
+    bikeSource: BikeSource,
+    onManageBikeSource: () -> Unit,
     onManageAppUpdates: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
@@ -187,6 +192,12 @@ fun ProfileTabScreen(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             // PRD P1-5 (T12): stock Android settings, for when OpenRide is the tablet's launcher.
             OrSettingsGroup(title = "Device") {
+                OrSettingsRow(
+                    title = "Bike",
+                    value = BikeSourceLabels.profileRow(bikeSource, BuildConfig.USE_REAL_BIKE_SENSOR),
+                    onClick = onManageBikeSource,
+                )
+                OrSettingsDivider()
                 OrSettingsRow(
                     title = "Wi-Fi",
                     value = "Android Wi-Fi settings",

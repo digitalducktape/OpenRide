@@ -124,7 +124,7 @@ fun InRideScreen(
             }
         }
 
-        RideMetricsBar(uiState = uiState, translucent = false)
+        RideMetricsBar(uiState = uiState, translucent = false, onStepResistance = viewModel::stepResistance)
     }
 
     if (showEndConfirmation) {

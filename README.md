@@ -71,6 +71,17 @@ Good to know:
 - **Players disappear when music stops for a while.** Most apps let go of their session after a pause, and the player goes with it. Press play in the music app and it's back.
 - **In the games**, the **♪** button in the hub and in each game opens the player (a game pauses until you tap **Done**), and game music turns itself off while your music plays.
 
+## Smart trainers (FTMS)
+
+OpenRide can take its numbers from a smart trainer or smart bike instead of the Peloton's own sensors: anything that speaks the standard Bluetooth **Fitness Machine Service** (FTMS), such as most current Wahoo, Tacx, Elite, Saris and JetBlack trainers. That also means OpenRide runs on an ordinary Android tablet next to a trainer.
+
+**To set one up**, open **Profile → Bike**, tap **Scan for trainers**, then **Use** next to yours. **Use** on *Peloton bike* switches back. OpenRide connects to the trainer while it's open or recording a ride, and lets go otherwise, so another app can use it.
+
+A trainer has no resistance knob, so OpenRide's resistance is yours to set: **−** and **+** beside the resistance reading on the ride screens, the same buttons at the right edge of the games, or a controller's shift buttons (below). OpenRide sends it to the trainer as a resistance level, or as a hill's gradient (0-15 %) on trainers that only simulate a road. The games read it as they read the knob, so Safe Cracker and the resistance bonus work the same.
+
+> [!NOTE]
+> Trainer support is new and has been built to the Bluetooth specification rather than ridden on every trainer yet. If yours connects but resistance doesn't change, please [open an issue](https://github.com/digitalducktape/openride/issues) with its make and model.
+
 ## Controllers (OpenBikeControl)
 
 OpenRide takes button presses from controllers that speak [OpenBikeControl](https://openbikecontrol.org/), an open protocol for shifters, buttons and steering. That includes bikes with it built in, like the Stages SB200, and [BikeControl](https://bikecontrol.app/) on a phone, which turns Zwift Click and Play, game controllers and many other remotes into one. They connect over Bluetooth or over your Wi-Fi.
@@ -82,7 +93,7 @@ What the buttons do:
 - **Pause** and **Resume** pause and resume your ride, or the game you're playing.
 - **Steer left / right**, or a steering angle, steer the kart in **Kart Race** instead of leaning your head.
 - **Power-up 1-3** use your item in Kart Race.
-- **Shift up / down** and **Increase / decrease difficulty** change the resistance on a smart trainer. On a Peloton, the knob does that.
+- **Shift up / down** and **Increase / decrease difficulty** change the resistance on a [smart trainer](#smart-trainers-ftms), and holding one keeps stepping. On a Peloton, the knob does that.
 
 ## Mini-games (BETA)
 
