@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.digitalducktape.openride.core.backup.MediaStoreAutoBackupStore
+import dev.digitalducktape.openride.core.controller.ControllerStatus
+import dev.digitalducktape.openride.core.sensor.BikeSource
+import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.BuildConfig
 import dev.digitalducktape.openride.core.music.MusicApp
 import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.ui.common.ExportShare
@@ -63,6 +67,12 @@ fun ProfileTabScreen(
     onEditProfile: () -> Unit,
     onRestoreComplete: () -> Unit,
     onManageHeartRateStrap: () -> Unit,
+    /** The paired OpenBikeControl controllers and their connections (#68). */
+    controllers: List<ControllerStatus>,
+    onManageControllers: () -> Unit,
+    /** Where the bike's numbers come from (#68). */
+    bikeSource: BikeSource,
+    onManageBikeSource: () -> Unit,
     onManageAppUpdates: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
@@ -113,6 +123,8 @@ fun ProfileTabScreen(
         if (text != null) pendingRestoreContent = text
     }
 
+    // Each column scrolls only where it doesn't fit: never on the bike, but on a phone's shorter
+    // screen the lower rows (Controllers among them, #68) were out of reach.
     // One page, no scrolling (the rider's ask, 2026-10-21): three columns of groups under the
     // shared top bar, which carries the rider and Switch rider; Edit profile is a setting like
     // the rest. The tallest column is about 360 dp of the 528 between the bars, leaving room for
@@ -123,7 +135,7 @@ fun ProfileTabScreen(
             .padding(start = OrSpacing.ScreenGutter, end = OrSpacing.ScreenGutter, top = OrSpacing.sm, bottom = OrSpacing.lg),
         horizontalArrangement = Arrangement.spacedBy(OrSpacing.lg),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             OrSettingsGroup(title = "Rider") {
                 OrSettingsRow(
                     title = "Edit profile",
@@ -139,6 +151,14 @@ fun ProfileTabScreen(
                     value = ProfileTabLabels.heartRateStrap(paired),
                     valueColor = if (paired) OrColors.Success else OrColors.OnSurfaceMuted,
                     onClick = onManageHeartRateStrap,
+                )
+                OrSettingsDivider()
+                val controllersLive = controllers.any { it.connection == ConnectionState.Connected }
+                OrSettingsRow(
+                    title = "Controllers",
+                    value = ProfileTabLabels.controllers(controllers.size, controllers.count { it.connection == ConnectionState.Connected }),
+                    valueColor = if (controllersLive) OrColors.Success else OrColors.OnSurfaceMuted,
+                    onClick = onManageControllers,
                 )
                 OrSettingsDivider()
                 // GPX route import (PRD #21/T21).
@@ -171,9 +191,15 @@ fun ProfileTabScreen(
             }
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             // PRD P1-5 (T12): stock Android settings, for when OpenRide is the tablet's launcher.
             OrSettingsGroup(title = "Device") {
+                OrSettingsRow(
+                    title = "Bike",
+                    value = BikeSourceLabels.profileRow(bikeSource, BuildConfig.USE_REAL_BIKE_SENSOR),
+                    onClick = onManageBikeSource,
+                )
+                OrSettingsDivider()
                 OrSettingsRow(
                     title = "Wi-Fi",
                     value = "Android Wi-Fi settings",
@@ -218,7 +244,7 @@ fun ProfileTabScreen(
             }
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(OrSpacing.lg)) {
             // The music player's two settings (rider's ask, 2026-10-27): which app its button
             // opens, and the permission that lets it show what's playing. Here, not under Device:
             // with the Home screen row, the middle column outgrew the page.

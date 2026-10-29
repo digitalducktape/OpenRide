@@ -33,6 +33,12 @@ source code from any of them. See `docs/INTEROP.md` for details.
   does not bundle or redistribute OpenPelo; it is referenced only as an external
   install prerequisite in the README and `docs/INSTALL.md`.
 
+- **OpenBikeControl** — https://github.com/OpenBikeControl/openbikecontrol-protocol
+  The open protocol for trainer-app controllers (issue #68), published under the
+  MIT License. OpenRide implements the wire format from the specification
+  (`app/src/main/java/dev/digitalducktape/openride/core/controller/ObcProtocol.kt`);
+  no code from the repository's examples is copied.
+
 - **1€ (One Euro) filter** — Géry Casiez, Nicolas Roussel and Daniel Vogel,
   "1€ Filter: A Simple Speed-based Low-pass Filter for Noisy Input in Interactive
   Systems", CHI 2012. The head tracker's smoothing implements the algorithm from

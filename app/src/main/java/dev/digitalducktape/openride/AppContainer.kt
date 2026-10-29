@@ -28,6 +28,16 @@ import dev.digitalducktape.openride.core.camera.HeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
 import dev.digitalducktape.openride.core.camera.UnavailableReason
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
+import dev.digitalducktape.openride.core.controller.BleObcLink
+import dev.digitalducktape.openride.core.controller.ControllerManager
+import dev.digitalducktape.openride.core.controller.ControllerRouter
+import dev.digitalducktape.openride.core.controller.ControllerScanner
+import dev.digitalducktape.openride.core.controller.ControllerStore
+import dev.digitalducktape.openride.core.controller.ControllerTransport
+import dev.digitalducktape.openride.core.controller.NetworkObcLink
+import dev.digitalducktape.openride.core.controller.ObcControllerScanner
+import dev.digitalducktape.openride.core.controller.ObcProtocol
+import dev.digitalducktape.openride.core.controller.SharedPrefsControllerStore
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
 import dev.digitalducktape.openride.core.data.MIGRATION_1_2
@@ -54,6 +64,7 @@ import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
 import dev.digitalducktape.openride.games.bridge.CameraPermission
+import dev.digitalducktape.openride.games.bridge.ControllerReading
 import dev.digitalducktape.openride.games.bridge.GameBridge
 import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.toTrackerReading
@@ -67,7 +78,11 @@ import dev.digitalducktape.openride.games.session.NowPlayingFeed
 import dev.digitalducktape.openride.games.session.OtherMusicDetector
 import dev.digitalducktape.openride.core.music.NowPlayingMonitor
 import dev.digitalducktape.openride.core.sensor.AffernetBikeDataSource
-import dev.digitalducktape.openride.core.sensor.BikeDataSource
+import dev.digitalducktape.openride.core.sensor.BikeSourceStore
+import dev.digitalducktape.openride.core.sensor.SharedPrefsBikeSourceStore
+import dev.digitalducktape.openride.core.sensor.SwitchableBikeDataSource
+import dev.digitalducktape.openride.core.trainer.FtmsBikeDataSource
+import dev.digitalducktape.openride.core.trainer.FtmsProtocol
 import dev.digitalducktape.openride.core.sensor.MockBikeDataSource
 import java.io.File
 import dev.digitalducktape.openride.core.data.Profile
@@ -92,7 +107,7 @@ import kotlinx.coroutines.flow.stateIn
  * [OpenRideApplication] so [MainActivity], the games host and Compose screens can pull their
  * dependencies from one place via constructor injection.
  *
- * [bikeDataSource] is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
+ * [bikeDataSource]'s built-in source is [MockBikeDataSource] by default; [BuildConfig.USE_REAL_BIKE_SENSOR]
  * (default `false`) switches it to [AffernetBikeDataSource] — the real system-service binding,
  * which races the two affernet sensor interfaces and keeps whichever one the board actually
  * feeds (Gen 2 streams over `IV1Interface`, Bike+ over `IBikeInterface`). Every other layer
@@ -162,12 +177,35 @@ class AppContainer(private val applicationContext: Context) {
         )
     }
 
-    val bikeDataSource: BikeDataSource by lazy {
-        if (BuildConfig.USE_REAL_BIKE_SENSOR) {
-            AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
-        } else {
-            MockBikeDataSource(scope = containerScope)
-        }
+    /** Which bike source the rider chose (#68): the built-in one, or a smart trainer. */
+    val bikeSourceStore: BikeSourceStore by lazy { SharedPrefsBikeSourceStore(applicationContext) }
+
+    /** Finds FTMS smart trainers for the bike-source screen (#68). */
+    val trainerScanner: BleScanner by lazy {
+        AndroidBleScanner(applicationContext, FtmsProtocol.SERVICE_UUID, offerConnected = false)
+    }
+
+    /**
+     * The bike's live numbers, from whichever source [bikeSourceStore] holds (#68). The built-in
+     * one is the build's: [AffernetBikeDataSource] when [BuildConfig.USE_REAL_BIKE_SENSOR], else
+     * [MockBikeDataSource]. A trainer is [FtmsBikeDataSource], connected while OpenRide is in use.
+     * On [containerScope], not the main thread: its wanted-flow reads [rideSessionManager], which
+     * is built from this, so it must not be collected while this is still being built.
+     */
+    val bikeDataSource: SwitchableBikeDataSource by lazy {
+        SwitchableBikeDataSource(
+            store = bikeSourceStore,
+            builtin = {
+                if (BuildConfig.USE_REAL_BIKE_SENSOR) {
+                    AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
+                } else {
+                    MockBikeDataSource(scope = containerScope)
+                }
+            },
+            trainerFactory = { address -> FtmsBikeDataSource(applicationContext, address) },
+            scope = containerScope,
+            wanted = accessoriesWanted(),
+        )
     }
 
     /**
@@ -276,6 +314,66 @@ class AppContainer(private val applicationContext: Context) {
         )
     }
 
+    /** Main-thread scope for the controllers: their links call back on the main thread. */
+    private val mainScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
+    /** Whether OpenRide needs its Bluetooth accessories now: in front, or recording a ride ([strapWanted]). */
+    private fun accessoriesWanted() = strapWanted(
+        foreground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow
+            .map { it.isAtLeast(Lifecycle.State.STARTED) },
+        rideActive = flow { emitAll(rideSessionManager.isRideActive) },
+    )
+
+    /** The OpenBikeControl controllers the rider paired (#68): the bike's, shared by every rider. */
+    val controllerStore: ControllerStore by lazy { SharedPrefsControllerStore(applicationContext) }
+
+    /** Finds controllers for the pairing screen, over Bluetooth and the local network (#68). */
+    val controllerScanner: ControllerScanner by lazy {
+        ObcControllerScanner(
+            applicationContext,
+            AndroidBleScanner(applicationContext, ObcProtocol.SERVICE_UUID, offerConnected = false),
+        )
+    }
+
+    /**
+     * Keeps the paired controllers connected while OpenRide is in use (#68), like the strap, and
+     * turns their buttons into actions. Built at launch from [OpenRideApplication.onCreate].
+     */
+    val controllerManager: ControllerManager by lazy {
+        ControllerManager(
+            store = controllerStore,
+            linkFactory = { controller ->
+                when (controller.transport) {
+                    ControllerTransport.BLUETOOTH -> BleObcLink(applicationContext, controller.id, BuildConfig.VERSION_NAME)
+                    ControllerTransport.NETWORK -> NetworkObcLink(applicationContext, controller.id, BuildConfig.VERSION_NAME)
+                }
+            },
+            scope = mainScope,
+            wanted = accessoriesWanted(),
+        )
+    }
+
+    /** Sends the controllers' presses to the ride, the games and the trainer (#68). */
+    val controllerRouter: ControllerRouter by lazy {
+        ControllerRouter(
+            events = controllerManager.events,
+            scope = mainScope,
+            gameSessionActive = { gameBridge.hasSession },
+            // Lambdas, not bound references: launch builds this, and needn't build the bridge.
+            pauseGame = { gameBridge.requestPause() },
+            resumeGame = { gameBridge.requestResume() },
+            rideState = { rideSessionManager.state.value },
+            pauseRide = { rideSessionManager.pause() },
+            resumeRide = { rideSessionManager.resume() },
+            stepResistance = { steps ->
+                if (bikeDataSource.adjustable.value) {
+                    bikeDataSource.stepResistance(steps)
+                    controllerManager.haptic(ObcProtocol.HAPTIC_SHORT)
+                }
+            },
+        )
+    }
+
     /**
      * Mini-games (#32): the app-scoped side of the Godot bridge. One per process, like the
      * Godot engine itself, so every GameHostActivity (and the engine's one plugin instance)
@@ -289,6 +387,7 @@ class AppContainer(private val applicationContext: Context) {
             trackerReading = { headTracker.state.value.toTrackerReading() },
             riderMusic = { riderMusic.value },
             musicControl = { NowPlayingFeed.control(nowPlaying, it) },
+            controllerReading = { ControllerReading(controllerManager.steer.value, controllerRouter.itemPresses) },
         ).also { bridge ->
             // The hub's music card: the rider's track, sent as it changes.
             NowPlayingFeed(applicationContext, nowPlaying, bridge::publishNowPlaying, containerScope)

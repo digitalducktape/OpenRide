@@ -63,6 +63,13 @@ uses them nominatively â€” only as needed to identify the compatible hardware â€
 does not use Peloton's logos, stylized marks, or trade dress. OpenRide does not
 imply sponsorship or endorsement.
 
+## Smart trainers and controllers
+
+Smart trainers and OpenBikeControl controllers (issue #68) involve no Peloton software at all.
+OpenRide speaks two published, freely implementable protocols to devices the rider owns: the
+Bluetooth SIG's Fitness Machine Service, and the MIT-licensed OpenBikeControl protocol. Both are
+reimplemented from their specifications (`core/trainer/`, `core/controller/`).
+
 ## Scope
 
 OpenRide exists so an owner can see and keep their own ride data on hardware they

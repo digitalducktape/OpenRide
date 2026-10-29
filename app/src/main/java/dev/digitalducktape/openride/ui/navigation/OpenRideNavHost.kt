@@ -27,6 +27,10 @@ import dev.digitalducktape.openride.ui.profile.ProfileEditorRoute
 import dev.digitalducktape.openride.ui.profile.ProfileEditorViewModel
 import dev.digitalducktape.openride.ui.profile.ProfileSelectRoute
 import dev.digitalducktape.openride.ui.profile.ProfileSelectViewModel
+import dev.digitalducktape.openride.ui.profile.BikeSourceRoute
+import dev.digitalducktape.openride.ui.profile.BikeSourceViewModel
+import dev.digitalducktape.openride.ui.profile.ControllersRoute
+import dev.digitalducktape.openride.ui.profile.ControllersViewModel
 import dev.digitalducktape.openride.ui.profile.HrPairingRoute
 import dev.digitalducktape.openride.ui.profile.HrPairingViewModel
 import dev.digitalducktape.openride.ui.ride.InRideScreen
@@ -137,6 +141,36 @@ fun OpenRideNavHost(appContainer: AppContainer) {
             )
             HrPairingRoute(
                 viewModel = viewModel,
+                onDone = { navController.popBackStack() },
+            )
+        }
+
+        composable(Destinations.Controllers) {
+            val viewModel: ControllersViewModel = viewModel(
+                factory = viewModelFactory {
+                    ControllersViewModel(
+                        appContainer.controllerScanner,
+                        appContainer.controllerStore,
+                        appContainer.controllerManager.statuses,
+                        appContainer.controllerManager.lastPress,
+                    )
+                },
+            )
+            ControllersRoute(
+                viewModel = viewModel,
+                onDone = { navController.popBackStack() },
+            )
+        }
+
+        composable(Destinations.BikeSource) {
+            val viewModel: BikeSourceViewModel = viewModel(
+                factory = viewModelFactory {
+                    BikeSourceViewModel(appContainer.trainerScanner, appContainer.bikeSourceStore, appContainer.bikeDataSource)
+                },
+            )
+            BikeSourceRoute(
+                viewModel = viewModel,
+                realBike = BuildConfig.USE_REAL_BIKE_SENSOR,
                 onDone = { navController.popBackStack() },
             )
         }
