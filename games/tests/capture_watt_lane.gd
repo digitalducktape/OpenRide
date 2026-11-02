@@ -34,6 +34,14 @@ func _run() -> void:
 		elif arg.begins_with("--measure="):
 			measure_sec = float(arg.get_slice("=", 1))
 	DirAccess.make_dir_recursive_absolute(out)
+	# The bike's app area is 1920x1008: a borderless window fits it under a 1080p desktop's
+	# menu bar (a titled one is clamped shorter).
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+	DisplayServer.window_set_position(Vector2i(0, 40))
+	DisplayServer.window_set_size(Vector2i(1920, 1008))
+	for i in 3:
+		await process_frame
+	print("CAPTURE window %s" % DisplayServer.window_get_size())
 	_session = root.get_node("Session")
 	_director = _session.director
 	_session._local.start({"kind": "just_ride", "plan_id": "capture", "difficulty": "standard", "total_sec": roundi(play_sec) + 10,

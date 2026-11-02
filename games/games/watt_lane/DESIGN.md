@@ -212,3 +212,33 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
 | HUD | `hud-system` | A slim `PanelContainer` widget in the HUD's top-centre slot, labels changed only on new values, framework tweens for pop and fade | A `ProgressBar` power meter of the game's own | A second power bar is what made Balloon Pump's numbers disagree; the ride panel's W (fed the same smoothed value) is the meter |
 | Audio | `audio-system` | Rendered OGG stems through `AudioDirector` (stem gates by intensity), registered one-shots, and two looping `AudioStreamWAV` hums on the SFX bus crossfaded in code | An `AudioStreamSynchronized`/`AudioStreamInteractive` of the game's own | `AudioDirector` already owns crossfades, ducking and the rider's-music rule; the hum is the only continuous sound, so two players are enough |
 | Tests | `godot-testing` | GdUnit4 suites: headless logic with scripted power, and the scene stepped by hand (no InputBus) | GUT; driving the scene through the keyboard simulator | The project's framework; stepping by hand makes the HUD agreement check exact frame by frame |
+
+## Game-studio roles and gates (`.claude/ccgs/`)
+
+| Pass | What it changed |
+| --- | --- |
+| `game-designer` | This file's rules: the switch window, the 1 s streak grace, the 5 W grid and the softer lane floor and range; then (from the logic tests) jumps of over half a lane and a range that widens for them, and the stars 250 / 1200 / 2000 |
+| `godot-gdscript-specialist`, `lead-programmer` | Rules as two typed `RefCounted` classes (`WattLaneCourse`, `WattLaneLogic`) returning event lists; 26 headless tests; the Kotlin entry |
+| `art-director` + `AD-ART-BIBLE` | `ART_BIBLE.md` (APPROVE): lime and amber on petrol night, open road, chevrons as the only angular shapes |
+| `technical-artist` | `WattLaneWorld`: the bend from a uniform array, 5 draws, nothing per frame but uniforms |
+| `ux-designer`, `ui-programmer` | The lane's bounds as the hero; the ride panel fed the same smoothed watts (`set_power_source`); the countdown chip in the widget's second row; "UP 175–215 in 4" to fit 850 px |
+| `sound-designer` | "Night Current" and seven effects; the hum; levels set from `analyze_mix` (the ticks and streak steps were masked at first) |
+
+**Gates before finishing:**
+
+- **AD-VISUAL: CONCERNS → resolved.** The moon sat above the view (§6 says it shows): moved low
+  left, clear of the HUD. The first bike nose was a large dark wedge that read as an obstacle:
+  now a slim notched arrowhead. Open on the tablet: lime against amber on its warm panel.
+- **LP-CODE-REVIEW: APPROVE after one fix.** The ride panel's power source was a lambda that
+  could outlive the game; it is now a bound method (`smoothed_power`). Public APIs are
+  documented; rules never read `InputBus`.
+- **QL-TEST-COVERAGE: ADEQUATE.** Every acceptance item (smoothing, membership, announce
+  timing, streaks) and the HUD agreement have tests; a test for the "stopped" edge case was
+  added. Not covered by tests: pause (the framework's), sensor loss (`Effort`'s), and the
+  on-bike lag (the issue's bike acceptance item).
+- **TD-FEASIBILITY: CONCERNS (manageable).** Not measured on the tablet in this phase (the
+  tablet lock was held by another agent). Risks: uniform-array indexing in the road's fragment
+  shader on the GX6250 (fallback: bake the offsets into a 64×1 float texture); the road shader
+  covers half the screen with three noise reads (fallback: per-vertex grain on a subdivided
+  plane); the hum loops are rendered in GDScript once a process (about 240k `sin` calls; move to
+  the offline renderer if the first load stutters).
