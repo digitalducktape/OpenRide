@@ -281,7 +281,7 @@ func _handle(event: Dictionary) -> void:
 			AudioDirector.play_sfx("crowd_swell", -12.0)
 			_show_message("Get set", PullLogic.SET_SEC - 0.5, GameTheme.TARGET)
 		"board":
-			AudioDirector.play_sfx("board_pass", -9.0)
+			AudioDirector.play_sfx("board_pass", -1.0)
 			world.excitement = minf(world.excitement + 0.12, 1.0)
 		"dig_in":
 			AudioDirector.play_sfx("dig_in", -3.0)

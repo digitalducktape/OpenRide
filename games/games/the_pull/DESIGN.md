@@ -193,6 +193,35 @@ game build.
 6. The sled is seen in a handlebar mirror and in a look back over the shoulder at each pull's
    `SET`.
 
+## Audio (sound-designer pass)
+
+All original and synthesised by `games/tools/music/songs/the_pull.py` (no samples). The music is
+"Heavy Haul", a county-fair boogie at 116 bpm in E: driving drums, octave bass, chugs and power
+chords, a twang guitar lead, then brass and piano in the chorus. Its stem gates are harmony at
+0.5 (the sled is rolling) and lead at 0.85 (within 15 m of the best flag, or 20 m of the Full
+Pull line). The intensity is 0.4 while setting, 0.6 while pulling and 0.3 at rest.
+
+| Event | Sound | Level | Notes |
+| --- | --- | --- | --- |
+| Horn (GO) | `pull_horn`: two air-horn blasts | -2 dB, 1 s moment duck | announced 3.5 s ahead by the look back and "Get set" |
+| Every 25 m board | `board_pass`: a dry wooden clack | -1 dB | subtle by design; the loops mask it a little (cut-through ≈ 0 dB) |
+| Dig in! | `dig_in`: two bell knocks | -3 dB | 3.5 s before the stall |
+| Near the best | `crowd_swell` | -6 dB | the crowd jumps too |
+| Past the best | `best_pass`: a rising brass call | -3 dB, sting duck | |
+| Full Pull | `full_pull` fanfare and `crowd_swell` | 0 / -2 dB, sting duck 2.5 s | confetti and a floodlight flare |
+| Stall | `stall_horn`: a falling horn and a clank | -3 dB, 1.5 s moment duck | the view dips |
+| Time! | `stall_horn` | -8 dB | |
+| Loop: motor | `engine_drone` | -26 dB idle → -9 dB at FTP; pitch 0.7-1.6× with watts / FTP | the issue's "engine-like drone pitched to power" |
+| Loop: chain | `chain_strain` | silent → -8 dB with strain | strain = how far the speed has dropped under 1 m/s with power on |
+| Loop: box | `box_scrape` | silent → -11 dB with speed | the weight box grinding |
+
+The loops play on the game's own players on the SFX bus, eased over 0.25 s so the 1 Hz readings
+don't step them, and paused with the game. The bus effects are an outdoor reverb and a glue
+compressor on the music, a reverb and a limiter on the effects, and the shared -1 dBFS Master
+limiter. An offline render (`tests/render_game_audio.gd --game=the_pull`, 90 s) measured the mix
+at -18.4 LUFS with a -2.5 dBFS peak before the limiter and no clipping. The horn cuts through by
+14 dB broadband, and the stall horn by 10 dB.
+
 ## GodotPrompter pattern choices
 
 Filled in at each pass. The pattern picked, the alternative rejected, and why.
