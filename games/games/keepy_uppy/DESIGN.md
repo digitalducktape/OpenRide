@@ -59,11 +59,19 @@ decide when to ride high for 3× points. Session: points a minute, stars, pops.
   `BASE_POINTS = 10` a second, awarded every frame through `award()` (the effort multiplier
   applies). Nothing scores while a new balloon is on its way.
 - Stars are points a minute (`stars_per_minute`), the same for every difficulty because the
-  weight already scales with it: **600 / 1200 / 2000**.
-  - Steady mid at 1.0×: 1200 a minute, 2 stars.
-  - A perfect run, always high, at 1.0×: 1800 a minute, **short of 3 stars** (epic #31).
-  - Mostly high (80% high, 20% mid) at 1.3×: about 2180, 3 stars. All high at 1.3×: 2340.
-  - `keepy_logic_test` checks each.
+  weight already scales with it: **500 / 1100 / 2000**.
+  - Modelled over 5 minutes with the weather on (`keepy_logic_test`, three seeds):
+
+| Rider | Points a minute at 1.0× | Stars at 1.0× | At 1.3× |
+| --- | --- | --- | --- |
+| 45% of FTP, ignoring the weather (low band, pops 12-15 times) | 430-470 | 0 | 1 |
+| 51% of FTP, ignoring the weather (pops 3-4 times, mostly to rain) | 820-880 | 1 | 2 |
+| 51% of FTP, answering rain and birds (steady mid) | 1190-1200 | 2 | 2 |
+| 65% of FTP, answering the weather (high almost all the time) | 1795 | 2 | **3** (2330) |
+| As high as the column goes, all the time (a perfect run) | 1798 | 2 | 3 |
+
+  So a perfect run at 1.0× stays **short of 3 stars** (epic #31), and 3 stars takes riding
+  high with about 1.3× effort.
 
 ### The ceiling's gusts
 
@@ -86,7 +94,8 @@ with three birds already perched, no more birds.
 - **Birds.** Telegraph **2.5 s**: a bird flies in from the side ("Bird incoming"). It lands
   on the balloon: **+5% of FTP** each (`bird_watts`), up to three. **Shake them off**: hold the
   high band for 3 s in a row and every bird flies off (`birds_shaken` counts them). A pop also
-  scares them off (not counted).
+  scares them off, and they get bored and leave by themselves 20 s after the last one landed
+  (`BIRD_STAY`; neither is counted), so a rider who never rides high isn't buried under them.
 - **Downdraft.** Telegraph **2.5 s**: the grass flattens in a dark band rolling in and a low
   whoosh builds ("Downdraft! Push!"). Then for 1.5 s the air pushes down: the balloon sinks at
   up to `DOWNDRAFT_SINK = 0.25` a second (the floaty limit is lifted) and the lift is pushed down
@@ -111,17 +120,22 @@ the center of the screen but might move."
 
 - With Steer on, **wind** drifts the balloon left and right. The fan slides on a short rail in
   front of the bike, and the rider leans to put it back under the balloon.
-- The column **holds the balloon gently**: `dx/dt = wind + CENTRING × (fan_x − x)`,
-  `CENTRING = 0.6`/s. So a steady wind holds the balloon `wind / CENTRING` off the fan's
-  centre, and the rider leans into the wind to cancel it.
+- **The wind carries the balloon** toward `wind` metres off the middle (at most `WIND_MAX` =
+  0.8 m), easing there with a 2 s time constant, while the column pulls it a little toward the
+  fan's centre: `dx/dt = (wind − x) / 2 + 0.15 × (fan_x − x)`. With the fan left in the middle,
+  a full wind holds the balloon about 0.6 m off it (about a fifth of the lift lost, a band's
+  drop); with the fan slid under it, nothing is lost. (A first version had the column hold the
+  balloon at a fixed offset from wherever the fan was, so leaning could never win the lift
+  back; the test caught it.)
 - **Lift loss in proportion to the offset**, past a free zone: `steer_efficiency = 1 −
   MAX_LOSS × clamp((|x − fan_x| − FREE) / (EDGE − FREE), 0, 1)`, `FREE = 0.25 m`,
   `EDGE = 1.2 m`, `MAX_LOSS = 0.5`. A fan fully out from under the balloon halves its lift,
   which sinks it from anywhere. Leaning the wrong way makes the offset bigger: that is how a
   lean "could miss keeping the balloon up".
-- **The wind** is at most 0.45 m/s (an offset of 0.75 m if ignored: about a 30% lift loss, a
-  band's drop). It eases to a new strength every 6-10 s over 3 s; the windsock on the height pole
-  and the HUD's wind arrow show the new wind as soon as it's chosen, 3 s before it's fully in.
+- **The wind** changes every 6-10 s and eases to its new strength over up to 3 s; the windsock
+  on the height pole and the HUD's wind arrow show the new wind as soon as it's chosen, and the
+  balloon's 2 s drift lag adds to that, so the rider sees it coming. Holding a full wind takes
+  a moderate lean (about 0.6 of the tracker's range, less with the free zone).
 - **The camera follows the balloon gently** (it pans toward the balloon's x with a 1.2 s lag
   and pitches with its height), so the balloon stays near the centre of the screen and its
   sideways drift reads against the fan and the meadow.
@@ -134,7 +148,7 @@ already applies a 0.15 dead zone with a ramp. On top, the game:
 
 1. **Dead zone** `LEAN_DEAD = 0.12` of the tracker's lean, then a **soft curve** (`t^1.6`
    of the rest), so small sways move the fan by centimetres, not tens of them.
-2. **Position, not speed**: the lean sets where the fan wants to be (`FAN_RANGE = ±1.3 m` at
+2. **Position, not speed**: the lean sets where the fan wants to be (`FAN_RANGE = ±1.6 m` at
    full lean), so sitting up straight always brings it back to the centre: no hunting for
    neutral.
 3. **Smoothed and rate-limited**: the fan eases to that place with a 0.35 s time constant and
@@ -167,14 +181,15 @@ loss curve). Tune them on the bike.
 | `SMOOTH_TAU` | 1.0 s | feel | "Smoothed power (2 s)" |
 | Bands | 0.35, 0.65 | gate | Three equal-ish bands; the low band is the warning zone |
 | `BASE_POINTS` | 10 /s | curve | Mid a minute = 1200 |
-| Stars | 600/1200/2000 | gate | Epic #31 rule, see Scoring |
+| Stars | 500/1100/2000 | gate | Epic #31 rule, see Scoring |
 | Rain | +10% FTP, 8-12 s, 3 s warning | feel | The issue's |
 | Bird | +5% FTP, 2.5 s warning, shake 3 s high | feel | The issue's |
 | Downdraft | +20% FTP, 1.5 s, sink 0.25/s, 2.5 s warning | feel | Survivable from mid without answering |
 | Force gap | first 8-14 s, then 10-16 s | gate | About four forces a minute is too busy; one every ~15 s keeps it calm |
 | Gust | 6-10 s while high, 2 s warning, −0.12 | feel | High pays 3×, so it gets a small tax |
 | Pop | −50, 3 s, respawn at 0.4 | gate | The rider's rule |
-| Steer | dead 0.12, curve 1.6, ±1.3 m, 0.35 s, 1.6 m/s, free 0.25 m | feel | #71 |
+| Steer | dead 0.12, curve 1.6, ±1.6 m, 0.35 s, 1.6 m/s, free 0.25 m, wind 0.8 m | feel | #71 |
+| Birds' stay | 20 s | feel | A rider who never rides high isn't buried under birds |
 
 Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin sends the watts.
 
@@ -202,7 +217,15 @@ Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin se
 - **Gusts** are my reading of "the ceiling has gusts": small, telegraphed knocks in the high
   band only.
 - **Downdraft** numbers are mine: +20% of FTP for 1.5 s, survivable from mid.
-- **Respawn height** 0.4 (just into mid) and **a 4 s calm** after a new balloon arrives.
+- **Respawn height** 0.4 (just into mid) and **a 4 s calm** after a new balloon arrives. The
+  3 s is pop to back in the air: the pieces fall for 1.2 s, then the new balloon is dispatched
+  and drifts in for 1.8 s. Each new balloon (and the first) holds its height for a moment
+  (1.5 s; the first 3 s) while the rider gets going.
+- **Birds leave by themselves** after 20 s: without it a half-FTP rider who never rides high
+  collected three birds and popped about once a minute.
+- **A rider ignoring the rain pops**: at exactly 51% of FTP the rain's +10% sinks the balloon
+  in about 3 s. That's the issue's number and the point of the 3 s warning; the comfortable
+  answer is about 10% of FTP more for 8-12 s. Revisit on the bike if it feels harsh.
 - **Rounds** are 60 s of air time.
 - **Shake off**: "a 3 s push above the high band" read as 3 s in a row in the high band.
 - **Steer details** (the centring column, the free zone, the dead zone and curve) are mine,
