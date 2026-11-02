@@ -11,6 +11,7 @@ const GAMES := {
 	"safe_cracker": "res://games/safe_cracker/SafeCracker.tscn",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceKaraoke.tscn",
 	"kart_race": "res://games/kart_race/KartRace.tscn",
+	"the_pull": "res://games/the_pull/ThePull.tscn",
 }
 
 static var _infos := {}
