@@ -232,6 +232,40 @@ Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin se
   for #71.
 - **Extra stats**: `downdrafts`, `downdrafts_beaten`, `best_air`.
 
+## Desktop and hub notes
+
+- Play it on the desktop by running `KeepyUppy.tscn` (F6), which gives a local Just Ride with the
+  keyboard simulator (`+`/`-` cadence, `[`/`]` resistance, arrows to lean with Steer on), or
+  `tests/capture_keepy.gd` (`--play=SECONDS` rides with a scripted rider).
+- **Not in the desktop hub's list yet** (`LocalHub.ORDER`): the hub's home row fits five game
+  cards at 1920 wide, and a sixth falls off the right edge (`hub_layout_test` fails). Issue #75
+  ("the hub shows every game") owns that layout; once it lands, append `keepy_uppy` to
+  `LocalHub.ORDER` and `USES_CAMERA` (`false`). On the bike the Kotlin catalog already lists it,
+  so until #75 its card sits partly off screen (checked on the tablet: still tappable).
+
+## Gate reviews (ccgs, before the slice goes to the rider)
+
+- **AD-VISUAL: APPROVE.** The slice matches the bible: one coral hero near the centre, a
+  cool-fresh meadow with no fairground props (distinct from Balloon Pump), every force visible
+  in the world before it acts (the cloud and its shadow, the incoming bird, the downdraft's dark
+  curtain, the whipping streamers). Two adjustments were made in the pass: the clouds' painted
+  AO darkened them to grey (fixed), and the downdraft's ground band was invisible at a grazing
+  angle, so a curtain of dark slanting air carries it (ART_BIBLE §7 updated).
+- **LP-CODE-REVIEW: APPROVE.** Rules in a `RefCounted` with two enum machines, no scene
+  access; the scene only wires; no per-frame allocations beyond the event array; labels set
+  only on change; sound names namespaced (`keepy_*`) so a parallel game can't replace them.
+  Concern noted, not blocking: a handful of shader uniforms are set every frame (cloud shadow,
+  downdraft band, column), as Tug of War does for its deck shadow.
+- **QL-TEST-COVERAGE: ADEQUATE.** Every acceptance item of #77 maps to a test in
+  `keepy_logic_test` (lift against weight, bands, each force and its ≥ 2 s warning, pop and
+  respawn, Steer's lift loss and the #71 forgiveness, stars) and `keepy_scene_test` (camera
+  only with Steer, the pop's penalty, stats, rounds ending, the HUD widget's budget), plus
+  `KeepyUppyCatalogTest` on the Kotlin side. Gap left for the bike: how the thresholds feel.
+- **TD-FEASIBILITY: APPROVE.** The family's tablet recipe (0.62 SubViewport, no MSAA, unshaded
+  hand light, one baked meadow mesh, the sky from its cubemap, `RenderScaleStep`). Desktop: 53-69
+  draw calls in play with the HUD, about 40-44k primitives. Tablet (mock build): see the final
+  report's fps line.
+
 ## GodotPrompter patterns (picked, rejected, why)
 
 | System | Skill | Picked | Rejected | Why |

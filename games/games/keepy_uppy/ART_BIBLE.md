@@ -110,7 +110,7 @@ camera. The rider never sees themselves: only the belt and the fan they drive.
 | Pop | 28 coral shards (`CPUParticles3D`, one-shot) and a white ring card expanding |
 | Rain | One cylinder card of grey streaks falling under the cloud, alpha blended |
 | Cloud shadow | A soft dark ellipse on the grass (a decal-like quad in the ground shader's uniform) |
-| Downdraft | A dark band in the ground shader rolling toward the fan, and the grass bending |
+| Downdraft | A wide curtain of dark, slanting air (the rain shader on one card) rolling in from the horizon to the fan over the warning, a dark band of flattened grass under it, and the column's streaks turning downward. The ground band alone was invisible at a grazing angle (AD-VISUAL), hence the curtain |
 | Grass, flowers, streamers, windsock | Sway in their shaders with the wind |
 
 Additive only for the column's streaks and the pop ring. Everything else alpha blended or opaque.
