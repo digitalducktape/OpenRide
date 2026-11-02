@@ -163,6 +163,21 @@ func celebrate() -> void:
 	_bob = 1.0
 
 
+## A posed scene for stills (the hub card): the bunch holds `tied` (kinds) and the nozzle a
+## balloon of `kind` at `fill`.
+func pose(tied: Array, kind: String, fill: float) -> void:
+	for k in tied:
+		_flight_kind = k
+		_flight_slot = _bunch_count % BUNCH_MAX
+		_land_flyer()
+	set_balloons(kind, "gold")
+	_fill_shown = fill
+	_load_t = 1.0
+	_place_nozzle_balloon()
+	_nozzle.visible = true
+	_nozzle_mat.set_shader_parameter("taut", smoothstep(0.55, 1.0, fill))
+
+
 func bunch_count() -> int:
 	return _bunch_count
 
@@ -434,7 +449,8 @@ func _build_fx() -> void:
 
 func _burst(at: Vector3, big: bool) -> void:
 	_confetti.position = at
-	_confetti.amount = 48 if big else 28
+	# A fixed amount (changing it reallocates the particles); a small burst just throws slower.
+	_confetti.initial_velocity_max = 3.2 if big else 2.2
 	_confetti.restart()
 	_confetti.emitting = true
 

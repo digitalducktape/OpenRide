@@ -44,6 +44,7 @@ var _over := false
 var _state := ""
 var _count := -1
 var _race_text := ""
+var _race_key := Vector3i(-1, -1, -1)  ## the last (done, target, seconds) shown: no formatting a frame
 var _race_warn := false
 var _next := ""
 var _fill := 0.0
@@ -160,7 +161,8 @@ func set_state(smoothed_watts: float, needle: float, line: float, state: String)
 	_line = clampf(line, 0.0, 1.0)
 	var fill_px := roundi(_fill * BAR_SIZE.x)
 	var line_px := roundi(_line * BAR_SIZE.x)
-	var over := needle >= line
+	# The fill's colour follows the valve, as the badge does: amber whenever it reads PUSH!.
+	var over := state != "push" and state != "pedal"
 	if fill_px != _fill_px or line_px != _line_px or over != _over:
 		_fill_px = fill_px
 		_line_px = line_px
@@ -212,10 +214,14 @@ func set_count(balloons: int) -> void:
 
 ## Race: `done` of `target` this heat with `sec_left` on its clock; target 0 hides it (Max).
 func set_race(done: int, target: int, sec_left: float) -> void:
+	var s := maxi(ceili(sec_left), 0)
+	var key := Vector3i(done, target, s) if target > 0 else Vector3i.ZERO
+	if key == _race_key:
+		return
+	_race_key = key
 	var text := ""
 	var warn := false
 	if target > 0:
-		var s := maxi(ceili(sec_left), 0)
 		text = tr("RACE %d/%d · %d:%02d") % [done, target, s / 60, s % 60]
 		warn = sec_left <= PumpLogic.WARN_SEC
 	if text != _race_text:

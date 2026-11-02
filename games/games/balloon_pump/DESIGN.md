@@ -225,7 +225,32 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
 - **Mix** (`tests/render_game_audio.gd --game=balloon_pump`, `analyze_mix.py`): -15.8 LUFS, no
   clipping, true peak -0.8 dBTP after the limiter.
 
-## 11. GodotPrompter patterns
+## 11. Gates (2026-11-01, before the slice goes to the rider)
+
+- **AD-VISUAL: APPROVE.** The captures match the art bible: candy stripes, brass and noon light,
+  the nozzle's balloon at the centre, the bunch rising right of it under the status widget. Fixed
+  on the way: the sun was behind the stall (maroon stripes), a roof sign with painted balloons
+  read as part of the bunch (removed), the plunger's handle hid behind the ride panel (lowered),
+  the bunch hid behind the widget (lowered and moved right). Within budget: 51-54 draw calls in
+  play on the desktop with the HUD (UI_STYLE §8: 120).
+- **LP-CODE-REVIEW: APPROVE** (with `godot-code-review`). Rules in a `RefCounted`, the scene only
+  wires; typed GDScript; no `_process` in the widget; labels and the bar change only on a change;
+  the Race line formats only when its numbers change; the confetti's amount is fixed (changing it
+  reallocated the particles); every sound name is prefixed `pump_`. Kept: `PumpAudio` is a
+  preloaded script without `class_name`, Tug's pattern.
+- **QL-TEST-COVERAGE: ADEQUATE.** Every issue acceptance item maps to a test: fill rate against
+  power, the push line, the leak, the tie-off, Race and Max end conditions and stars
+  (`pump_logic_test`, 23 cases); the world (`pump_world_test`, 9), the widget's layout and states
+  (`pump_status_test`, 6), the scene's mode, variant, stats and rounds end (`pump_game_test`, 5);
+  Kotlin `SessionPlansTest` for the params. Desktop play is shown by `tests/capture_pump.gd`. Gap
+  left: the on-bike feel (the issue's third acceptance item) needs the rider.
+- **TD-FEASIBILITY: CONCERNS** (viable). The recipe is Tug's and Dodge's, which hold 59-62 fps on
+  the tablet; this world is lighter (about 10 draws, no water). Unmeasured on the tablet (the
+  tablet lock was held by another agent): the per-pixel balloon shader (small on screen), the sky
+  cubemap's first draw and the CPU confetti. If fps drops, the first steps are the render scale
+  (0.62 → 0.55, Tug's `RenderScaleStep`) and the balloons' highlight per vertex.
+
+## 12. GodotPrompter patterns
 
 Filled in pass by pass (picked / rejected / why).
 

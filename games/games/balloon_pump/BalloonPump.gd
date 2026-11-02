@@ -111,8 +111,12 @@ func target_text(seg: Dictionary) -> String:
 	var p: Dictionary = seg.get("params", {})
 	var ftp := float(p.get("ftp_watts", PumpLogic.DEFAULT_FTP))
 	var recovery := str(seg.get("role", "free")) == "recovery"
-	var hi := float(p.get("push_hi_watts", ftp * (PumpLogic.LINE_RECOVERY.y if recovery else PumpLogic.LINE_WORK.y)))
-	return "Push past %d W to finish a balloon" % roundi(hi)
+	var line := PumpLogic.LINE_RECOVERY if recovery else PumpLogic.LINE_WORK
+	var lo := float(p.get("push_lo_watts", ftp * line.x))
+	var hi := float(p.get("push_hi_watts", ftp * line.y))
+	# The biggest balloon's top line: past it, every balloon finishes.
+	var top := lo + (hi - lo) * float(PumpLogic.KINDS.large.line)
+	return "Push past %d W to finish every balloon" % roundi(top)
 
 
 ## Circuits always play Max (issue #76); a Just Ride plays the rider's Mode.
@@ -234,6 +238,13 @@ func finish() -> Dictionary:
 		"fastest_balloon_sec": snappedf(logic.fastest_balloon_sec, 0.1),
 	}
 	return super.finish()
+
+
+## The hub card's picture (tests/capture_hub_cards.gd): a bunch already up and a big balloon
+## nearly full on the nozzle.
+func pose_for_card() -> void:
+	world.pose(["medium", "small", "large", "gold", "small", "medium", "large", "small", "medium", "small",
+		"large", "medium"], "large", 0.85)
 
 
 func _update_world(delta: float) -> void:
