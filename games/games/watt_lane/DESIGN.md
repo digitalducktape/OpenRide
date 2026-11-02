@@ -68,8 +68,13 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
 - **Lead-in:** the first 10 s hold the start (a third of the way up the range).
 - **Drifts:** between jumps, 10-16 s of slow drift toward a random point in the range, at most
   1% of FTP a second, in 5 W steps (unannounced: the rails show it).
-- **Jumps:** a step of 12-20% of FTP (warm-up 6-10%, at least 10 W), on the 5 W grid, at least
-  20 s apart. The direction goes where there's room, and alternates when both sides have it.
+- **Jumps:** a step of 12-20% of FTP (warm-up 6-10%), and always **more than half a lane**
+  (`width / 2 + 5 W`), so a rider who stays put is outside the new lane. On the 5 W grid, at
+  least 20 s apart (the first 20-24 s in). The direction goes where there's room, and alternates
+  when both sides have it (a warm-up climbs while it can).
+- **A range too narrow for that** (low FTPs: at 150 W the standard range is 70-105 W, 35 W, and a
+  jump must be 25 W either way from its middle) widens to twice the smallest jump, half down
+  (never under 30% of FTP) and the rest up. At 150 W standard: 60-110 W.
 - Generated ahead in chunks from the segment's seed, so an open-ended ride never runs out and the
   same seed gives the same course.
 
@@ -97,15 +102,22 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
   noisy), then resets ("lane_exit", a soft buzz).
 - **Warm-up:** no effort multiplier there, so its points count 1.25× (a clean 3-minute warm-up can
   earn 3 stars).
-- Stars are points per minute, the same for every difficulty: **500, 1200, 1900**.
+- Stars are points per minute, the same for every difficulty: **250, 1200, 2000**.
 
 | Rider (modelled in `watt_lane_logic_test`) | Points a minute | Stars |
 | --- | --- | --- |
 | Perfect, 60 s slot, 1.0× effort | ~1550 | 2 |
+| Perfect, 90 s slot, 1.0× | ~1630 | 2 |
 | Perfect, long ride, 1.0× | → 1800 | 2 |
-| Perfect, 60 s slot, 1.3× | ~2015 | 3 |
+| Perfect, 60 s slot, 1.3× (1.15× is short) | ~2015 | 3 |
+| Perfect, long ride, 1.3× | ~2340 | 3 |
 | Perfect warm-up (3 min, ×1.25) | ~2150 | 3 |
-| In the lane about half the time | ~500-700 | 1 |
+| In the lane 10 s of every 20 | ~300 | 1 |
+
+The streak's 20 s build costs a short slot a third of its minute, so a perfect run's points a
+minute grow with the slot's length. 2000 is the one 3-star line that a perfect 1.0× run never
+reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Just Ride about
+1.12× is enough. 1 star stays low (250) on purpose: it means "you rode the lane".
 
 ### Stats
 
@@ -145,7 +157,7 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
 | centre range | Kotlin params | see above | curve |
 | `JUMP_GAP_SEC`, jump sizes | logic | 20 s, 12-20% | gate |
 | `POINTS_PER_SEC`, streak | logic | 10, +0.5 / 5 s to ×3 | curve |
-| stars | `WattLane.info()` | 500 / 1200 / 1900 a minute | curve |
+| stars | `WattLaneLogic.STARS` | 250 / 1200 / 2000 a minute | curve |
 
 ## Changes from the issue (and why)
 
@@ -159,11 +171,13 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
    announce would make riders leave the old lane early and lose their streak for doing the right
    thing.
 5. **The streak's 1 s grace** is new, for the same noisy reading Cadence Karaoke allows for.
-6. **Lane bounds on a 5 W grid** and drifts in 5 W steps: the hero number doesn't flicker, and
+6. **Jumps of over half a lane, and a range that widens to allow them** (new): the logic tests
+   found that a 20 W jump with a 40 W lane left a rider who stayed put inside the new lane.
+7. **Lane bounds on a 5 W grid** and drifts in 5 W steps: the hero number doesn't flicker, and
    "in" means exactly what the numbers say.
-7. **Warm-up points ×1.25**, so a warm-up (no effort multiplier) can still earn 3 stars.
-8. **The ride panel shows the smoothed power** in this game, so it agrees with everything else.
-9. **The light-trail bike in first person:** you can't see your own trail from the saddle, so
+8. **Warm-up points ×1.25**, so a warm-up (no effort multiplier) can still earn 3 stars.
+9. **The ride panel shows the smoothed power** in this game, so it agrees with everything else.
+10. **The light-trail bike in first person:** you can't see your own trail from the saddle, so
    in play your bike is its glowing nose and the headlight beam (the trail's head) on the road;
    the hub card and the intro picture show the bike and its trail from behind.
 

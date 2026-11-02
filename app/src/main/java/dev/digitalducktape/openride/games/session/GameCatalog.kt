@@ -243,6 +243,44 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Watt Lane (#78), `games/games/watt_lane/`: a work game (and a low-profile warm-up). Smoothed
+         * power is the rider's place across a night highway; a lane of watts drifts and jumps, and
+         * every jump is announced 5 s ahead. Params, in watts on a 5 W grid: the lane's width (a
+         * share of FTP with a floor, rounded up to 10 W) and its centre's range (shares of FTP).
+         * Low on purpose (about half of FTP): the forgiving-thresholds lesson. The game widens a
+         * range too narrow for a jump of over half a lane (watt_lane/DESIGN.md).
+         */
+        val WATT_LANE = GameDeclaration(
+            id = "watt_lane",
+            title = "Watt Lane",
+            supports = setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            roles = setOf(SegmentRole.WORK, SegmentRole.WARMUP),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (widthShare, widthFloor) = when (difficulty) {
+                    Difficulty.EASY -> 0.25 to 50
+                    Difficulty.STANDARD -> 0.20 to 40
+                    Difficulty.HARD -> 0.15 to 30
+                }
+                val (low, high) = when {
+                    role == SegmentRole.WARMUP -> 0.35 to 0.55
+                    difficulty == Difficulty.EASY -> 0.40 to 0.60
+                    difficulty == Difficulty.STANDARD -> 0.45 to 0.70
+                    else -> 0.50 to 0.75
+                }
+                val width = maxOf(Math.ceil(ftp.watts * widthShare / 10.0).toInt() * 10, widthFloor)
+                fun grid(share: Double) = (ftp.watts * share / 5.0).roundToInt() * 5
+                mapOf(
+                    "lane_width_watts" to JsonPrimitive(width),
+                    "lane_min_watts" to JsonPrimitive(grid(low)),
+                    "lane_max_watts" to JsonPrimitive(grid(high)),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -257,6 +295,6 @@ class GameCatalog(games: List<GameDeclaration>) {
         private const val KART_BOTS = 7
 
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE))
     }
 }
