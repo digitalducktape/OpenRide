@@ -6,7 +6,8 @@ extends SceneTree
 ##   $GODOT_BIN --path games --resolution 1920x1080 -s res://tests/capture_hub_cards.gd [-- --only=dodge_ball]
 ## Then re-import (`--import`).
 
-const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"]
+const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke",
+	"keepy_uppy"]
 const SIZE := Vector2i(512, 288)
 ## Seconds into the intro before the shot (Kart Race builds its world first).
 const WAIT := {"kart_race": 9.0}

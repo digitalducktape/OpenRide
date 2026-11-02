@@ -234,6 +234,41 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Keepy Uppy (#77), `games/games/keepy_uppy/`: keep a balloon up over a fan driven by
+         * pedalling. A work game. Its lean steering is the rider's "Steer" option (off by
+         * default), which Godot decides per segment, so [GameDeclaration.usesCamera] stays false
+         * (Tug of War's brace-lean precedent). A round is a minute of air time.
+         * `weight_watts` is the balloon's weight, 30 / 40 / 50% of FTP (holding the mid band then
+         * takes about half of FTP on standard); the weather adds `rain_watts` (10%), `bird_watts`
+         * (5% a bird) and `downdraft_watts` (20%, briefly). See its DESIGN.md.
+         */
+        val KEEPY_UPPY = GameDeclaration(
+            id = "keepy_uppy",
+            title = "Keepy Uppy",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 60,
+            roles = setOf(SegmentRole.WORK),
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val weight = when (difficulty) {
+                    Difficulty.EASY -> 0.30
+                    Difficulty.STANDARD -> 0.40
+                    Difficulty.HARD -> 0.50
+                }
+                mapOf(
+                    "weight_watts" to JsonPrimitive((ftp.watts * weight).roundToInt()),
+                    "rain_watts" to JsonPrimitive((ftp.watts * 0.10).roundToInt()),
+                    "bird_watts" to JsonPrimitive((ftp.watts * 0.05).roundToInt()),
+                    "downdraft_watts" to JsonPrimitive((ftp.watts * 0.20).roundToInt()),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -248,6 +283,7 @@ class GameCatalog(games: List<GameDeclaration>) {
         private const val KART_BOTS = 7
 
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE,
+            KEEPY_UPPY))
     }
 }
