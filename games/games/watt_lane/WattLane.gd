@@ -1,9 +1,12 @@
 extends Game
-## Watt Lane (#78): a glowing highway at night. Your power is your place across the road; stay
-## inside a lane of watts that drifts and jumps. Every jump is announced 5 s ahead with chevrons
-## on the road, a countdown chip and a chime (rider's decision). DESIGN.md has the rules.
+## Watt Lane (#78): a chevron cursor following an illuminated horizontal lane. Your power is
+## the cursor's height; the lane comes in from the right and steps up or down. Hold the wattage,
+## then the next one. Every step is shown ahead and announced 5 s before with chevrons, its new
+## watts, a countdown chip and a chime (rider's decisions, 2026-11-02: 2D and horizontal, so no
+## one reads a change as "lean"; abstract, with a chevron cursor). DESIGN.md has the rules.
 ##
-## Rules: `WattLaneLogic` (tested headless). View: `WattLaneWorld` (3D). HUD: `WattLaneStatus`.
+## Rules: `WattLaneLogic` (tested headless). View: `WattLaneBackdrop` (the abstract field) and
+## `WattLaneTrack` (the lane and the cursor), 2D on the full canvas. HUD: `WattLaneStatus`.
 ## Audio: `WattLaneAudio`. This scene wires them to the framework: declarations, scoring through
 ## award() (the effort multiplier applies in work), music and effects through AudioDirector, and
 ## the HUD's one power number (the ride panel shows the rules' smoothed watts).
@@ -18,26 +21,25 @@ const MUSIC_STYLE := {
 	"loop_from": WattLaneMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.45, "lead": 0.9},
 }
-const RENDER_SCALE := 0.62
-const MSAA := Viewport.MSAA_DISABLED
 const HUM_DB := {true: -15.0, false: -24.0}  ## the hum's level in and out of the lane
 const HUM_FADE := 0.6  ## seconds for the hum to swap
 const PEDAL_WATTS := 15.0  ## under this (smoothed) the alert says PEDAL
 
-## The look (ART_BIBLE.md §4, framework/ui/UI_STYLE.md): volt lime on night petrol, upright.
-static var look := GameTheme.new(Color("c8ff3e"), Color("061418"), 0.0)
+## The look (ART_BIBLE.md §4, framework/ui/UI_STYLE.md): copper (the wires) on dusk navy,
+## upright. Not lime: an accent must never read as a meaning colour (green, GOOD).
+static var look := GameTheme.new(Color("f0875a"), Color("0f1a2e"), 0.0)
 
 var logic: WattLaneLogic
-var world: WattLaneWorld
+var backdrop: WattLaneBackdrop
+var track: WattLaneTrack
 
-var _view: SubViewport
-var _shown: TextureRect
 var _status: WattLaneStatus
 var _hum_in: AudioStreamPlayer
 var _hum_out: AudioStreamPlayer
 var _message_left := 0.0
 var _beat := 0.0
 var _beat_phase := 0.0
+var _beats := 0
 var _band := Vector2i(-1, -1)
 
 
@@ -61,7 +63,7 @@ func info() -> GameInfo:
 
 
 func how_to_text(_seg: Dictionary) -> String:
-	return "More watts move you right. Stay between the rails"
+	return "More watts, higher cursor. Ride inside the glowing lane"
 
 
 func target_text(seg: Dictionary) -> String:
@@ -80,12 +82,7 @@ func smoothed_power() -> float:
 	return logic.smoothed if logic else InputBus.power
 
 
-## The hub card's framing (tests/capture_hub_cards.gd): the bike and its trail from behind.
-func showcase() -> void:
-	world.chase = true
-
-
-## The intro card's picture: the hub card (the light-bike and its trail from behind).
+## The intro card's picture: the hub card (the lane and the cursor).
 func intro_visual() -> Control:
 	const CARD := "res://games/watt_lane/hub_card.png"
 	if not ResourceLoader.exists(CARD):
@@ -102,26 +99,12 @@ func intro_visual() -> Control:
 
 func _ready() -> void:
 	WattLaneAudioScript.register()
-	world = WattLaneWorld.new()
-	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_view.msaa_3d = MSAA
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	_shown = TextureRect.new()
-	_shown.name = "View3DImage"
-	_shown.texture = _view.get_texture()
-	_shown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_shown.stretch_mode = TextureRect.STRETCH_SCALE
-	_shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_shown)
-	Stage.bleed(_shown)  # the whole window, past the centred stage (#57)
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	backdrop = WattLaneBackdrop.new()
+	backdrop.name = "Backdrop"
+	add_child(backdrop)
+	track = WattLaneTrack.new()
+	track.name = "Track"
+	add_child(track)
 	_hum_in = _hum_player("HumIn", true)
 	_hum_out = _hum_player("HumOut", false)
 
@@ -136,13 +119,10 @@ func _hum_player(node_name: String, bright: bool) -> AudioStreamPlayer:
 	return p
 
 
-func _fit_view() -> void:
-	_view.size = Stage.view_size(RENDER_SCALE)
-
-
 func _on_prepare(seg: Dictionary) -> void:
 	logic = WattLaneLogic.new(difficulty, params, int(seg.get("seed", 0)), str(seg.get("role", "work")))
-	world.setup(logic.ftp, logic.width)
+	track.setup(logic.ftp, logic.width, look)
+	backdrop.set_beat_px(60.0 / WattLaneMusic.BPM * WattLaneTrack.SPEED)
 	hud.set_skin(look.hud_skin())
 	_status = WattLaneStatus.new(look)
 	hud.add_widget(_status)
@@ -153,9 +133,10 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, WattLaneAudioScript.music_effects())
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, WattLaneAudioScript.sfx_effects())
 	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
-	# The rider starts in the lane's middle on the intro card: one frame of the road at rest.
+	# The rider starts in the lane's middle on the intro card: one frame of the lane at rest.
 	var centre := float(logic.course.centre_at(0.0))
-	world.update_view(0.0, logic.course, 0.0, centre, true, -1.0, true)
+	track.update_view(0.0, logic.course, 0.0, centre, true, -1.0, true)
+	backdrop.update_view(0.0, track.scroll, 0.0, track.lane_mid(), true)
 	_update_status()
 
 
@@ -181,9 +162,10 @@ func _on_frame(delta: float) -> void:
 	for event in events:
 		_handle(event)
 	var up := logic.upcoming()
-	_pedal_beat(delta)
-	world.update_view(delta, logic.course, logic.time, logic.smoothed, logic.in_lane,
-		float(up.get("at", -1.0)), bool(up.get("up", true)), _beat)
+	_music_beat(delta)
+	track.update_view(delta, logic.course, logic.time, logic.smoothed, logic.in_lane,
+		float(up.get("at", -1.0)), bool(up.get("up", true)), int(up.get("lo", 0)), int(up.get("hi", 0)), _beat)
+	backdrop.update_view(delta, track.scroll, _beat, track.lane_mid(), logic.in_lane)
 	_update_status()
 	_update_audio(delta)
 	if _message_left > 0.0:
@@ -202,7 +184,7 @@ func _handle(event: Dictionary) -> void:
 		"jump":
 			AudioDirector.play_sfx("lane_shift", -3.0)
 		"caught":
-			world.flash = 1.0
+			track.caught()
 			AudioDirector.play_sfx("caught", -2.0)
 			_show_message("Caught it!", 1.2, GameTheme.GOOD)
 		"missed":
@@ -263,13 +245,15 @@ func _update_audio(delta: float) -> void:
 	AudioDirector.set_intensity(intensity)
 
 
-## A soft pulse on the bike's nose once a pedal stroke (cadence), visual only.
-func _pedal_beat(delta: float) -> void:
-	_beat_phase += delta * InputBus.cadence / 60.0
+## The music's beat (WattLaneMusic.BPM) as a flare that decays: the lane's edges, the field's
+## beat lines and the cursor's glow pulse with it. Visual only, on the game's own clock.
+func _music_beat(delta: float) -> void:
+	_beat_phase += delta * WattLaneMusic.BPM / 60.0
 	if _beat_phase >= 1.0:
 		_beat_phase = fmod(_beat_phase, 1.0)
 		_beat = 1.0
-	_beat = maxf(_beat - delta * 4.0, 0.0)
+		_beats += 1
+	_beat = maxf(_beat - delta * 3.5, 0.0)
 
 
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:

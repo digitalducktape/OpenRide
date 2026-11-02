@@ -2,7 +2,7 @@ extends GdUnitTestSuite
 ## Watt Lane's scene with the framework (#78): every power number on the HUD agrees (the ride
 ## panel shows the rules' smoothed watts and turns gold exactly inside the rules' band), the status
 ## widget fits its slot with the longest texts and its countdown follows the announced jump, the
-## world bends its rails along the course, and the result carries the stats.
+## track's band follows the course with power as height, and the result carries the stats.
 
 const DT := 1.0 / 30.0
 const SEGMENT := {"game_id": "watt_lane", "role": "work", "difficulty": "standard",
@@ -26,8 +26,8 @@ func _ride(game: Game, seconds: float, power: float) -> void:
 		for e in events:
 			game._handle(e)
 		var up: Dictionary = game.logic.upcoming()
-		game.world.update_view(DT, game.logic.course, game.logic.time, game.logic.smoothed, game.logic.in_lane,
-			float(up.get("at", -1.0)), bool(up.get("up", true)))
+		game.track.update_view(DT, game.logic.course, game.logic.time, game.logic.smoothed, game.logic.in_lane,
+			float(up.get("at", -1.0)), bool(up.get("up", true)), int(up.get("lo", 0)), int(up.get("hi", 0)))
 		game._update_status()
 
 
@@ -41,6 +41,7 @@ func test_the_ride_panel_shows_the_rules_power_and_its_gold_matches_the_band() -
 	assert_bool(game.logic.in_lane).is_true()
 	assert_object(metrics.power_color(metrics.shown_power())).is_equal(HudTheme.STAR_ON)
 	_ride(game, 4.0, float(hi) + 1.0)
+	_ride(game, 0.1, float(hi) + 1.0)
 	assert_bool(game.logic.in_lane).is_false()
 	assert_object(metrics.power_color(metrics.shown_power())).is_equal(HudTheme.WARN)
 	var status: WattLaneStatus = _status(game)
@@ -104,25 +105,61 @@ func _assert_fits(status: WattLaneStatus) -> void:
 			assert_int(l.get_theme_font_size("font_size")).is_greater_equal(34)
 
 
-func test_the_rails_follow_the_course_ahead() -> void:
+func test_the_lane_follows_the_course_ahead() -> void:
 	var game := _game()
 	_ride(game, 1.0, 120.0)
-	var world: WattLaneWorld = game.world
+	var track: WattLaneTrack = game.track
 	var t: float = game.logic.time
-	for i in [0, 20, 63]:
-		var expect := world.x_of(game.logic.course.visual_centre_at(t + i * WattLaneWorld.ROW_LEN / WattLaneWorld.SPEED))
-		assert_float(world.get("_offsets")[i]).is_equal_approx(expect, 0.001)
-	assert_float(world.bike_x).is_equal_approx(world.x_of(game.logic.smoothed), 0.5)
+	var half := float(game.logic.width) / 2.0
+	for i in [0, 20, 40, 63]:
+		var x: float = track.get("_x0") + i * track.get("_dx")
+		var centre: float = game.logic.course.visual_centre_at(WattLaneTrack.time_at(x, t))
+		assert_float(track.get("_hi")[i]).is_equal_approx(track.y_of(centre + half), 0.01)
+		assert_float(track.get("_lo")[i]).is_equal_approx(track.y_of(centre - half), 0.01)
+	assert_float(track.cursor_y).is_equal_approx(track.y_of(game.logic.smoothed), 2.0)
 
 
-func test_the_road_is_a_watt_scale() -> void:
-	var world: WattLaneWorld = auto_free(WattLaneWorld.new())
-	add_child(world)
-	world.setup(200.0, 40)
-	assert_float(world.x_of(0.575 * 200.0)).is_equal_approx(0.0, 0.001)
-	assert_float(world.x_of(200.0)).is_equal_approx(WattLaneWorld.ROAD_HALF, 0.001)
-	assert_float(world.x_of(2000.0)).is_equal_approx(WattLaneWorld.ROAD_HALF + WattLaneWorld.SHOULDER, 0.001)
-	assert_float(world.x_of(0.0)).is_equal_approx(-WattLaneWorld.ROAD_HALF - WattLaneWorld.SHOULDER, 0.001)
+func test_more_watts_is_higher() -> void:
+	var track: WattLaneTrack = auto_free(WattLaneTrack.new())
+	add_child(track)
+	track.ftp = 200.0
+	assert_float(track.y_of(0.6 * 200.0)).is_equal_approx(WattLaneTrack.MID_Y, 0.01)
+	assert_float(track.y_of(0.725 * 200.0)).is_equal_approx(WattLaneTrack.guide_y(1), 0.01)  # a guide every 12.5%
+	assert_float(track.y_of(150.0)).is_less(track.y_of(100.0))
+	assert_float(track.y_of(2000.0)).is_equal(WattLaneTrack.TOP_Y)
+	assert_float(track.y_of(0.0)).is_equal(WattLaneTrack.BOTTOM_Y)
+
+
+func test_an_announced_step_shows_its_watts_where_it_lands() -> void:
+	var game := _game()
+	var course: WattLaneCourse = game.logic.course
+	var j := course.next_jump_after(0.0)
+	_ride(game, course.times[j] - 3.0, float(course.watts[0]))
+	var track: WattLaneTrack = game.track
+	var w := course.watts[j]
+	assert_bool(track.label.visible).is_true()
+	assert_str(track.label.text).is_equal("%d–%d W" % [w - game.logic.width / 2, w + game.logic.width / 2])
+	assert_float(track.label.position.x).is_equal_approx(WattLaneTrack.RIDER_X + 3.0 * WattLaneTrack.SPEED + 16.0, 6.0)
+
+
+func test_the_cursor_is_an_angular_chevron() -> void:
+	# The silhouette check (ART_BIBLE.md): a moving marker never has a round head with a tail.
+	var shape := WattLaneTrack.chevron()
+	assert_int(shape.size()).is_equal(4)
+	var tip := shape[1]
+	assert_float(tip.x).is_greater(0.0)  # points along the lane, to the right
+	for p in shape:
+		assert_float(absf(p.y)).is_less_equal(34.0)
+
+
+func test_the_field_follows_the_lane_and_draws_nothing_per_frame() -> void:
+	var game := _game()
+	_ride(game, 2.0, float(game.logic.course.watts[0]))
+	game.backdrop.update_view(DT, game.track.scroll, 0.5, game.track.lane_mid(), true)
+	var mat: ShaderMaterial = game.backdrop.field.material
+	assert_float(mat.get_shader_parameter("scroll")).is_equal(game.track.scroll)
+	assert_float(mat.get_shader_parameter("lane_mid")).is_equal_approx(game.track.y_of(game.logic.course.visual_centre_at(game.logic.time)), 2.0)
+	assert_int(game.backdrop.get_child_count()).is_equal(1)  # one rect, no geometry
 
 
 func test_the_result_carries_the_stats_and_the_panel_lets_go() -> void:
@@ -144,7 +181,7 @@ func test_stopping_says_pedal_and_ends_the_streak() -> void:
 	_ride(game, 5.0, 0.0)
 	assert_str(_status(game).alert_kind()).is_equal(WattLaneStatus.ALERT_PEDAL)
 	assert_float(game.logic.streak_sec).is_equal(0.0)
-	assert_float(game.world.bike_x).is_less(-WattLaneWorld.ROAD_HALF)  # on the left shoulder
+	assert_float(game.track.cursor_y).is_equal_approx(WattLaneTrack.BOTTOM_Y, 1.0)  # at the foot of the field
 
 
 func test_a_warm_up_starts_low() -> void:

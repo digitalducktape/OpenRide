@@ -85,7 +85,7 @@ func _run() -> void:
 			shots["jump"] = _shot(out, "wl_3_jump_announced")
 		if not shots.has("bend") and not up.is_empty() and float(up.at) < 1.0:
 			shots["bend"] = _shot(out, "wl_4_jump_bend")
-		if not shots.has("off") and t > 34.5:
+		if not shots.has("off") and t > 33.0 and not game.logic.in_lane:
 			shots["off"] = _shot(out, "wl_5_off_lane")
 	_ride_stop()
 	deadline = Time.get_ticks_msec() + 20000
