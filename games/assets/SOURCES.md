@@ -32,6 +32,11 @@ with Godot's default font.
 | `games/dodge_ball/shaders/*.gdshader` and `look.gdshaderinc` (road, verge, sky, scenery, handlebars, bursts, ball, warning, shadow, shield, screen effects), and the procedural horizon, fence and handlebar meshes in `DodgeWorld.gd` | Written for this repo (#39, graphics pass 2026-10-20) | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/tug_of_war/sfx/*.tres` (6 `SfxPreset` parameter sets: rope_creak, crowd_swell, surge_drumroll, win_sting, lose_sting, splash; synth settings, no samples) | Written for this repo (#40) | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/tug_of_war/shaders/*.gdshader`, `tug_look.gdshaderinc` and every mesh in `TugMeshes.gd` / `TugWorld.gd` (banks, piers, deck planks, water, the wind-up tin robot, the crowd's two-frame sprite drawn in code, gloves, rope, flag, bunting, string lights, reeds, tent, hay bales, lily pads, flames, steam, splash; graphics pass 2026-10-19, built from primitives and `KartMeshKit` shapes in code; `sky.gdshader` is a copy of Dodge Ball's with Tug's grade) | Written for this repo (#40) | The OpenRide Authors | Apache-2.0, the repo's licence |
+| `games/the_pull/shaders/*.gdshader`, `pull_look.gdshaderinc` and every mesh in `PullMeshes.gd` / `PullWorld.gd` (the clay track, infield, dusk sky, stands, billboard crowd, barriers, floodlight towers, distance boards, the Full Pull line and arch, the far fair's tents, wheel and string lights, the sled, its weight box and chain, the handlebars and mirror, the best flag; built from primitives and `KartMeshKit` shapes in code). The track's words are generic ("FULL PULL", distances, "YOUR BEST"), no league's name or livery | Written for this repo (#79) | The OpenRide Authors | Apache-2.0, the repo's licence |
+
+The Pull (#79) adds no recorded asset: everything in its world is built in code, its board
+numbers use the shared OFL display face, and its music and effects are rendered by
+`games/tools/music` (below).
 
 Tug of War (#40) adds no recorded asset: its trees, bushes and rocks are the Kenney nature-kit
 models listed above (loaded from `games/dodge_ball/models/`, recoloured and baked into its
@@ -78,6 +83,7 @@ written for this repo). No samples, soundfonts or third-party material.
 
 | Asset | Source | Author | Licence |
 | --- | --- | --- | --- |
+| `games/the_pull/music/*.ogg`, `music/sfx/*.ogg` and `PullMusic.gd` ("Heavy Haul", a county-fair boogie at 116 bpm in E, and the game's effects: three loops and seven one-shots) | Written for this repo (#79), `songs/the_pull.py` | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/dodge_ball/music/*.ogg`, `music/sfx/*.ogg` and `DodgeMusic.gd` ("Incoming!" and the game's effects) | Written for this repo (#55), `games/tools/music/songs/dodge_ball.py` | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/tug_of_war/music/*.ogg`, `music/sfx/*.ogg` and `TugMusic.gd` ("Heave Together" and the game's effects) | Written for this repo (#55), `songs/tug_of_war.py` | The OpenRide Authors | Apache-2.0, the repo's licence |
 | `games/safe_cracker/music/*.ogg`, `music/sfx/*.ogg` and `SafeMusic.gd` ("Night Shift" and the game's effects) | Written for this repo (#55), `songs/safe_cracker.py` | The OpenRide Authors | Apache-2.0, the repo's licence |

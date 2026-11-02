@@ -38,8 +38,10 @@ const SET_SEC := 3.5
 const RESULT_SEC := 4.0
 const REST_SEC := 60.0  ## between pulls in rounds and open rides
 const TIMED_REST_SEC := 30.0  ## between pulls in a timed ride
-const MIN_PULL_LEFT := 60.0  ## a timed ride starts no new pull with less left than this
-const OVERTIME := 1.45  ## a pull still going at this × the length ends ("time"); Kotlin stops at 1.5
+## A timed ride starts a new pull if at least this would be left after the rest ("new pulls
+## until the timer ends"; a 60 s floor ended a 5-minute ride at 4 minutes).
+const MIN_PULL_LEFT := 10.0
+const OVERTIME := 1.3  ## a pull still going at this × the length ends ("time"); Kotlin stops at 1.5
 const POINTS_PER_M := 10.0
 const FULL_PULL_BONUS := 500.0
 const BOARD_EVERY := 25.0  ## metres between distance boards

@@ -2094,6 +2094,49 @@ every frame. `capture_kart_hud.gd` prints the same split per viewport on the des
 - the climb crawl floor (2.5 m/s);
 - `SPEED_SCALE` (2.4), which sets how fast the karts feel.
 
+## The Pull (#79)
+
+A sled pull at a county fair at dusk, in first person from the bike. A chain runs back to a steel
+sled whose weight box slides forward as it goes, so every metre needs more watts. Pull until you
+max out: distance is the score. The rules, the tuning and every call are in
+`games/games/the_pull/DESIGN.md`, and the look is in its `ART_BIBLE.md`. `PullLogic` holds the
+rules (headless-tested by `the_pull_logic_test`), `PullWorld` and `PullMeshes` the 3D view,
+`PullStatus` the HUD widget, `PullAudio` the sounds and `PullBests` the rider's best distance
+per difficulty (for the flag on the track). `ThePull.gd` wires them to the framework.
+
+- **Drag:** `FTP × (0.30 + 0.70 × d / d_ref_m)`. Kotlin sends `d_ref_m` (easy 360, standard
+  300, hard 250), so a steady pull at FTP lasts about 4.5, 3.8 and 3.2 minutes. It also sends
+  `full_factor` (1.12), the Full Pull line as a multiple of `d_ref_m` (108% of FTP there).
+- **Speed** follows the square root of the gap between power smoothed over 1.5 s and the drag
+  (at most 2.5 m/s at FTP), eased at 0.6 / 0.5 m/s², never backwards. **Stall:** 5 s in a row
+  below 0.2 m/s, once the sled has rolled 1 m (or 15 s after the horn). "Dig in!" shows 3.5 s
+  before. Sensor loss and pause freeze the sled.
+- **Modes:** `timed_end_mode: game`. Rounds play N pulls with a 60 s rest. A timed ride starts
+  pulls (with a 30 s rest) while at least 10 s would be left after the rest, and lets the last
+  finish. Open plays pulls until the rider ends. An overtime guard ends a pull still going at
+  1.3 × the length,
+  before Kotlin's hard stop. No circuit roles: a custom circuit plays it as a `free` slot, like
+  Kart Race.
+- **Scoring:** 10 points a metre and +500 for a Full Pull, through `award()`. Stars come from
+  the **best single pull's** points, against thresholds of 0.2 / 0.667 / 1.2 × `d_ref_m` × 10
+  (the game sets the result's `stars` itself). FTP at 1.0× earns 2 stars, and 1.3× earns 3.
+  **Stats:** `distance_m`, `best_distance_m`, `peak_power` (the raw reading, what the ride
+  metrics showed), `pull_sec`, `pulls`, `full_pulls`.
+- **HUD agreement:** the widget never shows the rider's watts. The sled's need appears in the
+  widget's chip and as the ride metrics' power band tick, both from `PullLogic.shown_need()`.
+  Metres come from `PullLogic.shown_m()` everywhere (`the_pull_scene_test`).
+- **Look:** a floodlit clay track, hand-lit like every 3D game here (pools from a `mod`, no
+  loop). One baked scenery mesh, a billboard crowd MultiMesh, the sled with its sliding box and
+  an 18-link chain, a handlebar mirror (a 256×166 SubViewport) and a look back over the shoulder
+  at each pull's start. 68-85 draw calls in play on the desktop with the HUD.
+- **Captures:** `tests/capture_pull.gd` (review shots; `--play=SECONDS` for a recording) and
+  `tests/render_game_audio.gd --game=the_pull`.
+
+**Camera-off stand-ins (#79).** The Pull is the second camera-free game with no circuit role,
+so "the first camera-free game of the same circuit role" would have swapped a Kart Race slot for
+The Pull. A `free` slot now has no stand-in on all three sides (`SessionPlans.customGame`,
+`CircuitBuilder.stand_in`, `LocalHub`), and Kart Race is still refused without the camera.
+
 ## Circuits and the Games hub (#37, #38)
 
 **Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min warm-up, N blocks of

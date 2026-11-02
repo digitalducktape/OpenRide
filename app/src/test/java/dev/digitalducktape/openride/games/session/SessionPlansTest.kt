@@ -214,6 +214,52 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `The Pull is Just Ride only, ends on its own terms and sends its sled by difficulty`() {
+        val pull = GameCatalog.THE_PULL
+        assertEquals("the_pull", pull.id)
+        assertEquals("The Pull", pull.title)
+        assertEquals(setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN), pull.supports)
+        assertEquals(300, pull.minSec)
+        assertEquals(5, pull.maxRounds)
+        assertTrue(pull.roles.isEmpty())
+        assertFalse(pull.usesCamera)
+        assertTrue(pull.effortInJustRide)
+        assertEquals(EndMode.GAME, pull.timedEndMode)
+        assertEquals(pull, GameCatalog.DEFAULT["the_pull"])
+        assertTrue(SegmentRole.entries.none { role -> GameCatalog.DEFAULT.circuitPool(role).any { it.id == "the_pull" } })
+        assertEquals(SegmentRole.FREE, GameCatalog.circuitRole(pull))
+
+        fun segment(mode: JustRideMode, d: Difficulty) = SessionPlans.justRide(pull, mode, d, ftp200).segments.single()
+        val timed = segment(JustRideMode.Timed(10), Difficulty.STANDARD)
+        assertEquals(600, timed.durationSec)
+        assertEquals(EndMode.GAME, timed.endMode)
+        assertTrue(timed.effort)
+        assertEquals(200, timed.params.int("ftp_watts"))
+        assertEquals(300, timed.params.int("d_ref_m"))
+        assertEquals(1.12, timed.params["full_factor"]!!.jsonPrimitive.content.toDouble(), 1e-9)
+        assertEquals(360, segment(JustRideMode.Timed(10), Difficulty.EASY).params.int("d_ref_m"))
+        assertEquals(250, segment(JustRideMode.Timed(10), Difficulty.HARD).params.int("d_ref_m"))
+        val rounds = segment(JustRideMode.Rounds(3), Difficulty.STANDARD)
+        assertEquals(900, rounds.durationSec)
+        assertEquals(EndMode.GAME, rounds.endMode)
+        assertEquals(3, rounds.params.int("rounds"))
+        val open = segment(JustRideMode.Open, Difficulty.STANDARD)
+        assertEquals(-1, open.durationSec)
+        assertEquals(EndMode.GAME, open.endMode)
+    }
+
+    @Test
+    fun `a custom circuit plays The Pull as a free slot that ends on its own terms`() {
+        val plan = SessionPlans.custom(listOf(slot("dodge_ball", 120), slot("the_pull", 600)), Difficulty.HARD, ftp200, GameCatalog.DEFAULT)
+        val pull = plan.segments.last()
+        assertEquals("the_pull", pull.gameId)
+        assertEquals(SegmentRole.FREE, pull.role)
+        assertEquals(EndMode.GAME, pull.endMode)
+        assertEquals(600, pull.durationSec)
+        assertEquals(250, pull.params.int("d_ref_m"))
+    }
+
+    @Test
     fun `a 20 minute Kart Race carries the bots' FTP shares and the drift knob by difficulty`() {
         fun segment(d: Difficulty) = SessionPlans.justRide(GameCatalog.KART_RACE, JustRideMode.Timed(20), d, ftp200).segments.single()
         fun shares(d: Difficulty) =
@@ -328,7 +374,10 @@ class SessionPlansTest {
         usesCamera = camera,
     )
 
-    /** Eleven games, as the epic plans them: some only fit the 1:30 work slot, three need the camera. */
+    /**
+     * Eleven games, as the epic plans them: some only fit the 1:30 work slot, three need the
+     * camera. The Pull (#79) is real now, so it comes from the catalog.
+     */
     private val elevenGames = GameCatalog(
         GameCatalog.DEFAULT.games + listOf(
             poolGame("power_grid", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.WORK),
@@ -336,7 +385,6 @@ class SessionPlansTest {
             poolGame("gate_crasher", SegmentRole.WORK, camera = true),
             poolGame("ready_for_launch", SegmentRole.WORK, minSec = 90),
             poolGame("keepy_uppy", SegmentRole.RECOVERY),
-            poolGame("the_pull"),
         ),
     )
 
@@ -475,6 +523,7 @@ class SessionPlansTest {
         assertEquals(SegmentRole.RECOVERY, GameCatalog.circuitRole(GameCatalog.SAFE_CRACKER))
         assertEquals(SegmentRole.RECOVERY, GameCatalog.circuitRole(GameCatalog.CADENCE_KARAOKE))
         assertEquals(SegmentRole.FREE, GameCatalog.circuitRole(GameCatalog.KART_RACE))
+        assertEquals(SegmentRole.FREE, GameCatalog.circuitRole(GameCatalog.THE_PULL))
     }
 
     @Test

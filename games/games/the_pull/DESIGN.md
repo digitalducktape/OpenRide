@@ -84,10 +84,15 @@ pull as a Full Pull, with a +500 bonus. "Full Pull" is a generic sport term.
 - **Rounds:** N pulls (1-5) with a 60 s recovery card between them, then `end_segment()`.
   Kotlin's `roundSec` is 300 (a pull plus its rest), so N rounds are `N × 300` s.
 - **Minutes:** new pulls until the timer ends. With `end_mode: game`, Kotlin doesn't cut the
-  segment at its length. The game lets the pull in progress finish, then ends. It doesn't start a
-  new pull with under 60 s left (`MIN_PULL_LEFT`). Kotlin hard-stops at 1.5 × the length, so a
-  pull still going at 1.45 × ends as **Time!** with its distance kept (the overtime guard, which
-  applies in every mode with a length). Between pulls the rest is 30 s.
+  segment at its length. The game lets the pull in progress finish, then ends. A new pull starts
+  if at least 10 s would be left after the rest (`MIN_PULL_LEFT`). Kotlin hard-stops at 1.5 ×
+  the length, so a pull still going at 1.3 × ends as **Time!** with its distance kept (the
+  overtime guard, which applies in every mode with a length). Between pulls the rest is 30 s.
+  - *Refined in the build:* the first version started no pull with under 60 s left. The
+    headless check (`sim_pull_check`) then ended a 5-minute ride at FTP after 3:57, one pull
+    and 63 s early. Ending early reads as "the game stopped", while running a little over
+    reads as "finish your pull". So the floor is 10 s and the guard 1.3 × (6:30 at most for a
+    5-minute ride).
 - **Open:** pulls, each with a 60 s rest, until the rider ends the session.
 - **Custom circuit:** The Pull has **no circuit role**. A custom circuit plays it as a `free`
   slot (like Kart Race), with `end_mode: game` from `timedEndMode`, so it behaves as a timed
@@ -150,7 +155,7 @@ in the same capture. Here:
   to fall below crawl, then 5 s more to stall. The rider has ~9 s to restart.
 - **Sprint at the start:** capped at 1.22 × `V_MAX`. It gives a little time back, not distance.
 - **Sensor loss or pause:** frozen, as above. Effort freezes the score.
-- **A pull in progress when the timer ends:** it carries on, up to the 1.45 × overtime guard.
+- **A pull in progress when the timer ends:** it carries on, up to the 1.3 × overtime guard.
 - **Open ride ended mid-pull:** the points so far count. The pull's distance counts for the stats
   and the best.
 - **Below 60 rpm:** no effort multiplier (Effort's grinding guard). The sled doesn't care about
@@ -188,7 +193,8 @@ game build.
 1. Speed follows the square root of the gap (a finite bog-down), not a straight line.
 2. Stars come from the best single pull, not the session's sum.
 3. A timed ride rests 30 s between pulls, not 60 s, so a 10-minute ride fits more pulls.
-4. A pull may run past a timed ride's end, up to 1.45 × its length.
+4. A pull may run past a timed ride's end, up to 1.3 × its length, and a new one starts while
+   at least 10 s would be left after the rest.
 5. The Full Pull line sits at 1.12 × `d_ref` (108% FTP at the end).
 6. The sled is seen in a handlebar mirror and in a look back over the shoulder at each pull's
    `SET`.

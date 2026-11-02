@@ -477,6 +477,9 @@ object SessionPlans {
     /** [game], or with the camera off the first camera-free game of the same circuit role (null if none). */
     private fun customGame(game: GameDeclaration, catalog: GameCatalog, cameraGames: Boolean): GameDeclaration? =
         if (cameraGames || !game.usesCamera) game
+        // A free slot (a game with no circuit role, like Kart Race) has no stand-in: The Pull is
+        // free too, but it is no substitute for a race (#79).
+        else if (GameCatalog.circuitRole(game) == SegmentRole.FREE) null
         else catalog.games.firstOrNull { !it.usesCamera && GameCatalog.circuitRole(it) == GameCatalog.circuitRole(game) }
 
     /**

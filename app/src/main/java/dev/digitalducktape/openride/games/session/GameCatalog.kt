@@ -243,9 +243,43 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * The Pull (#79), `games/games/the_pull/`: drag a weighted sled down a track; it needs
+         * more watts every metre (`30% FTP + d / d_ref_m × 70% FTP`), until the rider maxes out.
+         * Distance is the score. Just Ride only (no circuit roles; a custom circuit plays it as
+         * a `free` slot, like Kart Race). A timed ride starts pulls until the timer ends and lets
+         * the last one finish ([EndMode.GAME]). `d_ref_m` is where the sled needs exactly FTP,
+         * tuned so a steady pull at FTP lasts 3-5 minutes; `full_factor` places the Full Pull
+         * line (× d_ref_m).
+         */
+        val THE_PULL = GameDeclaration(
+            id = "the_pull",
+            title = "The Pull",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 300,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 5,
+            // A pull (3-5 minutes at FTP) and its 60 s rest.
+            roundSec = 300,
+            effortInJustRide = true,
+            timedEndMode = EndMode.GAME,
+            params = { _, difficulty, _ ->
+                val dRef = when (difficulty) {
+                    Difficulty.EASY -> 360
+                    Difficulty.STANDARD -> 300
+                    Difficulty.HARD -> 250
+                }
+                mapOf(
+                    "d_ref_m" to JsonPrimitive(dRef),
+                    "full_factor" to JsonPrimitive(1.12),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
-         * `free` (Kart Race). [SessionPlans.custom] still plays warm-up in the first slot and
+         * `free` (Kart Race, The Pull). [SessionPlans.custom] still plays warm-up in the first slot and
          * cool-down in the last for a game that has those roles.
          */
         fun circuitRole(game: GameDeclaration): SegmentRole =
@@ -257,6 +291,6 @@ class GameCatalog(games: List<GameDeclaration>) {
         private const val KART_BOTS = 7
 
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, THE_PULL))
     }
 }

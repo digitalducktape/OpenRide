@@ -289,8 +289,9 @@ func test_timed_ride_starts_pulls_until_the_timer_and_lets_the_last_finish() -> 
 	assert_float(clock[0]).is_less(240.0 * PullLogic.OVERTIME + PullLogic.RESULT_SEC)
 
 
-func test_timed_ride_starts_no_pull_with_under_a_minute_left() -> void:
-	var logic := _logic("standard", "timed", 1, 200.0)
+func test_timed_ride_starts_no_pull_when_the_rest_would_use_up_the_time() -> void:
+	# Half-FTP: the pull and its result end near 122 s; 150 - 122 - 30 s of rest leaves no pull.
+	var logic := _logic("standard", "timed", 1, 150.0)
 	var events := _run(logic, 600.0, _steady(FTP * 0.5), func() -> bool: return logic.is_done())
 	assert_int(_count(events, "pull_end")).is_equal(1)
 	assert_int(_count(events, "recovery")).is_equal(0)

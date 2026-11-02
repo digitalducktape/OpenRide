@@ -27,7 +27,7 @@ const MUSIC_STYLE := {
 ## up under the HUD (Dodge Ball's pattern: the tablet's GPU is fill-rate bound at 1080p).
 const RENDER_SCALE := 0.62
 const DIG_IN_TINT := Color(1.0, 0.62, 0.45)
-const LOOK_TURN_SEC := 1.0  ## the look back turns this long each way inside SET
+const LOOK_TURN_SEC := 1.2  ## the look back turns to the track over the end of SET
 const RESULT_END_DELAY := 2.0  ## after the last pull's result, the segment ends this much later
 const NEAR_FULL_M := 20.0
 
@@ -154,9 +154,9 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, PullAudio.music_effects())
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, PullAudio.sfx_effects())
 	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
-	# One frame of the start line behind the intro card, with the sled in the look-back, and the
-	# effects warmed up.
-	world.update_view(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+	# The sled in the look back behind the intro card (the pull's SET turns to the track), and
+	# the effects warmed up.
+	world.update_view(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0)
 	world.prewarm()
 
 
@@ -203,8 +203,8 @@ func _update_view(delta: float, power: float) -> void:
 	var look_back := 0.0
 	match logic.phase:
 		PullLogic.Phase.SET:
-			var t := PullLogic.SET_SEC - logic.phase_left
-			look_back = minf(t / LOOK_TURN_SEC, 1.0) * minf(logic.phase_left / LOOK_TURN_SEC, 1.0)
+			# Looking back at the sled since the intro card; facing the track for the horn.
+			look_back = minf(logic.phase_left / LOOK_TURN_SEC, 1.0)
 			_view_distance = 0.0
 		PullLogic.Phase.PULL, PullLogic.Phase.RESULT:
 			_view_distance = logic.distance
