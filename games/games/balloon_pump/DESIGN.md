@@ -60,7 +60,8 @@ line rises as the balloon fills, steepest at the end:
 - Points are 100 × the air, so **points are proportional to the work done** (rider: more work is
   more points). The large's line stops at 48% rather than the issue's "higher" open end, so no
   balloon asks for more than about half of FTP **(my call; the forgiving-watts lesson)**.
-- The order is drawn from the segment's seed: small 35%, medium 40%, large 25%; from the third
+- The order is drawn from the segment's seed: the first balloon is always small, so the push line
+  is learnt on an easy one (UX pass); then small 35%, medium 40%, large 25%; from the third
   balloon on, each has a 1 in 8 chance to be gold, never two golds in a row **(my call)**.
 - The next balloon waits on the rack beside the pump, so a gold or a large is seen a whole
   balloon ahead (the 2 s warning rule).
@@ -194,7 +195,21 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
 - [ ] On the bike: the last third of a balloon makes the rider reach for the knob without
   grinding. Record the rider's verdict in the PR.
 
-## 9. GodotPrompter patterns
+## 9. UX notes (ux-designer, ui-programmer passes)
+
+- **Flow:** intro card (the mode's line, "Push past N W to finish a balloon", the four balloons
+  and their points) → a small first balloon → play. Race: "Fill 5 in 2:00!" at each heat, "10 s
+  left!" 10 s before the end (also amber on the widget's clock), "Race won! +bonus" or "Time! n
+  filled" for the 4 s break.
+- **Feedback for every input:** each pedal stroke moves the plunger (and its chuff); over the line
+  the balloon swells, squeaks and the badge reads FILLING; under it the badge breathes PUSH!, the
+  balloon wobbles and hisses; a tie-off pops, twangs, throws confetti and flies to the bunch.
+- **Never colour alone:** every badge is a word, the bar's fill sits left or right of the gold
+  tick, balloon kinds differ in size, gold carries a star.
+- **Glance budget:** the widget is the hero at the top; the 3D gauge repeats it in the world.
+  Messages show in the HUD's centre, above the nozzle's balloon.
+
+## 10. GodotPrompter patterns
 
 Filled in pass by pass (picked / rejected / why).
 
@@ -207,4 +222,6 @@ Filled in pass by pass (picked / rejected / why).
 | Shaders | `shader-basics` | text spatial shaders sharing one include; the gauge drawn in a quad's UV (needle and wedge as uniforms); the bunch's sway in its vertex shader | a 2D gauge in a SubViewport texture, or swaying the bunch from GDScript | one draw call and no per-frame redraw or GDScript loop |
 | Confetti and hiss | `particles-vfx` | one pooled `CPUParticles3D` one-shot (confetti) and a tiny continuous one (the leak's hiss) | `GPUParticles3D` | Tug's precedent on the GL Compatibility tablet: a few dozen particles, no process-material compile stall |
 | The bunch | `godot-optimization` (via 3d-essentials §8) | one `MultiMesh` of balloon-and-string instances, at most 48 shown | a MeshInstance3D per tied balloon | a long ride ties 60+ balloons; one draw call whatever the count |
+| HUD widget | `hud-system` | `PumpStatus` in the framework HUD's top-centre slot: a drawn pressure bar (one ShapeBatch), a word badge, count, Race clock and next balloon, updated by setters that touch labels only on a change | a ProgressBar/TextureProgressBar with tweens, or an event-bus score signal | the framework owns the HUD's CanvasLayer and score; the bar needs a push-line tick a ProgressBar can't draw, and per-frame tweens would re-lay out the HUD on the tablet |
+| Intro card | `godot-ui` (via hud-system) | `intro_visual()`: the four balloons drawn with their points | text only | the kinds and their worth are learnt before the first one loads |
 | Desktop hub listing | (framework) | registry and catalog entries now; the desktop hub's home row waits for #75 | adding a sixth card to `LocalHub.ORDER` | the home row fits five game cards (`hub_layout_test` fails with six); #75 reworks the hub for a bigger list |

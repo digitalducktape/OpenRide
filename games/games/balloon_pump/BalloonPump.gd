@@ -4,7 +4,7 @@ extends Game
 ## knob. A full balloon ties itself off and floats up into the bunch over the stall.
 ##
 ## Rules: `PumpLogic` (tested headless; DESIGN.md is the design record). View: `PumpWorld` (3D,
-## ART_BIBLE.md). This scene wires them to the framework: declarations, scoring through award(),
+## ART_BIBLE.md). HUD widget: `PumpStatus`. This scene wires them to the framework: declarations, scoring through award(),
 ## the Mode option, the result's variant and stats.
 
 ## The look (framework/ui/UI_STYLE.md §4): a daylight fairground stall. Candy pink on deep plum,
@@ -19,6 +19,8 @@ const GAUGE_HEADROOM := 1.4
 
 var logic: PumpLogic
 var world: PumpWorld
+
+var _status: PumpStatus
 
 var _view: SubViewport
 var _shown: MeshInstance2D
@@ -65,6 +67,35 @@ func info() -> GameInfo:
 
 func ui_theme() -> GameTheme:
 	return look
+
+
+## The intro card's picture: the four balloons with their points, so the kinds are known before
+## the first one loads.
+func intro_visual() -> Control:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 28)
+	for kind in ["small", "medium", "large", "gold"]:
+		var col := VBoxContainer.new()
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.alignment = BoxContainer.ALIGNMENT_END
+		var icon := Control.new()
+		icon.custom_minimum_size = Vector2(80, 80)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var size: float = PumpMeshes.BALLOON_RADIUS[kind] / PumpMeshes.BALLOON_RADIUS.large
+		icon.draw.connect(func() -> void:
+			var b := ShapeBatch.new()
+			PumpStatus._balloon(b, Vector2(40, 40), 1.7 * size, PumpMeshes.BALLOON_COLORS[kind], look.ink, kind == "gold")
+			b.draw(icon))
+		col.add_child(icon)
+		var points := PumpLogic.POINTS_PER_AIR * float(PumpLogic.KINDS[kind].air)
+		var text := "×3" if kind == "gold" else str(roundi(points))
+		var l := look.label(text, HudTheme.SMALL, GameTheme.TARGET if kind == "gold" else GameTheme.INK, true)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(l)
+		row.add_child(col)
+	return row
 
 
 func how_to_text(seg: Dictionary) -> String:
@@ -130,9 +161,12 @@ func _on_prepare(seg: Dictionary) -> void:
 	variant = "race" if _mode_name == "race" else ""
 	_gauge_max = logic.line_at(1.0, "large") * GAUGE_HEADROOM
 	hud.set_skin(look.hud_skin())
+	_status = PumpStatus.new(look)
+	hud.add_widget(_status)
 	world.set_balloons(logic.kind, logic.next_kind)
 	_update_world(0.0)
 	world.prewarm()
+	_update_status()
 
 
 func _on_frame(delta: float) -> void:
@@ -140,6 +174,7 @@ func _on_frame(delta: float) -> void:
 	for event in events:
 		_handle(event)
 	_update_world(delta)
+	_update_status()
 	if _message_left > 0.0:
 		_message_left -= delta
 		if _message_left <= 0.0:
@@ -196,6 +231,24 @@ func _update_world(delta: float) -> void:
 	var loaded := logic.has_balloon()
 	world.update_view(delta, logic.fill, logic.leaking, logic.open, logic.smoothed / _gauge_max,
 		logic.push_line() / _gauge_max, InputBus.cadence if playing else 0.0, loaded)
+
+
+func _update_status() -> void:
+	var state := "filling"
+	match logic.phase:
+		PumpLogic.Phase.BREAK, PumpLogic.Phase.OVER:
+			state = "rest"
+		PumpLogic.Phase.TIE, PumpLogic.Phase.LOAD:
+			state = "tied"
+		_:
+			if logic.keep_pumping and playing:
+				state = "pedal"
+			elif logic.open < 0.5:
+				state = "push"
+	_status.set_state(logic.smoothed, logic.smoothed / _gauge_max, logic.push_line() / _gauge_max, state)
+	_status.set_count(logic.balloons)
+	_status.set_race(logic.heat_balloons, logic.race_target if logic.mode == "race" else 0, logic.heat_left)
+	_status.set_next(logic.next_kind)
 
 
 ## The 3D view renders at `scale` of the window's resolution (drawn scaled up under the HUD).

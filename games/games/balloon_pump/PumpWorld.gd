@@ -221,8 +221,8 @@ func _slot(i: int, kind: String) -> Array:
 	var golden := 2.39996
 	var a := i * golden
 	var k := sqrt(float(i + 1) / BUNCH_MAX)
-	var tilt := 0.12 + 0.42 * k
-	var length := 1.65 + 0.35 * k + 0.12 * float(i % 3)
+	var tilt := 0.12 + 0.5 * k
+	var length := 1.15 + 0.35 * k + 0.1 * float(i % 3)
 	var dir := Vector3(cos(a) * sin(tilt), cos(tilt), sin(a) * sin(tilt) * 0.55).normalized()
 	var center := PumpMeshes.TETHER + dir * length
 	var s: float = PumpMeshes.BALLOON_RADIUS[kind] * 0.9

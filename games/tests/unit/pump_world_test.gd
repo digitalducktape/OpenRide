@@ -109,6 +109,6 @@ func test_every_slot_sits_over_the_counter_under_the_hud() -> void:
 	for i in PumpWorld.BUNCH_MAX:
 		var slot: Array = world._slot(i, "large")
 		var p: Vector3 = slot[0].origin
-		assert_float(p.y).is_between(2.2, 3.6)
+		assert_float(p.y).is_between(1.9, 3.0)
 		assert_float(absf(p.x - PumpMeshes.TETHER.x)).is_less(1.6)
 		assert_float(slot[1]).is_greater(1.0)

@@ -306,13 +306,15 @@ func _start_heat(events: Array[Dictionary]) -> void:
 		"sec": heat_sec})
 
 
-## The next balloon's kind, from the segment's seed: never gold among the first GOLD_FROM, never
-## two golds in a row.
+## The next balloon's kind, from the segment's seed: the first is always small, never gold among
+## the first GOLD_FROM, never two golds in a row.
 func _draw() -> String:
 	var index := _drawn
 	_drawn += 1
 	var r := _rng.randf()
 	var pick := _rng.randf()
+	if index == 0:
+		return "small"  # an easy first balloon teaches the push line before a big one
 	if index >= GOLD_FROM and not _last_gold and r < GOLD_CHANCE:
 		_last_gold = true
 		return "gold"

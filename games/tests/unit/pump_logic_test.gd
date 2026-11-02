@@ -172,7 +172,7 @@ func test_gold_balloons_are_rare_never_early_and_never_twice_in_a_row() -> void:
 		var kinds := [logic.kind, logic.next_kind]
 		for i in 60:
 			kinds.append(logic._draw())
-		assert_str(kinds[0]).is_not_equal("gold")
+		assert_str(kinds[0]).is_equal("small")
 		assert_str(kinds[1]).is_not_equal("gold")
 		for i in range(1, kinds.size()):
 			assert_bool(kinds[i] == "gold" and kinds[i - 1] == "gold").is_false()

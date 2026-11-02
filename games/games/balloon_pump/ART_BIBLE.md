@@ -83,8 +83,9 @@ present only through the plunger moving with their legs.
   stand at (0.35, 0, -3.1), the balloon's knot at 1.05 m; a red hose from the pump's foot to the
   stand; the rack with the next balloon on the counter's right at (1.55, 1.12, -4.75); the stall
   behind (counter at z -5, back wall at -5.8) with its striped, scalloped awning and bulbs; the
-  bunch's tether, a brass weight and post, at (0.45, 1.0, -4.45), so a tied balloon rises
-  straight up from the nozzle into the bunch over the counter (2.5-3.4 m); tents, a Ferris wheel
+  bunch's tether, a brass weight and post, at (0.95, 1.0, -4.45), so a tied balloon rises
+  up and right from the nozzle into the bunch over the counter (centres 2.1-2.9 m, under the HUD's
+  status widget); tents, a Ferris wheel
   (turning slowly) and lollipop trees beyond, hills at 70-150 m.
 - **The sun** sits behind the rider's left shoulder (elevation 58°, azimuth -150°), so the stall,
   the pump's gauge and the balloons face it. (First capture: with the sun behind the stall the
