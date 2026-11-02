@@ -100,20 +100,68 @@ func _legend(slots: Array) -> Control:
 	return row
 
 
-## The games in the lineup as chips in their accents: "Tug of War ×2".
+## The games in the lineup as chips in their accents: "Tug of War ×2", on one line. A circuit
+## drawn from a big pool (#75) has nine or ten games: the chips that don't fit become "+3 more".
 func _games(slots: Array) -> Control:
 	var counts := {}
 	for s in slots:
 		counts[str(s.game_id)] = int(counts.get(str(s.game_id), 0)) + 1
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 18)
+	row.name = "Games"
+	row.add_theme_constant_override("separation", CHIP_GAP)
+	var chips: Array[Control] = []
 	for id in counts:
-		var chip := PanelContainer.new()
-		chip.add_theme_stylebox_override("panel", HubTheme.game_look(id).badge_style(null, true))
 		var info := GameRegistry.info(id)
-		chip.add_child(HubTheme.label("%s ×%d" % [info.title if info else id, counts[id]], HudTheme.SMALL, GameTheme.INK, true))
-		row.add_child(chip)
+		chips.append(_chip("%s ×%d" % [info.title if info else id, counts[id]], HubTheme.game_look(id).badge_style(null, true)))
+	var used := 0.0
+	var shown := 0
+	for i in chips.size():
+		var w := _chip_width(chips[i])
+		var rest := chips.size() - i - 1
+		# Room for this chip, and for a "+N more" after it unless it's the last.
+		var more_w := 0.0
+		if rest > 0:
+			var probe := _more_chip(rest)
+			more_w = _chip_width(probe) + CHIP_GAP
+			probe.free()
+		if used + w + more_w > INFO_SIZE.x:
+			row.add_child(_more_chip(chips.size() - i))
+			break
+		row.add_child(chips[i])
+		shown += 1
+		used += w + CHIP_GAP
+	for i in range(shown, chips.size()):
+		chips[i].free()  # past the line: never in the tree
 	return row
+
+
+const CHIP_GAP := 18
+
+
+## A chip's width before it is in the tree (its label's theme isn't resolved yet): the text in
+## the display face, plus the style's margins and a little slack.
+static func _chip_width(chip: Control) -> float:
+	var label: Label = chip.get_child(0)
+	var style: StyleBox = chip.get_theme_stylebox("panel")
+	var text_w := GameTheme.display_font().get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, HudTheme.SMALL).x
+	return ceilf(text_w + style.get_minimum_size().x + 8.0)
+
+
+func _chip(text: String, style: StyleBox) -> Control:
+	var chip := PanelContainer.new()
+	chip.add_theme_stylebox_override("panel", style)
+	chip.add_child(HubTheme.label(text, HudTheme.SMALL, GameTheme.INK, true))
+	return chip
+
+
+## "+3 more": the games past the line, in the hub's own muted look.
+func _more_chip(n: int) -> Control:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(GameTheme.MUTED, 0.35)
+	style.set_corner_radius_all(14)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	return _chip("+%d more" % n, style)
 
 
 ## The circuit at a glance, as the summary's tiles: the total, the games, work and recovery.

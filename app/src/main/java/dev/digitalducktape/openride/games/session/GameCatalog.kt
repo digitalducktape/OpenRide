@@ -52,6 +52,15 @@ class GameCatalog(games: List<GameDeclaration>) {
 
     operator fun get(gameId: String): GameDeclaration? = byId[gameId]
 
+    /**
+     * The games a circuit preset's [role] slots draw from (#75): every game that declares the
+     * role, in catalog order, without the demo, and without the camera games (those that declare
+     * [GameDeclaration.usesCamera]) when [cameraGames] is false. A new game joins circuits by
+     * declaring roles; nothing else lists it.
+     */
+    fun circuitPool(role: SegmentRole, cameraGames: Boolean = true): List<GameDeclaration> =
+        games.filter { role in it.roles && it.id != DEMO.id && (cameraGames || !it.usesCamera) }
+
     companion object {
         /** The framework's reference game (#34), `games/games/demo/`. */
         val DEMO = GameDeclaration(

@@ -121,6 +121,16 @@ class HubStateBuilderTest {
     }
 
     @Test
+    fun `presets show the lineup the visit's circuit seed draws, which is the one that plays`() {
+        val ftp = FtpBasis.of(inputs().profile?.ftp)
+        for (seed in listOf(1L, 2L, 99L)) {
+            val shown = HubStateBuilder.build(inputs().copy(circuitSeed = seed)).circuits.first { it.id == "circuit-45" }
+            val played = SessionPlans.forRequest(SessionRequest.Circuit("circuit-45"), ftp, GameCatalog.DEFAULT, circuitSeed = seed)!!
+            assertEquals(played.segments.map { it.gameId }, shown.slots.map { it.gameId })
+        }
+    }
+
+    @Test
     fun `settings and the resolved audio are sent as wire words`() {
         val state = HubStateBuilder.build(inputs(settings = GamesSettings(GameAudioPrefs(gameMusic = false, musicVolume = 0.5, sfxVolume = 0.7))))
         assertFalse(state.settings.gameMusic)

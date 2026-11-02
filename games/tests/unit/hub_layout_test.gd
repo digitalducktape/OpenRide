@@ -158,6 +158,78 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 	HubPrefs.forget_rider(HubPrefs.rider(hub.state))
 
 
+## Six made-up games on top of the registered five, with their roles: the 11 of wave 2 (#75).
+const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "watt_lane": ["warmup", "recovery", "cooldown"],
+	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"], "the_pull": []}
+
+
+## A hub_state with eleven games, its circuits drawn from all of them.
+func _send_eleven_games() -> void:
+	HubState.test_ids = FAKE_GAMES.keys()
+	var s: Dictionary = local.hub.state()
+	for id in FAKE_GAMES:
+		var e: Dictionary = s.catalog[1].duplicate(true)
+		e.id = id
+		e.title = id.capitalize()
+		e.roles = FAKE_GAMES[id]
+		e.uses_camera = id == "gate_crasher"
+		e.circuit_role = local.hub.circuit_role(e.roles)
+		s.catalog.append(e)
+	for c in s.circuits:
+		var shape: Array = c.slots.map(func(slot): return {"role": slot.role, "duration_sec": slot.duration_sec})
+		c.slots = local.hub.draw_slots(shape, s.catalog, true, 7)
+	Session._on_hub_state(JSON.parse_string(JSON.stringify(s)))
+	await _settle()
+
+
+func test_circuit_screens_with_eleven_games() -> void:
+	await _send_eleven_games()
+	for c in hub.state.circuits:
+		hub.nav.push(HubNav.CIRCUIT, {"circuit_id": c.id})
+		await _settle()
+		_check_screen("circuit %s, 11 games" % c.id)
+		hub.nav.pop()
+		await _settle(2)
+	HubState.test_ids = []
+
+
+func test_home_pages_through_eleven_games() -> void:
+	await _send_eleven_games()
+	var home: HomeScreen = hub.screen
+	assert_int(home.game_cards.size()).is_equal(11)
+	assert_int(home.page_count()).is_equal(3)
+	assert_object(home.page_left).is_not_null()
+	var seen := {}
+	for page in home.page_count():
+		home.show_page(page)
+		await _settle(3)
+		_check_screen("home, 11 games, page %d" % page)
+		assert_bool(home.page_left.disabled).is_equal(page == 0)
+		assert_bool(home.page_right.disabled).is_equal(page == home.page_count() - 1)
+		for id in home.game_cards:
+			var card: HubCard = home.game_cards[id]
+			if card.is_visible_in_tree():
+				seen[id] = true
+				assert_float(minf(card.target_rect().size.x, card.target_rect().size.y)).is_greater_equal(HubTheme.CARD_TARGET)
+	assert_int(seen.size()).override_failure_message("every game shows on some page").is_equal(11)
+	# The right button turns the page.
+	home.show_page(0)
+	home.page_right.pressed.emit()
+	assert_int(home.game_page).is_equal(1)
+	HubState.test_ids = []
+
+
+func test_the_builder_tiles_wrap_eleven_games() -> void:
+	await _send_eleven_games()
+	hub.nav.push(HubNav.BUILDER, {"index": -1})
+	await _settle()
+	var s: BuilderScreen = hub.screen
+	assert_int(s.tiles.grid.columns).is_equal(BuilderScreen.TILE_COLUMNS_MAX)
+	_check_screen("builder, 11 games")
+	assert_float(s.scroll.size.y).override_failure_message("room for the slot list").is_greater_equal(2 * HubTheme.TARGET)
+	HubState.test_ids = []
+
+
 func test_my_circuits() -> void:
 	var rider := HubPrefs.rider(hub.state)
 	HubPrefs.save_custom(rider, 1, CircuitBuilder.new(hub.state.catalog, [{"game_id": "cadence_karaoke", "duration_sec": 180},

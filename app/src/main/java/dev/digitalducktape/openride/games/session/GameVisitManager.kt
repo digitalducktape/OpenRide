@@ -86,6 +86,8 @@ class GameVisitManager(
     private val avatar: suspend (Profile) -> String? = { null },
     private val catalog: GameCatalog = GameCatalog.DEFAULT,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** A visit's circuit seed (#75); tests pin it. */
+    private val seedSource: () -> Long = { kotlin.random.Random.nextLong() },
     /** Where the app goes when the rider leaves (the ride summary, or the profile editor). */
     private val navigator: VisitNavigator = VisitNavigator(),
     private val log: (String) -> Unit = {},
@@ -105,6 +107,8 @@ class GameVisitManager(
     private var rideDecided = false
     private var recording = false
     private var planIndex = 0
+    /** Seeds this visit's circuit draws (#75): plan n draws with [circuitSeed]. */
+    private var visitSeed = 0L
     private var segmentIndex = 0
     private var gameplaySec = 0
     private var pending: Ending? = null
@@ -162,6 +166,7 @@ class GameVisitManager(
         rideDecided = false
         recording = false
         planIndex = 0
+        visitSeed = seedSource()
         segmentIndex = 0
         gameplaySec = 0
         pending = null
@@ -308,7 +313,7 @@ class GameVisitManager(
         scope.launch {
             // The FTP may have changed since the visit began.
             rider = activeProfileId()?.let { loadProfile(it) } ?: rider
-            val plan = SessionPlans.forRequest(sessionRequest, FtpBasis.of(rider?.ftp), catalog)
+            val plan = SessionPlans.forRequest(sessionRequest, FtpBasis.of(rider?.ftp), catalog, circuitSeed(index))
             if (gen != generation || phase != Phase.PLAN) return@launch
             if (plan == null) {
                 enterHub()
@@ -612,10 +617,17 @@ class GameVisitManager(
                 rideSec = if (recording) rideSessionManager.elapsedSec.value else 0,
                 visitResults = visitResults.toList(),
                 visitPlans = visitPlans.toList(),
+                circuitSeed = circuitSeed(planIndex),
             ),
         )
         signals.hubState(BridgeMessages.encode(state))
     }
+
+    /**
+     * The seed plan [index] of this visit draws a preset circuit with (#75): a fresh mix each
+     * ride and each circuit, and the hub's lineup is the one that plays.
+     */
+    private fun circuitSeed(index: Int): Long = visitSeed + index
 
     /** Whether a ride could start now: the recorder is free (or holds a finished ride). */
     private fun canRecord(): Boolean = rideSessionManager.state.value.let { it == RideSessionState.Idle || it is RideSessionState.Finished }
