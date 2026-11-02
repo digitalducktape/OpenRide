@@ -6,7 +6,7 @@ extends SceneTree
 ##   $GODOT_BIN --path games --resolution 1920x1080 -s res://tests/capture_hub_cards.gd [-- --only=dodge_ball]
 ## Then re-import (`--import`).
 
-const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"]
+const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane"]
 const SIZE := Vector2i(512, 288)
 ## Seconds into the intro before the shot (Kart Race builds its world first).
 const WAIT := {"kart_race": 9.0}
@@ -58,5 +58,7 @@ func _hide_framework() -> void:
 			layer.visible = false
 	var game: Node = _director.game
 	if game:
+		if game.has_method("showcase"):
+			game.showcase()  # a game's own card framing (Watt Lane: the bike from behind)
 		for c in game.find_children("*", "CanvasLayer", true, false):
 			(c as CanvasLayer).visible = false
