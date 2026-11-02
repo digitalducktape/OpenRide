@@ -144,6 +144,11 @@ func avg_power() -> float:
 	return _power_sum / _power_sec if _power_sec > 0.0 else 0.0
 
 
+## Whether a balloon sits on the nozzle (not while one ties off or the next loads).
+func has_balloon() -> bool:
+	return not _need_load
+
+
 func is_over() -> bool:
 	return phase == Phase.OVER
 
