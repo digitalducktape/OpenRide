@@ -36,6 +36,7 @@ const LOOKS := {
 	"tug_of_war": [Color("ff9f1c"), Color("2a160b")],
 	"safe_cracker": [Color("e8b04a"), Color("14110d")],
 	"cadence_karaoke": [Color(1.0, 0.45, 0.8), Color("12052a")],
+	"balloon_pump": [Color("ff5fa2"), Color("2b0f2a")],
 }
 
 static var _looks := {}

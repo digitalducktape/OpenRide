@@ -163,6 +163,24 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `Balloon Pump scales its push line by role and its race by difficulty`() {
+        fun segment(d: Difficulty) =
+            SessionPlans.justRide(GameCatalog.BALLOON_PUMP, JustRideMode.Timed(20), d, ftp200).segments.single()
+        // A Just Ride is work: the line runs from 20% to 45% of FTP, with the effort multiplier.
+        assertEquals(40, segment(Difficulty.STANDARD).params.int("push_lo_watts"))
+        assertEquals(90, segment(Difficulty.STANDARD).params.int("push_hi_watts"))
+        assertTrue(segment(Difficulty.STANDARD).effort)
+        assertEquals(listOf(4, 5, 7), Difficulty.entries.map { segment(it).params.int("race_balloons") })
+        assertEquals(120, segment(Difficulty.HARD).params.int("race_sec"))
+        // Recovery is gentler: 15% to 30% of FTP.
+        val recovery = GameCatalog.BALLOON_PUMP.params(SegmentRole.RECOVERY, Difficulty.STANDARD, ftp200)
+        assertEquals(30, recovery["push_lo_watts"]!!.jsonPrimitive.int)
+        assertEquals(60, recovery["push_hi_watts"]!!.jsonPrimitive.int)
+        assertEquals(SegmentRole.WORK, GameCatalog.circuitRole(GameCatalog.BALLOON_PUMP))
+        assertEquals(125, GameCatalog.BALLOON_PUMP.roundSec)
+    }
+
+    @Test
     fun `Safe Cracker is a recovery game with a power cap and no effort multiplier`() {
         val plan = SessionPlans.justRide(GameCatalog.SAFE_CRACKER, JustRideMode.Timed(20), Difficulty.HARD, ftp200)
         val segment = plan.segments.single()

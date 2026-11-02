@@ -243,6 +243,40 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Balloon Pump (#76), `games/games/balloon_pump/`: the bike drives an air pump. A
+         * balloon takes air only over its push line, which rises as it fills (from 20% to 45% of
+         * FTP in work, 15% to 30% in recovery; `PumpLogic` scales it per balloon size). Race
+         * fills `race_balloons` within `race_sec`; Max fills as many as it can (circuits always).
+         * A round is one Race heat and its break.
+         */
+        val BALLOON_PUMP = GameDeclaration(
+            id = "balloon_pump",
+            title = "Balloon Pump",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 125,
+            roles = setOf(SegmentRole.WORK, SegmentRole.RECOVERY),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (lo, hi) = if (role == SegmentRole.RECOVERY) 0.15 to 0.30 else 0.20 to 0.45
+                val balloons = when (difficulty) {
+                    Difficulty.EASY -> 4
+                    Difficulty.STANDARD -> 5
+                    Difficulty.HARD -> 7
+                }
+                mapOf(
+                    "push_lo_watts" to JsonPrimitive((ftp.watts * lo).roundToInt()),
+                    "push_hi_watts" to JsonPrimitive((ftp.watts * hi).roundToInt()),
+                    "race_balloons" to JsonPrimitive(balloons),
+                    "race_sec" to JsonPrimitive(120),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -257,6 +291,6 @@ class GameCatalog(games: List<GameDeclaration>) {
         private const val KART_BOTS = 7
 
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE))
+        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, BALLOON_PUMP))
     }
 }

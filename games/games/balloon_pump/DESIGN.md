@@ -80,7 +80,7 @@ onto the nozzle (0.8 s), then filling resumes.
 
 - **A Race heat** is fill X balloons within Y seconds: X is 4 / 5 / 7 on easy / standard /
   hard, Y is 120 s **(issue for 5 in 2:00; my call for 4 and 7)**. Filling the X-th balloon wins
-  the heat and awards a **time bonus of 5 points a second left** (through `award`, so the effort
+  the heat and awards a **time bonus of 2 points a second left** (through `award`, so the effort
   multiplier applies) **(my call)**. Time out loses the heat (no bonus; balloons already tied
   keep their points).
 - Between heats a 4 s break shows the result; the pump rests (no leak) **(my call)**. A balloon
@@ -114,28 +114,34 @@ open    = smoothstep(L, L + 0.03 F, P)
 flow    = K × gain × min(P, cap) / F / a          K = 0.25 /s; gain 1 (work), 1.4 (recovery)
 df/dt   = flow × open − LEAK × (P < L)            LEAK = 0.025 /s
 points  = 100 × a  (× 3 for gold)  × the effort multiplier
-bonus   = 5 × seconds left in a won Race heat  × the effort multiplier
+bonus   = 2 × seconds left in a won Race heat  × the effort multiplier
 ```
 
 Examples (work, F = 200 W): a medium balloon at 100 W (50%) fills in 1.5 / (0.25 × 0.5) = 12 s;
 a small at 100 W in 8 s; a large at 100 W in 16 s; a medium at 60 W stalls where
 `0.2 + 0.25 f³ = 0.3`, f ≈ 0.74.
 
-**Points a minute** (the star scale; `pump_logic_test` simulates these, with the tie-off and the
-nozzle, gold balloons and the seeded order): about 600 a minute at 40% of FTP, 780 at 50%,
-950 at 60%, at 1.0×. A rider at 60% with the 1.3× multiplier (about 48% resistance) makes about
-1230.
+**Points a minute** (the star scale; `pump_logic_test` simulates these over 10 minutes, with the
+tie-off and the nozzle, gold balloons and the seeded order, for a rider who rides at a share of
+FTP and, when a balloon has stalled for 2 s, digs in just past its top line until it ties): Max at
+1.0× is about 460 a minute at 30% of FTP, 530 at 40%, 740 at 50%, 870 at 60% and 1120 at 80%. The
+same 60% ride at 1.3× (about 48% resistance) makes about 1130. Race (standard) at 60% makes about
+940, the time bonus included. A rider who never digs in stalls on the first medium or large
+balloon and scores nothing more: the push line is the game.
 
 **Stars** (points a minute, `stars_per_minute`), set so a strong ride at 1.0× stays at 2 stars
 and 3 needs about 1.3× (epic #31):
 
 | | 1★ | 2★ | 3★ |
 | --- | --- | --- | --- |
-| Max: easy / standard / hard | 350 / 400 / 450 | 650 / 700 / 750 | 1100 / 1150 / 1200 |
-| Race | as Max + 100 | as Max + 150 | as Max + 200 |
+| Max: easy / standard / hard | 300 / 350 / 400 | 600 / 650 / 700 | 1000 / 1050 / 1100 |
+| Race: easy / standard / hard | 400 / 350 / 300 | 750 / 700 / 650 | 1150 / 1100 / 1050 |
 
-The Race thresholds sit higher because the time bonus adds about 150-300 a minute for a rider who
-wins heats. Every number here is provisional until bike tuning.
+Max's difficulty only moves the bar (the rules are the same). Race's thresholds fall with
+difficulty because a bigger target wins fewer heats early, so less time bonus: the same ride
+earns the same stars at every difficulty. Every number here is provisional until bike tuning.
+**Changed from the issue:** the bonus is 2 points a second, not "a bonus" left open; 5 a second
+made Race worth 40% more than Max for the same legs.
 
 ## 5. Edge cases
 
@@ -177,7 +183,7 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
 | Recovery flow gain | 1.4 | 1.2-1.6 | `RECOVERY_GAIN` |
 | Race X (easy/standard/hard) | 4 / 5 / 7 | | params `race_balloons` |
 | Race Y | 120 s | 90-180 | params `race_sec` |
-| Time bonus | 5 /s | 2-8 | `BONUS_PER_SEC` |
+| Time bonus | 2 /s | 1-5 | `BONUS_PER_SEC` |
 | Gold chance | 1 in 8 | | `GOLD_CHANCE` |
 
 ## 8. Acceptance criteria
@@ -194,3 +200,7 @@ Filled in pass by pass (picked / rejected / why).
 
 | System | Skill | Picked | Rejected | Why |
 | --- | --- | --- | --- | --- |
+| Rules' phases | `state-machine` | an enum FSM in a `RefCounted` (`PumpLogic.Phase`: LOAD, FILL, TIE, BREAK, OVER) stepped by the scene | node-based states | five states with no per-state nodes, animation or input; nodes would make the rules untestable headless |
+| Tests | `godot-testing` | GdUnit4 suites with scripted power (`pump_logic_test`), the repo's framework | GUT | GdUnit4 is vendored and every suite here uses it; a scripted-rider simulation pins the star thresholds |
+| Scene tree | `scene-organization` | one game scene (`BalloonPump`) wiring logic, a `PumpWorld` Node3D in a SubViewport, a `PumpStatus` widget and `PumpAudio`; calls down, events up from the logic's `step` return | separate .tscn per part, or an event bus | each part is used once and owned by the scene; the framework already owns the session's signals |
+| Desktop hub listing | (framework) | registry and catalog entries now; the desktop hub's home row waits for #75 | adding a sixth card to `LocalHub.ORDER` | the home row fits five game cards (`hub_layout_test` fails with six); #75 reworks the hub for a bigger list |
