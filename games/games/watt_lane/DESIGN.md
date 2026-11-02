@@ -48,7 +48,7 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
 - The lane's bounds are whole watts on a 5 W grid, and the HUD hero shows exactly `lo–hi`.
 - The ride panel's W turns gold inside the band the rules use right now (`set_power_band`), so its
   colour never disagrees with the game.
-- The countdown chip names the next lane's exact bounds.
+- The countdown chip names the next lane's exact bounds (the hero's caption says W).
 
 ### Power to position
 
@@ -80,8 +80,8 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
 
 ### Announcing a jump (rider)
 
-- **5 s ahead** (`ANNOUNCE_SEC`): a chime, the countdown chip ("UP to 175–215 W in 5", then 4, 3,
-  2, 1), and amber chevrons on the road in the lane leading into the bend. The bike reports about
+- **5 s ahead** (`ANNOUNCE_SEC`): a chime, the countdown chip ("▲ UP 175–215 in 5", then 4, 3,
+  2, 1, NOW), and amber chevrons on the road in the lane leading into the bend. The bike reports about
   once a second, so 5 s is well over the 2 s minimum.
 - A soft tick on each of 3, 2, 1; a whoosh at the jump.
 - **The switch window:** from 1.5 s before the jump to 3.5 s after, **either lane counts** (the
@@ -181,6 +181,34 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
    in play your bike is its glowing nose and the headlight beam (the trail's head) on the road;
    the hub card and the intro picture show the bike and its trail from behind.
 
+11. **The countdown chip reads "▲ UP 175–215 in 5"**, not the issue's "UP to 160 W in 5": it names
+    the lane's bounds (the numbers the rules use) and, with "to" and "W" in, a three-digit lane
+    overflowed the HUD's 850 px slot (`watt_lane_scene_test`).
+
+## The slice as built
+
+- **Files:** `WattLane.gd`/`.tscn` (the scene), `WattLaneLogic.gd` and `WattLaneCourse.gd` (rules),
+  `WattLaneWorld.gd` + `shaders/` (3D), `WattLaneStatus.gd` (HUD), `WattLaneAudio.gd` and
+  `WattLaneMusic.gd` (audio; music from `games/tools/music/songs/watt_lane.py`), `hub_card.png`.
+- **Shared code touched:** `RideMetrics.set_power_source` and two-sided power bands (the ride
+  panel shows the rules' number and is gold exactly in the band; Dodge Ball's one-sided target is
+  unchanged), `arrange.py`'s `synthwave` groove, `pulse` bass and `analog` lead, and
+  `capture_hub_cards.gd` calls a game's `showcase()` if it has one.
+- **Desktop cost:** the 3D view is 5 draw calls and about 950 primitives; per frame GDScript fills
+  64 offsets and a dozen uniforms (`tests/capture_watt_lane.gd --measure=6`).
+- **Tests:** `watt_lane_logic_test` (26: smoothing, membership, the course, announce timing, the
+  switch window, catches, streaks, stars) and `watt_lane_scene_test` (8: the HUD's numbers agree
+  every frame, the chip, the widget's budget, the rails, the stats).
+
 ## GodotPrompter pattern choices
 
-(Filled in as each system is built; see the end of this file.)
+| System | Skill | Picked | Rejected | Why |
+| --- | --- | --- | --- | --- |
+| Scene structure | `scene-organization` | One `Game` scene composing plain classes: `WattLaneLogic` (RefCounted rules), `WattLaneWorld` (Node3D view), `WattLaneStatus` (HUD widget); signals up are replaced by the logic's returned event list | Child scenes per part (`.tscn` for world, HUD) | The house pattern (Tug, Cadence): rules testable headless, views built in code, no editor scenes to keep in step |
+| Rules data | `scene-organization` / `resource-pattern` | Constants in the logic and FTP-scaled params from Kotlin | A custom `Resource` for tuning | Kotlin's `GameCatalog` is the tuning's source for the bike; a Resource would be a second copy |
+| 3D world | `3d-essentials` | Unshaded `ShaderMaterial`s with the shared world look, no lights, fog or environment effects; one MultiMesh for the posts | `StandardMaterial3D` with a DirectionalLight, glow and fog | The tablet recipe: engine light, fog and glow cost a third of a frame on the GX6250 |
+| The lane's bend | `shader-basics` | A uniform float array (`offsets[64]`) read in the rails' vertex shader and the road's fragment shader | Rebuilding an `ArrayMesh`/`ImmediateMesh` every frame in GDScript | 64 floats a frame instead of hundreds of vertices; the road reuses the same data for its glow and chevrons |
+| Effects | `shader-basics` / `particles-vfx` | Chevrons, beam, trail and the catch flash drawn in the road and rail shaders | `GPUParticles3D` sparks, decals for the chevrons | No extra draws or overdraw; the Compatibility renderer's particles compile late on the tablet |
+| HUD | `hud-system` | A slim `PanelContainer` widget in the HUD's top-centre slot, labels changed only on new values, framework tweens for pop and fade | A `ProgressBar` power meter of the game's own | A second power bar is what made Balloon Pump's numbers disagree; the ride panel's W (fed the same smoothed value) is the meter |
+| Audio | `audio-system` | Rendered OGG stems through `AudioDirector` (stem gates by intensity), registered one-shots, and two looping `AudioStreamWAV` hums on the SFX bus crossfaded in code | An `AudioStreamSynchronized`/`AudioStreamInteractive` of the game's own | `AudioDirector` already owns crossfades, ducking and the rider's-music rule; the hum is the only continuous sound, so two players are enough |
+| Tests | `godot-testing` | GdUnit4 suites: headless logic with scripted power, and the scene stepped by hand (no InputBus) | GUT; driving the scene through the keyboard simulator | The project's framework; stepping by hand makes the HUD agreement check exact frame by frame |

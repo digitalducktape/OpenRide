@@ -23,7 +23,7 @@ const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75}
 const USES_CAMERA := {"tug_of_war": false}
 ## The display order of the first games (GameCatalog's, without the demo); every other
 ## registered game follows, by id (`order()`).
-const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"]
+const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane"]
 ## CircuitPresets: warm-up, N blocks, cool-down. Shapes only: each slot's game is drawn from its
 ## role's pool (`draw_slots`, as Kotlin's CircuitDraw).
 const WARMUP := {"role": "warmup", "duration_sec": 180}
