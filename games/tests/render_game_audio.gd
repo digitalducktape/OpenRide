@@ -22,6 +22,8 @@ const REELS := {
 	"tug_of_war": ["rope_creak", "surge_drumroll", "crowd_swell", "win_sting", "lose_sting", "splash"],
 	"safe_cracker": ["proximity_tick", "tumbler_click", "soft_alarm", "vault_open", "door_creak"],
 	"cadence_karaoke": ["beat_tick", "streak_up", "band_exit", "ease_off_chime"],
+	"balloon_pump": ["pump_chuff", "pump_squeak", "pump_tie", "pump_hiss", "pump_gold", "pump_heat_start",
+		"pump_won", "pump_lost", "pump_tick"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
 }
@@ -30,6 +32,7 @@ const GAME_SCRIPTS := {
 	"tug_of_war": "res://games/tug_of_war/TugAudio.gd",
 	"safe_cracker": "res://games/safe_cracker/SafeAudio.gd",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceAudio.gd",
+	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
 }
 
 var out_dir := ""
@@ -153,6 +156,13 @@ func _ride(game_id: String, director: Node) -> void:
 			lean = sin(t * 1.3) * 0.9
 			if director.game and "logic" in director.game and director.game.logic:
 				director.game.logic.target_watts = 200.0  # the power target, for the bonus
+		"balloon_pump":
+			# Spin lightly, then turn the knob up to finish each balloon, and ease off now and
+			# then so a balloon leaks.
+			cad = 85.0
+			res = 15.0 + 35.0 * (0.5 + 0.5 * sin(t * 0.35))
+			if t > 50.0 and t < 56.0:
+				cad = 35.0
 		"tug_of_war":
 			cad = 85.0
 			res = 30.0 + 30.0 * (0.5 + 0.5 * sin(t * 0.25))

@@ -209,7 +209,23 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
 - **Glance budget:** the widget is the hero at the top; the 3D gauge repeats it in the world.
   Messages show in the HUD's centre, above the nozzle's balloon.
 
-## 10. GodotPrompter patterns
+## 10. Sound (sound-designer pass)
+
+- **Theme:** "Candy Stripe March" (`songs/balloon_pump.py`), a fairground-organ march, 126 bpm in
+  F major, 68.6 s with a 7.6 s intro; 1.36 MB with the effects. Bed (pop beat, oom-pah root-fifth
+  bass) always; harmony (accordion oom-pah, vibes, organ stabs) at intensity 0.5, while the balloon
+  takes air; lead (pipe organ, glockenspiel an octave up, a flute in the bridge) at 0.85, when the
+  valve is wide open and the balloon over half full. Resting and leaking drop to the bed.
+- **Effects** (all `pump_` names, since AudioDirector's names are global): a chuff on every pedal
+  stroke, pitched up as the balloon fills; a rubber squeak every 1.4 s empty to 0.7 s full while
+  it takes air; the tie-off's pop and twang at full level with a 0.6 s music dip (the first mix
+  check had it only 3.5 dB over the music; now 14 dB in its best band); a hiss every 0.5 s while
+  leaking; a glockenspiel run for gold; the organ's start call, won and lost stings; a tick on each
+  of a Race heat's last 5 seconds.
+- **Mix** (`tests/render_game_audio.gd --game=balloon_pump`, `analyze_mix.py`): -15.8 LUFS, no
+  clipping, true peak -0.8 dBTP after the limiter.
+
+## 11. GodotPrompter patterns
 
 Filled in pass by pass (picked / rejected / why).
 
@@ -224,4 +240,5 @@ Filled in pass by pass (picked / rejected / why).
 | The bunch | `godot-optimization` (via 3d-essentials §8) | one `MultiMesh` of balloon-and-string instances, at most 48 shown | a MeshInstance3D per tied balloon | a long ride ties 60+ balloons; one draw call whatever the count |
 | HUD widget | `hud-system` | `PumpStatus` in the framework HUD's top-centre slot: a drawn pressure bar (one ShapeBatch), a word badge, count, Race clock and next balloon, updated by setters that touch labels only on a change | a ProgressBar/TextureProgressBar with tweens, or an event-bus score signal | the framework owns the HUD's CanvasLayer and score; the bar needs a push-line tick a ProgressBar can't draw, and per-frame tweens would re-lay out the HUD on the tablet |
 | Intro card | `godot-ui` (via hud-system) | `intro_visual()`: the four balloons drawn with their points | text only | the kinds and their worth are learnt before the first one loads |
+| Audio | `audio-system` | the framework's `AudioDirector` (buses, the 8-voice SFX pool, stems gated by intensity) with a rendered three-stem OGG theme and OGG one-shots from `games/tools/music`; `PumpAudio` decides when each plays | `AudioStreamSynchronized` or players of the game's own | AudioDirector already owns buses, ducking, the rider's-music rule and the crossfade between games; every shipped game uses this pipeline |
 | Desktop hub listing | (framework) | registry and catalog entries now; the desktop hub's home row waits for #75 | adding a sixth card to `LocalHub.ORDER` | the home row fits five game cards (`hub_layout_test` fails with six); #75 reworks the hub for a bigger list |

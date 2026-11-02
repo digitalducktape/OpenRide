@@ -4,11 +4,13 @@ extends Game
 ## knob. A full balloon ties itself off and floats up into the bunch over the stall.
 ##
 ## Rules: `PumpLogic` (tested headless; DESIGN.md is the design record). View: `PumpWorld` (3D,
-## ART_BIBLE.md). HUD widget: `PumpStatus`. This scene wires them to the framework: declarations, scoring through award(),
+## ART_BIBLE.md). HUD widget: `PumpStatus`. Audio: `PumpAudio` (rendered music and effects). This scene wires them to the framework: declarations, scoring through award(),
 ## the Mode option, the result's variant and stats.
 
 ## The look (framework/ui/UI_STYLE.md §4): a daylight fairground stall. Candy pink on deep plum,
 ## badges leaning a little; distinct from Tug's rope orange and every other game's accent.
+const PumpAudioScript := preload("res://games/balloon_pump/PumpAudio.gd")
+
 static var look := GameTheme.new(Color("ff5fa2"), Color("2b0f2a"), 0.1)
 
 ## The 3D view renders into a SubViewport at this share of the window's resolution, drawn scaled
@@ -21,6 +23,7 @@ var logic: PumpLogic
 var world: PumpWorld
 
 var _status: PumpStatus
+var _audio = PumpAudioScript.new()
 
 var _view: SubViewport
 var _shown: MeshInstance2D
@@ -133,6 +136,7 @@ static func _clock(sec: float) -> String:
 
 
 func _ready() -> void:
+	PumpAudioScript.register()
 	world = PumpWorld.new()
 	world.name = "World"
 	_view = SubViewport.new()
@@ -163,6 +167,8 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = PumpStatus.new(look)
 	hud.add_widget(_status)
+	_audio = PumpAudioScript.new()
+	PumpAudioScript.start_music()
 	world.set_balloons(logic.kind, logic.next_kind)
 	_update_world(0.0)
 	world.prewarm()
@@ -173,6 +179,9 @@ func _on_frame(delta: float) -> void:
 	var events := logic.step(delta, InputBus.power, InputBus.cadence, InputBus.sensors_ok)
 	for event in events:
 		_handle(event)
+		_audio.on_event(event)
+	_audio.step(delta, logic, InputBus.cadence)
+	AudioDirector.set_intensity(PumpAudioScript.intensity(logic))
 	_update_world(delta)
 	_update_status()
 	if _message_left > 0.0:
