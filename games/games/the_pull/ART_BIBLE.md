@@ -55,7 +55,7 @@ warm-on-cool dusk with floodlight pools.
 | Boards | `#F2E6C8` face, `#10200F` numbers | posts `#5A4630` |
 | Barrier | `#E8E4DC` and `#C8382E` stripes | a low rail along each side |
 | Sky | zenith `#141C46` → mid `#3A4A8A` → horizon `#E8743B` | dusk |
-| Floodlight | `#FFD9A0` | lamps, pools and cones |
+| Floodlight | `#FFD9A0` | lamps and pools (no light cones: their overdraw costs the tablet) |
 | Fair lights | `#FFB347`, `#FF5D73`, `#6FD3FF` | the far wheel and string lights |
 
 ## 4. Lighting, materials and shading
