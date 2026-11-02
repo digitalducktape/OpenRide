@@ -263,8 +263,10 @@ Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin se
   `KeepyUppyCatalogTest` on the Kotlin side. Gap left for the bike: how the thresholds feel.
 - **TD-FEASIBILITY: APPROVE.** The family's tablet recipe (0.62 SubViewport, no MSAA, unshaded
   hand light, one baked meadow mesh, the sky from its cubemap, `RenderScaleStep`). Desktop: 53-69
-  draw calls in play with the HUD, about 40-44k primitives. Tablet (mock build): see the final
-  report's fps line.
+  draw calls in play with the HUD, about 40-44k primitives. Tablet (Gen 2, mock build,
+  2026-11-01): 60-61 fps in play with Steer off (a minute, a mock rider at 80-190 W), and 60-61
+  for a minute of play with Steer on and the camera's full load running (`tracker_load`, no
+  face, about 2.1 cores busy); the quality step never tripped.
 
 ## GodotPrompter patterns (picked, rejected, why)
 
