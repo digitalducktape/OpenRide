@@ -133,3 +133,13 @@ func test_ending_mid_pull_counts_it_and_saves_the_best() -> void:
 	game._on_finish_requested()
 	assert_bool(game.has_ended()).is_true()
 	assert_float(PullBests.get_best("standard")).is_equal_approx(snappedf(metres, 0.01), 0.01)
+
+
+func test_the_last_result_ends_the_segment_in_game_time() -> void:
+	_ride(PullLogic.SET_SEC + 1.0, 200.0)
+	game._finish_soon()
+	_ride(1.0, 0.0)
+	# Game frames count it down, so a pause (no game frames) holds it.
+	assert_bool(game.has_ended()).is_false()
+	_ride(float(game.RESULT_END_DELAY), 0.0)
+	assert_bool(game.has_ended()).is_true()

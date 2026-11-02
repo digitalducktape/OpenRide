@@ -77,6 +77,7 @@ var _dip := 0.0
 var _flare := 0.0
 var _excite_shown := -1.0
 var _warming := 0
+var _mirror_frame := 0
 
 
 func _ready() -> void:
@@ -91,11 +92,16 @@ func _ready() -> void:
 
 
 ## Builds the statics for a sled whose Full Pull line is at `full_m` metres, with the rider's
-## best flag at `best` (hidden for 0).
+## best flag at `best` (hidden for 0). The statics are only rebuilt when the line moves (a
+## difficulty other than the one built at `_ready`).
 func build(new_full_m: float, best: float) -> void:
+	if _scenery and is_equal_approx(new_full_m, full_m):
+		set_best(best)
+		return
 	full_m = new_full_m
 	if _scenery:
-		_scenery.queue_free()
+		remove_child(_scenery)  # gone at once: its name is free for the new one, and no orphan waits
+		_scenery.free()
 	_scenery = KartMeshKit.mesh_node(PullMeshes.scenery(full_m), _scenery_mat, "Scenery")
 	add_child(_scenery)
 	_build_labels()
@@ -128,6 +134,9 @@ func update_view(delta: float, distance: float, speed: float, box_t: float, cade
 	_sled.position = Vector3(0.0, 0.0, -distance + SLED_GAP)
 	_box.position = Vector3(0.0, 0.22, lerpf(BOX_REAR, BOX_FRONT, clampf(box_t, 0.0, 1.0)))
 	_lay_chain()
+	_mirror_frame += 1
+	if _mirror_frame % 2 == 0:
+		_mirror_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	mirror_camera.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(-12.0), PI, 0.0)),
 		_rig.position + MIRROR_CAMERA)
 	if _warming == 0:
@@ -262,7 +271,8 @@ func _build_rig() -> void:
 	_mirror_view.name = "MirrorView"
 	_mirror_view.size = MIRROR_VIEW
 	_mirror_view.msaa_3d = Viewport.MSAA_DISABLED
-	_mirror_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	# Rendered every other frame (`update_view`): half the second pass's cost on the tablet.
+	_mirror_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_mirror_view.audio_listener_enable_3d = false
 	add_child(_mirror_view)
 	mirror_camera = Camera3D.new()
@@ -368,7 +378,8 @@ func _particle_quad(size: float) -> QuadMesh:
 
 func _build_labels() -> void:
 	if _labels:
-		_labels.queue_free()
+		remove_child(_labels)  # gone at once: its name is free for the new one, and no orphan waits
+		_labels.free()
 	_labels = Node3D.new()
 	_labels.name = "Labels"
 	add_child(_labels)
@@ -401,7 +412,8 @@ func _label(text: String, size: int, color: Color) -> Label3D:
 
 func _build_crowd() -> void:
 	if _crowd:
-		_crowd.queue_free()
+		remove_child(_crowd)  # gone at once: its name is free for the new one, and no orphan waits
+		_crowd.free()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7979
 	var transforms := []

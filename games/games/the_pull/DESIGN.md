@@ -236,3 +236,22 @@ Filled in at each pass. The pattern picked, the alternative rejected, and why.
 | --- | --- | --- | --- | --- |
 | Pull phases | `state-machine` | enum FSM in the `RefCounted` logic | node-based states | 5 small states with no enter/exit animation of their own; the logic must test headless |
 | Logic tests | `godot-testing` | GdUnit4 suite driving `PullLogic.step` with scripted 1 Hz readings | scene runner | the repo's suites are GdUnit4; the rules don't need a tree |
+| Typing | `gdscript-patterns` | typed everything, typed float loops over literal arrays (`for side: float in [...]`) | inferred `:=` from an untyped loop variable | the untyped form failed to compile ("cannot infer the type") |
+| World look | `3d-essentials` | unshaded hand-lit materials on the shared `WorldLook`, floodlight pools computed in the shader | engine `OmniLight3D`/`SpotLight3D` floodlights with shadows, `Environment` fog | the skill's default; the repo measured per-pixel lights and fog at about a third of the tablet's frame |
+| Floodlight pools, sky | `shader-basics` | spatial shaders sharing one include (`pull_look.gdshaderinc`), pools per vertex on a fine grid, a gradient dome on the camera | a `sky` shader with a radiance cubemap; additive light-cone meshes | the dome is one cheap draw; cones cost overdraw on a fill-bound GPU |
+| Sled view | `3d-essentials` | a 256×166 `SubViewport` mirror, rendered every other frame, plus a look back at SET | a third-person chase view | the brief says first person from the bike; the mirror keeps the sled in sight all the pull |
+| Crowd | `3d-essentials` (MultiMesh) | one billboard `MultiMeshInstance3D`, the figure drawn in the fragment shader | `Sprite3D` per spectator | about 1,500 figures in one draw call |
+| HUD widget | `hud-system` | a `PanelContainer` in the HUD's top-centre slot whose labels change only with their values, drawn shapes for the bar | a `ProgressBar` tweened every frame | the HUD kit's rule (re-layout costs the tablet), and the bar needs the best flag and checked end |
+| Tweens | `tween-animation` (via `GameTheme`) | the kit's `pop`/`pulse` on the chip | hand-rolled `_process` animation | the house motion rules; no per-frame code |
+| Audio | `audio-system` | the loops' looping set in their `.import` files, on the game's own players on the SFX bus; one-shots through `AudioDirector` | an `AudioStreamSynchronized` of the loops | each loop needs its own pitch and level |
+| Review | `godot-code-review` | fixes: the end-of-ride delay counts game frames (a `SceneTreeTimer` ran through a pause); rebuilt statics are freed at once (18 orphans per test) | | found in the lead-programmer gate |
+
+## Gates
+
+| Gate | Verdict | What it changed |
+| --- | --- | --- |
+| `ad-art-bible` | APPROVE | It noted the board numbers (Label3D, one draw each) as an open cost. |
+| `ad-visual` | APPROVE with one change | It dropped the floodlight cones from the bible (overdraw). The captures match the bible: warm pools on clay, a blue dusk, the sled in the mirror. |
+| `lp-code-review` | CONCERNS, fixed | The end delay now runs on game time, and rebuilt statics are freed at once (no rebuild when the line hasn't moved). It also found that the camera-off stand-in rule would have swapped Kart Race for The Pull, now fixed on all three sides. |
+| `ql-test-coverage` | GAPS, filled | It added `the_pull_world_test` (shaders, statics, the per-frame parts, the flag, the warm-up) and `sim_pull_check` (a timed ride end to end). That check found the timed ride ending 63 s early. |
+| `td-feasibility` | CONCERNS | The tablet fps is unmeasured (no tablet attached). The mirror re-renders the world (now every other frame), and the board numbers are Label3D. Mitigations: `RenderScaleStep` drops the render scale to 0.55 if a pull's frame rate stays under 54 fps. Next fallbacks: an atlas for the numbers, or the mirror at 15 Hz. |

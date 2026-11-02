@@ -51,7 +51,10 @@ var _peak_power := 0.0
 var _start_best := 0.0
 var _message_left := 0.0
 var _tint := 0.0
-var _ending := false
+## Steps the 3D view down to a lower render scale if the frame rate stays low in a pull.
+var governor := RenderScaleStep.new()
+var _view_scale := RENDER_SCALE
+var _end_left := -1.0  ## counts down to end_segment after the last result (game time: a pause holds it)
 
 
 func info() -> GameInfo:
@@ -142,7 +145,9 @@ func _on_prepare(seg: Dictionary) -> void:
 	_best_pull_points = 0.0
 	_total_full = 0
 	_peak_power = 0.0
-	_ending = false
+	_end_left = -1.0
+	governor = RenderScaleStep.new()
+	_set_render_scale(RENDER_SCALE)
 	world.build(logic.full_m, _start_best)
 	hud.set_skin(look.hud_skin())
 	_status = PullStatus.new(look)
@@ -174,6 +179,10 @@ func _on_resume() -> void:
 
 
 func _on_frame(delta: float) -> void:
+	if governor.sample(delta, logic.phase == PullLogic.Phase.PULL):
+		_set_render_scale(governor.render_scale(RENDER_SCALE))
+		print("OPENRIDE_GAMES the_pull quality tier=%d fps=%.1f scale=%.2f" % [
+			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
 	var power := InputBus.power
 	var events := logic.step(delta, power, _clock(), InputBus.sensors_ok)
 	if logic.last_points > 0.0:
@@ -188,6 +197,10 @@ func _on_frame(delta: float) -> void:
 		_message_left -= delta
 		if _message_left <= 0.0:
 			hud.hide_message()
+	if _end_left >= 0.0:
+		_end_left -= delta
+		if _end_left < 0.0:
+			end_segment()
 
 
 ## The segment's gameplay seconds so far: Kotlin's clock on the bike, ours on a desktop.
@@ -341,10 +354,8 @@ func _on_finish_requested() -> void:
 
 
 func _finish_soon() -> void:
-	if _ending:
-		return
-	_ending = true
-	get_tree().create_timer(RESULT_END_DELAY).timeout.connect(end_segment)
+	if _end_left < 0.0:
+		_end_left = RESULT_END_DELAY
 
 
 ## The result's stats, and its stars from the best single pull (DESIGN.md "Scoring and stars").
@@ -368,7 +379,13 @@ func finish() -> Dictionary:
 func _fit_view() -> void:
 	_shown.position = -Stage.pad
 	_shown.mesh = PullMeshes.view_image(Stage.visible_size)
-	var size := Stage.view_size(RENDER_SCALE)
+	_set_render_scale(_view_scale)
+
+
+## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
+func _set_render_scale(scale: float) -> void:
+	_view_scale = scale
+	var size := Stage.view_size(scale)
 	if _view.size != size:
 		_view.size = size
 
