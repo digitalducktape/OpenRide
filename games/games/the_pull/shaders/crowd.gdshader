@@ -12,6 +12,8 @@ varying vec3 v_light;
 varying float v_haze;
 varying vec3 v_tint;
 varying float v_skin;
+varying float v_arms;
+varying float v_cap;
 
 void vertex() {
 	float phase = INSTANCE_CUSTOM.x * 6.283;
@@ -28,6 +30,9 @@ void vertex() {
 	v_haze = haze_amount(length(CAMERA_POSITION_WORLD - wp));
 	v_tint = COLOR.rgb;
 	v_skin = 0.7 + 0.3 * INSTANCE_CUSTOM.z;
+	// Arms go up while the crowd cheers, each figure on its own beat.
+	v_arms = step(0.35, excitement * INSTANCE_CUSTOM.y) * step(0.0, sin(TIME * 3.0 + phase));
+	v_cap = step(0.6, fract(INSTANCE_CUSTOM.x * 7.3));
 }
 
 void fragment() {
@@ -35,12 +40,20 @@ void fragment() {
 	vec2 p = UV * vec2(1.0, 1.6);
 	float head = length(p - vec2(0.5, 0.32)) - 0.2;
 	vec2 b = p - vec2(0.5, 1.12);
-	float body = length(max(abs(b) - vec2(0.24, 0.42), 0.0)) - 0.16;
-	float d = min(head, body);
+	float body = length(max(abs(b) - vec2(0.16, 0.42), 0.0)) - 0.14;
+	// Raised arms: a rounded bar up from each shoulder.
+	vec2 la = vec2(abs(p.x - 0.5) - 0.32, p.y - 0.62);
+	float arm = (length(max(abs(la) - vec2(0.0, 0.3), 0.0)) - 0.06) + (1.0 - v_arms) * 10.0;
+	float d = min(min(head, body), arm);
 	if (d > 0.0) {
 		discard;
 	}
 	vec3 skin = vec3(0.86, 0.66, 0.5) * v_skin;
-	vec3 col = head < body ? skin : v_tint;
+	vec3 col = v_tint;
+	if (head <= min(body, arm)) {
+		col = (v_cap > 0.5 && p.y < 0.3) ? v_tint * 0.7 : skin;
+	} else if (arm < body && p.y < 0.45) {
+		col = skin;
+	}
 	ALBEDO = grade(hazed(col * v_light, v_haze), SCREEN_UV);
 }

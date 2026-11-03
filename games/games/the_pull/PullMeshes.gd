@@ -39,6 +39,12 @@ const ACCENT := Color("5fd068")
 const INK := Color("10200f")
 const STAND_WOOD := Color("6b5844")
 const FAIR_LIGHTS := [Color("ffb347"), Color("ff5d73"), Color("6fd3ff"), Color("fff1a8")]
+const BANNERS := [Color("c8382e"), Color("2f5fa8"), Color("e8e4dc"), Color("3e8a4a"), Color("d9a227")]
+const BUNTING := [Color("e04a3a"), Color("f2c230"), Color("3a7fd9"), Color("5fd068"), Color("f2e6c8")]
+const ROOF := Color("4a5868")
+## The wheel on the far right horizon (its own mesh: it turns, PullWorld).
+const WHEEL_HUB := Vector3(36.0, 18.0, -540.0)
+const WHEEL_RADIUS := 13.7
 
 
 ## A flat grid in the xz plane, `width` across and from z = `z0` to `z0 - length`, with `cols`
@@ -125,9 +131,61 @@ static func _stands(kit: KartMeshKit) -> void:
 			# The back wall and a roof on posts.
 			var back := side * (STAND_X + TIER_DEPTH * STAND_TIERS + 0.2)
 			_box(kit, Vector3(0.3, 3.6, length), Vector3(back, 1.8, centre), STAND_WOOD.darkened(0.25))
-			_box(kit, Vector3(TIER_DEPTH * STAND_TIERS + 1.0, 0.15, length), Vector3(side * (STAND_X + 1.9), 4.1, centre),
-				Color("3c4a5a"), Vector3(0, 0, -side * 8.0))
+			_stand_front(kit, side, z, length)
+			_stand_roof(kit, side, z, length)
 		z -= TOWER_SPACING
+
+
+## The stand's front: a low wall of painted panels facing the track (plain colour blocks and
+## stripes, no words or logos).
+static func _stand_front(kit: KartMeshKit, side: float, z: float, length: float) -> void:
+	var x := side * (STAND_X - 0.08)
+	var panels := int(length / 2.0)
+	for i in panels:
+		var c: Color = BANNERS[(i + int(absf(z))) % BANNERS.size()]
+		var pz := z - (i + 0.5) * length / panels
+		kit.glow = 0.12
+		_box(kit, Vector3(0.08, 0.7, length / panels - 0.08), Vector3(x, 0.55, pz), c)
+		kit.glow = 0.0
+		_box(kit, Vector3(0.09, 0.08, length / panels - 0.08), Vector3(x, 0.78, pz), c.lightened(0.35))
+	_box(kit, Vector3(0.1, 0.12, length), Vector3(x, 0.96, z - length / 2.0), STAND_WOOD.darkened(0.4))
+
+
+## The roof: posts at the front, a corrugated sheet (alternating tones) sloping back, pennant
+## bunting along its front edge (it sways: COLOR.a < 1) and a string of warm bulbs under it.
+static func _stand_roof(kit: KartMeshKit, side: float, z: float, length: float) -> void:
+	var front_x := side * (STAND_X + 0.15)
+	var eave := 4.3
+	var depth := TIER_DEPTH * STAND_TIERS + 1.0
+	for i in 4:
+		var pz := z - 1.0 - i * (length - 2.0) / 3.0
+		_box(kit, Vector3(0.14, eave, 0.14), Vector3(front_x, eave / 2.0, pz), Color("3a3f46"))
+	var ribs := int(length / 0.8)
+	for i in ribs:
+		var tone := ROOF if i % 2 == 0 else ROOF.lightened(0.12)
+		_box(kit, Vector3(depth, 0.12, length / ribs), Vector3(side * (STAND_X + depth / 2.0 - 0.3), eave + 0.25, z - (i + 0.5) * length / ribs),
+			tone, Vector3(0, 0, -side * 8.0))
+	_box(kit, Vector3(0.12, 0.3, length), Vector3(front_x, eave - 0.05, z - length / 2.0), ROOF.darkened(0.3))
+	# Bunting: pennants on a sagging line, alternating colours.
+	var flags := int(length / 1.1)
+	for i in flags:
+		var t0 := float(i) / flags
+		var t1 := float(i + 1) / flags
+		var a := Vector3(front_x - side * 0.05, eave - 0.2 - 0.35 * sin(t0 * PI), z - t0 * length)
+		var b := Vector3(front_x - side * 0.05, eave - 0.2 - 0.35 * sin(t1 * PI), z - t1 * length)
+		var tip := (a + b) / 2.0 + Vector3(0, -0.42, 0)
+		var c: Color = BUNTING[i % BUNTING.size()]
+		c.a = 0.4  # sways
+		kit.quad(a, b, tip, tip, c)
+		kit.quad(b, a, tip, tip, c)
+	# Bulbs under the eave.
+	kit.glow = 1.0
+	var bulbs := int(length / 1.6)
+	for i in bulbs:
+		var t := (i + 0.5) / bulbs
+		var pos := Vector3(front_x - side * 0.1, eave - 0.75 - 0.25 * sin(t * PI), z - t * length)
+		_box(kit, Vector3(0.12, 0.12, 0.12), pos, FLOOD.lightened(0.2))
+	kit.glow = 0.0
 
 
 static func _boards(kit: KartMeshKit) -> void:
@@ -207,18 +265,8 @@ static func _fair(kit: KartMeshKit, rng: RandomNumberGenerator) -> void:
 		kit.glow = 1.0
 		_box(kit, Vector3(0.3, 0.3, 0.3), pos + Vector3(0, 5.1, 0), FAIR_LIGHTS[i % 4])
 		kit.glow = 0.0
-	# A lit wheel on the right horizon.
-	var hub := Vector3(36.0, 18.0, FAIR_Z)
-	kit.add(KartMeshKit.torus(13.4, 14.0, 28, 4), KartMeshKit.xf(hub, Vector3(90, 0, 0)), Color("6a6f7a"))
-	for i in 12:
-		var a := TAU * i / 12.0
-		var tip := hub + Vector3(cos(a), sin(a), 0.0) * 13.7
-		kit.add(KartMeshKit.box(Vector3(0.15, 1.0, 0.15)), KartMeshKit.between(hub, tip, Vector3(1, 1, 1)), Color("6a6f7a"))
-	kit.glow = 1.0
-	for i in 24:
-		var a := TAU * i / 24.0
-		_box(kit, Vector3(0.6, 0.6, 0.3), hub + Vector3(cos(a), sin(a), 0.0) * 13.7, FAIR_LIGHTS[i % 4])
-	kit.glow = 0.0
+	# The wheel's legs (the wheel itself turns: `wheel()`).
+	var hub := WHEEL_HUB
 	for leg: float in [-1.0, 1.0]:
 		kit.add(KartMeshKit.box(Vector3(0.4, 1.0, 0.4)), KartMeshKit.between(hub, Vector3(36.0 + leg * 9.0, 0.0, FAIR_Z), Vector3(1, 1, 1)),
 			Color("4a4f57"))
@@ -280,29 +328,89 @@ static func weight_box() -> ArrayMesh:
 	return kit.commit()
 
 
-## The rider's bike up front, in the rig's space: the bars, the grips and gloves, the stem, the
-## top of the front tyre and the mirror's stalk and rim (the glass is its own quad).
+## The rider's bike up front, in the rig's space: the bar tops with tape and brake hoods, the
+## stem and its top cap, the top of the front tyre, gloved fists (knuckles, a thumb over the bar,
+## an accent cuff) on sleeves that run back out of the frame, and the mirror's jointed stalk and
+## slim chrome housing (the glass is its own quad).
 static func bike(bars: Vector3, mirror: Vector3) -> ArrayMesh:
 	var kit := _kit()
 	kit.outline = 0.4
-	var bar := Color("2a2e33")
-	kit.add(KartMeshKit.cylinder(0.022, 0.022, 0.66, 8), KartMeshKit.xf(bars, Vector3(0, 0, 90)), bar)
+	var metal := Color("2a2e33")
+	var tape := Color("1b1d20")
+	var glove := Color("4a525c")
+	var sleeve := Color("1f2a3a")
+	# The bar: a straight centre and taped tops either side.
+	kit.add(KartMeshKit.cylinder(0.024, 0.024, 0.2, 10), KartMeshKit.xf(bars, Vector3(0, 0, 90)), metal)
 	for side: float in [-1.0, 1.0]:
-		var grip := bars + Vector3(side * 0.3, 0, 0)
-		kit.add(KartMeshKit.cylinder(0.03, 0.03, 0.14, 8), KartMeshKit.xf(grip, Vector3(0, 0, 90)), Color("111111"))
-		# A glove over the grip: a rounded fist in the accent, knuckles forward.
-		kit.add(KartMeshKit.sphere(0.07, 8, 5), KartMeshKit.xf(grip + Vector3(0, 0.03, 0.01), Vector3.ZERO, Vector3(1.0, 0.85, 1.25)),
-			ACCENT.darkened(0.35))
-		kit.add(KartMeshKit.sphere(0.05, 8, 4), KartMeshKit.xf(grip + Vector3(0, 0.0, 0.1), Vector3.ZERO, Vector3(0.9, 0.8, 1.4)),
-			Color("23332a"))
-	kit.add(KartMeshKit.cylinder(0.03, 0.035, 0.5, 8), KartMeshKit.xf(bars + Vector3(0, -0.24, -0.05), Vector3(10, 0, 0)), bar)
-	kit.add(KartMeshKit.torus(0.3, 0.36, 18, 5), KartMeshKit.xf(bars + Vector3(0, -0.75, -0.3), Vector3(0, 90, 0)), Color("161616"))
-	# The mirror: a stalk from the right bar end to a rim around the glass.
-	var bar_end := bars + Vector3(0.33, 0, 0)
-	kit.add(KartMeshKit.box(Vector3(0.018, 1.0, 0.018)), KartMeshKit.between(bar_end, mirror + Vector3(0, -0.07, 0.01), Vector3.ONE), bar)
-	kit.add(KartMeshKit.cylinder(0.105, 0.105, 0.03, 16), KartMeshKit.xf(mirror + Vector3(0, 0, -0.02), Vector3(90, 0, 0), Vector3(1.0, 1.0, 0.68)),
+		kit.add(KartMeshKit.cylinder(0.021, 0.021, 0.24, 10), KartMeshKit.xf(bars + Vector3(side * 0.22, 0, 0), Vector3(0, 0, 90)), tape)
+		# A brake hood forward of the bar end.
+		var hood := bars + Vector3(side * 0.34, 0.01, -0.06)
+		kit.add(KartMeshKit.capsule(0.026, 0.12, 8, 2), KartMeshKit.xf(hood, Vector3(-70, 0, 0)), tape)
+		kit.add(KartMeshKit.box(Vector3(0.012, 0.11, 0.02)), KartMeshKit.xf(hood + Vector3(0, -0.06, -0.03), Vector3(20, 0, 0)), Color("8a9098"))
+		# The fist on the bar top: palm, four knuckles, a thumb wrapped under, the cuff and sleeve.
+		var fist := bars + Vector3(side * 0.24, 0.035, 0.02)
+		kit.add(KartMeshKit.sphere(0.058, 10, 6), KartMeshKit.xf(fist, Vector3.ZERO, Vector3(1.2, 0.85, 1.1)), glove)
+		for k in 4:
+			var kx := side * (0.012 + 0.024 * k) - side * 0.045
+			kit.add(KartMeshKit.sphere(0.02, 8, 4), KartMeshKit.xf(fist + Vector3(kx, 0.035, -0.035), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)),
+				glove.lightened(0.12))
+		kit.add(KartMeshKit.capsule(0.017, 0.07, 6, 2), KartMeshKit.xf(fist + Vector3(-side * 0.05, -0.03, -0.02), Vector3(0, 0, 70 * side)),
+			glove.darkened(0.15))
+		# An accent strap across the back of the hand, and the sleeve running back out of frame.
+		kit.add(KartMeshKit.box(Vector3(0.075, 0.008, 0.028)), KartMeshKit.xf(fist + Vector3(0, 0.046, 0.03)), ACCENT.darkened(0.3))
+		kit.add(KartMeshKit.cylinder(0.05, 0.075, 0.6, 10), KartMeshKit.xf(fist + Vector3(side * 0.02, -0.16, 0.3), Vector3(55, 0, 0)), sleeve)
+	# The stem, its top cap and the steerer down to the front tyre.
+	kit.add(KartMeshKit.box(Vector3(0.05, 0.045, 0.12)), KartMeshKit.xf(bars + Vector3(0, -0.01, 0.06), Vector3(-8, 0, 0)), metal)
+	kit.add(KartMeshKit.cylinder(0.022, 0.022, 0.012, 10), KartMeshKit.xf(bars + Vector3(0, 0.02, 0.12)), Color("8a9098"))
+	kit.add(KartMeshKit.cylinder(0.022, 0.024, 0.35, 8), KartMeshKit.xf(bars + Vector3(0, -0.2, 0.12), Vector3(-15, 0, 0)), metal)
+	kit.add(KartMeshKit.torus(0.3, 0.35, 20, 5), KartMeshKit.xf(bars + Vector3(0, -0.72, -0.2), Vector3(0, 90, 0)), Color("161616"))
+	# The mirror: a two-part stalk from the right bar end, then a slim chrome rim and a dark back.
+	var bar_end := bars + Vector3(0.36, 0, -0.02)
+	var joint := bar_end + Vector3(0.07, 0.06, -0.02)
+	var glass_bottom := mirror + Vector3(-0.04, -0.06, 0.012)
+	kit.add(KartMeshKit.box(Vector3(0.014, 1.0, 0.014)), KartMeshKit.between(bar_end, joint, Vector3.ONE), metal)
+	kit.add(KartMeshKit.sphere(0.014, 6, 4), KartMeshKit.xf(joint), Color("8a9098"))
+	kit.add(KartMeshKit.box(Vector3(0.012, 1.0, 0.012)), KartMeshKit.between(joint, glass_bottom, Vector3.ONE), metal)
+	kit.glow = 0.25
+	kit.add(KartMeshKit.torus(0.096, 0.106, 24, 4), KartMeshKit.xf(mirror + Vector3(0, 0, -0.002), Vector3(90, 0, 0), Vector3(1.0, 1.0, 0.66)),
+		Color("c9ced6"))
+	kit.glow = 0.0
+	kit.add(KartMeshKit.sphere(0.1, 14, 6, true), KartMeshKit.xf(mirror + Vector3(0, 0, -0.008), Vector3(-90, 0, 0), Vector3(1.0, 0.35, 0.66)),
 		Color("1a1c1f"))
 	return kit.commit()
+
+
+## The lit wheel on the horizon, around its hub at the origin (PullWorld turns it slowly).
+static func wheel() -> ArrayMesh:
+	var kit := _kit()
+	kit.outline = 0.0
+	kit.add(KartMeshKit.torus(13.4, 14.0, 28, 4), KartMeshKit.xf(Vector3.ZERO, Vector3(90, 0, 0)), Color("6a6f7a"))
+	for i in 12:
+		var a := TAU * i / 12.0
+		var tip := Vector3(cos(a), sin(a), 0.0) * WHEEL_RADIUS
+		kit.add(KartMeshKit.box(Vector3(0.15, 1.0, 0.15)), KartMeshKit.between(Vector3.ZERO, tip, Vector3.ONE), Color("6a6f7a"))
+	kit.glow = 1.0
+	for i in 24:
+		var a := TAU * i / 24.0
+		_box(kit, Vector3(0.6, 0.6, 0.3), Vector3(cos(a), sin(a), 0.0) * WHEEL_RADIUS, FAIR_LIGHTS[i % 4])
+		# The gondolas hang under every other light.
+		if i % 2 == 0:
+			kit.glow = 0.0
+			_box(kit, Vector3(1.2, 1.0, 0.9), Vector3(cos(a), sin(a), 0.0) * WHEEL_RADIUS + Vector3(0, -0.9, 0), FAIR_LIGHTS[(i / 2) % 4].darkened(0.4))
+			kit.glow = 1.0
+	kit.glow = 0.0
+	return kit.commit()
+
+
+## Every floodlight lamp head's centre, for the glow halos (PullWorld).
+static func lamp_heads() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	var z := 0.0
+	while z > -LENGTH - 20.0:
+		for side: float in [-1.0, 1.0]:
+			out.append(Vector3(side * TOWER_X - side * 0.6, 16.2, z + 0.4))
+		z -= TOWER_SPACING
+	return out
 
 
 ## One chain link (a flattened ring).

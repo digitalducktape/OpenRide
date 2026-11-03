@@ -90,13 +90,20 @@ func how_to_text(seg: Dictionary) -> String:
 	return declared().how_to
 
 
+## The intro card's target, every number from the segment (rider's ask): the rider's best at this
+## difficulty once there is one, else the Full Pull line from the segment's `d_ref_m` and
+## `full_factor` (the difficulty's defaults without them).
 func target_text(seg: Dictionary) -> String:
-	var best := PullBests.get_best(str(seg.get("difficulty", "standard")))
+	var level := str(seg.get("difficulty", "standard"))
+	var best := PullBests.get_best(level)
 	if best > 0.5:
-		return "Beat your best: %d m" % PullLogic.shown_m(best)
-	var p: Dictionary = seg.get("params", {})
-	var d_ref := float(p.get("d_ref_m", PullLogic.D_REF.get(str(seg.get("difficulty", "standard")), 300.0)))
-	return "Full Pull at %d m" % PullLogic.shown_m(d_ref * float(p.get("full_factor", PullLogic.FULL_FACTOR)))
+		return "Your best: %d m" % PullLogic.shown_m(best)
+	return "Reach the Full Pull line at %d m" % PullLogic.shown_m(PullLogic.full_line_for(seg.get("params", {}), level))
+
+
+## The intro card's picture: the sled with its weight box sliding forward.
+func intro_visual() -> Control:
+	return PullIntroArt.new(look)
 
 
 func ui_theme() -> GameTheme:

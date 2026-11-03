@@ -143,3 +143,68 @@ func test_the_last_result_ends_the_segment_in_game_time() -> void:
 	assert_bool(game.has_ended()).is_false()
 	_ride(float(game.RESULT_END_DELAY), 0.0)
 	assert_bool(game.has_ended()).is_true()
+
+
+func test_the_intro_target_comes_from_the_segment() -> void:
+	var seg := {"difficulty": "hard", "params": {"ftp_watts": 250.0, "d_ref_m": 280.0, "full_factor": 1.1}}
+	assert_str(game.target_text(seg)).is_equal("Reach the Full Pull line at %d m" % PullLogic.shown_m(280.0 * 1.1))
+	# Without params, the difficulty's own sled.
+	assert_str(game.target_text({"difficulty": "easy"})).is_equal(
+		"Reach the Full Pull line at %d m" % PullLogic.shown_m(PullLogic.D_REF.easy * PullLogic.FULL_FACTOR))
+	PullBests.offer("hard", 187.4)
+	assert_str(game.target_text(seg)).is_equal("Your best: 187 m")
+	var art: Control = game.intro_visual()
+	assert_object(art).is_not_null()
+	art.free()
+
+
+## Where a point in the rig's space lands on the stage (canvas pixels), through the 3D view.
+func _on_stage(rig_point: Vector3) -> Vector2:
+	var world: PullWorld = game.world
+	var view: SubViewport = game.get_node("View3D")
+	var p: Vector2 = world.camera.unproject_position(world.get_node("Rig").to_global(rig_point))
+	return p / Vector2(view.size) * Stage.visible_size - Stage.pad
+
+
+## The stage rect a box in the rig's space covers (its eight corners).
+func _stage_rect(centre: Vector3, half: Vector3) -> Rect2:
+	var rect := Rect2(_on_stage(centre), Vector2.ZERO)
+	for x in [-1.0, 1.0]:
+		for y in [-1.0, 1.0]:
+			for z in [-1.0, 1.0]:
+				rect = rect.expand(_on_stage(centre + half * Vector3(x, y, z)))
+	return rect
+
+
+func test_nothing_is_clipped_by_the_frame_or_a_hud_panel() -> void:
+	_ride(PullLogic.SET_SEC + 5.0, 200.0)  # facing the track, mid-pull
+	game.hud.show_message("FULL PULL! 1888 m", GameTheme.GOOD)  # the longest centre message
+	game._status.set_distance(1888)
+	game._status.set_chip("need", 1888)
+	for i in 4:
+		await get_tree().process_frame
+	var stage := Rect2(Vector2.ZERO, Vector2(HudTheme.W, HudTheme.H))
+	var hud: Hud = game.hud
+	var panels := {"ride panel": hud.ride_panel, "clock": hud.clock_panel, "pause": hud.pause_button,
+		"end": hud.end_button, "status widget": game._status, "message": hud._message}
+	var mirror := _stage_rect(PullWorld.MIRROR, Vector3(PullWorld.MIRROR_SIZE.x / 2.0 + 0.012, PullWorld.MIRROR_SIZE.y / 2.0 + 0.012, 0.01))
+	var things := {"mirror": mirror}
+	for side in [-1.0, 1.0]:
+		things["fist %d" % side] = _stage_rect(PullWorld.BARS + Vector3(side * 0.24, 0.035, 0.02), Vector3(0.08, 0.07, 0.07))
+	for thing in things:
+		var rect: Rect2 = things[thing]
+		assert_float(rect.size.x).override_failure_message("%s projects to nothing" % thing).is_greater(40.0)
+		assert_bool(stage.encloses(rect)).override_failure_message("%s %s leaves the frame" % [thing, rect]).is_true()
+		for name in panels:
+			var panel: Control = panels[name]
+			var box := panel.get_global_rect()
+			if name == "message":
+				# The label spans the row; its text is centred.
+				var w := panel.get_theme_font("font").get_string_size(panel.text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+					panel.get_theme_font_size("font_size")).x
+				box = Rect2(box.get_center().x - w / 2.0, box.position.y, w, box.size.y)
+			assert_bool(rect.intersects(box)).override_failure_message("%s %s is under the %s %s" % [thing, rect, name, box]).is_false()
+	# The HUD's own pieces stay on the stage.
+	for name in panels:
+		if name != "message":
+			assert_bool(stage.encloses((panels[name] as Control).get_global_rect())).override_failure_message(name).is_true()

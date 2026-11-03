@@ -3,7 +3,7 @@ extends GdUnitTestSuite
 ## per-frame parts follow the logic (the rig, the sled, the weight box, the chain, the sky), the
 ## best flag, and the warm-up idles afterwards.
 
-const SHADERS := ["track", "scenery", "sky", "crowd", "mirror"]
+const SHADERS := ["track", "scenery", "sky", "crowd", "mirror", "glow"]
 
 var world: PullWorld
 

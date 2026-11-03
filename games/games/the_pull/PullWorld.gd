@@ -18,7 +18,7 @@ const FOV := 68.0
 const FAR := 900.0
 const SKY_RADIUS := 850.0  ## inside FAR; the dome follows the camera
 const BARS := Vector3(0.0, 1.16, -0.74)
-const MIRROR := Vector3(0.5, 1.3, -0.78)
+const MIRROR := Vector3(0.56, 1.27, -0.8)
 const MIRROR_SIZE := Vector2(0.2, 0.13)
 const MIRROR_VIEW := Vector2i(256, 166)
 const MIRROR_CAMERA := Vector3(0.3, 1.5, 0.15)
@@ -33,6 +33,9 @@ const CROWD_COLORS := [Color("d94a3a"), Color("f2c230"), Color("3a7fd9"), Color(
 	Color("8a4ad9"), Color("f28a30"), Color("2a2e33")]
 const BOARD_LABEL_RANGE := 140.0
 const FLARE_SEC := 1.5
+const HALO_SIZE := 4.2  ## metres across a floodlight's halo
+const WHEEL_TURN := 0.06  ## radians a second: the far wheel turns slowly
+const FLOOD_HALO := Color(1.0, 0.82, 0.55, 0.9)
 ## The dusk (ART_BIBLE §3-4) for WorldLook: a low cool moon, a blue sky ambient, a violet haze.
 const LOOK := {
 	"sun_color": Color(0.16, 0.18, 0.28),
@@ -70,6 +73,9 @@ var _crowd: MultiMeshInstance3D
 var _mirror_view: SubViewport
 var _dust: CPUParticles3D
 var _confetti: CPUParticles3D
+var _glow_mat: ShaderMaterial
+var _wheel: Node3D
+var _motes: CPUParticles3D
 var _t := 0.0
 var _pedal_phase := 0.0
 var _slack := 1.0
@@ -132,6 +138,8 @@ func update_view(delta: float, distance: float, speed: float, box_t: float, cade
 	var turn := smoothstep(0.0, 1.0, look_back)
 	camera.rotation_degrees = Vector3(CAMERA_PITCH - 4.0 * turn - _dip * 2.0, -LOOK_BACK_YAW * turn, sin(_pedal_phase) * 0.4)
 	_sled.position = Vector3(0.0, 0.0, -distance + SLED_GAP)
+	_wheel.rotation.z += WHEEL_TURN * delta
+	_motes.position = _rig.position + Vector3(0.0, 3.0, -9.0)
 	_box.position = Vector3(0.0, 0.22, lerpf(BOX_REAR, BOX_FRONT, clampf(box_t, 0.0, 1.0)))
 	_lay_chain()
 	_mirror_frame += 1
@@ -361,6 +369,54 @@ func _build_fx() -> void:
 	_confetti.color_initial_ramp = colors
 	_confetti.mesh = _particle_quad(0.14)
 	add_child(_confetti)
+	_build_glows()
+
+
+## The floodlights' halos (one additive MultiMesh), the dust motes drifting in their light
+## around the rider, and the far wheel, which turns.
+func _build_glows() -> void:
+	_glow_mat = ShaderMaterial.new()
+	_glow_mat.shader = _shader("glow.gdshader")
+	var quad := QuadMesh.new()
+	quad.size = Vector2(HALO_SIZE, HALO_SIZE)
+	var transforms := []
+	var colors := []
+	for head in PullMeshes.lamp_heads():
+		transforms.append(Transform3D(Basis(), head))
+		colors.append(FLOOD_HALO)
+	var halos := KartMeshKit.multimesh_node(quad, transforms, "Halos", [], colors)
+	halos.material_override = _glow_mat
+	halos.custom_aabb = AABB(Vector3(-12, 10, -PullMeshes.LENGTH - 30.0), Vector3(24, 12, PullMeshes.LENGTH + 40.0))
+	add_child(halos)
+	_motes = CPUParticles3D.new()
+	_motes.name = "Motes"
+	_motes.amount = 36
+	_motes.lifetime = 6.0
+	_motes.preprocess = 6.0
+	_motes.local_coords = false
+	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_motes.emission_box_extents = Vector3(7.0, 2.5, 14.0)
+	_motes.direction = Vector3(0.3, 0.2, 0.0)
+	_motes.spread = 180.0
+	_motes.initial_velocity_min = 0.05
+	_motes.initial_velocity_max = 0.25
+	_motes.gravity = Vector3.ZERO
+	_motes.scale_amount_min = 0.5
+	_motes.scale_amount_max = 1.0
+	_motes.color = Color(1.0, 0.86, 0.6, 0.35)
+	var mote := QuadMesh.new()
+	mote.size = Vector2(0.06, 0.06)
+	var mote_mat := ShaderMaterial.new()
+	mote_mat.shader = _glow_mat.shader
+	mote_mat.set_shader_parameter("billboard", true)
+	mote.material = mote_mat
+	_motes.mesh = mote
+	add_child(_motes)
+	_wheel = Node3D.new()
+	_wheel.name = "Wheel"
+	_wheel.position = PullMeshes.WHEEL_HUB
+	_wheel.add_child(KartMeshKit.mesh_node(PullMeshes.wheel(), _scenery_mat, "Ring"))
+	add_child(_wheel)
 
 
 func _particle_quad(size: float) -> QuadMesh:
@@ -464,3 +520,4 @@ func _set_flood(strength: float) -> void:
 	for mat in [_track_mat, _infield_mat, _scenery_mat, _flag_mat, _crowd_mat]:
 		mat.set_shader_parameter("flood_strength", strength)
 	_scenery_mat.set_shader_parameter("glow_gain", strength)
+	_glow_mat.set_shader_parameter("strength", strength)

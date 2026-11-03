@@ -84,12 +84,18 @@ func _init(params := {}, difficulty := "standard", new_mode := "open", new_round
 		duration_sec := -1.0, best_m := 0.0) -> void:
 	ftp = maxf(float(params.get("ftp_watts", params.get("ftp", DEFAULT_FTP))), 1.0)
 	d_ref = maxf(float(params.get("d_ref_m", D_REF.get(difficulty, D_REF.standard))), 10.0)
-	full_m = d_ref * float(params.get("full_factor", FULL_FACTOR))
+	full_m = full_line_for(params, difficulty)
 	mode = new_mode
 	rounds = maxi(new_rounds, 1)
 	duration = duration_sec
 	best_distance = maxf(best_m, 0.0)
 	_begin_set()
+
+
+## Where the Full Pull line sits for a segment's `params` at a difficulty (the logic's own rule).
+static func full_line_for(params: Dictionary, difficulty: String) -> float:
+	var d_ref := maxf(float(params.get("d_ref_m", D_REF.get(difficulty, D_REF.standard))), 10.0)
+	return d_ref * float(params.get("full_factor", FULL_FACTOR))
 
 
 ## The sled's need at `d` metres, in watts: FTP × (0.30 + 0.70 × d / d_ref).

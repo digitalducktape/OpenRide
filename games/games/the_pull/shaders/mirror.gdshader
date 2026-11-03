@@ -13,5 +13,7 @@ void fragment() {
 	}
 	vec3 col = texture(view, vec2(1.0 - UV.x, UV.y)).rgb;
 	col = mix(col, vec3(0.75, 0.85, 1.0), 0.06 + 0.1 * smoothstep(0.75, 1.0, r));
+	float sheen = 1.0 - smoothstep(0.0, 0.12, abs(UV.x + UV.y - 0.75));
+	col += vec3(0.12) * sheen;
 	ALBEDO = col;
 }
