@@ -1,17 +1,17 @@
 extends RefCounted
 ## Watt Lane's sounds (#78), registered with AudioDirector by the game scene.
 ##
-## Rendered effects (`music/sfx/*.ogg`, games/tools/music/songs/watt_lane.py, in F minor):
+## Rendered effects (`music/sfx/*.ogg`, games/tools/music/songs/watt_lane.py, in Eb major):
 ## jump_chime (a jump announced), count_tick (3, 2, 1), lane_shift (the jump), caught, missed,
-## off_buzz (left the lane) and streak_up. The music is "Night Current" (WattLaneMusic), synthwave
-## at 104 bpm. The hum is the bike's: a seamless one-second loop rendered here, played on the SFX
+## off_buzz (left the lane) and streak_up. The music is "Live Wire" (WattLaneMusic), dream-pop
+## electronica at 112 bpm. The hum is the bike's: a seamless one-second loop rendered here, played on the SFX
 ## bus by the scene, warmer and louder in the lane and thin out of it (the issue's "hum that
-## brightens in-lane"). Bus effects for this game only: a long night-road reverb on the music.
+## brightens in-lane"). Bus effects for this game only: a wide reverb on the music.
 
 const WattLaneMusic := preload("res://games/watt_lane/WattLaneMusic.gd")
 
 const HUM_RATE := 22050
-const HUM_HZ := 87.0  ## near F2, the key; whole cycles in a second, so the loop is seamless
+const HUM_HZ := 78.0  ## near Eb2, the key; whole cycles in a second, so the loop is seamless
 
 static var _registered := false
 static var _hums := {}

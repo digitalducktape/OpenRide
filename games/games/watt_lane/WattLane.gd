@@ -14,9 +14,9 @@ extends Game
 const WattLaneAudioScript := preload("res://games/watt_lane/WattLaneAudio.gd")
 const WattLaneMusic := preload("res://games/watt_lane/WattLaneMusic.gd")
 
-## "Night Current": the bed always; the harmony near the lane; the lead only in it.
+## "Live Wire": the bed always; the harmony near the lane; the lead only in it.
 const MUSIC_STYLE := {
-	"name": "night_current",
+	"name": "live_wire",
 	"stem_files": WattLaneMusic.STEM_FILES,
 	"loop_from": WattLaneMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.45, "lead": 0.9},
@@ -47,7 +47,7 @@ func info() -> GameInfo:
 	var i := GameInfo.new()
 	i.id = "watt_lane"
 	i.title = "Watt Lane"
-	i.how_to = "Your power is your place: ride inside the lane"
+	i.how_to = "More watts move you up. Keep the chevron in the lit lane"
 	i.supports = ["minutes", "open"]
 	i.min_sec = 60
 	i.max_sec = 3600
@@ -63,13 +63,13 @@ func info() -> GameInfo:
 
 
 func how_to_text(_seg: Dictionary) -> String:
-	return "More watts, higher cursor. Ride inside the glowing lane"
+	return "More watts move you up. Keep the chevron in the lit lane"
 
 
 func target_text(seg: Dictionary) -> String:
 	var preview := WattLaneLogic.new(str(seg.get("difficulty", "standard")), seg.get("params", {}),
 		int(seg.get("seed", 0)), str(seg.get("role", "work")))
-	return "Start in %d–%d W" % [preview.lane_lo(), preview.lane_hi()]
+	return "Start between %d and %d W" % [preview.lane_lo(), preview.lane_hi()]
 
 
 func ui_theme() -> GameTheme:

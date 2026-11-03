@@ -32,6 +32,13 @@ float hash(vec2 c) {
 void fragment() {
 	vec2 p = origin + UV * rect_size;
 	vec3 col = mix(top_color, bottom_color, UV.y);
+	// Farthest: two huge soft clouds of colour, teal and copper, drifting very slowly.
+	// (Sampled from the noise's lowest mip, so each is a broad, smooth wash, never mottled.)
+	vec2 q = vec2(p.x + scroll * 0.08, p.y) / 2400.0;
+	float n1 = textureLod(noise_tex, q * 0.25 + vec2(TIME * 0.001, 0.0), 4.0).r;
+	float n2 = textureLod(noise_tex, q * 0.2 + vec2(0.37, 0.61) - vec2(TIME * 0.0008, 0.0), 4.0).r;
+	col += bokeh_color * smoothstep(0.35, 0.75, n1) * 0.06;
+	col += warm_color * smoothstep(0.45, 0.8, n2) * 0.035;
 	// Far: soft bokeh discs, one per cell, drifting slowly left.
 	vec2 bp = vec2(p.x + scroll * 0.33, p.y) / 180.0;
 	vec2 cell = floor(bp);

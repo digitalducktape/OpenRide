@@ -1,135 +1,138 @@
 # Watt Lane: art bible
 
-> **Status**: Approved for the look-and-sound slice (AD-ART-BIBLE: APPROVE, with the notes at
-> the end)
-> **Owned by**: art-director pass, 2026-11-02
-> **Scope**: the 3D world (`WattLaneWorld`, `shaders/`), the HUD widget (`WattLaneStatus`) and
-> the hub card. Rules are in `DESIGN.md`.
+> **Status**: Approved for the rework slice (AD-ART-BIBLE: APPROVE, notes at the end)
+> **Owned by**: art-director pass, 2026-11-02 (third look: abstract)
+> **Scope**: the 2D field (`WattLaneBackdrop`, `shaders/wl_field.gdshader`), the lane and cursor
+> (`WattLaneTrack`, `shaders/wl_lane.gdshader`), the HUD widget (`WattLaneStatus`) and the hub
+> card. Rules are in `DESIGN.md`.
+
+**History.** The first slice was a 3D night highway; the rider found a lane that moves sideways
+reads as "lean". The second was a 2D music staff of power lines with a note-head marker; its
+marker failed the silhouette check (below). This third look is the rider's direction: "just make
+it abstract, a chevron cursor following an illuminated horizontal lane."
 
 ## 1. Visual identity statement
 
-**"Open road, one light to follow."** A wide, dark highway under a big night sky, and the only
-saturated thing on it is the lane: two rails of volt-lime light that bend ahead of you.
+**"One lit lane through the dark, one arrow riding it."** A flat, deep night field; across it a
+lane of warm light that comes in from the right and steps up or down; a chevron (▶) holding it.
 
-- **The lane wins every contrast contest.** When anything competes with the rails (lamps, the
-  city glow, the HUD), dim the other thing. Serves the rule "know at a glance if you're in".
-- **Open, never enclosed.** When in doubt, remove a wall or ceiling and show more sky. This is
-  what separates it from Cadence Karaoke's tunnel.
-- **The future is drawn on the road.** Anything the rider must react to (a jump) appears on the
-  road ahead first, then in the HUD, then as a sound. Never only in the HUD.
+- **The lane is the only warm, bright thing.** When something competes (the HUD, the field's
+  layers), dim it. Serves "know at a glance if you're in".
+- **Flat and horizontal, never a tunnel.** Depth comes from layers moving at different speeds,
+  not perspective. This is what keeps it apart from Cadence Karaoke's neon tunnel.
+- **The future is drawn ahead.** A step appears on the right first (its riser, chevrons, its new
+  watts), then in the HUD's chip, then as a chime.
+- **Up is more.** More watts, higher. Nothing in the picture moves sideways for the rider.
 
 ## 2. Mood and atmosphere
 
-| State | Target | Lighting | Descriptors | Energy |
+| State | Target | Light | Descriptors | Energy |
 | --- | --- | --- | --- | --- |
-| Cruising in the lane | calm focus, "locked in" | cool night, lime rails at full glow, lane floor lit | hushed, wide, humming | medium |
-| Off the lane | a gentle nudge, not alarm | rails dim to 60%, the lane floor fades, your beam goes amber at its tip | cooler, emptier | low |
-| A jump coming | anticipation | amber chevrons pulse in the lane ahead, rails bend toward the new lane | expectant, clear | rising |
-| Caught it | release | rails flash white-lime for 0.4 s, sparks off the rails | crisp, bright | peak |
-| Intro card / paused | still postcard | the same scene, held | quiet | low |
+| In the lane | locked in, calm | the lane at full glow, a beam from the chevron along it, the field warming around it, the edges pulsing with the beat | warm, steady, humming | medium |
+| Out of the lane | a nudge, not alarm | the lane dims to two-thirds, the chevron's rim and glow turn amber, PUSH or EASE in the HUD | cooler, quieter | low |
+| A step coming | anticipation | an amber riser where the lane jumps, chevrons leading to it, its new watts beside it | expectant, clear | rising |
+| Caught it | release | the lane and the chevron flash, gold sparks | bright, crisp | peak |
+| Intro / pause | still | the same field and lane, held | quiet | low |
 
 ## 3. Shape language
 
-- **Long and horizontal.** Rails, road lines, the horizon, the low city: everything is a line
-  that runs to the vanishing point or along the horizon. No round hero objects (Cadence has the
-  orb).
-- **The lane** is two thin bright rails (a white-hot core, lime halo) and a faint fill between
-  them. Rails curve smoothly (S-bends for jumps); they never break.
-- **Chevrons** (▲-shapes laid flat, pointing toward the new lane) are the only angular shapes,
-  and they mean "a change is coming".
-- **Your bike** is a slim light nose at the bottom centre and a headlight beam, warm white, so
-  "you" is never the same colour as "the lane".
-- **Scenery** is silhouettes: flat mesas and a low city skyline on the horizon, slender lamp
-  posts along the shoulders. Nothing tall near the road.
+- **Horizontal bands and lines.** The lane, the watt scale's guides and the path are horizontal;
+  the beat lines are thin verticals. No curves except the lane's smooth step.
+- **The chevron (▶)** is the only solid shape: four points, a notched arrowhead, an ink outline,
+  a rim, a white-hot face with a lit upper facet. Angular on purpose.
+- **Amber chevrons** inside the lane mean "a change is coming"; they point up or down.
+- **Round only for light**: the bokeh and the chevron's glow are soft discs with no edge and no
+  tail, and they never move with a trail.
 
 ## 4. Colour system
 
 | Name | Hex | Meaning |
 | --- | --- | --- |
-| Volt lime | `#C8FF3E` | the lane (rails, fill, the HUD accent and hero) |
-| Rail core | `#F4FFE0` | the rails' white-hot centre, the "caught" flash |
-| Signal amber | `#FFB020` | a change is coming: chevrons, the countdown chip, the off-lane beam tip |
-| Headlight | `#FFF1D0` | you: the bike's nose and beam |
-| Sodium | `#FF8A3C` | street lamps (small, far, dim) |
-| Night petrol | `#061418` | ink: the HUD panels, the sky's top |
-| Horizon teal | `#145A5C` | the sky's glow at the horizon, the city's haze |
-| Asphalt | `#0B1216` | the road |
+| Lane gold | `#FFC752` | the lane (the target: the framework's gold, TARGET) |
+| Edge light | `#FFEDBF` | the lane's edges, the beam, a catch |
+| Signal amber | `#FFB020` | a change is coming; out of the lane (WARN) |
+| Good green | GameTheme `GOOD` | the chevron's rim in the lane (backed by "In lane" and the hum) |
+| Path blue | `#BFE6FF` | the dashed path behind the chevron |
+| Field teal | `#05121C` → `#08202B` | the field, its grid and bokeh |
+| Copper | `#F0875A` | the game's accent: HUD panel edges, buttons, the hero's gradient |
+| Dusk navy | `#0F1A2E` | the game's ink |
 
-- Cool world, warm accents: everything big is petrol and teal; lime and amber are the only
-  saturated colours, and they never touch (chevrons sit inside the lane's fill, which is faint).
-- **Distinct from Cadence Karaoke** (magenta, cyan, violet, a magenta-on-violet ink): no pink,
-  no violet, no cyan grid.
-- **Colourblind backups:** in/out is never colour alone: the rails' brightness changes, the hum
-  changes, and the HUD says IN LANE / PUSH ▲ / EASE ▼. Lime vs amber (hard to tell apart for
-  some riders) is backed by shape (chevrons, arrows) and by the chime and countdown.
-- The HUD uses the framework's meaning colours (good, warn, bad, target) with lime as the
-  game's accent and petrol as its ink (`GameTheme`).
+- Cool field, warm lane: everything big is teal and dark; the lane's gold is the only warm
+  light. **Distinct from Cadence Karaoke** (magenta, cyan, violet neon in a tunnel).
+- **The accent is copper, not lime** (the first slice): an accent must never read as a meaning
+  colour (UI_STYLE.md §4), and lime reads as GOOD green.
+- **Colourblind backups:** in or out is never colour alone: the HUD says In lane / PUSH / EASE,
+  the hum changes, the lane dims. Steps carry shape (chevrons, the riser) and sound.
 
 ## 5. Character design direction
 
-There are no characters. The rider's bike is the only "actor": a light-cycle nose (a low wedge
-with a lit edge) and its beam. The hub card and the intro picture show it from behind, with its
-light trail drawn on the road: a warm ribbon from the bike back toward the camera.
+No characters. The rider is the chevron: a pointer, not a creature.
 
 ## 6. Environment design language
 
-- **A desert highway at night**: six lanes' worth of dark asphalt with faint white dashed lines
-  (every 25% of FTP is a painted line, so the road reads as a scale), solid edge lines, and a
-  glowing shoulder line. Beyond: flat dark ground with a little noise, mesas, and a city's skyline
-  glowing on the horizon straight ahead.
-- **Texture philosophy:** none imported. Every surface is unshaded and drawn in its shader (the
-  tablet recipe), the grade folded in through `world_look.gdshaderinc` (`wl_look.gdshaderinc`
-  sets the game's defines).
-- **Props:** lamp posts every 40 m each side (a MultiMesh, scrolled in the shader), reflector
-  studs along the edge lines. Density is low on purpose: the lane must dominate.
-- **Wet sheen:** the road reflects the rails and lamps as soft vertical streaks (drawn in the
-  road shader, no reflection pass).
-- **Sky:** a gradient from petrol to teal at the horizon, a scatter of stars, and a thin crescent
-  moon high left. No aurora, no sun.
+- **The field** (one shader rect, far to near):
+  - two huge soft washes of teal and copper, drifting very slowly (sampled from a low mip, so
+    never mottled);
+  - bokeh discs at a third of the lane's speed;
+  - a dot grid at half speed;
+  - the watt scale's five faint guides, one every 12.5% of FTP;
+  - beat lines at the lane's own speed, one a beat, brighter at each bar and flaring on the beat;
+  - a vignette and a pixel of dither.
+- **No imported textures.** Everything is drawn in two canvas shaders and one `SafeMesh` batch
+  (the chevron), on the full 1080p canvas with no SubViewport.
+- **Density:** the field stays dim (each layer under 10% brightness) so the lane dominates.
 
 ## 7. UI/HUD visual direction
 
-- Screen-space HUD in the top-centre slot (`WattLaneStatus`, at most 850 x 120): the lane's
-  bounds are the hero ("150–190", 96 px, lime gradient), "W lane" as its caption, and a second
-  row with "In lane 82%", the streak (×2.5) and a direction chip when you're out (PUSH ▲ / EASE ▼).
-- The **countdown chip** is amber, with a drawn arrow: "UP to 175–215 W in 4". It pops when it
-  appears and on each second.
-- Display face: the shared OFL face (`GameTheme`); upright (lean 0.0): a highway sign, not a
-  sticker. Minimum 34 px.
-- Motion: pop on change, slam on ×3, fade on hide (the framework's tweens). Nothing moves every
-  frame.
-- Conflict decided: the countdown could be a big centre message (more readable), but the centre
-  of the screen is the road where the arrows are drawn; the chip stays in the top slot and the
-  road carries the big signal.
+- The HUD's top-centre widget (`WattLaneStatus`): the lane's exact bounds as the hero
+  ("115–165", 96 px, copper gradient), "W LANE", the streak, "In lane 82%", and PUSH / EASE /
+  PEDAL; before a step, the amber chip "▲ UP 135–185 in 3" takes the second row.
+- On the field: the step's new bounds ("135–185 W", 40 px, amber, outlined in ink) beside the
+  riser, the same numbers as the chip.
+- Lilita One, upright (lean 0). Nothing below 34 px.
+- Motion: framework tweens (pop, slam, fade); nothing laid out per frame.
 
 ## 8. Asset standards
 
-- No imported assets: meshes are built in code (`PlaneMesh`, `ArrayMesh` strips, a MultiMesh
-  for posts), all shading in `.gdshader` files under `shaders/` (pre-loaded by
-  `Game.keep_shaders`).
-- **Tablet budget** (Gen 2, PowerVR GX6250, Compatibility, no camera): 3D view at 0.62 scale in
-  a SubViewport, MSAA off; at most 12 draw calls for the world; no engine lights, fog, glow or
-  post passes; additive layers kept thin (rails and beam are strips, not full quads); per-frame
-  GDScript limited to a handful of uniforms (the lane's 64 offsets, the scroll and states).
-- Where art and the budget disagree: the wet-road reflections are fake streaks in the road
-  shader rather than a mirrored pass (about a whole extra scene draw).
+- No imported assets. The field and the lane are canvas shaders on two rects; the chevron is one
+  `SafeMesh` batch, redrawn only when its state changes; catch sparks are one CPUParticles2D.
+- **Tablet budget** (Gen 2, PowerVR GX6250, Compatibility): no SubViewport; about 1.7 screens of
+  fill a frame (the field 1.0, the lane rect 0.67, the chevron's glow small); per frame, three
+  64-float arrays and a dozen uniforms. The field's noise reads: 6 a pixel (fallback: drop the
+  far washes, 2 reads).
 
 ## 9. Reference direction
 
-- **Night motorway photography with long exposures**: take the light streaks and the empty
-  dark around them. Avoid motion-blur trails across the whole frame.
-- **1980s retro-futurist album covers (general synthwave styling)**: take the horizon glow and
-  the sense of a road to a glowing city. Avoid the cliché pink-and-purple grid sun (that's also
-  Cadence's palette).
-- **Highway signage**: take the upright, plain numerals and the amber "change ahead" language.
-- **Racing-game ghost lines in general**: take "the line to follow is drawn on the road". Avoid
-  any specific game's look, colours or UI.
+- **Long-exposure light trails at night:** the warm glow against deep dark. Avoid motion blur
+  across the frame.
+- **Data-visualisation and audio-meter interfaces:** a clean band and a pointer, legible at a
+  glance. Avoid any specific app's look.
+- **Ambient generative art (soft bokeh, grids):** depth from layers. Avoid a neon synthwave
+  grid floor, which is Cadence Karaoke's world.
+
+## Silhouette check (required; rider, 2026-11-02)
+
+Every main shape, viewed as a black silhouette at hub-card size (about 1/4 scale) and at full
+size, for unintended readings:
+
+| Shape | Silhouette | Verdict |
+| --- | --- | --- |
+| The chevron (▶) | a notched arrowhead, four straight edges | reads as a pointer only. **Pass** |
+| The chevron's glow | a soft round disc behind it, no edge, no tail | reads as light. **Pass** |
+| The path behind the chevron | a dashed straight-segmented line, separated from the chevron by a 34 px gap, the same width all along | reads as a dotted path, not a tail. **Pass** |
+| The lane and its step | a horizontal band with a smooth S-step | reads as a band. **Pass** |
+| The amber chevrons in the lane | V or Λ strokes | reads as arrows. **Pass** |
+| Bokeh | soft discs, static or drifting slowly, no trails | reads as out-of-focus light. **Pass** |
+| Catch sparks | small squares in a burst, short-lived | reads as sparks. **Pass** |
+
+**Rule kept from the failure:** a moving marker, cursor or particle never has a round head with
+a wavy or tapering tail. The music-note marker (an oval head with a stem and a glowing trail)
+failed this and is gone; nothing round moves with a trail.
 
 ## AD-ART-BIBLE review (art-director gate)
 
-**APPROVE.** The colour system matches the mood targets (one saturated element, cool world),
-the shape language follows from "open road, one light to follow", and the asset standards fit
-the measured budgets of the existing 3D games (Cadence ~10 world calls). Notes carried into
-production: (1) the rails must stay readable when they bend sharply near the camera: keep their
-screen width from collapsing (a minimum width in the shader); (2) check the lime against the
-amber chevrons on the tablet's panel, which runs warm.
+**APPROVE.** The colour system follows the mood (one warm element in a cool field), the shape
+language follows "one lit lane, one arrow", the silhouette check passes, and the budget is under
+Safe Cracker's measured 2.1 screens of fill. Notes: (1) check the gold lane against the amber
+step marks on the tablet's warm panel; (2) if the beat flare reads as flicker on the bike, halve
+it (`beat` in `wl_lane.gdshader` and `wl_field.gdshader`).

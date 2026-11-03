@@ -18,7 +18,7 @@ const GUIDE_GAP := 110.0
 const MID_Y := 620.0  ## the middle guide
 const MID_SHARE := 0.60  ## the share of FTP at the middle guide
 const PX_PER_FTP := GUIDE_GAP / 0.125
-const TOP_Y := 330.0  ## the cursor stays between these
+const TOP_Y := 372.0  ## the cursor stays between these (clear of the HUD's top bar)
 const BOTTOM_Y := 960.0
 const RECT_Y := 290.0
 const RECT_H := 720.0
@@ -139,7 +139,7 @@ func update_view(delta: float, course: WattLaneCourse, t: float, watts: float, i
 	cursor.position = Vector2(RIDER_X, cursor_y)
 	_cursor_glow.scale = Vector2.ONE * (_glow_base() * (1.0 + 0.15 * beat + 0.6 * flash))
 	_set_state("in" if in_lane else "out")
-	_glow = move_toward(_glow, 1.0 if in_lane else 0.5, delta * 2.5)
+	_glow = move_toward(_glow, 1.0 if in_lane else 0.68, delta * 2.5)
 	_in = move_toward(_in, 1.0 if in_lane else 0.0, delta * 4.0)
 	flash = maxf(flash - delta * 2.5, 0.0)
 	_apply(step_at, up, beat)

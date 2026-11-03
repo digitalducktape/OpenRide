@@ -1057,7 +1057,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | Tug of War | Heave Together | 132 bpm, D minor | Stomp-clap sea shanty: strums, accordion, tin whistle, brass | harmony with the rope tight, lead in a surge |
 | Safe Cracker | Night Shift | 120 bpm swung, C minor | Spy jazz: ride and brushes, walking bass, vibes, muted trumpet, sax, spy guitar | harmony and lead while steady; the bed alone while the alarm rings |
 | Cadence Karaoke | Neon Lines | the cadence (70-130 bpm), A major | Synth-funk: slap bass, Rhodes, plucks, supersaw hook | the tempo is the target cadence; the lead only in the band |
-| Watt Lane | Night Current | 104 bpm, F minor | Synthwave: big backbeat, pulsing synth bass, pad, plucked arp, analog lead, supersaw hook | harmony near the lane, lead only in it |
+| Watt Lane | Live Wire | 112 bpm, Eb major | Dream-pop electronica: glockenspiel hook over flute, eighth-note piano, plucked arp, sleigh bells, octave bass, supersaw chorus with brass stabs | harmony near the lane, lead only in it |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -1807,34 +1807,39 @@ for the floor's reflections alike (`cadence_world_test`).
 
 ## Watt Lane (#78)
 
-A work game (and a low-profile warm-up) on a glowing highway at night: **your power is your
-place across the road**, and a lane of watts drifts and jumps ahead of you. Rules and tuning are
-in `games/watt_lane/DESIGN.md`, the look in `ART_BIBLE.md`. `WattLaneLogic` and `WattLaneCourse`
-hold the rules (`watt_lane_logic_test`), `WattLaneWorld` the 3D view, `WattLaneStatus` the HUD
-widget and `WattLaneAudio` the sounds (`watt_lane_scene_test` covers the scene).
+A work game (and a low-profile warm-up): **a chevron cursor following an illuminated horizontal
+lane.** Your smoothed power is the chevron's height (more watts, higher); the lane comes in from
+the right and steps up or down. 2D and abstract (rider, 2026-11-02: a lane moving sideways on a
+road read as "lean", and a note-head marker failed the silhouette check). Rules and tuning are in
+`games/watt_lane/DESIGN.md`, the look in `ART_BIBLE.md` (with its silhouette check), the polish in
+`GFX_POLISH.md`, `UI_POLISH.md` and `AUDIO_POLISH.md`. `WattLaneLogic` and `WattLaneCourse` hold
+the rules (`watt_lane_logic_test`), `WattLaneTrack` the lane and the chevron, `WattLaneBackdrop`
+the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt_lane_scene_test`).
 
-- **One power number.** The smoothed power (a 3 s window, rounded) is the bike's place on the
-  road, the lane check and the ride panel's W: the game calls `hud.metrics.set_power_source`, so
-  the panel shows that value, and `set_power_band(lo, hi)` with the rules' band turns it gold
-  exactly when the rules say "in" (`RideMetrics.power_color`; a band with a top is amber above
-  it). The lane's bounds are whole watts on a 5 W grid and the hero shows them as they are.
+- **One power number.** The smoothed power (a 3 s window, rounded) is the chevron's height, the
+  lane check and the ride panel's W: the game calls `hud.metrics.set_power_source`, so the panel
+  shows that value, and `set_power_band(lo, hi)` with the rules' band turns it gold exactly when
+  the rules say "in" (`RideMetrics.power_color`; a band with a top is amber above it). The lane's
+  bounds are whole watts on a 5 W grid and the hero shows them as they are.
 - **The lane.** 20% of FTP wide, at least 40 W (easy 25% / 50 W, hard 15% / 30 W); its centre
-  follows a seeded course of slow drifts and jumps of over half a lane, at least 20 s apart, within
-  `lane_min_watts`..`lane_max_watts` (Kotlin: work 40-60 / 45-70 / 50-75% of FTP, warm-up 35-55%).
-- **Jumps** are announced 5 s ahead: a chime, a countdown chip ("▲ UP 175–215 in 5") and amber
-  chevrons on the road; the rails bend ahead along the course (the road maps time ahead to
-  distance at 14 m/s). From 1.5 s before a jump to 3.5 s after, either lane counts.
+  follows a seeded course of slow drifts and steps of over half a lane, at least 20 s apart,
+  within `lane_min_watts`..`lane_max_watts` (Kotlin: work 40-60 / 45-70 / 50-75% of FTP, warm-up
+  35-55%). On screen, a faint guide every 12.5% of FTP; time ahead is distance to the right at
+  150 px a second (about 9 s visible).
+- **Steps** are announced 5 s ahead: a chime, a countdown chip ("▲ UP 175–215 in 5"), and on the
+  lane a riser of light, amber chevrons and the new watts. From 1.5 s before a step to 3.5 s after,
+  either lane counts.
 - **Scoring.** 10 points a second in the lane times a streak (×1 to ×3 over 20 s; it survives
   1 s outside), through `Effort.award`; a warm-up's points count 1.25×. Stars, points a minute:
   250, 1200, 2000 (a perfect 1.0× run earns 1550-1800, 2 stars; 1.3× reaches 3).
-- **Look and cost.** Five draws for the 3D view (sky card, road, rails, a MultiMesh of lamp posts,
-  the bike's nose), every surface unshaded on the shared world look; the lane's 64 offsets are a
-  uniform array. `tests/capture_watt_lane.gd` takes the review shots and `--measure=SEC` prints
-  the view's draw calls; the hub card is the bike and its trail from behind (`showcase()`, called
-  by `tests/capture_hub_cards.gd`).
-- **Music.** "Night Current", synthwave at 104 bpm in F minor (`songs/watt_lane.py`, using
-  `arrange.py`'s `synthwave` groove and `pulse` bass): the harmony near the lane, the lead only in
-  it, and a hum loop that brightens in the lane.
+- **Look and cost.** Full-canvas 2D, no SubViewport: the field (`wl_field.gdshader`: far washes,
+  bokeh, a dot grid, the guides and beat lines, each layer at its own speed, flaring on the music's
+  beat) and the lane (`wl_lane.gdshader`, fed three 64-column arrays a frame: glow, edges, a beam
+  from the chevron while in it, the step's riser and chevrons, the dashed path) are one shader rect
+  each; the chevron is one `SafeMesh` batch. `tests/capture_watt_lane.gd` takes the review shots.
+- **Music.** "Live Wire", dream-pop electronica at 112 bpm in Eb major (`songs/watt_lane.py`): a
+  glockenspiel hook over a flute, eighth-note piano, a plucked arpeggio, a supersaw chorus; the
+  harmony near the lane, the lead only in it, and a hum loop that brightens in the lane.
 
 ## Kart Race (#43)
 
