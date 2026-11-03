@@ -301,8 +301,9 @@ class SessionPlansTest {
             assertEquals(withCamera.segments.map { it.durationSec }, without.segments.map { it.durationSec })
             assertEquals(withCamera.segments.map { it.effort }, without.segments.map { it.effort })
             assertEquals(withCamera.planId, without.planId)
-            // Today Tug of War is the only camera-free work game, so it plays every work slot.
-            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertEquals("tug_of_war", it.gameId) }
+            // Only camera-free work games play the work slots (Tug of War and Balloon Pump today).
+            val free = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id }.toSet()
+            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertTrue(it.gameId in free) }
         }
         // With the camera, Dodge Ball plays its share.
         assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId == "dodge_ball" })
@@ -347,6 +348,7 @@ class SessionPlansTest {
     )
 
     /** Eleven games, as the epic plans them: some only fit the 1:30 work slot, three need the camera. */
+    /** Today's games plus fakes for the wave 2 games not registered yet (eleven or more). */
     private val elevenGames = GameCatalog(
         GameCatalog.DEFAULT.games + listOf(
             poolGame("power_grid", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.WORK),
@@ -355,14 +357,14 @@ class SessionPlansTest {
             poolGame("ready_for_launch", SegmentRole.WORK, minSec = 90),
             poolGame("keepy_uppy", SegmentRole.RECOVERY),
             poolGame("the_pull"),
-        ),
+        ).filter { fake -> GameCatalog.DEFAULT[fake.id] == null },
     )
 
     private val catalogs = listOf(GameCatalog.DEFAULT, elevenGames)
 
     @Test
     fun `the eleven-game fake catalog has eleven games besides the demo`() {
-        assertEquals(11, elevenGames.games.count { it.id != GameCatalog.DEMO.id })
+        assertTrue(elevenGames.games.count { it.id != GameCatalog.DEMO.id } >= 11)
     }
 
     @Test
@@ -409,11 +411,15 @@ class SessionPlansTest {
         for (catalog in catalogs) for (camera in listOf(true, false)) for (seed in 0L until 50L) {
             val plan = SessionPlans.circuit(CircuitPresets.FORTY_FIVE, Difficulty.STANDARD, ftp200, catalog, cameraGames = camera, seed = seed)
             for (role in SegmentRole.entries) {
-                val slots = plan.segments.filter { it.role == role }
                 val played = mutableSetOf<String>()
-                for (slot in slots) {
+                for ((i, slot) in plan.segments.withIndex()) {
+                    if (slot.role != role) continue
                     if (slot.gameId in played) {
-                        val fitting = catalog.circuitPool(role, camera).filter { slot.durationSec in it.minSec..it.maxSec }.map { it.id }
+                        // Not twice running wins: a round may end early on the game that played
+                        // the slot before (a game in two pools).
+                        val before = plan.segments.getOrNull(i - 1)?.gameId
+                        val fitting = catalog.circuitPool(role, camera).filter { slot.durationSec in it.minSec..it.maxSec }
+                            .map { it.id }.filter { it != before }
                         assertTrue("$role repeats ${slot.gameId} before $fitting all played (seed $seed)", played.containsAll(fitting))
                         played.clear()
                     }
@@ -439,8 +445,8 @@ class SessionPlansTest {
     fun `pools come from the catalog's roles and leave out the demo and, without the camera, camera games`() {
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP).map { it.id })
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.COOLDOWN).map { it.id })
-        assertEquals(setOf("dodge_ball", "tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
-        assertEquals(listOf("tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
+        assertEquals(setOf("dodge_ball", "tug_of_war", "balloon_pump"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
+        assertEquals(listOf("tug_of_war", "balloon_pump"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
         assertEquals(setOf("cadence_karaoke", "power_grid", "watt_lane"), elevenGames.circuitPool(SegmentRole.WARMUP).map { it.id }.toSet())
         assertFalse(elevenGames.circuitPool(SegmentRole.WORK, cameraGames = false).any { it.usesCamera })
         assertTrue(SegmentRole.entries.none { role -> elevenGames.circuitPool(role).any { it.id == "the_pull" || it.id == "kart_race" } })

@@ -1,16 +1,16 @@
 extends RefCounted
-## Candy Stripe March: the game's rendered music and effects (#55). Written by
+## Midnight Carousel: the game's rendered music and effects (#55). Written by
 ## games/tools/music/render_music.py from songs/balloon_pump.py; don't edit by hand.
 
-const TITLE := "Candy Stripe March"
+const TITLE := "Midnight Carousel"
 const BPM := 126.0
-const KEY := 5  ## the key's pitch class (0 = C)
+const KEY := 2  ## the key's pitch class (0 = C)
 const LOOP_FROM := 7.6191  ## seconds: the intro plays once, the rest loops
 ## The stems: the bed always plays; harmony and lead are gated by the game.
 const STEM_FILES := {
-	"bed": "res://games/balloon_pump/music/candy_stripe_march_bed.ogg",
-	"harmony": "res://games/balloon_pump/music/candy_stripe_march_harmony.ogg",
-	"lead": "res://games/balloon_pump/music/candy_stripe_march_lead.ogg",
+	"bed": "res://games/balloon_pump/music/midnight_carousel_bed.ogg",
+	"harmony": "res://games/balloon_pump/music/midnight_carousel_harmony.ogg",
+	"lead": "res://games/balloon_pump/music/midnight_carousel_lead.ogg",
 }
 const SOUNDS := {
 	"pump_chuff": "res://games/balloon_pump/music/sfx/pump_chuff.ogg",

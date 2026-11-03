@@ -2094,6 +2094,26 @@ every frame. `capture_kart_hud.gd` prints the same split per viewport on the des
 - the climb crawl floor (2.5 m/s);
 - `SPEED_SCALE` (2.4), which sets how fast the karts feel.
 
+## Balloon Pump (#76)
+
+The bike drives a brass air pump; the rider's watts, smoothed over about 2 s, fill a balloon on
+its nozzle. Each balloon pushes back harder as it fills (a push line from 20% to 45% of FTP in
+work, 15% to 30% in recovery, steepest at the end), so the last part asks for the knob; below the
+line it leaks back slowly. A full balloon ties off and floats into the bunch. **Race** fills
+X balloons (4 / 5 / 7) in 2:00 with a time bonus; **Max** fills as many as it can; circuits play
+Max. Points are 100 × the balloon's air (gold ×3) through `award`, so more work is more points.
+`PumpLogic` holds the rules (`pump_logic_test`); `games/balloon_pump/DESIGN.md` is the design
+record.
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the pump and its balloon in a
+warm key light at the fair after dark, in three places (a fair at dusk with a Ferris wheel,
+backstage in a big top, a pier at night), changing after each Race heat or every 6 balloons in
+Max. `PumpPlaces` and `PumpArt` draw the room and the pump into one `SafeMesh` batch, baked once
+per place; `PumpStage` adds the live layers (the plunger moving with the cadence, the gauge's
+needle and push wedge, the balloon and the bunch shaded per pixel by `pump_balloon.gdshader`,
+twinkling bulbs, confetti). `pump_layout_test` keeps every element inside the stage and clear of
+the HUD at its extremes. **Music:** "Midnight Carousel" (`AUDIO_POLISH.md`).
+
 ## Circuits and the Games hub (#37, #38)
 
 **Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min warm-up, N blocks of
@@ -2116,7 +2136,9 @@ circuit order:
   has played. Then the bag refills, with the game just played at its end. A slot prefers a game
   that fits fewer of the role's lengths, so the long slots use up the games only they can play.
   It never repeats the slot before's game when another fits (Cadence Karaoke's recovery then its
-  cool-down, say).
+  cool-down, say). That wins over the bag's round: when the only game left in a role's bag is the
+  one that played the slot before (a game in two pools, like Balloon Pump's work and recovery),
+  the role's next round starts early, with that game first in it (#76).
 - **A fresh mix every ride (rider decision).** The draw is seeded: same seed, same lineup.
   `GameVisitManager` takes a random seed per visit and draws plan *n* of the visit with
   `seed + n`; `hub_state.circuits` shows the lineup that seed draws, so the hub shows what plays.

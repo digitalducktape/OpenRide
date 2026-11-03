@@ -1,7 +1,9 @@
 # Balloon Pump: design record
 
-> Issue #76 (epic #74). **Status:** the look-and-sound slice, 2026-11-01, awaiting the rider's
-> approval; bike tuning comes after it. Built against `docs/GAMES.md`. **Owner:** whoever changes
+> Issue #76 (epic #74). **Status:** the 2D rework, 2026-11-02 (rider: "2D, like Safe Cracker",
+> and parity with the wave 1 games' visuals and music; `GFX_POLISH.md`, `UI_POLISH.md`,
+> `AUDIO_POLISH.md`). The rules are unchanged from the slice of 2026-11-01. Bike tuning comes
+> after the rider approves. Built against `docs/GAMES.md`. **Owner:** whoever changes
 > the rules. Change this file in the same commit as any change to `PumpLogic`, the tuning or the
 > Kotlin `GameCatalog.BALLOON_PUMP` entry.
 
@@ -14,7 +16,8 @@ Marks used below: **(rider)** the rider decided it; **(issue)** the issue's own 
 
 ## 1. Overview
 
-The bike drives a big brass air pump at a daylight fairground stall. A balloon sits on the pump's
+The bike drives a big brass air pump at the fair after dark (three places: a fair at dusk,
+backstage in a big top, a pier at night; drawn in 2D like Safe Cracker). A balloon sits on the pump's
 nozzle; the rider's watts are the air. Each balloon pushes back harder as it fills, so spinning
 lightly gets most of the way and the last part asks for the knob or a dig. A full balloon ties
 itself off and floats up into a growing bunch over the stall: the bunch is the score you can see.
@@ -165,8 +168,8 @@ made Race worth 40% more than Max for the same legs.
 
 `Effort` (award, multiplier), `InputBus` (power, cadence, sensors_ok), `Session` /
 `SessionDirector` (segment, timer, end modes), `GameOptions` (Mode), `AudioDirector` (rendered
-theme and effects), `WorldLook` and the shared `world_look.gdshaderinc`, `KartMeshKit` (read
-only, for baking meshes), Kotlin `GameCatalog.BALLOON_PUMP` (roles, params).
+theme and effects), `SafeMesh` (Safe Cracker's shape batcher, read only) and its static
+helpers `SafePlaces.rivet`, `SafePlaces.soft_dot` and `SafeDoor.lit_ring`, Kotlin `GameCatalog.BALLOON_PUMP` (roles, params).
 
 ## 7. Tuning knobs
 
@@ -206,16 +209,17 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
   balloon wobbles and hisses; a tie-off pops, twangs, throws confetti and flies to the bunch.
 - **Never colour alone:** every badge is a word, the bar's fill sits left or right of the gold
   tick, balloon kinds differ in size, gold carries a star.
-- **Glance budget:** the widget is the hero at the top; the 3D gauge repeats it in the world.
+- **Glance budget:** the widget is the hero at the top; the pump's gauge repeats it in the world.
   Messages show in the HUD's centre, above the nozzle's balloon.
 
 ## 10. Sound (sound-designer pass)
 
-- **Theme:** "Candy Stripe March" (`songs/balloon_pump.py`), a fairground-organ march, 126 bpm in
-  F major, 68.6 s with a 7.6 s intro; 1.36 MB with the effects. Bed (pop beat, oom-pah root-fifth
+- **Theme:** "Midnight Carousel" (`songs/balloon_pump.py`; the rework is in `AUDIO_POLISH.md`), a
+  swung band-organ carousel, 126 bpm in D minor, 68.6 s with a 7.6 s intro; 1.45 MB with the
+  effects. Bed (pop beat, oom-pah root-fifth
   bass) always; harmony (accordion oom-pah, vibes, organ stabs) at intensity 0.5, while the balloon
-  takes air; lead (pipe organ, glockenspiel an octave up, a flute in the bridge) at 0.85, when the
-  valve is wide open and the balloon over half full. Resting and leaking drop to the bed.
+  takes air; lead (calliope organ, glockenspiel, a flute in the bridge) at 0.85, while the valve is
+  wide open (over the push line). Resting and leaking drop to the bed.
 - **Effects** (all `pump_` names, since AudioDirector's names are global): a chuff on every pedal
   stroke, pitched up as the balloon fills; a rubber squeak every 1.4 s empty to 0.7 s full while
   it takes air; the tie-off's pop and twang at full level with a 0.6 s music dip (the first mix
@@ -227,6 +231,7 @@ All in `PumpLogic` (constants) or the segment's params (Kotlin, scaled by FTP):
 
 ## 11. Gates (2026-11-01, before the slice goes to the rider)
 
+- (These gates were for the 3D slice; the 2D rework's are in §13.)
 - **AD-VISUAL: APPROVE.** The captures match the art bible: candy stripes, brass and noon light,
   the nozzle's balloon at the centre, the bunch rising right of it under the status widget. Fixed
   on the way: the sun was behind the stall (maroon stripes), a roof sign with painted balloons
@@ -258,12 +263,27 @@ Filled in pass by pass (picked / rejected / why).
 | --- | --- | --- | --- | --- |
 | Rules' phases | `state-machine` | an enum FSM in a `RefCounted` (`PumpLogic.Phase`: LOAD, FILL, TIE, BREAK, OVER) stepped by the scene | node-based states | five states with no per-state nodes, animation or input; nodes would make the rules untestable headless |
 | Tests | `godot-testing` | GdUnit4 suites with scripted power (`pump_logic_test`), the repo's framework | GUT | GdUnit4 is vendored and every suite here uses it; a scripted-rider simulation pins the star thresholds |
-| Scene tree | `scene-organization` | one game scene (`BalloonPump`) wiring logic, a `PumpWorld` Node3D in a SubViewport, a `PumpStatus` widget and `PumpAudio`; calls down, events up from the logic's `step` return | separate .tscn per part, or an event bus | each part is used once and owned by the scene; the framework already owns the session's signals |
-| 3D look | `3d-essentials` | every surface `unshaded` and lit by hand on the shared `world_look.gdshaderinc` (pump_look.gdshaderinc), statics baked into vertex-coloured meshes, a sky cubemap drawn once | `StandardMaterial3D` with a `DirectionalLight3D` and shadows | the engine's per-pixel light and fog cost the tablet about a third of its frame (Dodge, Tug); one fixed noon needs no live light |
-| Shaders | `shader-basics` | text spatial shaders sharing one include; the gauge drawn in a quad's UV (needle and wedge as uniforms); the bunch's sway in its vertex shader | a 2D gauge in a SubViewport texture, or swaying the bunch from GDScript | one draw call and no per-frame redraw or GDScript loop |
-| Confetti and hiss | `particles-vfx` | one pooled `CPUParticles3D` one-shot (confetti) and a tiny continuous one (the leak's hiss) | `GPUParticles3D` | Tug's precedent on the GL Compatibility tablet: a few dozen particles, no process-material compile stall |
-| The bunch | `godot-optimization` (via 3d-essentials §8) | one `MultiMesh` of balloon-and-string instances, at most 48 shown | a MeshInstance3D per tied balloon | a long ride ties 60+ balloons; one draw call whatever the count |
+| Scene tree | `scene-organization` | one game scene (`BalloonPump`) wiring logic, a `PumpStage` Node2D (a baked room and live layers), a `PumpStatus` widget and `PumpAudio`; calls down, events up from the logic's `step` return | separate .tscn per part, or an event bus | each part is used once and owned by the scene; the framework already owns the session's signals |
+| 2D look | `2d-essentials` | Safe Cracker's recipe: shapes batched into one `SafeMesh` triangle array per layer, the static room, pump and stand baked once per place into a SubViewport texture shown as one sprite, live layers only for what moves | `Polygon2D`/`Line2D` nodes, `Light2D` | each 2D draw call is a batch in Compatibility; `Light2D` draws every lit item again; the bake pays the room's fill once per place |
+| Shaders | `shader-basics` | four small `canvas_item` shaders: the balloon (a teardrop SDF lit per pixel, one quad, shared by the nozzle, the flyer and the bunch's MultiMesh), the gauge's push wedge (one uniform), the bulbs' twinkle (phase in UV.x), the pier's sea | balloon sprites per kind and size, redrawn gauges | smooth edges at any size, no textures, no redraws |
+| Confetti, hiss, vapour, dust | `particles-vfx` | pooled `CPUParticles2D` one-shots and small continuous emitters | `GPUParticles2D` | Safe Cracker's precedent on the tablet: a few dozen particles, no process-material compile stall |
+| The bunch | `godot-optimization` | one `MultiMeshInstance2D` of balloon quads (colour per instance, gold in custom data), swayed by a rotation tween on its parent | a node per balloon | 40 balloons in one draw call; the sway costs a transform |
+| Layout guard | `godot-testing` | `pump_layout_test`: the key elements' boxes at their extremes against the stage and every HUD panel | eyeballing captures | the rider caught a clipped handle and a sunk wheel; this can't come back silently |
 | HUD widget | `hud-system` | `PumpStatus` in the framework HUD's top-centre slot: a drawn pressure bar (one ShapeBatch), a word badge, count, Race clock and next balloon, updated by setters that touch labels only on a change | a ProgressBar/TextureProgressBar with tweens, or an event-bus score signal | the framework owns the HUD's CanvasLayer and score; the bar needs a push-line tick a ProgressBar can't draw, and per-frame tweens would re-lay out the HUD on the tablet |
 | Intro card | `godot-ui` (via hud-system) | `intro_visual()`: the four balloons drawn with their points | text only | the kinds and their worth are learnt before the first one loads |
 | Audio | `audio-system` | the framework's `AudioDirector` (buses, the 8-voice SFX pool, stems gated by intensity) with a rendered three-stem OGG theme and OGG one-shots from `games/tools/music`; `PumpAudio` decides when each plays | `AudioStreamSynchronized` or players of the game's own | AudioDirector already owns buses, ducking, the rider's-music rule and the crossfade between games; every shipped game uses this pipeline |
-| Desktop hub listing | (framework) | registry and catalog entries now; the desktop hub's home row waits for #75 | adding a sixth card to `LocalHub.ORDER` | the home row fits five game cards (`hub_layout_test` fails with six); #75 reworks the hub for a bigger list |
+| Desktop hub listing | (framework) | in `LocalHub.ORDER`, on #75's paged hub (this branch is rebased onto `games-75-circuit-pool`) | waiting for a merge | #75 pages the home row 4 at a time, so a sixth game fits |
+
+## 13. Gates for the 2D rework (2026-11-02)
+
+- **AD-ART-BIBLE: APPROVE** and the silhouette check: see `ART_BIBLE.md` §6 and §8.
+- **AD-VISUAL: APPROVE** after `GFX_POLISH.md` (the clipped handle, the sunk wheel, the bunch
+  off the edge, bulbs over the pump: all fixed and guarded by `pump_layout_test`).
+- **LP-CODE-REVIEW: APPROVE.** The rules (`PumpLogic`) and their tests are unchanged; the scene
+  talks to its view through the same five calls; no `_process` in the view or the widget; per frame
+  only transforms and a few uniforms change.
+- **QL-TEST-COVERAGE: ADEQUATE.** `pump_logic_test` (23), `pump_stage_test` (12),
+  `pump_layout_test` (5), `pump_status_test` (6), `pump_game_test` (5). Gap: the on-bike feel.
+- **TD-FEASIBILITY: CONCERNS** (viable). Safe Cracker's recipe, which the tablet runs; this scene
+  has one baked full-screen layer (blended over the sea on the pier) and per-pixel balloons (a fifth
+  of the screen at most). Not measured on the tablet in this pass.

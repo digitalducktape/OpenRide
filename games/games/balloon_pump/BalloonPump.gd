@@ -3,8 +3,8 @@ extends Game
 ## as fast as you can; each one pushes back harder as it fills, so the last part asks for the
 ## knob. A full balloon ties itself off and floats up into the bunch over the stall.
 ##
-## Rules: `PumpLogic` (tested headless; DESIGN.md is the design record). View: `PumpWorld` (3D,
-## ART_BIBLE.md). HUD widget: `PumpStatus`. Audio: `PumpAudio` (rendered music and effects). This scene wires them to the framework: declarations, scoring through award(),
+## Rules: `PumpLogic` (tested headless; DESIGN.md is the design record). View: `PumpStage` (2D, drawn
+## in code on the full canvas, Safe Cracker's way; ART_BIBLE.md). HUD widget: `PumpStatus`. Audio: `PumpAudio` (rendered music and effects). This scene wires them to the framework: declarations, scoring through award(),
 ## the Mode option, the result's variant and stats.
 
 ## The look (framework/ui/UI_STYLE.md §4): a daylight fairground stall. Candy pink on deep plum,
@@ -13,21 +13,18 @@ const PumpAudioScript := preload("res://games/balloon_pump/PumpAudio.gd")
 
 static var look := GameTheme.new(Color("ff5fa2"), Color("2b0f2a"), 0.1)
 
-## The 3D view renders into a SubViewport at this share of the window's resolution, drawn scaled
-## up under the HUD (Dodge Ball's and Tug's tablet recipe: the GPU is fill-rate bound at 1080p).
-const RENDER_SCALE := 0.62
+## The place changes after every Race heat, or after this many balloons in Max (ART_BIBLE §6).
+const BALLOONS_PER_PLACE := 6
 ## The gauge's scale ends this far past the biggest balloon's top line.
 const GAUGE_HEADROOM := 1.4
 
 var logic: PumpLogic
-var world: PumpWorld
+var world: PumpStage
 
 var _status: PumpStatus
 var _audio = PumpAudioScript.new()
 
-var _view: SubViewport
-var _shown: MeshInstance2D
-var _view_scale := RENDER_SCALE
+var _place := 0
 var _gauge_max := 100.0
 
 var _mode_name := "max"
@@ -84,12 +81,12 @@ func intro_visual() -> Control:
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.alignment = BoxContainer.ALIGNMENT_END
 		var icon := Control.new()
-		icon.custom_minimum_size = Vector2(80, 80)
+		icon.custom_minimum_size = Vector2(100, 100)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var size: float = PumpMeshes.BALLOON_RADIUS[kind] / PumpMeshes.BALLOON_RADIUS.large
+		var size: float = PumpArt.BALLOON_RADIUS[kind] / PumpArt.BALLOON_RADIUS.large
 		icon.draw.connect(func() -> void:
 			var b := ShapeBatch.new()
-			PumpStatus._balloon(b, Vector2(40, 40), 1.7 * size, PumpMeshes.BALLOON_COLORS[kind], look.ink, kind == "gold")
+			PumpStatus._balloon(b, Vector2(50, 54), 2.1 * size, PumpArt.BALLOON_COLORS[kind], look.ink, kind == "gold")
 			b.draw(icon))
 		col.add_child(icon)
 		var points := PumpLogic.POINTS_PER_AIR * float(PumpLogic.KINDS[kind].air)
@@ -141,22 +138,9 @@ static func _clock(sec: float) -> String:
 
 func _ready() -> void:
 	PumpAudioScript.register()
-	world = PumpWorld.new()
-	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_view.msaa_3d = Viewport.MSAA_DISABLED
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	_shown = MeshInstance2D.new()
-	_shown.name = "View3DImage"
-	_shown.texture = _view.get_texture()
-	_shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(_shown)
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	world = PumpStage.new()
+	world.name = "Stage"
+	add_child(world)
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -173,6 +157,9 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.add_widget(_status)
 	_audio = PumpAudioScript.new()
 	PumpAudioScript.start_music()
+	PumpStage.prebuild()
+	_place = rng.randi_range(0, PumpPlaces.count() - 1)
+	world.set_place(_place)
 	world.set_balloons(logic.kind, logic.next_kind)
 	_update_world(0.0)
 	world.prewarm()
@@ -200,9 +187,13 @@ func _handle(event: Dictionary) -> void:
 		"filled":
 			award(event.points)
 			world.tie_off(event.kind)
+			if logic.mode != "race" and logic.balloons % BALLOONS_PER_PLACE == 0:
+				_next_place()
 			if event.gold:
 				_show_message("Gold! +%d" % roundi(event.points), 1.5, GameTheme.TARGET)
 		"heat_start":
+			if int(event.heat) > 1:
+				_next_place()
 			if logic.mode == "race":
 				_show_message("Fill %d in %s!" % [event.target, _clock(event.sec)], 2.0)
 		"warn_time":
@@ -247,6 +238,12 @@ func pose_for_card() -> void:
 		"large", "medium"], "large", 0.85)
 
 
+## The next place (a heat ends, or every few balloons in Max): never the same twice running.
+func _next_place() -> void:
+	_place = (_place + 1 + rng.randi_range(0, PumpPlaces.count() - 2)) % PumpPlaces.count()
+	world.set_place(_place)
+
+
 func _update_world(delta: float) -> void:
 	var loaded := logic.has_balloon()
 	world.update_view(delta, logic.fill, logic.leaking, logic.open, logic.smoothed / _gauge_max,
@@ -269,21 +266,6 @@ func _update_status() -> void:
 	_status.set_count(logic.balloons)
 	_status.set_race(logic.heat_balloons, logic.race_target if logic.mode == "race" else 0, logic.heat_left)
 	_status.set_next(logic.next_kind)
-
-
-## The 3D view renders at `scale` of the window's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
-## The view over the whole window, past the centred stage (#57), whenever the window changes.
-func _fit_view() -> void:
-	_shown.position = -Stage.pad
-	_shown.mesh = PumpMeshes.view_image(Stage.visible_size)
-	_set_render_scale(_view_scale)
 
 
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:

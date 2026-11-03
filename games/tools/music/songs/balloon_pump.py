@@ -1,8 +1,11 @@
-"""Balloon Pump (#76): "Candy Stripe March", a fairground-organ march at 126 bpm in F major, for a
-balloon stall at noon. A light pop beat, an oom-pah root-fifth bass, an accordion oom-pah and
-vibes as the band organ's chords, a pipe-organ tune with a glockenspiel an octave up in the
-chorus, and a flute in the bridge. The harmony comes in while the balloon takes air, the lead
-once the rider is well over the push line. Written for this repo; no existing tune is quoted.
+"""Balloon Pump (#76; the audio rework of 2026-11-02, AUDIO_POLISH.md): "Midnight Carousel", a
+swung band-organ waltz-march at 126 bpm in D minor, for a balloon pump at the fair after dark. A
+light pop kit with swing, an oom-pah root-fifth bass, an accordion oom-pah, plucked arpeggios and
+vibes as the carousel's works; a calliope (pipe organ) tune with a glockenspiel counter-line in the
+verse; the chorus turns to F major with the organ in harmony over brass stabs and a pad, the
+glockenspiel an octave up; the bridge drops to a flute over held accordion, then builds back.
+Distinct from Tug of War's stomp-clap shanty and Safe Cracker's spy jazz. Written for this repo;
+no existing tune is quoted.
 
 Effects, in the theme's key: the pump's chuff (pitched per stroke by the game), the rubber squeak
 of a filling balloon, the tie-off's pop and twang, the hiss of a leak, a gold chime, the Race's
@@ -18,36 +21,38 @@ from dsp import SR, secs, hp, bp, lp
 PREFIX = "Pump"
 
 SONG = dict(
-    file="candy_stripe_march", title="Candy Stripe March", bpm=126, key="F", scale=[0, 2, 4, 5, 7, 9, 10], seed=76,
-    drums="pop", bass="root5", verb_sec=1.5,
+    file="midnight_carousel", title="Midnight Carousel", bpm=126, key="D", scale=[0, 2, 3, 5, 7, 8, 10], seed=76,
+    drums="pop", bass="root5", swing=0.1, verb_sec=1.8,
     form=([("intro", 4)], [("verse", 8), ("chorus", 8), ("bridge", 8), ("chorus2", 8)]),
     chords=dict(
-        intro=["F", "Bb", "C7", "C7"],
-        verse=["F", "C7", "C7", "F", "Bb", "F", "C7", "F"],
-        chorus=["F", "C7", "Bb", "F", "F", "C7", "Bb C7", "F"],
-        bridge=["Dm", "C", "F", "Bb", "Bb", "F", "Gm", "C7"],
+        intro=["Dm", "Dm", "A7", "A7"],
+        verse=["Dm", "A7", "A7", "Dm", "Gm", "Dm", "A7", "Dm"],
+        chorus=["F", "C", "Dm", "A7", "Bb", "F", "Gm A7", "Dm"],
+        bridge=["Gm", "Dm", "Bb", "A7", "Gm", "Dm", "E7", "A7"],
     ),
     melody=dict(
-        verse="C5:0.5 F5:0.5 A5:0.5 F5:0.5 C6:1 A5:1 | Bb5:0.5 A5:0.5 G5:0.5 F5:0.5 G5:2 |"
-              " C5:0.5 E5:0.5 G5:0.5 E5:0.5 C6:1 Bb5:1 | A5:1.5 G5:0.5 F5:2 |"
-              " D5:0.5 F5:0.5 Bb5:0.5 D6:0.5 C6:1 Bb5:1 | A5:0.5 C6:0.5 F5:0.5 A5:0.5 G5:2 |"
-              " E5:0.5 G5:0.5 C6:0.5 Bb5:0.5 A5:1 G5:1 | F5:3 r:1",
-        chorus="A5:1 A5:0.5 Bb5:0.5 C6:1 A5:1 | G5:1 G5:0.5 A5:0.5 Bb5:2 |"
-               " Bb5:1 Bb5:0.5 C6:0.5 D6:1 Bb5:1 | A5:1 G5:1 F5:2 |"
-               " A5:1 A5:0.5 Bb5:0.5 C6:1 F6:1 | E6:1 D6:0.5 C6:0.5 D6:2 |"
-               " C6:0.5 Bb5:0.5 A5:0.5 G5:0.5 A5:1 E5:1 | F5:2 r:2",
-        bridge="D5:2 F5:2 | E5:2 G5:2 | F5:1 A5:1 C6:2 | Bb5:3 r:1 |"
-               " D6:2 C6:1 Bb5:1 | A5:2 F5:2 | G5:1 A5:1 Bb5:1 G5:1 | C6:2 E5:2",
+        verse="A4:0.5 D5:0.5 F5:0.5 A5:0.5 A5:1 G5:0.5 F5:0.5 | E5:0.5 C#5:0.5 E5:0.5 G5:0.5 A5:2 |"
+              " G5:0.5 E5:0.5 C#5:0.5 E5:0.5 G5:1 F5:0.5 E5:0.5 | F5:1 D5:1 A4:2 |"
+              " Bb4:0.5 D5:0.5 G5:0.5 Bb5:0.5 A5:1 G5:1 | F5:0.5 A5:0.5 D6:0.5 A5:0.5 F5:2 |"
+              " E5:0.5 G5:0.5 Bb5:0.5 A5:0.5 G5:1 E5:1 | D5:3 r:1",
+        chorus="C6:1 A5:0.5 C6:0.5 F6:1 C6:1 | E5:1 G5:0.5 C6:0.5 E6:2 | D6:1 A5:0.5 D6:0.5 F6:1 D6:1 |"
+               " C#6:1 A5:1 E5:2 | D6:1 Bb5:0.5 D6:0.5 F6:1 D6:1 | C6:1 A5:1 F5:2 |"
+               " G5:0.5 Bb5:0.5 D6:0.5 G5:0.5 A5:0.5 C#6:0.5 E6:0.5 A5:0.5 | D6:2 r:2",
+        bridge="G5:2 Bb5:2 | A5:2 F5:2 | D5:1 F5:1 Bb5:2 | A5:3 r:1 | G5:1 A5:1 Bb5:1 D6:1 | A5:2 F5:2 |"
+               " G#5:1 B5:1 D6:1 E6:1 | C#6:2 A5:2",
     ),
     parts=dict(
-        intro=[("comp", "oompah", 0.7), ("comp", "vibes", 0.5)],
-        verse=[("comp", "oompah", 0.8), ("comp", "vibes", 0.5), ("lead", "verse", "organ", "lead", 0, 0.9)],
-        chorus=[("comp", "oompah", 0.85), ("comp", "stabs", 0.45), ("lead", "chorus", "organ", "lead", 0, 0.9),
-                ("lead", "chorus", "bells", "lead2", 12, 0.5)],
-        bridge=[("comp", "acc_hold", 0.6), ("comp", "vibes", 0.6), ("lead", "bridge", "flute", "lead", 0, 0.8)],
-        chorus2=[("comp", "oompah", 0.85), ("comp", "stabs", 0.5), ("lead", "chorus", "organ", "lead", 0, 0.9, True),
-                 ("lead", "chorus", "whistle", "lead2", 12, 0.4)],
+        intro=[("comp", "arp", 0.6), ("comp", "vibes", 0.5)],
+        verse=[("comp", "oompah", 0.8), ("comp", "arp", 0.45), ("lead", "verse", "organ", "lead", 0, 0.9),
+               ("counter", "bells", "lead2", 0.35)],
+        chorus=[("comp", "oompah", 0.85), ("comp", "stabs", 0.45), ("comp", "pad", 0.35),
+                ("lead", "chorus", "organ", "lead", 0, 0.95, True), ("lead", "chorus", "bells", "lead2", 12, 0.45)],
+        bridge=[("comp", "acc_hold", 0.6), ("comp", "vibes", 0.6), ("comp", "pad", 0.45),
+                ("lead", "bridge", "flute", "lead", 0, 0.85), ("counter", "pluck", "lead2", 0.4)],
+        chorus2=[("comp", "oompah", 0.9), ("comp", "stabs", 0.5), ("comp", "arp", 0.4),
+                 ("lead", "chorus", "organ", "lead", 0, 0.95, True), ("lead", "chorus", "whistle", "lead2", 12, 0.4)],
     ),
+    levels={"cym": -30, "perc": -30, "lead2": -24},
 )
 
 BEAT = 60 / 126
@@ -80,8 +85,8 @@ def tie_pop(rng):
     t = _t(0.12)
     pop = hp(rng.uniform(-1, 1, len(t)), 700) * np.exp(-t / 0.008)
     body = np.sin(2 * np.pi * np.cumsum(220 + 400 * np.exp(-t / 0.01)) / SR) * np.exp(-t / 0.03)
-    twang = ins.twang(note("C5"), 0.35, 0.7, rng)
-    up = ins.pluck(note("F5"), 0.25, 0.6, rng)
+    twang = ins.twang(note("D5"), 0.35, 0.7, rng)
+    up = ins.pluck(note("A5"), 0.25, 0.6, rng)
     return fx.mix((0, pop * 0.9 + body * 0.7), (0.05, twang), (0.13, up))
 
 
@@ -93,27 +98,27 @@ def leak_hiss(rng):
 
 
 def gold_chime(rng):
-    # A gold balloon tied: glockenspiel up the F major arpeggio.
-    return fx.arp([note("F6"), note("A6"), note("C7"), note("F7")], 0.07, "bells", 0.5, 0.9, rng)
+    # A gold balloon tied: glockenspiel up the D major arpeggio (the minor key lifts).
+    return fx.arp([note("D6"), note("F#6"), note("A6"), note("D7")], 0.07, "bells", 0.5, 0.9, rng)
 
 
 def heat_start(rng):
     # A Race heat starts: the band organ's call, two short and a long.
-    return fx.fanfare([(0, 0.5, note("C5")), (0.5, 0.5, note("C5")), (1, 1.5, note("F5"))], BEAT, "organ", rng)
+    return fx.fanfare([(0, 0.5, note("A4")), (0.5, 0.5, note("A4")), (1, 1.5, note("D5"))], BEAT, "organ", rng)
 
 
 def race_won(rng):
-    # A heat won: the organ runs up to the top F, the glockenspiel doubling, with a cymbal.
-    notes = [(0, 0.5, note("F5")), (0.5, 0.5, note("A5")), (1, 0.5, note("C6")), (1.5, 2.5, note("F6"))]
+    # A heat won: the organ runs up to D major (a lift out of the minor), the glockenspiel doubling.
+    notes = [(0, 0.5, note("D5")), (0.5, 0.5, note("F#5")), (1, 0.5, note("A5")), (1.5, 2.5, note("D6"))]
     top = fx.fanfare(notes, BEAT, "organ", rng)
     bells = fx.fanfare(notes, BEAT, "bells", rng, vel=0.5)
-    under = fx.fanfare([(1.5, 2.5, note("A5")), (1.5, 2.5, note("C5"))], BEAT, "organ", rng, vel=0.6)
+    under = fx.fanfare([(1.5, 2.5, note("F#5")), (1.5, 2.5, note("A4"))], BEAT, "organ", rng, vel=0.6)
     return fx.mix((0, top), (0, bells), (0, under), (1.5 * BEAT, ins.crash(0.6, rng)))
 
 
 def race_lost(rng):
     # Time's up: a deflating slide down on the organ, wah-wah.
-    notes = [(0, 0.75, note("C5")), (0.75, 0.75, note("B4")), (1.5, 0.75, note("Bb4")), (2.25, 2.0, note("A4"))]
+    notes = [(0, 0.75, note("A4")), (0.75, 0.75, note("G#4")), (1.5, 0.75, note("G4")), (2.25, 2.0, note("F4"))]
     return fx.fanfare(notes, BEAT, "organ", rng)
 
 

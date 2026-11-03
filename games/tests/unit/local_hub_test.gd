@@ -53,7 +53,7 @@ func test_a_visit_starts_with_a_full_hub_state() -> void:
 	assert_str(s.phase).is_equal("hub")
 	assert_str(s.visit_id).is_equal(Session.visit_id)
 	var ids: Array = s.catalog.map(func(g): return g.id)
-	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"])
+	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "balloon_pump"])
 	var kart: Dictionary = s.catalog[0]
 	assert_array(kart.minute_steps).is_equal([5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0])
 	assert_str(kart.circuit_role).is_equal("free")
@@ -145,6 +145,7 @@ func test_circuits_draw_from_role_pools_like_kotlin() -> void:
 				for e in entries:
 					by_id[e.id] = e
 				var played := {}  # role → ids this pass
+				var before := ""
 				for slot in slots:
 					var e: Dictionary = by_id[slot.game_id]
 					assert_bool(slot.role in e.roles).is_true()
@@ -152,12 +153,14 @@ func test_circuits_draw_from_role_pools_like_kotlin() -> void:
 					assert_bool(camera or not e.uses_camera).is_true()
 					var seen: Dictionary = played.get_or_add(slot.role, {})
 					if seen.has(slot.game_id):
-						# A repeat only once every game that fits the slot has played this pass.
+						# A repeat only once every game that fits the slot has played this pass, but
+						# for the one that played the slot before (not twice running wins).
 						for f in LocalHub.circuit_pool(entries, slot.role, camera):
-							if int(slot.duration_sec) >= int(f.min_sec):
+							if int(slot.duration_sec) >= int(f.min_sec) and f.id != before:
 								assert_bool(seen.has(f.id)).override_failure_message("%s repeats before %s" % [slot.game_id, f.id]).is_true()
 						seen.clear()
 					seen[slot.game_id] = true
+					before = slot.game_id
 				# 12 work and 12 recovery slots cover those pools.
 				for role in ["work", "recovery"]:
 					var ids := {}

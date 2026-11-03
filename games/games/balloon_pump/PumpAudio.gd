@@ -6,14 +6,14 @@ extends RefCounted
 ## key): pump_chuff (one a pedal stroke, pitched up as the balloon fills), pump_squeak (the rubber
 ## stretching, every so often while it takes air), pump_tie (the pop and twang of a tie-off),
 ## pump_hiss (a leak), pump_gold, pump_heat_start, pump_won, pump_lost and pump_tick (a Race's last
-## seconds). The music is "Candy Stripe March" (PumpMusic): the bed always, the harmony while the
+## seconds). The music is "Midnight Carousel" (PumpMusic): the bed always, the harmony while the
 ## balloon takes air, the lead once the rider is well over the push line.
 ## Bus effects for this game only: a small open-air reverb and a glue compressor on the music.
 
 const PumpMusic := preload("res://games/balloon_pump/PumpMusic.gd")
 
 const MUSIC_STYLE := {
-	"name": "candy_stripe_march",
+	"name": "midnight_carousel",
 	"stem_files": PumpMusic.STEM_FILES,
 	"loop_from": PumpMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
@@ -50,7 +50,8 @@ static func start_music() -> void:
 
 
 ## The music's intensity for the moment: the bed alone while resting or leaking, the harmony
-## while the balloon takes air, the lead when the valve is wide open and the balloon nearly full.
+## while the balloon takes air, the lead while the valve is wide open (the rider is over the push
+## line: the tune is the reward, as Safe Cracker's plays while the rider is steady).
 static func intensity(logic: PumpLogic) -> float:
 	if logic.phase == PumpLogic.Phase.BREAK or logic.phase == PumpLogic.Phase.OVER:
 		return 0.3
@@ -58,7 +59,7 @@ static func intensity(logic: PumpLogic) -> float:
 		return 0.7
 	if logic.leaking or logic.open < 0.3:
 		return 0.3
-	return 1.0 if logic.fill > 0.55 and logic.open > 0.95 else 0.7
+	return 1.0 if logic.open > 0.9 else 0.7
 
 
 ## Every gameplay frame: the pump's chuffs, the squeaks, the hiss and the last-seconds ticks.
@@ -67,12 +68,12 @@ func step(delta: float, logic: PumpLogic, cadence: float) -> void:
 	if _stroke >= 1.0:
 		_stroke = fmod(_stroke, 1.0)
 		if cadence > 20.0:
-			AudioDirector.play_sfx("pump_chuff", -9.0 + 4.0 * logic.open, 0.9 + 0.3 * logic.fill)
+			AudioDirector.play_sfx("pump_chuff", -11.0 + 4.0 * logic.open, 0.9 + 0.3 * logic.fill)
 	if logic.phase == PumpLogic.Phase.FILL and logic.open > 0.5:
 		_squeak_left -= delta
 		if _squeak_left <= 0.0:
 			_squeak_left = lerpf(SQUEAK_GAP.y, SQUEAK_GAP.x, logic.fill)
-			AudioDirector.play_sfx("pump_squeak", -12.0 + 6.0 * logic.fill, 0.85 + 0.5 * logic.fill)
+			AudioDirector.play_sfx("pump_squeak", -14.0 + 6.0 * logic.fill, 0.85 + 0.5 * logic.fill)
 	if logic.phase == PumpLogic.Phase.FILL and logic.leaking and logic.fill > 0.05:
 		_hiss_left -= delta
 		if _hiss_left <= 0.0:
@@ -91,7 +92,7 @@ func on_event(event: Dictionary) -> void:
 		"filled":
 			# The tie-off is the game's payoff: full level, the music dipped under it (the first mix
 			# check had it only 3.5 dB over the music in its best band).
-			AudioDirector.play_sfx("pump_tie", 0.0, 1.12 if event.kind == "small" else (0.9 if event.kind == "large" else 1.0))
+			AudioDirector.play_sfx("pump_tie", -1.0, 1.12 if event.kind == "small" else (0.9 if event.kind == "large" else 1.0))
 			GameMix.duck_for_moment(0.6)
 			if event.gold:
 				AudioDirector.play_sfx("pump_gold", -1.0)
@@ -102,9 +103,9 @@ func on_event(event: Dictionary) -> void:
 				GameMix.duck_for_moment(1.5)
 		"heat_end":
 			if event.won == false:
-				AudioDirector.play_sfx("pump_lost", -2.0)
+				AudioDirector.play_sfx("pump_lost", -4.0)
 			else:
-				AudioDirector.play_sfx("pump_won", -2.0)
+				AudioDirector.play_sfx("pump_won", -4.0)
 			GameMix.duck_for_sting(2.0)
 
 

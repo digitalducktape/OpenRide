@@ -299,7 +299,9 @@ object CircuitPresets {
  * - A slot prefers a game that fits fewer of the role's slot lengths (Ready for Launch, 90 s,
  *   takes a 1:30 work slot before a game that also fits 1:00), so long slots use up the games
  *   only they can play, and the short slots don't run out first.
- * - Never the game of the slot before, when another fits.
+ * - Never the game of the slot before, when another fits. This wins over the bag's round: when the
+ *   only game left in a role's bag played the slot before (a game in two pools, like Balloon
+ *   Pump's work and recovery), the role's next round starts early, that game first in it.
  * - A slot no pool game fits returns null: [SessionPlans.circuit] plays its stand-in.
  */
 class CircuitDraw(
@@ -329,7 +331,21 @@ class CircuitDraw(
         val lengths = roleLengths[role].orEmpty()
         val candidates = bag.filter { fits(it, durationSec) }
             .sortedBy { game -> lengths.count { fits(game, it) } } // stable: the bag's order breaks ties
-        val pick = candidates.firstOrNull { it.id != previous } ?: candidates.first()
+        var pick = candidates.firstOrNull { it.id != previous }
+        if (pick == null && pool.any { fits(it, durationSec) && it.id != previous }) {
+            // A game in two roles' pools (Balloon Pump: work and recovery) can be the only one left
+            // in this bag right after it played the slot before. Not twice running wins over the
+            // bag's round: start the next round now, that game first in it, so it plays the next
+            // slot it can rather than being skipped again.
+            bag.clear()
+            bag += pool.shuffled(random)
+            bag.firstOrNull { it.id == previous }?.let { bag.remove(it); bag.add(0, it) }
+            pick = bag.filter { fits(it, durationSec) }.sortedBy { game -> lengths.count { fits(game, it) } }
+                .firstOrNull { it.id != previous }
+        }
+        if (pick == null) {
+            pick = candidates.first()
+        }
         bag.remove(pick)
         lastOfRole[role] = pick.id
         previous = pick.id

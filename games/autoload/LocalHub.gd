@@ -23,7 +23,7 @@ const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75, "ba
 const USES_CAMERA := {"tug_of_war": false}
 ## The display order of the first games (GameCatalog's, without the demo); every other
 ## registered game follows, by id (`order()`).
-const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"]
+const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "balloon_pump"]
 ## CircuitPresets: warm-up, N blocks, cool-down. Shapes only: each slot's game is drawn from its
 ## role's pool (`draw_slots`, as Kotlin's CircuitDraw).
 const WARMUP := {"role": "warmup", "duration_sec": 180}
@@ -225,12 +225,18 @@ static func draw_slots(shape: Array, entries: Array, camera: bool, seed_value: i
 						bag.append(bag.pop_at(i))
 						break
 			var role_lengths: Array = (lengths[role] as Dictionary).keys()
-			# [reach, bag index, entry]: sorting by reach, the bag's order breaks ties.
-			var ranked: Array = []
-			for i in bag.size():
-				if _fits(bag[i], sec):
-					ranked.append([role_lengths.filter(func(l): return _fits(bag[i], l)).size(), i, bag[i]])
-			ranked.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+			var ranked := _ranked(bag, sec, role_lengths)
+			# Not twice running wins over the bag's round (SessionPlans' CircuitDraw): when the only
+			# game left is the one that played the slot before (a game in two pools), the role's
+			# next round starts early, that game first in it.
+			if ranked.all(func(r): return r[2].id == previous) and pool.any(func(e): return _fits(e, sec) and e.id != previous):
+				bag.clear()
+				bag.append_array(_shuffled(pool, rng))
+				for i in bag.size():
+					if bag[i].id == previous:
+						bag.push_front(bag.pop_at(i))
+						break
+				ranked = _ranked(bag, sec, role_lengths)
 			var pick: Dictionary = ranked[0][2]
 			for r in ranked:
 				if r[2].id != previous:
@@ -242,6 +248,17 @@ static func draw_slots(shape: Array, entries: Array, camera: bool, seed_value: i
 		out.append({"game_id": picked, "role": role, "duration_sec": sec})
 		previous = picked if picked != "demo" else ""
 	return out
+
+
+## The bag's games that fit `sec`, as [reach, bag index, entry], sorted by reach (how many of the
+## role's lengths the game fits), the bag's order breaking ties.
+static func _ranked(bag: Array, sec: int, role_lengths: Array) -> Array:
+	var ranked: Array = []
+	for i in bag.size():
+		if _fits(bag[i], sec):
+			ranked.append([role_lengths.filter(func(l): return _fits(bag[i], l)).size(), i, bag[i]])
+	ranked.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return ranked
 
 
 static func _shuffled(items: Array, rng: RandomNumberGenerator) -> Array:

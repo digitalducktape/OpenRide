@@ -23,7 +23,7 @@ const BAR_SIZE := Vector2(400, 40)
 const SIDE_WIDTH := 150.0
 const BADGE_WIDTH := 180.0
 const ICON := Vector2(44, 44)
-const BALLOON_COLORS := PumpMeshes.BALLOON_COLORS
+const BALLOON_COLORS := PumpArt.BALLOON_COLORS
 
 var look: GameTheme
 
@@ -296,7 +296,7 @@ static func _balloon(b: ShapeBatch, c: Vector2, scale: float, color: Color, ink:
 
 func _draw_count_icon() -> void:
 	var b := ShapeBatch.new()
-	_balloon(b, ICON * 0.5, 1.0, PumpMeshes.BALLOON_COLORS.medium, look.ink)
+	_balloon(b, ICON * 0.5, 1.0, PumpArt.BALLOON_COLORS.medium, look.ink)
 	b.draw(count_icon)
 
 
@@ -304,6 +304,6 @@ func _draw_next_icon() -> void:
 	if _next == "":
 		return
 	var b := ShapeBatch.new()
-	var r: float = PumpMeshes.BALLOON_RADIUS[_next] / PumpMeshes.BALLOON_RADIUS.large
+	var r: float = PumpArt.BALLOON_RADIUS[_next] / PumpArt.BALLOON_RADIUS.large
 	_balloon(b, ICON * 0.5, lerpf(0.7, 1.0, r), BALLOON_COLORS[_next], look.ink, _next == "gold")
 	b.draw(next_icon)

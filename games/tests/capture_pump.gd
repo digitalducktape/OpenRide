@@ -3,7 +3,7 @@ extends SceneTree
 ##   $GODOT_BIN --path games --resolution 1920x1008 -s res://tests/capture_pump.gd -- --out=DIR
 ## Plays a local Race Just Ride (5 balloons in 2:00) with a scripted rider who spins lightly,
 ## stalls under the push line, then turns the knob up to finish each balloon, and saves full-size
-## PNGs: the intro card, filling, pushing under the line, a tie-off on its way to the bunch, a gold
+## PNGs (with --places, instead every place posed, the HUD hidden): the intro card, filling, pushing under the line, a tie-off on its way to the bunch, a gold
 ## balloon, the Race won, and the summary. With --play=SECONDS it only rides (for Movie Maker:
 ## add --write-movie FILE.avi --fixed-fps 30), and stops.
 
@@ -20,11 +20,14 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var play_sec := 0.0
+	var places := false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			_out = arg.get_slice("=", 1)
 		elif arg.begins_with("--play="):
 			play_sec = float(arg.get_slice("=", 1))
+		elif arg == "--places":
+			places = true
 	DirAccess.make_dir_recursive_absolute(_out)
 	_session = root.get_node("Session")
 	_director = _session.director
@@ -44,6 +47,17 @@ func _run() -> void:
 		quit(1)
 		return
 	var game: Node = _director.game
+	if places:
+		# Every place, posed with a bunch up and a big balloon nearly full (--places).
+		_director.hud.visible = false
+		game.set_paused(true)  # hold the pose: no frames move the balloon
+		game.pose_for_card()
+		for i in PumpPlaces.count():
+			game.world.set_place(i)
+			await create_timer(0.8).timeout
+			_shot("place_%s" % PumpPlaces.place(i).id)
+		quit()
+		return
 	if play_sec > 0.0:
 		await _ride(game, play_sec, false)
 		quit()
