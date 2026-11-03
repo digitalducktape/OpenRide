@@ -113,7 +113,7 @@ static func build_scene(m: SafeMesh, index: int) -> void:
 		m.circle(sun, 62.0, sc)
 	_high_clouds(m, p, rng)
 	# The land under everything, so no ridge's dip ever shows the clear colour.
-	m.rect_v(Rect2(x0, HORIZON_Y - 40, x1 - x0, SIZE.y - HORIZON_Y + 40), p.mid, p.near2)
+	m.rect_v(Rect2(x0, HORIZON_Y - 40, x1 - x0, SIZE.y - HORIZON_Y + 40), (p.far as Color).lerp(p.near, 0.6), p.near2)
 	match p.id:
 		"meadow":
 			_meadow(m, p, rng)
@@ -123,8 +123,13 @@ static func build_scene(m: SafeMesh, index: int) -> void:
 			_rooftop(m, p, rng)
 		"park":
 			_park(m, p, rng)
-	# Light falling on the ground round the fan, toward the sun.
-	m.glow(FAN_AT + Vector2(0, 40), Vector2(520, 120), Color(sc, 0.12), 10)
+	# Mown stripes on the grass, in perspective toward the fan (GFX_POLISH item 4).
+	if p.id != "rooftop":
+		_stripes(m, HORIZON_Y + 170.0, Color((p.near as Color).lightened(0.25), 0.07))
+	# Light falling on the ground round the fan, toward the sun (item 2).
+	m.glow(FAN_AT + Vector2(((p.sun as Vector2).x - FAN_AT.x) * 0.15, 40), Vector2(640, 150), Color(sc, 0.2), 12)
+	# Haze along the horizon, so the far land sits back (item 3).
+	m.glow(Vector2(960, HORIZON_Y - 10), Vector2(1400, 70), Color(p.haze, 0.25), 8)
 
 
 ## Thin, wind-combed streaks of high cloud.
@@ -185,6 +190,18 @@ static func _flowers(m: SafeMesh, rng: RandomNumberGenerator, from_y: float, col
 		var r := lerpf(3.0, 7.0, (at.y - from_y) / (SIZE.y - from_y))
 		m.circle(at, r, c)
 		m.circle(at, r * 0.4, Color(1.0, 0.9, 0.4))
+
+
+## Alternate lighter stripes from `from_y` to the bottom edge, converging on a point above the
+## horizon (one-point perspective, as Safe Cracker's floors converge on the safe).
+static func _stripes(m: SafeMesh, from_y: float, col: Color) -> void:
+	var vp := Vector2(960, HORIZON_Y - 260)
+	var w := 260.0
+	for k in range(-9, 9):
+		var b0 := Vector2(960 + k * w, SIZE.y)
+		var b1 := Vector2(960 + (k + 0.5) * w, SIZE.y)
+		var t := (from_y - vp.y) / (SIZE.y - vp.y)
+		m.quad4(vp.lerp(b0, t), vp.lerp(b1, t), b1, b0, Color(col, 0.0), Color(col, 0.0), col, col)
 
 
 static func _ground(m: SafeMesh, p: Dictionary, from_y: float) -> void:

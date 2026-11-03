@@ -24,6 +24,7 @@ var crate: Node2D
 var blades: Node2D
 var blade_spin: Node2D
 var grille: Node2D
+var shadow: Node2D
 var column: ColorRect
 var pole: Node2D
 var streamers: Node2D
@@ -63,6 +64,12 @@ func _init() -> void:
 	fan.add_child(blades)
 	blade_spin = _layer("Blades", _paint_blades, blades)
 	grille = _layer("Grille", _paint_grille, fan)
+	# The balloon's shadow on the grille: darker and tighter the lower it flies.
+	shadow = _layer("BalloonShadow", func(ci: CanvasItem) -> void:
+		var m := SafeMesh.new()
+		m.glow(Vector2.ZERO, Vector2(110, 26), Color(0, 0, 0, 0.55), 8)
+		m.flush(ci), fan)
+	shadow.position = Vector2(0, KeepyPlaces.FAN_AT.y - 4.0)
 	belt = Line2D.new()
 	belt.name = "Belt"
 	belt.width = 16.0
@@ -99,6 +106,17 @@ func update(delta: float, fan_x_m: float, power_share: float, strength: float, c
 	sm.set_shader_parameter("gust", gust)
 	sm.set_shader_parameter("wind", wind)
 	_place_belt()
+
+
+## The balloon's shadow on the grille for its height `h` (0-1, -1 when there is no balloon)
+## and its offset from the fan's centre in px.
+func set_shadow(h: float, dx: float) -> void:
+	shadow.visible = h >= 0.0 and h < 0.6
+	if shadow.visible:
+		var k := 1.0 - h / 0.6
+		shadow.modulate.a = k
+		shadow.scale = Vector2.ONE * lerpf(1.4, 0.8, k)
+		shadow.position.x = clampf(dx, -KeepyPlaces.GRILLE.x, KeepyPlaces.GRILLE.x)
 
 
 ## The belt from the drive pulley down off the bottom edge, toward the bike (centre, below).
@@ -164,6 +182,16 @@ func _paint_crate(ci: CanvasItem) -> void:
 			var x0 := pr.position.x + rng.randf_range(0.0, 120.0)
 			m.line(Vector2(x0, y), Vector2(x0 + rng.randf_range(80.0, 200.0), y + rng.randf_range(-1.5, 1.5)), 1.6, Color(PLANK_DARK, 0.35))
 		m.rect(Rect2(pr.position.x, pr.end.y, pr.size.x, 3.0), Color(0.25, 0.17, 0.1, 0.7))
+	# Cross braces on the front (a shipping crate's X, behind the brackets), a plinth board at the
+	# foot and a light bevel along the top edge: weight, as GFX_POLISH item 1 asks.
+	var brace := PLANK_DARK.lightened(0.08)
+	for d in [[Vector2(r.position.x + 30, r.position.y + 10), Vector2(r.end.x - 30, r.end.y - 10)],
+			[Vector2(r.end.x - 30, r.position.y + 10), Vector2(r.position.x + 30, r.end.y - 10)]]:
+		m.line(d[0] + Vector2(2, 4), d[1] + Vector2(2, 4), 18.0, Color(0.2, 0.13, 0.07, 0.35))
+		m.line(d[0], d[1], 16.0, brace)
+		m.line(d[0] + Vector2(0, -5), d[1] + Vector2(0, -5), 2.5, brace.lightened(0.25))
+	m.rect_v(Rect2(r.position.x - 6, r.end.y - 16, r.size.x + 12, 18), PLANK_DARK, PLANK_DARK.darkened(0.35))
+	m.rect(Rect2(r.position.x, r.position.y, r.size.x, 4), PLANK.lightened(0.3))
 	# The top face: a lighter board frame round the grille, in perspective.
 	var back := gy - TOP_DEPTH
 	var front := gy + TOP_DEPTH

@@ -246,8 +246,8 @@ static func vignette() -> TextureRect:
 	var ink := Color(0.04, 0.07, 0.12)
 	var g := Gradient.new()
 	g.set_color(0, Color(ink, 0.0))
-	g.set_color(1, Color(ink, 0.42))
-	for k in [[0.55, 0.0], [0.7, 0.05], [0.84, 0.16]]:
+	g.set_color(1, Color(ink, 0.55))
+	for k in [[0.5, 0.0], [0.66, 0.06], [0.82, 0.2]]:
 		g.add_point(k[0], Color(ink, k[1]))
 	var tex := GradientTexture2D.new()
 	tex.gradient = g

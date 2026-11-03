@@ -48,9 +48,9 @@ var weather: KeepyWeather
 var foreground: Node2D
 
 var _status: KeepyStatus
+var banner: KeepyBanner
 var _hum: AudioStreamPlayer
 var _rain: AudioStreamPlayer
-var _message_left := 0.0
 var _squeak_left := 0.0
 var _rain_level := 0.0
 var _rounds := 0
@@ -150,6 +150,9 @@ func _ready() -> void:
 	add_child(foreground)
 	add_child(weather.front)
 	add_child(weather)  # its own node (it drives the two layers above)
+	banner = KeepyBanner.new(look)
+	banner.name = "Banner"
+	add_child(banner)
 	_hum = KeepyAudioScript.loop_player("keepy_fan_hum")
 	add_child(_hum)
 	_rain = KeepyAudioScript.loop_player("keepy_rain")
@@ -233,10 +236,6 @@ func _on_frame(delta: float) -> void:
 	_draw_state(delta)
 	_update_status()
 	_update_sound(delta)
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	if option("place") == "random":
 		_place_left -= delta
 		if _place_left <= 0.0 and logic.balloon == KeepyLogic.Balloon.FLYING and logic.weather == KeepyLogic.Weather.CALM:
@@ -273,8 +272,10 @@ func _draw_state(delta: float) -> void:
 			_balloon_at = at
 			var tilt := sin(_t * 1.3) * 4.0 + clampf((logic.x - logic.fan_x) * 12.0, -16.0, 16.0)
 			balloon.show_at(at, clampf(logic.rate, -0.3, 0.3), tilt, logic.birds)
+			rig.set_shadow(logic.h, at.x - rig.fan.position.x)
 		KeepyLogic.Balloon.POPPED:
 			balloon.hide_balloon()
+			rig.set_shadow(-1.0, 0.0)
 		KeepyLogic.Balloon.ARRIVING:
 			var p := clampf(1.0 - logic.state_left / KeepyLogic.ARRIVE_SEC, 0.0, 1.0)
 			var e := ease(p, -2.0)
@@ -282,6 +283,7 @@ func _draw_state(delta: float) -> void:
 			var to := KeepyPlaces.balloon_at(KeepyLogic.START_HEIGHT, logic.fan_x)
 			_balloon_at = from.lerp(to, e) + Vector2(0.0, -sin(p * PI) * 80.0)
 			balloon.show_at(_balloon_at, 0.0, (1.0 - e) * 20.0, 0)
+			rig.set_shadow(-1.0, 0.0)
 	weather.update(delta, logic, _balloon_at)
 
 
@@ -381,9 +383,10 @@ func finish() -> Dictionary:
 	return super.finish()
 
 
+## A callout in the banner's lane, left of the column (never the HUD's centre message, which
+## would sit on the balloon).
 func _show_message(text: String, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = MESSAGE_SEC
+	banner.show_callout(text, color, MESSAGE_SEC)
 
 
 ## Grass tufts along the bottom edge, in front of the fan's feet, swaying (UV.x = sway weight).

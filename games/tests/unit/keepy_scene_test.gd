@@ -175,6 +175,24 @@ func test_the_fan_and_the_pole_stay_in_frame_and_clear_of_the_hud() -> void:
 	assert_float(KeepyPlaces.band_y(KeepyLogic.MID_FROM)).is_greater(KeepyPlaces.band_y(KeepyLogic.HIGH_FROM))
 
 
+func test_callouts_sit_in_their_lane_clear_of_the_balloon_and_the_hud() -> void:
+	await _settle()
+	game._handle({"type": "pop", "points": 50.0})
+	game._show_message("Downdraft! Push!", GameTheme.BAD)
+	await _settle()
+	assert_bool(game.banner.is_showing()).is_true()
+	var lane: Rect2 = game.banner.lane_rect()
+	var text: Rect2 = game.banner.label.get_global_rect()
+	assert_bool(lane.encloses(text)).override_failure_message("callout %s leaves its lane %s" % [text, lane]).is_true()
+	for p in _hud_rects():
+		assert_bool(lane.intersects(p)).override_failure_message("lane %s under %s" % [lane, p]).is_false()
+	# The balloon's widest drift never reaches the lane.
+	var balloon_left := KeepyPlaces.balloon_at(0.5, -KeepyLogic.X_LIMIT).x - KeepyPlaces.BALLOON_R.x - 10.0
+	assert_float(lane.end.x).is_less(balloon_left)
+	# Nothing goes to the HUD's centre message, which would cover the balloon.
+	assert_bool(game.hud.is_showing_message()).is_false()
+
+
 func test_the_whole_scene_redraws_nothing_while_playing() -> void:
 	# The backdrop is baked once per place: frames only move nodes and set uniforms.
 	var bakes: int = game.backdrop.bakes
