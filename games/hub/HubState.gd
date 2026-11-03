@@ -41,7 +41,11 @@ static func normalized(raw: Dictionary) -> Dictionary:
 
 ## Games to show: the catalog (Kotlin decides what's playable) intersected with GameRegistry.
 static func games(state: Dictionary) -> Array:
-	return state.catalog.filter(func(e): return GameRegistry.has(str(e.id)))
+	return state.catalog.filter(func(e): return GameRegistry.has(str(e.id)) or str(e.id) in test_ids)
+
+
+## Ids shown as if registered: lets hub tests lay out a bigger catalog (#75's 11 games).
+static var test_ids: Array = []
 
 
 static func entry(state: Dictionary, game_id: String) -> Dictionary:

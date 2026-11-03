@@ -15,9 +15,17 @@ signal camera_explain(game_id: String)  ## a dimmed card was tapped
 signal calibrate_requested  ## the header's camera chip (calibrate, recalibrate, or allow)
 
 const NUDGE_SIZE := Vector2(1400, 104)
+## Up to ROW_MAX games share one row; more page through PAGE_SIZE at a time between two page
+## buttons (#75: 11 games). Paging, not a scroll: every card is a full tap target (a drag on a
+## card is its tap), and a 120 px button is easy to hit while pedalling.
+const ROW_MAX := 5
+const PAGE_SIZE := 4
 
 var header: HubHeader
-var game_cards: Dictionary = {}  ## game_id → HubCard
+var game_cards: Dictionary = {}  ## game_id → HubCard (every game; off-page cards are hidden)
+var game_page := 0  ## the games page shown (kept across rebuilds)
+var page_left: IconButton  ## null when every game fits one row
+var page_right: IconButton
 var circuit_cards: Dictionary = {}  ## circuit id → HubCard
 var _column: VBoxContainer
 var _signature := ""
@@ -64,12 +72,32 @@ func _fill() -> void:
 	if bool(state.rider.get("ftp_is_default", false)):
 		_column.add_child(_nudge())
 	_column.add_child(HubTheme.heading("Play a game"))
+	var entries: Array = HubState.games(state)
+	var paged := entries.size() > ROW_MAX
 	var games := HBoxContainer.new()
 	games.name = "Games"
 	games.add_theme_constant_override("separation", int(_gap(5, HubTheme.GAME_CARD.x)))
 	games.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_column.add_child(games)
-	for e in HubState.games(state):
+	if paged:
+		# More games than fit a row (#75): pages of PAGE_SIZE between two page buttons.
+		var row := HBoxContainer.new()
+		row.name = "GamesRow"
+		row.add_theme_constant_override("separation", int(HubTheme.GAP))
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_column.add_child(row)
+		page_left = _page_button("left", -1)
+		row.add_child(page_left)
+		games.add_theme_constant_override("separation", int(_paged_gap()))
+		games.custom_minimum_size = Vector2(_paged_width(), HubTheme.GAME_CARD.y)
+		row.add_child(games)
+		page_right = _page_button("right", 1)
+		row.add_child(page_right)
+		game_page = clampi(game_page, 0, page_count() - 1)
+	else:
+		page_left = null
+		page_right = null
+		_column.add_child(games)
+	for e in entries:
 		var card := HubCard.new(game_card(e), HubTheme.GAME_CARD, queue)
 		card.name = "Game_" + str(e.id)
 		var playable := HubState.playable(state, e)
@@ -82,6 +110,8 @@ func _fill() -> void:
 				camera_explain.emit(id))
 		games.add_child(card)
 		game_cards[id] = card
+	if paged:
+		_show_page()
 	var spacer := Control.new()
 	spacer.custom_minimum_size = Vector2(0, 12)
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -110,6 +140,47 @@ func _fill() -> void:
 	build_card.pressed.connect(func(): open.emit(HubNav.BUILDER, {"index": -1}))
 	circuits.add_child(build_card)
 	circuit_cards["build"] = build_card
+
+
+## The game pages (1 when every game fits one row).
+func page_count() -> int:
+	var n: int = HubState.games(state).size()
+	return 1 if n <= ROW_MAX else ceili(float(n) / PAGE_SIZE)
+
+
+## Shows page `page` of the games (clamped), and enables the page buttons that lead somewhere.
+func show_page(page: int) -> void:
+	game_page = clampi(page, 0, page_count() - 1)
+	_show_page()
+
+
+func _show_page() -> void:
+	if page_left == null:
+		return
+	var i := 0
+	for card in game_cards.values():  # in catalog order (inserted so)
+		(card as HubCard).visible = i / PAGE_SIZE == game_page
+		i += 1
+	page_left.set_enabled(game_page > 0)
+	page_right.set_enabled(game_page < page_count() - 1)
+
+
+func _page_button(which: String, step: int) -> IconButton:
+	var b := IconButton.new(which, func(): show_page(game_page + step))
+	b.name = "Page" + which.capitalize()
+	b.custom_minimum_size = Vector2(HubTheme.TARGET, HubTheme.GAME_CARD.y)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return b
+
+
+## The paged row's card area: the column less the two page buttons and their gaps.
+static func _paged_width() -> float:
+	return HubTheme.W - 2 * HubTheme.MARGIN - 2 * (HubTheme.TARGET + HubTheme.GAP)
+
+
+## The gap that spreads a page's cards across the paged row's card area.
+static func _paged_gap() -> float:
+	return floorf((_paged_width() - PAGE_SIZE * HubTheme.GAME_CARD.x) / (PAGE_SIZE - 1))
 
 
 ## The gap that spreads `count` cards of `width` across the column.
@@ -301,7 +372,10 @@ func targets() -> Array[Control]:
 	var out: Array[Control] = []
 	out.append_array(header.targets())
 	for card in game_cards.values():
-		out.append(card.hit)
+		if card.is_visible_in_tree():  # this page's games
+			out.append(card.hit)
+	if page_left:
+		out.append_array([page_left, page_right])
 	for card in circuit_cards.values():
 		out.append(card.hit)
 	var nudge := _column.get_node_or_null("Nudge/SetFtp")

@@ -11,6 +11,7 @@ import dev.digitalducktape.openride.games.bridge.SegmentRole
 import dev.digitalducktape.openride.games.bridge.SessionKind
 import dev.digitalducktape.openride.games.bridge.SessionPlanMessage
 import kotlin.math.roundToInt
+import kotlin.random.Random
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -147,8 +148,7 @@ sealed interface SessionRequest {
 
     /**
      * A circuit. With [cameraGames] false (the rider turned them off, or the camera isn't
-     * available), a slot that would be a camera game is played by the next game of the same role
-     * that doesn't need the camera (epic #31, "Circuit mode").
+     * available), its slots draw from pools without the camera games (#75).
      */
     @Serializable @SerialName("circuit")
     data class Circuit(
@@ -240,12 +240,13 @@ fun SessionRequest.toPlanRequest(): PlanRequestMessage = when (this) {
     )
 }
 
-/** One slot of a circuit preset. */
-data class CircuitSlot(val gameId: String, val role: SegmentRole, val durationSec: Int)
+/** One slot of a circuit preset: its role and gameplay seconds. The game is drawn per ride (#75). */
+data class CircuitSlot(val role: SegmentRole, val durationSec: Int)
 
 /**
  * A circuit (epic #31, "Sessions, circuits and Just Ride"): warm-up, [blocks] × [block], then
- * cool-down, each slot after a 10 s intro card. Presets are data; circuit mode and its UX are #37.
+ * cool-down, each slot after a 10 s intro card. Presets are shapes only: each ride draws the
+ * slots' games from their roles' pools ([CircuitDraw]).
  */
 data class CircuitPreset(
     val id: String,
@@ -259,15 +260,15 @@ data class CircuitPreset(
 }
 
 object CircuitPresets {
-    private val WARMUP = CircuitSlot("cadence_karaoke", SegmentRole.WARMUP, 180)
-    private val COOLDOWN = CircuitSlot("cadence_karaoke", SegmentRole.COOLDOWN, 180)
+    private val WARMUP = CircuitSlot(SegmentRole.WARMUP, 180)
+    private val COOLDOWN = CircuitSlot(SegmentRole.COOLDOWN, 180)
 
     /** Work : recovery between 1:1 and 1:1.5, never two work games back to back. 6:10 with intro cards. */
     private val BLOCK = listOf(
-        CircuitSlot("tug_of_war", SegmentRole.WORK, 60),
-        CircuitSlot("safe_cracker", SegmentRole.RECOVERY, 90),
-        CircuitSlot("dodge_ball", SegmentRole.WORK, 90),
-        CircuitSlot("cadence_karaoke", SegmentRole.RECOVERY, 90),
+        CircuitSlot(SegmentRole.WORK, 60),
+        CircuitSlot(SegmentRole.RECOVERY, 90),
+        CircuitSlot(SegmentRole.WORK, 90),
+        CircuitSlot(SegmentRole.RECOVERY, 90),
     )
 
     private fun preset(minutes: Int, blocks: Int) =
@@ -285,6 +286,59 @@ object CircuitPresets {
     val ALL = listOf(TWENTY, THIRTY, FORTY_FIVE)
 
     operator fun get(id: String): CircuitPreset? = ALL.firstOrNull { it.id == id }
+}
+
+/**
+ * Draws a circuit's games (#75), one slot at a time in circuit order, from each role's
+ * [GameCatalog.circuitPool], with a [Random] of the ride's [seed] (same seed, same lineup).
+ *
+ * - A game fills a slot only if the slot's length is within its `min_sec`..`max_sec`.
+ * - Each role keeps a shuffled bag of its pool: a slot takes the first game in the bag that fits,
+ *   so no game repeats in a role until every game that fits the slot has played. Then the bag
+ *   refills (the game just played goes to its end, so it doesn't play twice running).
+ * - A slot prefers a game that fits fewer of the role's slot lengths (Ready for Launch, 90 s,
+ *   takes a 1:30 work slot before a game that also fits 1:00), so long slots use up the games
+ *   only they can play, and the short slots don't run out first.
+ * - Never the game of the slot before, when another fits.
+ * - A slot no pool game fits returns null: [SessionPlans.circuit] plays its stand-in.
+ */
+class CircuitDraw(
+    private val catalog: GameCatalog,
+    private val cameraGames: Boolean,
+    seed: Long,
+    /** Every slot length per role in this circuit, for the "fits fewer lengths" preference. */
+    private val roleLengths: Map<SegmentRole, Set<Int>> = emptyMap(),
+) {
+    private val random = Random(seed)
+    private val bags = mutableMapOf<SegmentRole, MutableList<GameDeclaration>>()
+    private val lastOfRole = mutableMapOf<SegmentRole, String>()
+    private var previous: String? = null
+
+    fun next(role: SegmentRole, durationSec: Int): GameDeclaration? {
+        val pool = catalog.circuitPool(role, cameraGames)
+        if (pool.none { fits(it, durationSec) }) {
+            previous = null // the stand-in plays it
+            return null
+        }
+        val bag = bags.getOrPut(role) { mutableListOf() }
+        if (bag.none { fits(it, durationSec) }) {
+            bag.clear()
+            bag += pool.shuffled(random)
+            lastOfRole[role]?.let { last -> bag.firstOrNull { it.id == last }?.let { bag.remove(it); bag.add(it) } }
+        }
+        val lengths = roleLengths[role].orEmpty()
+        val candidates = bag.filter { fits(it, durationSec) }
+            .sortedBy { game -> lengths.count { fits(game, it) } } // stable: the bag's order breaks ties
+        val pick = candidates.firstOrNull { it.id != previous } ?: candidates.first()
+        bag.remove(pick)
+        lastOfRole[role] = pick.id
+        previous = pick.id
+        return pick
+    }
+
+    companion object {
+        fun fits(game: GameDeclaration, durationSec: Int): Boolean = durationSec in game.minSec..game.maxSec
+    }
 }
 
 /** Builds [SessionPlan]s: Just Rides of any one game, and circuits from presets. */
@@ -322,10 +376,10 @@ object SessionPlans {
     }
 
     /**
-     * A circuit from [preset]. A slot whose game isn't in [catalog] yet plays [standIn]
-     * instead. With [cameraGames] false, a camera game's slot goes to the next game of its role
-     * that doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role,
-     * length and the circuit's id, so its bests stay per length.
+     * A circuit from [preset]: each slot's game drawn from its role's pool with the ride's
+     * [seed] ([CircuitDraw]), keeping the slot's role and length and the circuit's id, so its
+     * bests stay per length whichever games played. With [cameraGames] false the pools leave
+     * out camera games. A slot no game in [catalog] fits plays [standIn].
      */
     fun circuit(
         preset: CircuitPreset,
@@ -334,12 +388,12 @@ object SessionPlans {
         catalog: GameCatalog,
         standIn: GameDeclaration = GameCatalog.DEMO,
         cameraGames: Boolean = true,
+        seed: Long = 0L,
     ): SessionPlan {
+        val lengths = preset.slots.groupBy { it.role }.mapValues { (_, slots) -> slots.map { it.durationSec }.toSet() }
+        val draw = CircuitDraw(catalog, cameraGames, seed, lengths)
         val segments = preset.slots.map { slot ->
-            val planned = catalog[slot.gameId] ?: standIn
-            val game = if (cameraGames || !planned.usesCamera) planned else {
-                catalog.games.firstOrNull { slot.role in it.roles && !it.usesCamera && it.id != planned.id } ?: standIn
-            }
+            val game = draw.next(slot.role, slot.durationSec) ?: standIn
             Segment(
                 gameId = game.id,
                 durationSec = slot.durationSec,
@@ -425,13 +479,17 @@ object SessionPlans {
         if (cameraGames || !game.usesCamera) game
         else catalog.games.firstOrNull { !it.usesCamera && GameCatalog.circuitRole(it) == GameCatalog.circuitRole(game) }
 
-    /** The plan for [request], or null if it names an unknown game or preset or an unsupported mode. */
-    fun forRequest(request: SessionRequest, ftp: FtpBasis, catalog: GameCatalog): SessionPlan? = when (request) {
+    /**
+     * The plan for [request], or null if it names an unknown game or preset or an unsupported
+     * mode. [circuitSeed] draws a preset circuit's games (the ride's seed; the hub shows the
+     * lineup drawn with the same one).
+     */
+    fun forRequest(request: SessionRequest, ftp: FtpBasis, catalog: GameCatalog, circuitSeed: Long = 0L): SessionPlan? = when (request) {
         is SessionRequest.JustRide -> catalog[request.gameId]?.let { game ->
             runCatching { justRide(game, request.mode, request.difficulty, ftp) }.getOrNull()
         }
         is SessionRequest.Circuit -> CircuitPresets[request.presetId]?.let {
-            circuit(it, request.difficulty, ftp, catalog, cameraGames = request.cameraGames)
+            circuit(it, request.difficulty, ftp, catalog, cameraGames = request.cameraGames, seed = circuitSeed)
         }
         is SessionRequest.Custom -> runCatching {
             custom(request.slots, request.difficulty, ftp, catalog, request.cameraGames)

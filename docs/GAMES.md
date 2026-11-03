@@ -2096,20 +2096,55 @@ every frame. `capture_kart_hud.gd` prints the same split per viewport on the des
 
 ## Circuits and the Games hub (#37, #38)
 
-**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min Cadence Karaoke
-warm-up, N blocks of Tug of War 1:00, Safe Cracker 1:30, Dodge Ball 1:30 and Cadence Karaoke
-1:30, and a 3 min cool-down, each after a 10 s intro card (20 min = 2 blocks, 18:40; 30 min = 4,
-31:00; 45 min = 6, 43:20). It is one `SessionPlan`, recorded as one ride.
+**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min warm-up, N blocks of
+work 1:00, recovery 1:30, work 1:30 and recovery 1:30, and a 3 min cool-down, each after a 10 s
+intro card (20 min = 2 blocks, 18:40; 30 min = 4, 31:00; 45 min = 6, 43:20). It is one
+`SessionPlan`, recorded as one ride. A preset is only the shape (roles and lengths): the games are
+drawn per ride.
+
+**The circuit pool (#75).** `SessionPlans.circuit` fills each slot with `CircuitDraw`, in
+circuit order:
+
+- **Pools come from the catalog.** A role's pool is `GameCatalog.circuitPool(role, cameraGames)`:
+  every game that declares the role in its `GameDeclaration.roles`, without the demo. A new game
+  joins circuits by declaring roles there and nowhere else. A game with no roles (Kart Race, The
+  Pull) only plays a custom circuit's `free` slot.
+- **It fits.** A game fills a slot only if the slot's length is within its `minSec`..`maxSec`
+  (a 90 s game takes the 1:30 work slot, never the 1:00 one).
+- **No repeats until the pool is used up.** Each role keeps a shuffled bag; a slot takes the first
+  game in the bag that fits, so a game repeats in a role only once every game that fits that slot
+  has played. Then the bag refills, with the game just played at its end. A slot prefers a game
+  that fits fewer of the role's lengths, so the long slots use up the games only they can play.
+  It never repeats the slot before's game when another fits (Cadence Karaoke's recovery then its
+  cool-down, say).
+- **A fresh mix every ride (rider decision).** The draw is seeded: same seed, same lineup.
+  `GameVisitManager` takes a random seed per visit and draws plan *n* of the visit with
+  `seed + n`; `hub_state.circuits` shows the lineup that seed draws, so the hub shows what plays.
+- **No camera.** With `cameraGames = false` (the rider turned camera games off, or refused the
+  permission) the pools leave out every game that declares `usesCamera` (today Dodge Ball and Kart
+  Race; Tug of War's camera is an option, so it stays). The shape and the circuit's id don't
+  change.
+- **Bests stay per circuit length** (`circuit-20`, ...), whichever games played (`planBest`).
+- A slot no game fits plays the stand-in (the demo).
+- `SessionPlansTest` pins it with today's catalog and an eleven-game fake one: deterministic per
+  seed, every slot of its role and fitting, no repeats before the pool is used up, a 45 min
+  circuit covering the work and recovery pools, and the camera-off pools.
+- **On a desktop** `LocalHub.draw_slots` does the same from the `hub_state` catalog (its own
+  shuffle, so a seed's mix differs from the bike's), and lists every registered game (`ORDER`
+  first, then the rest by id). `local_hub_test` pins it with an eleven-game catalog.
 
 - **Progress strip.** From `session_started`, `Hud.circuit_strip` (`CircuitStrip`) shows a pill
   per segment above the game's widgets: as wide as the segment is long, in the role's colour (work
   warm, recovery cool); done pills are dimmed, the current one is outlined and fills as it plays.
   Its line says "3 of 10 · 14:02 left" (the rest of the segment plus every later segment and its
   10 s card). A Just Ride hides it. `circuit_strip_test` pins the pills, the time and the layout.
-- **No camera.** `SessionRequest.Circuit.cameraGames = false` (the rider turned camera games off,
-  or refused the permission) swaps each camera game's slot for the next game of its role that
-  doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role, length and the
-  circuit's id.
+- **The hub with many games (#75).** Up to five game cards share the home screen's row. More page
+  through four at a time between two 120 px page buttons (`HomeScreen.ROW_MAX`, `PAGE_SIZE`):
+  paging, not a scroll, because a whole card is its tap target and a big button is easy to hit
+  while pedalling. The builder's "Add a game" tiles wrap at six a row (`TILE_COLUMNS_MAX`). A
+  circuit's screen lists its games as chips on one line, the rest as "+3 more". A game whose
+  title is long needs a short name in `LineupStrip.SHORT` for the builder's tiles.
+  `hub_layout_test` lays out an eleven-game catalog (`HubState.test_ids`).
 - **Already there from #34/#35:** the intro card with its Skip button, music across cards, the
   per-segment summary and bests per circuit length (`GameResultDao.planBest`).
 - **The summary.** A circuit lists every planned game: the ones the session never reached say "not played", and the heading reads "Session ended early" instead of "Circuit complete". The best line says "New personal best!" (with the best before it) or "Your best: 5400 points, 2 stars"; Kotlin sends `previous_score` and `previous_stars` alongside the beaten flags. A Just Ride shows its one game.
