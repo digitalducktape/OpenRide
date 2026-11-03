@@ -90,7 +90,7 @@ func info() -> GameInfo:
 
 
 func how_to_text(_seg: Dictionary) -> String:
-	return "Match the target rpm. − and + change it"
+	return "Pedal to the beat. Tap − or + to change the pace"
 
 
 func ui_theme() -> GameTheme:
