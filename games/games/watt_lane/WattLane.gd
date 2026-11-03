@@ -59,6 +59,11 @@ func info() -> GameInfo:
 	# earns 1550-1800 a minute (2 stars); 3 stars takes about 1.3× (watt_lane_logic_test).
 	var stars: Array = WattLaneLogic.STARS
 	i.star_thresholds = {"easy": stars.duplicate(), "standard": stars.duplicate(), "hard": stars.duplicate()}
+	i.summary_stats = [
+		{"key": "in_lane_pct", "label": "in lane", "suffix": "%"},
+		{"key": "longest_streak_sec", "label": "best streak", "suffix": " s"},
+		{"key": "jumps_caught", "of": "jumps", "label": "steps caught"},
+	]
 	return i
 
 
@@ -211,22 +216,26 @@ func finish() -> Dictionary:
 
 func _update_status() -> void:
 	_status.set_lane(logic.lane_lo(), logic.lane_hi())
-	_status.set_info(roundi(logic.in_lane_pct()), logic.streak_multiplier())
+	_status.set_info(logic.in_lane, logic.streak_multiplier())
 	var up := logic.upcoming()
 	if up.is_empty():
 		_status.set_countdown(true, 0, 0, -1)
 	else:
 		_status.set_countdown(bool(up.up), int(up.lo), int(up.hi), ceili(float(up.at)) if float(up.at) > 0.05 else 0)
+	# Off the lane: which way, and how far in whole watts from the band the rules use.
+	var band := logic.band()
 	var alert := WattLaneStatus.ALERT_NONE
+	var off := 0
 	if logic.smoothed < PEDAL_WATTS:
 		alert = WattLaneStatus.ALERT_PEDAL
-	elif logic.side() < 0:
+	elif logic.shown_watts < band.x:
 		alert = WattLaneStatus.ALERT_PUSH
-	elif logic.side() > 0:
+		off = band.x - logic.shown_watts
+	elif logic.shown_watts > band.y:
 		alert = WattLaneStatus.ALERT_EASE
-	_status.set_alert(alert)
+		off = logic.shown_watts - band.y
+	_status.set_alert(alert, off)
 	# The ride panel's gold follows the rules' band (both lanes in a switch window).
-	var band := logic.band()
 	if band != _band:
 		_band = band
 		hud.metrics.set_power_band(float(band.x), float(band.y))

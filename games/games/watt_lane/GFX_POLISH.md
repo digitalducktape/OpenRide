@@ -54,3 +54,14 @@ suite green.
 - The 3D night highway (a road read as "lean to change lanes").
 - The power-line staff, its four illustrated places and the note-head marker (the marker failed
   the silhouette check; the rider asked for an abstract look).
+
+## Reviewer's punch list (2026-11-02), done
+
+9. **The last step chevron was cut by the lane's bend** (`wl_3`). **Done:** only whole chevrons,
+   each at its own centre's lane height, ending 130 px before the step (the bend starts about
+   90 px before it).
+10. **The step label was small and sat low.** **Done:** 56 px, white with an ink outline, just
+    inside the new lane at its top, right of the riser.
+11. **The top 40% of the field was empty next to Safe Cracker.** **Done:** a horizon of light
+    behind the top of the scale and two slow ribbons of light (teal and copper) drifting at a
+    tenth of the lane's speed, all dimmer than the lane.

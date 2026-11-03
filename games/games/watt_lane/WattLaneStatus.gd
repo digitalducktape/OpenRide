@@ -1,15 +1,15 @@
 class_name WattLaneStatus
 extends PanelContainer
-## Watt Lane's HUD widget (#78), in the HUD's top-centre slot. The hero is the lane: its exact
-## bounds in watts, the same numbers the rules compare against the ride panel's W (which shows
-## the same smoothed power). Two caption rows beside it:
+## Watt Lane's HUD widget (#78), in the HUD's top-centre slot, a fixed 820 px wide. The hero is
+## the lane: its exact bounds in watts, the same numbers the rules compare against the ride
+## panel's W (which shows the same smoothed power). Beside it, two rows at 42 px:
 ##
-##   150–190   W LANE   ×2.5
-##             In lane 82%   [▲ PUSH]          (or, before a jump: [▲ UP 175–215 in 4])
+##   115–165   W LANE  ×2.5
+##             IN LANE            (or [▲ PUSH 20 W], or before a step [▲ 135–185 in 4])
 ##
-## The countdown chip takes the second row's place while a jump is announced, and pops each
-## second. Within 850 x 120 px with the longest texts (watt_lane_scene_test). Labels change only
-## with their values; motion is scale and modulate only (framework/ui/UI_STYLE.md).
+## The countdown chip takes the second row while a step is announced, and pops each second.
+## Within the slot with the longest texts (watt_lane_scene_test). Labels change only with their
+## values; motion is scale and modulate only (framework/ui/UI_STYLE.md).
 
 const ARROW_UP := 0
 const ARROW_DOWN := 1
@@ -19,6 +19,8 @@ const ALERT_PUSH := "push"  ## under the lane
 const ALERT_EASE := "ease"  ## over it
 const ALERT_PEDAL := "pedal"  ## stopped
 const ALERT_TEXTS := {"push": "PUSH", "ease": "EASE", "pedal": "PEDAL"}
+const WIDTH := 820.0  ## the widget's fixed width (the slot is 850)
+const TEXT := HudTheme.SMALL + 8  ## the captions and chips: 42 px, readable at 1 m
 
 var lane: Label  ## the hero
 var caption: Label
@@ -40,6 +42,8 @@ var _bounds := Vector2i(-1, -1)
 
 func _init(look: GameTheme) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A fixed width: the HUD never shifts when a chip comes or goes.
+	custom_minimum_size = Vector2(WIDTH, 0)
 	var row := _box(HBoxContainer.new(), self, 12)
 	var hero_box := MarginContainer.new()
 	hero_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -60,7 +64,7 @@ func _init(look: GameTheme) -> void:
 	streak.custom_minimum_size = Vector2(84, 0)
 	var bottom := _box(HBoxContainer.new(), rows, 12)
 	info = _label("", bottom)
-	info.custom_minimum_size = Vector2(200, 0)  # "In lane 100%"
+	info.custom_minimum_size = Vector2(150, 0)  # "IN LANE"
 	alert = _chip(bottom)
 	_alert_arrow = _Arrow.new(ARROW_UP)
 	alert.get_child(0).add_child(_alert_arrow)
@@ -78,16 +82,16 @@ func _init(look: GameTheme) -> void:
 func apply_theme(look: GameTheme) -> void:
 	_look = look
 	var style := look.panel_style()
-	style.content_margin_top = 8
-	style.content_margin_bottom = 10
+	style.content_margin_top = 4
+	style.content_margin_bottom = 6
 	add_theme_stylebox_override("panel", style)
 	look.style_label(lane, HudTheme.BIG, GameTheme.INK, true)
 	look.set_gradient(lane)
-	look.style_label(caption, HudTheme.SMALL, GameTheme.MUTED, true)
-	look.style_label(streak, HudTheme.SMALL, GameTheme.TARGET, true)
-	look.style_label(info, HudTheme.SMALL, GameTheme.MUTED, true)
-	look.style_label(alert_label, HudTheme.SMALL, GameTheme.INK)
-	look.style_label(countdown_label, HudTheme.SMALL, GameTheme.INK)
+	look.style_label(caption, TEXT, GameTheme.MUTED, true)
+	look.style_label(streak, TEXT, GameTheme.TARGET, true)
+	look.style_label(info, TEXT, GameTheme.GOOD, true)
+	look.style_label(alert_label, TEXT, GameTheme.INK)
+	look.style_label(countdown_label, TEXT, GameTheme.INK)
 	alert.add_theme_stylebox_override("panel", look.badge_style(GameTheme.WARN.darkened(0.15), true))
 	countdown.add_theme_stylebox_override("panel", look.badge_style(Palette.AMBER.darkened(0.1), true))
 	_alert_arrow.color = GameTheme.INK
@@ -106,9 +110,11 @@ func set_lane(lo: int, hi: int) -> void:
 		GameTheme.pop(lane, 1.25)
 
 
-func set_info(pct_in_lane: int, multiplier: float) -> void:
-	if _changed("info", str(pct_in_lane)):
-		info.text = "In lane %d%%" % pct_in_lane
+## The second row when nothing else shows it: "IN LANE" while in (the percentage is on the
+## summary), and the streak's multiplier on the first row.
+func set_info(in_lane: bool, multiplier: float) -> void:
+	if _changed("info", str(in_lane)):
+		info.text = "IN LANE" if in_lane else ""
 	if _changed("streak", str(multiplier)):
 		streak.text = "×%d!" % roundi(multiplier) if multiplier >= WattLaneLogic.STREAK_MAX else "×%s" % String.num(multiplier, 1)
 
@@ -121,15 +127,21 @@ func streak_up(multiplier: float) -> void:
 		GameTheme.pop(streak, 1.35)
 
 
-## Out of the lane: which way to go (ALERT_*), or ALERT_NONE.
-func set_alert(kind: String) -> void:
+## Out of the lane: which way to go (ALERT_*) and how far, in whole watts ("PUSH 20 W"), or
+## ALERT_NONE. The distance is to the band the rules use, from the ride panel's W.
+func set_alert(kind: String, watts := 0) -> void:
+	var text := ""
+	if kind != ALERT_NONE:
+		text = ALERT_TEXTS[kind] if kind == ALERT_PEDAL or watts <= 0 else "%s %d W" % [ALERT_TEXTS[kind], watts]
+	if _changed("alert", text) and kind != ALERT_NONE:
+		alert_label.text = text
 	if kind == _alert:
 		return
 	_alert = kind
 	if kind == ALERT_NONE:
 		alert.visible = false
+		_show_alert_row()
 		return
-	alert_label.text = ALERT_TEXTS[kind]
 	_alert_arrow.set_direction(ARROW_DOWN if kind == ALERT_EASE else ARROW_UP)
 	_show_alert_row()
 	if not countdown.visible:
@@ -140,7 +152,7 @@ func alert_kind() -> String:
 	return _alert
 
 
-## The announced jump: "UP 175–215 in 4" (watts: the hero's caption says W) (`n` whole seconds left, 0 for "NOW"), or
+## The announced jump: "▲ 175–215 in 4" (a drawn arrow; watts: the hero's caption says W) (`n` whole seconds left, 0 for "NOW"), or
 ## `n` < 0 to hide the chip.
 func set_countdown(up: bool, lo: int, hi: int, n: int) -> void:
 	if n < 0:
@@ -149,7 +161,9 @@ func set_countdown(up: bool, lo: int, hi: int, n: int) -> void:
 			_count_n = -1
 			_show_alert_row()
 		return
-	var text := "%s %d–%d %s" % ["UP" if up else "DOWN", lo, hi, ("in %d" % n) if n > 0 else "NOW"]
+	# The drawn arrow says up or down (a shape, not colour alone); the words would overflow the
+	# slot at 42 px with a three-digit lane.
+	var text := "%d–%d %s" % [lo, hi, ("in %d" % n) if n > 0 else "NOW"]
 	if _changed("countdown", text):
 		countdown_label.text = text
 		_count_arrow.set_direction(ARROW_UP if up else ARROW_DOWN)
@@ -167,8 +181,8 @@ func set_countdown(up: bool, lo: int, hi: int, n: int) -> void:
 func _show_alert_row() -> void:
 	if countdown.visible:
 		return
-	info.visible = true
 	alert.visible = _alert != ALERT_NONE
+	info.visible = not alert.visible
 
 
 func _chip(parent: Control) -> PanelContainer:

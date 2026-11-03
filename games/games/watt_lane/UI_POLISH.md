@@ -29,3 +29,19 @@ From the UI review of 2026-11-02 against `framework/ui/UI_STYLE.md`, with the wa
 5. **The out-of-lane state was colour only on the field.** **Done:** the chip PUSH ▲ / EASE ▼ /
    PEDAL ▲ in the widget, the chevron's amber rim, and the softer hum (never colour alone).
 6. **The cursor sat under the ride panel at high power.** **Done** (`GFX_POLISH.md` item 2).
+
+## Reviewer's punch list (2026-11-02), done
+
+7. **The widget's captions were about 22 px on screen** ("W LANE ×2.0", "In lane 97%"). **Done:**
+   captions, the streak, the chips and the state at 42 px; "In lane %" moved to the summary, and
+   the row says "IN LANE" (green) while in.
+8. **The widget's width changed when a chip appeared** (its right edge 1240 → 1350), shifting the
+   HUD. **Done:** a fixed 820 px (`WattLaneStatus.WIDTH`); `watt_lane_scene_test` checks the width
+   is the same with no chip, the alert and the countdown. The chip drops its "UP"/"DOWN" word to
+   fit at 42 px: "▲ 135–185 in 3", the arrow a drawn shape.
+9. **Off the lane said only "PUSH".** **Done:** "PUSH 14 W" / "EASE 20 W": how far, in whole watts,
+   from the ride panel's W to the band the rules use.
+10. **The summary showed points and time only.** **Done:** three more tiles, in-lane %, best
+    streak and steps caught, through a new framework field, `GameInfo.summary_stats` (any game can
+    declare its own; a one-game summary shows them).
+11. **The step label** (`GFX_POLISH.md` item 10).

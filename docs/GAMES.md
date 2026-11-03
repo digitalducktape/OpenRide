@@ -663,6 +663,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
 | `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
+| `summary_stats` | A one-game summary's extra tiles from the result's `stats`: `[{key, label, suffix, of}]` (`of`: a second stat, shown "3/4"); at most three. Watt Lane shows in-lane %, best streak and steps caught. |
 | `options` | The game's own settings, shown on its hub screen and in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings, plus the optional `where`, `kind`, `cards`, `columns`, `group` and `rider_badge`. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
@@ -1826,8 +1827,9 @@ the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt
   within `lane_min_watts`..`lane_max_watts` (Kotlin: work 40-60 / 45-70 / 50-75% of FTP, warm-up
   35-55%). On screen, a faint guide every 12.5% of FTP; time ahead is distance to the right at
   150 px a second (about 9 s visible).
-- **Steps** are announced 5 s ahead: a chime, a countdown chip ("▲ UP 175–215 in 5"), and on the
-  lane a riser of light, amber chevrons and the new watts. From 1.5 s before a step to 3.5 s after,
+- **Steps** are announced 5 s ahead: a chime, a countdown chip ("▲ 175–215 in 5", the arrow
+  drawn), and on the lane a riser of light, whole amber chevrons before the bend and the new watts
+  (56 px, just inside the new lane). Off the lane, the widget says how far: "PUSH 14 W". From 1.5 s before a step to 3.5 s after,
   either lane counts.
 - **Scoring.** 10 points a second in the lane times a streak (×1 to ×3 over 20 s; it survives
   1 s outside), through `Effort.award`; a warm-up's points count 1.25×. Stars, points a minute:

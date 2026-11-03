@@ -47,6 +47,7 @@ func test_the_ride_panel_shows_the_rules_power_and_its_gold_matches_the_band() -
 	var status: WattLaneStatus = _status(game)
 	assert_str(status.lane.text).is_equal("%d–%d" % [game.logic.lane_lo(), game.logic.lane_hi()])
 	assert_str(status.alert_kind()).is_equal(WattLaneStatus.ALERT_EASE)
+	assert_str(status.alert_label.text).is_equal("EASE 1 W")  # how far off, in the panel's watts
 
 
 func test_every_frame_the_in_lane_verdict_and_the_gold_agree() -> void:
@@ -70,39 +71,54 @@ func test_the_countdown_chip_names_the_next_lane_and_counts_down() -> void:
 	_ride(game, 1.0, float(course.watts[0]))
 	assert_bool(status.countdown.visible).is_true()
 	var w := course.watts[j]
-	var verb := "UP" if w > course.watts[j - 1] else "DOWN"
-	assert_str(status.countdown_label.text).is_equal("%s %d–%d in 5" % [verb, w - game.logic.width / 2, w + game.logic.width / 2])
+	assert_str(status.countdown_label.text).is_equal("%d–%d in 5" % [w - game.logic.width / 2, w + game.logic.width / 2])
 	_ride(game, 3.0, float(course.watts[0]))
 	assert_str(status.countdown_label.text).ends_with("in 2")
 	_ride(game, 2.5, float(w))
 	assert_bool(status.countdown.visible).is_false()
 
 
-func test_the_status_widget_fits_its_slot_with_the_longest_texts() -> void:
+func test_the_status_widget_fits_its_slot_and_never_changes_width() -> void:
 	var status: WattLaneStatus = auto_free(WattLaneStatus.new(load("res://games/watt_lane/WattLane.gd").look))
 	add_child(status)
 	status.set_lane(880, 960)  # 3 digits: FTP 500 tops out near 425
-	status.set_info(100, 2.5)
-	status.set_alert(WattLaneStatus.ALERT_PEDAL)
+	status.set_info(true, 2.5)
 	await get_tree().process_frame
 	_assert_fits(status)
+	var width := status.get_combined_minimum_size().x
+	status.set_alert(WattLaneStatus.ALERT_EASE, 120)
+	await get_tree().process_frame
+	_assert_fits(status)
+	assert_float(status.get_combined_minimum_size().x).is_equal(width)
+	assert_bool(status.info.visible).is_false()  # the alert takes the row
 	status.set_countdown(false, 880, 960, 5)
 	await get_tree().process_frame
 	_assert_fits(status)
-	assert_bool(status.info.visible).is_false()  # the chip takes the row
+	assert_float(status.get_combined_minimum_size().x).is_equal(width)
+	assert_bool(status.alert.visible).is_false()  # the chip takes the row
 	status.set_countdown(true, 0, 0, -1)
 	await get_tree().process_frame
-	assert_bool(status.info.visible).is_true()
 	assert_bool(status.alert.visible).is_true()
+	status.set_alert(WattLaneStatus.ALERT_NONE)
+	await get_tree().process_frame
+	assert_bool(status.info.visible).is_true()
+	assert_str(status.info.text).is_equal("IN LANE")
+
+
+func test_the_summary_shows_in_lane_streak_and_steps_caught() -> void:
+	var game: Game = auto_free(load("res://games/watt_lane/WattLane.tscn").instantiate())
+	var info := game.declared()
+	var stats := {"in_lane_pct": 82, "longest_streak_sec": 41, "jumps": 4, "jumps_caught": 3}
+	var tiles := SummaryScreen._stat_tiles(info, [{"stats": stats}])
+	assert_array(tiles).is_equal([["82%", "in lane"], ["41 s", "best streak"], ["3/4", "steps caught"]])
 
 
 func _assert_fits(status: WattLaneStatus) -> void:
 	var size := status.get_combined_minimum_size()
 	assert_float(size.x).is_less_equal(850.0)
 	assert_float(size.y).is_less_equal(120.0)
-	for l in [status.lane, status.caption, status.info, status.countdown_label, status.alert_label]:
-		if l.visible:
-			assert_int(l.get_theme_font_size("font_size")).is_greater_equal(34)
+	for l in [status.caption, status.streak, status.info, status.countdown_label, status.alert_label]:
+		assert_int(l.get_theme_font_size("font_size")).is_greater_equal(42)  # readable at 1 m
 
 
 func test_the_lane_follows_the_course_ahead() -> void:
@@ -139,7 +155,7 @@ func test_an_announced_step_shows_its_watts_where_it_lands() -> void:
 	var w := course.watts[j]
 	assert_bool(track.label.visible).is_true()
 	assert_str(track.label.text).is_equal("%d–%d W" % [w - game.logic.width / 2, w + game.logic.width / 2])
-	assert_float(track.label.position.x).is_equal_approx(WattLaneTrack.RIDER_X + 3.0 * WattLaneTrack.SPEED + 16.0, 6.0)
+	assert_float(track.label.position.x).is_equal_approx(WattLaneTrack.RIDER_X + 3.0 * WattLaneTrack.SPEED + 22.0, 6.0)
 
 
 func test_the_cursor_is_an_angular_chevron() -> void:

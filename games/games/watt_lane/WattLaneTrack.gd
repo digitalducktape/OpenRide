@@ -31,7 +31,7 @@ const INK := Color("0f1a2e")
 var ftp := 150.0
 var width_watts := 40
 var cursor: Node2D
-var label: Label  ## the announced step's new bounds
+var label: Label  ## the announced step's new bounds, 56 px, just inside the new lane
 var cursor_y := MID_Y
 var flash := 0.0
 var rect: ColorRect
@@ -96,7 +96,7 @@ func _exit_tree() -> void:
 func setup(ftp_watts: float, lane_watts: int, look: GameTheme) -> void:
 	ftp = maxf(ftp_watts, 50.0)
 	width_watts = lane_watts
-	look.style_label(label, HudTheme.SMALL + 6, GameTheme.WARN, true)
+	look.style_label(label, HudTheme.MEDIUM, GameTheme.INK, true)
 	_hist.fill(-1.0)
 
 
@@ -294,8 +294,8 @@ func _show_label(step_at: float, up: bool, lo: int, hi: int) -> void:
 		label.text = "%d–%d W" % [lo, hi]
 		label.reset_size()
 	label.visible = true
-	var x := RIDER_X + step_at * SPEED + 16.0
-	label.position = Vector2(x, y_of(float(hi)) - label.size.y - 12.0 if up else y_of(float(lo)) + 10.0)
+	# Just inside the new lane, at its top, right of the riser: where the eye goes next.
+	label.position = Vector2(RIDER_X + step_at * SPEED + 22.0, y_of(float(hi)) + 6.0)
 
 
 ## A Node2D that draws with a callable, once (redrawn only on `queue_redraw`).

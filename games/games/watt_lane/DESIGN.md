@@ -91,7 +91,7 @@ one power number: the **smoothed power**, `W = round(3 s average of the power re
 
 ### Announcing a jump (rider)
 
-- **5 s ahead** (`ANNOUNCE_SEC`): a chime, the countdown chip ("▲ UP 175–215 in 5", then 4, 3,
+- **5 s ahead** (`ANNOUNCE_SEC`): a chime, the countdown chip ("▲ 175–215 in 5", then 4, 3,
   2, 1, NOW), and amber chevrons in the lane leading into the step, with its new watts beside it. The bike reports about
   once a second, so 5 s is well over the 2 s minimum.
 - A soft tick on each of 3, 2, 1; a whoosh at the jump.
@@ -192,7 +192,7 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
 10. **2D, horizontal, abstract (rider, 2026-11-02):** power is height, not a place across a
     road (a sideways lane reads as "lean"); a chevron cursor and a lit lane, not a staff and a
     note (the silhouette check). See the history above.
-11. **The countdown chip reads "▲ UP 175–215 in 5"**, not the issue's "UP to 160 W in 5": it names
+11. **The countdown chip reads "▲ 175–215 in 5"** (a drawn arrow), not the issue's "UP to 160 W in 5": it names
     the lane's bounds (the numbers the rules use) and, with "to" and "W" in, a three-digit lane
     overflowed the HUD's 850 px slot (`watt_lane_scene_test`).
 

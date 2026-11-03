@@ -39,6 +39,18 @@ void fragment() {
 	float n2 = textureLod(noise_tex, q * 0.2 + vec2(0.37, 0.61) - vec2(TIME * 0.0008, 0.0), 4.0).r;
 	col += bokeh_color * smoothstep(0.35, 0.75, n1) * 0.06;
 	col += warm_color * smoothstep(0.45, 0.8, n2) * 0.035;
+	// Far: a horizon of light behind the top of the scale, and two slow ribbons of light (teal and
+	// copper) in the upper field, drifting at a tenth of the lane's speed: depth above the lane,
+	// never brighter than it.
+	col += bokeh_color * exp(-pow((p.y - 380.0) / 160.0, 2.0)) * 0.06;
+	for (int r = 0; r < 2; r++) {
+		float fr = float(r);
+		float x = (p.x + scroll * (0.08 + 0.05 * fr)) / (420.0 + 140.0 * fr);
+		float y0 = 345.0 + 95.0 * fr + 34.0 * sin(x + fr * 2.1 + TIME * 0.07) + 14.0 * sin(x * 2.7 + TIME * 0.11);
+		float w = 26.0 + 22.0 * fr;
+		float shimmer = 0.65 + 0.35 * texture(noise_tex, vec2(x * 3.0, fr * 9.0 + TIME * 0.02) / 4.0).r;
+		col += mix(bokeh_color, warm_color, fr) * exp(-pow((p.y - y0) / w, 2.0)) * (0.09 - 0.03 * fr) * shimmer;
+	}
 	// Far: soft bokeh discs, one per cell, drifting slowly left.
 	vec2 bp = vec2(p.x + scroll * 0.33, p.y) / 180.0;
 	vec2 cell = floor(bp);

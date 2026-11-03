@@ -103,12 +103,18 @@ void fragment() {
 	if (step_x > 0.0) {
 		float riser = exp(-abs(p.x - step_x) * 0.08) * inside;
 		pm += warn_color * riser * 0.8 * chevrons;
-		if (p.x > step_x - 280.0 && p.x < step_x - 18.0) {
-			float cx = mod(p.x - step_x, 70.0) - 35.0;
-			float v = (p.y - mid) * step_dir * 0.85 + abs(cx) * 0.9;
+		// Whole chevrons only, on the flat lane before the bend (which starts about 90 px ahead
+		// of the step): each is drawn at its own centre's lane height, so none is cut.
+		float cell = floor((p.x - step_x) / 70.0);
+		float centre = step_x + (cell + 0.5) * 70.0;
+		if (centre >= step_x - 345.0 && centre <= step_x - 130.0) {
+			vec2 cb = band_at(centre);
+			float cmid = (cb.x + cb.y) * 0.5;
+			float cx = p.x - centre;
+			float v = (p.y - cmid) * step_dir * 0.85 + abs(cx) * 0.9;
 			float stroke = (1.0 - smoothstep(8.0, 11.0, abs(v))) * (1.0 - smoothstep(28.0, 32.0, abs(cx)));
-			stroke *= 1.0 - smoothstep(30.0, 46.0, abs(p.y - mid));
-			float f = smoothstep(step_x - 280.0, step_x - 210.0, p.x) * chevrons;
+			stroke *= 1.0 - smoothstep(30.0, 46.0, abs(p.y - cmid));
+			float f = (centre < step_x - 320.0 ? 0.6 : 1.0) * chevrons;
 			pm = mix(pm, warn_color * 1.1, stroke * f);
 			a = mix(a, 1.0, stroke * f);
 		}
