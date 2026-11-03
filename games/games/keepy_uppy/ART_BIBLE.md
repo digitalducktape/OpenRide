@@ -1,149 +1,161 @@
 # Keepy Uppy: art bible
 
-> **Status:** v1, 2026-11-01, the look-and-sound slice (#77). **Owner:** whoever changes the
-> look. Change this file in the same commit as any change to the palette, the light, the balloon
-> or the weather. **Sources of truth:** `KeepyWorld.gd` (layout, per frame), `KeepyMeshes.gd`
-> (every mesh), `shaders/*.gdshader` and `shaders/keepy_look.gdshaderinc` (the grade),
-> `KeepyStatus` / `KeepyUppy.look` (UI). **Open** marks what the code doesn't do yet.
-> **AD-ART-BIBLE:** reviewed in the art-director pass below (section 10).
+> **Status:** v2, 2026-11-02, the 2D rework (rider: "2D, like Safe Cracker"; v1 was a 3D meadow).
+> **Owner:** whoever changes the look. Change this file in the same commit as any change to the
+> palette, the places, the fan, the balloon or the weather. **Sources of truth:** `KeepyPlaces.gd`
+> (layout and the four places), `KeepyBackdrop.gd` (the bake and the ambient life), `KeepyRig.gd`
+> (the fan, the pole, the column), `KeepyBalloon.gd` (the balloon, the birds, the pop),
+> `KeepyWeather.gd`, `shaders/*.gdshader`, and `KeepyStatus` / `KeepyUppy.look` (UI).
+> **AD-ART-BIBLE:** §11. The graphics punch list is `GFX_POLISH.md`.
 
-Everything is procedural (primitive shapes merged into vertex-coloured meshes, shaders, a sky
-drawn in code) except the Kenney nature-kit trees and bushes (CC0, loaded from
-`games/dodge_ball/models/`, recoloured and baked into the meadow mesh), as Tug of War does.
+Everything is drawn in code: shapes batched by Safe Cracker's `SafeMesh` (one draw call a layer,
+1.2 px feathered edges, per-vertex gradients), a few small canvas shaders, and three tiny sprites
+drawn into images at start (a butterfly, a leaf, a latex shard). No textures from files, no
+third-party art.
 
 ## 1. Identity
 
-**The one rule:** *a breezy summer afternoon in an open meadow: one bright balloon riding a
-column of air you are making.* When something is ambiguous, pick what makes the balloon's height
-and what the sky is about to do read faster.
+**The one rule:** *a bright balloon riding a column of air you are making, in a lit, lively
+outdoor place.* When something is ambiguous, pick what makes the balloon's height and what the
+sky is about to do read faster.
 
 | Pillar | Design test |
 | --- | --- |
-| **The balloon is the hero** | It is the brightest, most saturated thing on screen and always near the centre. Nothing else is coral. |
-| **The wind is visible** | Every force shows in the world before it acts: a cloud's shadow creeps over the grass, a bird comes in from the side, the grass flattens in a band, the streamers whip. Text only confirms. |
-| **Open air, soft and airy** | Wide sky (more than half the frame), long views, rounded hills, pale haze. Calm, never cluttered: this is the calm effort game. |
+| **The balloon is the hero** | The most saturated thing on screen and always near the centre (it travels between y 340 and 756 on the 1080 canvas, x within ±224 px). Nothing else is coral. |
+| **The fan is the built thing** | One illustrated object with real material detail, like Safe Cracker's safe: pine planks with grain and gaps, brass corner brackets with rivets, a brass grille over turning blades, a drive pulley and the belt down to the rider's bike. |
+| **The weather shows before it acts** | Each force is visible from its warning: the rain cloud sailing in and its shadow, the bird flapping in, the downdraft's dark curtain sweeping across, the streamers whipping. Text only confirms. |
 
-**Distinct from Balloon Pump (#76)**, built at the same time: that is a fairground pump stall
-(striped canvas, a stall counter, lights, a crowd, a held pump, warm saturated fair colours, an
-enclosed booth). Keepy Uppy has **no stalls, no stripes, no crowd and no fairground props**:
-a wild meadow with nobody in it, cool-fresh greens and sky blues, one coral balloon. Its UI
-accent is a **meadow mint**, not a fair red or gold.
+**Distinct from Balloon Pump (#76):** that's a high-noon fairground stall, pastel mint, cream and
+candy pink, a brass pump on a plinth, balloons tied off into a bunch. Keepy Uppy has **no stall,
+no stripes, no crowd, no pump**: open-air places at different times of day, one coral balloon in
+free flight, and a **sunset coral on deep sky navy** UI. Its mid band is sky blue, not mint.
 
-Distinct from the family too: not Tug's warm timber and river, not Dodge's road, not Kart's
-violet, not Cadence's neon. The closest neighbour is Kart Race's Meadow Ring (green hills): Keepy
-has no track, no grandstand and no windmill, and its grass is long, flowered and swaying.
+Distinct from Safe Cracker (2D too): outdoors and airy where Safe is a dark room; the hero is
+low centre with the balloon above it, not one object filling the middle.
 
 ## 2. Mood by state
 
 | State | Look |
 | --- | --- |
-| Calm | Warm sun from the upper left, high thin clouds drifting, grass swaying, the air column's streaks rising softly. |
-| Climbing / high | The column's streaks run faster and brighter; the camera pitches up with the balloon so the horizon drops and more sky fills the frame: the feeling of height. |
-| Rain cloud (warning) | A grey-blue cloud slides in from the horizon; its shadow, a dark soft ellipse, crosses the meadow toward the fan. |
-| Rain | The cloud overhead, grey streaks falling through the column, the light cooled and dimmed by about a fifth. |
-| Bird (warning, landing) | A small round bird flaps in from the side and perches on the balloon's top, bobbing it. |
-| Downdraft (warning) | A darker band of flattened grass rolls toward the fan from the horizon; the column's streaks stall. During it: the streaks turn downward and the balloon squashes a little. |
-| Gust (high band) | The streamers on the height pole whip; the balloon wobbles sideways. |
-| Pop | A bright burst of coral shards and a white ring, a quick camera shake, then empty air over the fan for a moment. |
-| New balloon | It floats in from the left on a long string from off-screen, the string lets go and the balloon settles into the column. |
+| Calm | Clouds drifting, grass and streamers swaying, the column's streaks rising softly over the turning blades. |
+| Climbing / high | The column's streaks run faster and brighter; the balloon stretches a little as it climbs and squashes as it sinks. |
+| Rain cloud (warning) | A slate cloud sails in from the right and its shadow creeps across the ground. |
+| Rain | Rain falls under the cloud; the rain hiss comes in. |
+| Bird (warning, landing) | A bird flaps in from the left, low, and lands on the balloon's top; perched birds stay until shaken off. |
+| Downdraft (warning) | A curtain of dark slanting streaks sweeps in from the right, over the column by the time it hits; the column's streaks turn downward. |
+| Gust (high band) | The streamers whip and pale wind lines sweep past the balloon, which wobbles. |
+| Pop | Coral shards and a white ring burst where the balloon was. |
+| New balloon | It floats in from the left in an arc and settles into the column. |
 
-## 3. Shape language
+## 3. Shape language and the silhouette check
 
-- **Round and soft everywhere.** The balloon is a sphere stretched slightly tall (a classic party
-  balloon, a knot and a short curly ribbon below). Hills are rounded, trees are lollipop crowns,
-  clouds are clusters of spheres, the bird is two spheres and a wedge.
-- **The rig is the one built thing:** a chunky wooden pedal-fan box on the grass (a square crate
-  with a round grille facing up and four blades) on short rails, linked to the bike's front by a
-  belt (drawn as a dark band running off the bottom of the screen toward the rider).
-- **The height pole** beside the fan is the hero prop for reading height: a tall wooden pole
-  painted in three bands (low, mid, high) with a pennant streamer at each band line and a
-  windsock at the top.
+- **Round and soft for nature** (crowns of three circles, cumulus of five, round bushes), **square
+  and built for the fan** (planks, brackets, the crate). The balloon is an egg, a little fuller
+  at the top, with a pinched knot.
+- **The balloon has no string.** A balloon held up by air needs none, and the rider's rule
+  (2026-11-02) forbids any moving marker with a round head and a wavy or tapering tail.
+
+**Silhouette check** (every main shape at thumbnail size, against unintended readings):
+
+| Shape | At small size it reads as | Verdict |
+| --- | --- | --- |
+| Balloon | a round egg with a tiny knot, no tail | Safe. The v1 curly string (round head plus wavy tail) is gone. |
+| Perched bird | a round body, a round head, a beak, a short wedge tail wider than long | Safe: no tapering tail. |
+| Flying bird | two raised triangle wings over a round body | Safe. |
+| Gull (seaside) | a shallow "m" of two arcs | Safe: no body, no tail. |
+| Butterfly | four round wings and a short bar | Safe. |
+| Falling leaf | a pointed oval | Safe. |
+| Pop shard | a small irregular triangle | Safe. |
+| Wind lines | three short pale arcs, no heads | Safe. |
+| Rain and downdraft streaks | straight short dashes | Safe. |
+| Column streaks | soft vertical dashes | Safe. |
+| Fan, pole, streamers | built shapes; streamers are flat ribbons attached to a pole | Safe. |
 
 ## 4. Colour system
 
 | Role | Colour | Rule |
 | --- | --- | --- |
-| Balloon | coral `#FF5E5B`, highlight `#FFD6C9` | The only coral, the most saturated colour; a soft rim light so it reads against cloud and sky alike |
-| Grass near / far | `#6FBF4A` / `#9CCB6B` | Fresh yellow-green near, paler toward the horizon |
-| Hills | `#7FB86A` to `#B5D3A0` | Rolling, hazed toward the sky |
-| Wildflowers | white `#F7F4E8`, butter `#F5D547`, lilac `#B8A1E3` | Small dots, never coral or red |
-| Sky top / horizon | `#4FA3E8` / `#CFE9F7` | Clear, airy |
-| Clouds | `#FFFFFF` lit, `#C9D6E3` shade; rain cloud `#7D8A9C` / `#5A6677` | |
-| Fan rig, pole | pale pine `#C9A577`, dark `#6B4E2E` | Warm wood, the only built material |
-| Height bands (pole) | low `#F2EFE6` cream, mid `#7FD3C4` mint, high `#F5C04A` sun | The same three colours as the HUD's band strip |
-| Air column | white `#FFFFFF` streaks, additive and faint | Never opaque; it must not hide the balloon |
-| Bird | slate `#465466`, cream belly `#EDE6D6`, beak `#F5A623` | Small and dark so it reads on the coral |
+| Balloon | coral `#FF5E5B`, sheen `#FFD6C9` | The only coral; lit from the place's sun, a sky-coloured rim on its far side |
+| Fan crate | pine `#C9A577`, dark `#8A6A44` | The built thing; shaded toward the sun |
+| Brass | `#D9A441` | Brackets, rivets, the grille, the pulley's hub, the pole's cap |
+| Height bands (pole, HUD) | low cream `#F2EFE6`, mid sky `#8FD0F0`, high sun `#F5C04A` | The same three colours on the pole and the HUD's chips |
+| Air column | white, additive | Faint (under about 0.25) so the balloon reads through it |
+| Bird | slate `#465466`, cream belly `#EDE6D6`, beak `#F5A623` | Small and dark against the coral |
+| Rain cloud | slate `#8592A4` over `#56606F` | The only grey mass on screen |
 
-- **The grade** (`shaders/keepy_look.gdshaderinc`): fresh and airy, `LOOK_SAT 1.08`,
-  `LOOK_CONTRAST 1.03`, `LOOK_GAIN vec3(1.0, 1.02, 1.02)` (a hair cool-fresh), `LOOK_LIFT
-  vec3(0.0, 0.015, 0.03)` (soft blue-green shadows, never brown: that's Tug's), the vignette
-  light (0.18) and painted into the view grid as Tug does.
-- **UI palette.** Meadow mint accent `#2FD3B0` on deep pine ink `#0B2620`, badges leaning 0.08
-  (a little lift). The band strip uses the pole's three colours. Meaning colours are the kit's
-  (good, warn, bad, target gold). Coral stays in the world.
-- **Colourblind safety:** bands are told by position (bottom, middle, top) and the multiplier
-  number (1×, 2×, 3×), not colour alone; each force has its own icon word and sound.
+**The places** (`KeepyPlaces.PLACES`), each with its own sky, sun and land:
+
+| Place | Light | Signature |
+| --- | --- | --- |
+| Summer meadow | high afternoon sun, upper left | rolling hills, hedgerows, round trees, a mown path, wildflowers; butterflies |
+| Seaside cliffs | golden late afternoon, low right | the sea with the sun's glitter, a lighthouse on the cliff, a fenced headland; gulls |
+| City rooftop at dusk | low orange sun behind the towers | two rows of towers with lit windows, water tanks, a parapet, a deck, pots, a string of warm bulbs; windows lighting up |
+| Autumn park | warm afternoon, upper right | orange and red trees in two rows, a gravel path, a lamp post, a bench, fallen leaves; leaves falling |
+
+**UI palette:** sunset coral `#FF7A59` on deep sky navy `#12233A` (`KeepyUppy.look`), badges
+leaning 0.08. Meaning colours are the kit's. Bands are told by position (left low, right high) and
+the multiplier, never colour alone.
 
 ## 5. Characters
 
-No people. The **balloon** is the rider's avatar: it squashes a little when it sinks fast, bobs
-on the column, and its ribbon trails. The **birds** are round slate birds, cartoon-simple, no
-recognisable species or anyone's character; they flap in the vertex shader and perch facing the
-camera. The rider never sees themselves: only the belt and the fan they drive.
+No people. The balloon is the rider's avatar: it bobs, squashes when it sinks fast, stretches as
+it climbs, tilts when the wind pushes it off the fan. The birds are generic round birds, nobody's
+character, facing the camera's side.
 
-## 6. Environment
+## 6. Environment and layout (1920 x 1080 stage, painted 160 px past each side)
 
-- **Layout:** the fan 7 m ahead of the camera on the grass, the height pole 2 m to its right,
-  meadow in every direction, a few trees wide of the column (never behind the balloon's path),
-  hedgerow lines, hills, then haze. The column rises from the fan's grille up out of the top of
-  the view.
-- **Heights:** the balloon's centre is 1.1 m (on the grille: the ground) to 6.6 m (the top of the
-  column) above the grass; the pole's bands match the logic's 0.35 and 0.65.
-- **Density:** sparse and open. Flowers and grass tufts are one MultiMesh each; trees and
-  hedges are baked into the meadow mesh.
+- **Horizon** at y 640; the land under it everywhere, ridges and props over it.
+- **The fan** stands at x 960 (± 224 px on its rails with Steer), its grille's centre at y 858,
+  the crate's front 340 x 150 below it, its feet on two steel rails at y about 1054; the belt
+  runs down off the bottom edge to the bike.
+- **The balloon** rests on the grille at y 756 (h = 0) and rises to y 340 (h = 1).
+- **The pole** stands at x 1300 from the ground to y 236, painted cream to the mid line, sky blue
+  to the high line, sun above; a streamer at each band line and an orange pennant at the top.
+- **Props stay wide of the column** (x 660-1260 above the horizon is kept for the balloon).
 
 ## 7. VFX language
 
-| Effect | Look |
+| Effect | How |
 | --- | --- |
-| Air column | A tall open cone of soft white streaks rising (shader on one mesh), speed and brightness with the lift |
-| Pop | 28 coral shards (`CPUParticles3D`, one-shot) and a white ring card expanding |
-| Rain | One cylinder card of grey streaks falling under the cloud, alpha blended |
-| Cloud shadow | A soft dark ellipse on the grass (a decal-like quad in the ground shader's uniform) |
-| Downdraft | A wide curtain of dark, slanting air (the rain shader on one card) rolling in from the horizon to the fan over the warning, a dark band of flattened grass under it, and the column's streaks turning downward. The ground band alone was invisible at a grazing angle (AD-VISUAL), hence the curtain |
-| Grass, flowers, streamers, windsock | Sway in their shaders with the wind |
+| Air column | `keepy_column.gdshader` on one rect: streaks rising, faster with lift, falling in a downdraft |
+| Rain, downdraft | `keepy_streaks.gdshader` on one rect each: falling dashes; the curtain's leading edge is a uniform |
+| Sea glitter, windows | `keepy_sea.gdshader`, `keepy_windows.gdshader`, additive, on one rect each |
+| Grass, streamers | `keepy_sway.gdshader`: vertex sway weighted by each vertex's UV.x |
+| Pop | `CPUParticles2D` (26 shards) and a ring scaled and faded by a tween |
+| Butterflies, leaves | `CPUParticles2D`, 10 and 22 |
+| Clouds, gulls | layers drawn once and moved |
 
-Additive only for the column's streaks and the pop ring. Everything else alpha blended or opaque.
+## 8. The frame check (rider, 2026-11-02)
 
-## 8. Camera
+Nothing may be clipped by the frame, the ground line or a HUD panel. `keepy_scene_test` checks
+the balloon (with three birds, squashed and stretched) at every band and the rail's extremes
+against the stage, the grille and the HUD's ride panel, clock panel, Pause, End and the status
+widget laid out at their tallest; and the fan and the pole the same way. The rain cloud and the
+ambient clouds may pass behind the HUD's panels on their way in and out; they are scenery.
 
-First person from the bike at 1.5 m, FOV 66. It **pitches with the balloon** (from +4° with
-the balloon low to +22° at the top, eased) and, with Steer on, **pans gently toward the
-balloon's side** (about a third of its offset, a 1.2 s lag), so the balloon stays near the centre
-of the screen. A small shake at a pop. No roll.
-
-## 9. Tablet budget (Gen 2, PowerVR GX6250, Compatibility; the tracker only with Steer on)
+## 9. Tablet budget (Gen 2, PowerVR GX6250, Compatibility)
 
 | Item | Budget |
 | --- | --- |
 | fps | 60, at least 55 sustained, with Steer's tracker on |
-| Render scale | 0.62 in a SubViewport, no MSAA; 0.55 if play stays under 54 fps (`RenderScaleStep`) |
-| Sky per pixel | one cubemap read (the full sky only in the cubemap pass) |
-| Draw calls in play | ≤ 80 with the HUD (world ≤ 30) |
-| Triangles | ≤ 60k |
-| Ground per pixel | ≤ 2 noise reads |
-| Per-frame GDScript | the balloon, the rig's blades, a handful of uniforms; grass, flowers, clouds and birds' wings move in shaders |
-| Particles | the pop (28) only |
+| The place | one opaque sprite of the bake (two only during a 1.6 s cross-fade) |
+| Draw calls in play | ≤ 80 with the HUD |
+| Full-screen blended layers | none outside a cross-fade and the downdraft's curtain (a few seconds) |
+| Per frame | positions, rotations and about ten uniforms; no `_draw` redraws |
 
-## 10. Art-director review (AD-ART-BIBLE)
+## 10. Reference direction
 
-**AD-ART-BIBLE: APPROVE**, with two notes carried into the build:
+- **Safe Cracker (this repo):** the craft bar: one illustrated hero with material detail, a lit
+  place, ambient life that never redraws, a restrained palette.
+- **Picture-book landscapes:** layered flat ridges with soft haze, round trees. Take the layering;
+  avoid any one illustrator's recognisable style.
+- **Travel posters:** strong sky gradients and a single warm light. Take the light; no type, no
+  logos.
 
-- The colour system matches the mood targets: one coral hero against a cool-fresh field, and
-  each state changes the light or the ground before any text (the shadow, the dark band).
-- Shape language follows from the identity (round and soft; the rig as the one built thing).
-- The asset standards fit the family's proven tablet recipe (Tug of War: 13 world draw calls).
-- Note 1: the air column must stay faint enough that the balloon and its birds read through it;
-  keep it additive and under about 0.25 opacity at full lift.
-- Note 2: the camera's pitch with height is the main "height" cue besides the pole; keep it
-  eased (about 1 s) so a power change never swings the horizon.
+## 11. Art-director review (AD-ART-BIBLE)
+
+**AD-ART-BIBLE: APPROVE.** The colour system serves the mood (one coral hero, a warm or cool place
+around it, slate weather); the shape language follows from the identity (soft nature, a built
+fan); the budget fits the 2D recipe Safe Cracker proved on the tablet. Notes carried into the
+build: keep the column faint; keep props wide of the balloon's lane; run the silhouette check
+again for any new moving shape.

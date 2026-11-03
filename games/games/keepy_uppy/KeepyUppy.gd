@@ -3,10 +3,12 @@ extends Game
 ## weather tries to push it down. Ride higher for more points; touch the ground and it pops, and
 ## a new balloon is on its way.
 ##
-## Rules: `KeepyLogic` (tested headless; DESIGN.md). View: `KeepyWorld` (3D, ART_BIBLE.md).
-## HUD widget: `KeepyStatus`. Audio: `KeepyAudio` and the rendered "Meadow Breeze"
-## (`KeepyMusic`). This scene wires them to the framework: declarations, scoring through award()
-## and penalize(), music and effects through AudioDirector, and the rider's Steer option.
+## Rules: `KeepyLogic` (tested headless; DESIGN.md). The picture is 2D, drawn in code like Safe
+## Cracker's (ART_BIBLE.md): `KeepyBackdrop` (the place, baked, and its ambient life),
+## `KeepyRig` (the pedal fan, its column of air, the height pole), `KeepyBalloon` (the balloon,
+## its birds and the pop), `KeepyWeather` (the rain cloud, the bird coming in, the downdraft's
+## curtain, a gust) and the swaying foreground grass. HUD widget: `KeepyStatus`. Audio:
+## `KeepyAudio` and the rendered theme (`KeepyMusic`). This scene wires them to the framework.
 ##
 ## Camera: off unless the rider turned Steer on (Tug of War's brace-lean precedent):
 ## `tracker_mode_for_segment` returns `lean_x` only then, so the camera runs only for riders who
@@ -15,50 +17,56 @@ extends Game
 const KeepyAudioScript := preload("res://games/keepy_uppy/KeepyAudio.gd")
 const KeepyMusic := preload("res://games/keepy_uppy/KeepyMusic.gd")
 
-## "Meadow Breeze": the bed always; the harmony once the balloon is off the ground (mid band),
-## the lead in the high band.
+## The theme (KeepyMusic): the bed always; the harmony once the balloon is off the ground (the
+## mid band), the lead in the high band.
 const MUSIC_STYLE := {
-	"name": "meadow_breeze",
+	"name": "keepy_theme",
 	"stem_files": KeepyMusic.STEM_FILES,
 	"loop_from": KeepyMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
 }
 const MUSIC_BPM := KeepyMusic.BPM
-## The 3D view renders into a SubViewport at this share of the screen (the family's tablet
-## recipe: fill-rate bound at 1080p), drawn scaled up under the HUD, which stays sharp.
-const RENDER_SCALE := 0.62
-const MSAA := Viewport.MSAA_DISABLED
 const ROUND_SEC := 60.0  ## a "round" of a rounds Just Ride: a minute of air time
 const HUM_DB := -9.0  ## the fan's hum at full lift
 const RAIN_DB := -10.0
 const SQUEAK_BELOW := 0.1  ## the balloon squeaks on the grille below this height, sinking
 const MESSAGE_SEC := 1.6
+## With the Place option on "random", the place changes every PLACE_SEC of play (a cross-fade).
+const PLACE_SEC := 180.0
+const BOB_PX := 6.0
+const GUST_SHAKE_PX := 10.0
 
-## The look (framework/ui/UI_STYLE.md; ART_BIBLE §4): meadow mint on deep pine, badges leaning a
-## little (lift); the face upright.
-static var look := GameTheme.new(Color("2fd3b0"), Color("0b2620"), 0.08)
+## The look (framework/ui/UI_STYLE.md; ART_BIBLE §4): a warm sunset coral on deep sky navy, badges
+## leaning a little (lift); the face upright. Clear of Balloon Pump's mint and candy pink.
+static var look := GameTheme.new(Color("ff7a59"), Color("12233a"), 0.08)
 
 var logic: KeepyLogic
-var world: KeepyWorld
+var backdrop: KeepyBackdrop
+var rig: KeepyRig
+var balloon: KeepyBalloon
+var weather: KeepyWeather
+var foreground: Node2D
 
-var _view: SubViewport
 var _status: KeepyStatus
-var _shown: MeshInstance2D
 var _hum: AudioStreamPlayer
 var _rain: AudioStreamPlayer
-var _view_scale := RENDER_SCALE
 var _message_left := 0.0
 var _squeak_left := 0.0
 var _rain_level := 0.0
 var _rounds := 0
-var governor := RenderScaleStep.new()
+var _place := 0
+var _place_left := PLACE_SEC
+var _place_rng := RandomNumberGenerator.new()
+var _t := 0.0
+var _flash := 0.0
+var _balloon_at := Vector2(KeepyPlaces.FAN_AT.x, KeepyPlaces.BALLOON_LOW)
 
 
 func info() -> GameInfo:
 	var i := GameInfo.new()
 	i.id = "keepy_uppy"
 	i.title = "Keepy Uppy"
-	i.how_to = "Pedal to keep the balloon up"
+	i.how_to = "Pedal to keep the balloon in the air. The higher it flies, the more you score"
 	i.supports = ["rounds", "minutes", "open"]
 	i.min_sec = 60
 	i.max_sec = 3600
@@ -76,9 +84,16 @@ func info() -> GameInfo:
 		"standard": [500, 1100, 2000],
 		"hard": [500, 1100, 2000],
 	}
+	var place_ids: Array = ["random"]
+	var place_names: Array = ["Random"]
+	for p in KeepyPlaces.PLACES:
+		place_ids.append(p.id)
+		place_names.append(p.name)
 	i.options = [
 		{"key": "steer", "label": "Steer", "choices": ["off", "on"], "labels": ["Off", "On"],
 			"default": "off", "kind": "segmented"},
+		{"key": "place", "label": "Place", "choices": place_ids, "labels": place_names, "default": "random",
+			"group": "More options"},
 	]
 	return i
 
@@ -90,8 +105,8 @@ func tracker_mode_for_segment(_segment: Dictionary) -> String:
 
 func how_to_text(_seg: Dictionary) -> String:
 	if option("steer") == "on":
-		return "Pedal to keep the balloon up; lean to slide the fan under it"
-	return "Pedal to keep the balloon up: higher pays more"
+		return "Pedal to keep the balloon up. Lean to slide the fan under it"
+	return declared().how_to
 
 
 func target_text(seg: Dictionary) -> String:
@@ -99,7 +114,7 @@ func target_text(seg: Dictionary) -> String:
 	var ftp := float(p.get("ftp_watts", p.get("ftp", KeepyLogic.DEFAULT_FTP)))
 	var share: float = KeepyLogic.WEIGHT_SHARE.get(str(seg.get("difficulty", "standard")), 0.4)
 	var w := float(p.get("weight_watts", ftp * share))
-	return "About %d W floats it mid-air" % (roundi(KeepyLogic.power_for(0.5, w) / 5.0) * 5)
+	return "About %d W holds it in the middle" % (roundi(KeepyLogic.power_for(0.5, w) / 5.0) * 5)
 
 
 func ui_theme() -> GameTheme:
@@ -113,24 +128,28 @@ func intro_visual() -> Control:
 
 func _ready() -> void:
 	KeepyAudioScript.register()
-	world = KeepyWorld.new()
-	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_set_render_scale(RENDER_SCALE)
-	_view.msaa_3d = MSAA
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	# The view scaled up to the screen: a grid with the vignette in its vertex colours, one draw.
-	_shown = MeshInstance2D.new()
-	_shown.name = "View3DImage"
-	_shown.texture = _view.get_texture()
-	_shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(_shown)
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	backdrop = KeepyBackdrop.new()
+	backdrop.name = "Backdrop"
+	add_child(backdrop)
+	weather = KeepyWeather.new()
+	weather.name = "Weather"
+	add_child(weather.back)
+	rig = KeepyRig.new()
+	rig.name = "Rig"
+	add_child(rig)
+	balloon = KeepyBalloon.new()
+	balloon.name = "Balloon"
+	add_child(balloon)
+	foreground = SafeDial.Layer.new()
+	foreground.name = "Foreground"
+	foreground.paint = _paint_foreground
+	var sway := ShaderMaterial.new()
+	sway.shader = preload("res://games/keepy_uppy/shaders/keepy_sway.gdshader")
+	sway.set_shader_parameter("amount", 7.0)
+	foreground.material = sway
+	add_child(foreground)
+	add_child(weather.front)
+	add_child(weather)  # its own node (it drives the two layers above)
 	_hum = KeepyAudioScript.loop_player("keepy_fan_hum")
 	add_child(_hum)
 	_rain = KeepyAudioScript.loop_player("keepy_rain")
@@ -139,11 +158,13 @@ func _ready() -> void:
 
 func _on_prepare(seg: Dictionary) -> void:
 	logic = KeepyLogic.new(rng.seed, params, difficulty, option("steer") == "on")
-	governor = RenderScaleStep.new()
-	_set_render_scale(RENDER_SCALE)
 	_rounds = 0
 	if str(seg.get("end_mode", "timer")) == "game" and params.has("rounds"):
 		_rounds = maxi(int(params.rounds), 1)
+	_place_rng.seed = rng.seed + 17
+	_place = _pick_place(-1)
+	_place_left = PLACE_SEC
+	_set_place(_place, false)
 	hud.set_skin(look.hud_skin())
 	_status = KeepyStatus.new(look)
 	hud.add_widget(_status)
@@ -152,10 +173,26 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, KeepyAudioScript.music_effects())
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, KeepyAudioScript.sfx_effects())
 	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
-	# One frame of the meadow at rest behind the intro card, and the effects warmed up.
-	world.update_view(0.0, logic)
-	world.prewarm()
+	# The scene at rest behind the intro card, and the effects drawn once so they compile now.
+	_draw_state(0.0)
+	balloon.prewarm()
+	weather.prewarm()
 	_update_status()
+
+
+func _pick_place(not_index: int) -> int:
+	var fixed := KeepyPlaces.index_of(option("place"))
+	if fixed >= 0:
+		return fixed
+	return KeepyPlaces.random_index(_place_rng, not_index)
+
+
+func _set_place(index: int, fade: bool) -> void:
+	_place = index
+	backdrop.set_place(index, fade)
+	rig.set_place(index)
+	balloon.set_place(index)
+	foreground.queue_redraw()
 
 
 func _on_start() -> void:
@@ -174,32 +211,78 @@ func _on_resume() -> void:
 
 
 func _on_option_changed(key: String, _value: String) -> void:
-	if key == "steer":
-		logic.steer = option("steer") == "on"
-		# Switch the camera on or off at once; Kotlin calibrates on the first camera mode.
-		Session.set_tracker_mode(tracker_mode_for_segment(segment))
+	match key:
+		"steer":
+			logic.steer = option("steer") == "on"
+			# Switch the camera on or off at once; Kotlin calibrates on the first camera mode.
+			Session.set_tracker_mode(tracker_mode_for_segment(segment))
+		"place":
+			var fixed := KeepyPlaces.index_of(option("place"))
+			if fixed >= 0 and fixed != _place:
+				_set_place(fixed, true)
+			_place_left = PLACE_SEC
 
 
 func _on_frame(delta: float) -> void:
-	if governor.sample(delta, logic.balloon == KeepyLogic.Balloon.FLYING):
-		_set_render_scale(governor.render_scale(RENDER_SCALE))
-		print("OPENRIDE_GAMES keepy_uppy quality tier=%d fps=%.1f scale=%.2f" % [
-			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
 	var tracking := InputBus.tracker_state == InputBus.TRACKER_TRACKING
 	var events := logic.step(delta, InputBus.power, InputBus.lean_x, tracking, not InputBus.sensors_ok)
 	if logic.last_points > 0.0:
 		award(logic.last_points)
 	for event in events:
 		_handle(event)
-	world.update_view(delta, logic, InputBus.cadence)
+	_draw_state(delta)
 	_update_status()
 	_update_sound(delta)
 	if _message_left > 0.0:
 		_message_left -= delta
 		if _message_left <= 0.0:
 			hud.hide_message()
+	if option("place") == "random":
+		_place_left -= delta
+		if _place_left <= 0.0 and logic.balloon == KeepyLogic.Balloon.FLYING and logic.weather == KeepyLogic.Weather.CALM:
+			_place_left = PLACE_SEC
+			_set_place(_pick_place(_place), true)
 	if _rounds > 0 and played_sec >= _rounds * ROUND_SEC:
 		end_segment()
+
+
+## Moves everything that moves: the balloon, the fan, the column, the weather, the clouds.
+func _draw_state(delta: float) -> void:
+	_t += delta
+	backdrop.step(delta)
+	var power_share := logic.smoothed / maxf(logic.ftp, 1.0)
+	var strength := clampf(logic.smoothed / maxf(logic.weight(), 1.0) * 0.7, 0.0, 1.0) * logic.efficiency
+	var climb := lerpf(0.25, 1.3, strength)
+	if logic.weather == KeepyLogic.Weather.ACTIVE and logic.force == "downdraft":
+		climb = -0.9
+	var gusting := 1.0 if logic.gust != "" or (logic.force == "downdraft" and logic.weather != KeepyLogic.Weather.CALM) else 0.0
+	var wind := 0.3
+	if logic.steer:
+		wind = logic.wind_target / KeepyLogic.WIND_MAX
+	rig.update(delta, logic.fan_x, power_share, strength, climb, gusting, wind)
+	var fm := foreground.material as ShaderMaterial
+	fm.set_shader_parameter("gust", gusting)
+	fm.set_shader_parameter("wind", wind)
+	match logic.balloon:
+		KeepyLogic.Balloon.FLYING:
+			var at := KeepyPlaces.balloon_at(logic.h, logic.x)
+			at.y += sin(_t * 1.7) * BOB_PX
+			at.x += sin(_t * 1.1) * 3.0
+			if logic.gust == "gust":
+				at.x += sin(_t * 19.0) * GUST_SHAKE_PX
+			_balloon_at = at
+			var tilt := sin(_t * 1.3) * 4.0 + clampf((logic.x - logic.fan_x) * 12.0, -16.0, 16.0)
+			balloon.show_at(at, clampf(logic.rate, -0.3, 0.3), tilt, logic.birds)
+		KeepyLogic.Balloon.POPPED:
+			balloon.hide_balloon()
+		KeepyLogic.Balloon.ARRIVING:
+			var p := clampf(1.0 - logic.state_left / KeepyLogic.ARRIVE_SEC, 0.0, 1.0)
+			var e := ease(p, -2.0)
+			var from := Vector2(-140.0, 380.0)
+			var to := KeepyPlaces.balloon_at(KeepyLogic.START_HEIGHT, logic.fan_x)
+			_balloon_at = from.lerp(to, e) + Vector2(0.0, -sin(p * PI) * 80.0)
+			balloon.show_at(_balloon_at, 0.0, (1.0 - e) * 20.0, 0)
+	weather.update(delta, logic, _balloon_at)
 
 
 func _handle(event: Dictionary) -> void:
@@ -217,7 +300,7 @@ func _handle(event: Dictionary) -> void:
 					GameMix.duck_for_moment(2.4)
 					_show_message("Downdraft! Push!", GameTheme.BAD)
 		"bird_land":
-			world.nudge(0.6)
+			GameTheme.pop(_status, 1.06)
 		"birds_shaken":
 			AudioDirector.play_sfx("keepy_birds_shaken")
 			_show_message("Shook off %d!" % event.count if event.count > 1 else "Shook it off!", GameTheme.GOOD)
@@ -228,14 +311,12 @@ func _handle(event: Dictionary) -> void:
 				_show_message("Held it!", GameTheme.GOOD)
 		"gust_warn":
 			AudioDirector.play_sfx("keepy_gust", -4.0)
-		"gust":
-			world.nudge(1.0)
 		"band":
 			if event.band == KeepyLogic.Band.HIGH:
 				AudioDirector.play_sfx("keepy_high_chime", -6.0)
 		"pop":
 			penalize(event.points)
-			world.pop_at_balloon()
+			balloon.pop()
 			AudioDirector.play_sfx("keepy_pop")
 			GameMix.duck_for_sting(1.5)
 			_show_message("POP! −%d" % roundi(event.points), GameTheme.BAD)
@@ -259,12 +340,11 @@ func _update_sound(delta: float) -> void:
 		_squeak_left = 0.8
 		AudioDirector.play_sfx("keepy_squeak", -4.0, randf_range(0.9, 1.1))
 	var intensity := 0.3
-	if logic.balloon != KeepyLogic.Balloon.FLYING:
-		intensity = 0.3
-	elif logic.band == KeepyLogic.Band.HIGH:
-		intensity = 1.0
-	elif logic.band == KeepyLogic.Band.MID:
-		intensity = 0.6
+	if logic.balloon == KeepyLogic.Balloon.FLYING:
+		if logic.band == KeepyLogic.Band.HIGH:
+			intensity = 1.0
+		elif logic.band == KeepyLogic.Band.MID:
+			intensity = 0.6
 	AudioDirector.set_intensity(intensity)
 
 
@@ -306,16 +386,33 @@ func _show_message(text: String, color := GameTheme.INK) -> void:
 	_message_left = MESSAGE_SEC
 
 
-## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
-## The view over the whole window, past the centred stage (#57), whenever the window changes.
-func _fit_view() -> void:
-	_shown.position = -Stage.pad
-	_shown.mesh = KeepyMeshes.view_image(Stage.visible_size)
-	_set_render_scale(_view_scale)
+## Grass tufts along the bottom edge, in front of the fan's feet, swaying (UV.x = sway weight).
+func _paint_foreground(ci: CanvasItem) -> void:
+	var m := SafeMesh.new()
+	var pl := KeepyPlaces.place(_place)
+	var base: Color = pl.near2
+	var tip: Color = (pl.near as Color).lightened(0.15)
+	if pl.id == "rooftop":
+		# Pot plants' leaves at the corners instead of grass.
+		base = Color("2f5a2a")
+		tip = Color("5f9a48")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31 + _place
+	var x := -KeepyPlaces.BLEED
+	while x < KeepyPlaces.SIZE.x + KeepyPlaces.BLEED:
+		var near_fan := absf(x - KeepyPlaces.FAN_AT.x) < 230.0
+		if pl.id != "rooftop" or absf(x - 960.0) > 760.0:
+			var h := rng.randf_range(26.0, 54.0) * (0.6 if near_fan else 1.0)
+			var y := KeepyPlaces.SIZE.y + 4.0
+			for blade in 3:
+				var lean := rng.randf_range(-14.0, 14.0)
+				var bx := x + blade * 7.0
+				m.depth = 0.0
+				var i := m.vert(Vector2(bx - 5.0, y), base)
+				m.vert(Vector2(bx + 5.0, y), base)
+				m.depth = 1.0
+				m.vert(Vector2(bx + lean, y - h * rng.randf_range(0.7, 1.0)), tip)
+				m.tri(i, i + 1, i + 2)
+		x += rng.randf_range(16.0, 30.0)
+	m.depth = 0.0
+	m.flush(ci)

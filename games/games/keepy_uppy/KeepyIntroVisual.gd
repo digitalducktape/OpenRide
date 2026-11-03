@@ -5,7 +5,7 @@ extends HBoxContainer
 ## shapes once (no per-frame cost), like Tug of War's bot portrait.
 
 const PICTURE := Vector2(150, 150)
-const BAND_COLORS := [Color("f2efe6"), Color("7fd3c4"), Color("f5c04a")]
+const BAND_COLORS := [Color("f2efe6"), Color("8fd0f0"), Color("f5c04a")]
 const BALLOON := Color("ff5e5b")
 
 
@@ -28,10 +28,12 @@ func _init(theme: GameTheme, steer: bool) -> void:
 	bands.add_theme_constant_override("separation", 18)
 	words.add_child(bands)
 	for i in 3:
-		bands.add_child(theme.label(["LOW 1×", "MID 2×", "HIGH 3×"][i], HudTheme.SMALL + 4, BAND_COLORS[i], true))
+		var text := "%s %d×" % [KeepyStatus.BAND_NAMES[i], KeepyLogic.multiplier(i as KeepyLogic.Band)]
+		bands.add_child(theme.label(text, HudTheme.SMALL + 4, BAND_COLORS[i], true))
 	var line := "Rain, birds and downdrafts push it down" if not steer else "Wind drifts it: lean the fan back under"
 	words.add_child(theme.label(line, HudTheme.SMALL, GameTheme.MUTED, true))
-	words.add_child(theme.label("Touch the ground and it pops: −50", HudTheme.SMALL, GameTheme.MUTED, true))
+	words.add_child(theme.label("Touch the ground and it pops: −%d" % roundi(KeepyLogic.POP_PENALTY),
+		HudTheme.SMALL, GameTheme.MUTED, true))
 
 
 func _draw_picture(c: Control, ink: Color) -> void:
@@ -45,7 +47,8 @@ func _draw_picture(c: Control, ink: Color) -> void:
 	# The fan's crate and grille at the foot.
 	c.draw_rect(Rect2(20.0, h - 34.0, 70.0, 24.0), Color("c9a577"))
 	c.draw_rect(Rect2(28.0, h - 38.0, 54.0, 6.0), ink)
-	# The column of air, then the balloon in the mid band with its knot and string.
+	# The column of air, then the balloon in the mid band with its knot (no string: ART_BIBLE §3's
+	# silhouette rule).
 	for k in 3:
 		var x := 38.0 + k * 17.0
 		c.draw_line(Vector2(x, h - 44.0), Vector2(x + (k - 1) * 4.0, 40.0), Color(1, 1, 1, 0.35), 3.0, true)
@@ -53,4 +56,5 @@ func _draw_picture(c: Control, ink: Color) -> void:
 	c.draw_circle(centre, 30.0, ink)
 	c.draw_circle(centre, 27.0, BALLOON)
 	c.draw_circle(centre + Vector2(-9.0, -10.0), 7.0, Color("ffd6c9"))
-	c.draw_line(centre + Vector2(0, 28.0), centre + Vector2(4.0, 48.0), Color(1, 1, 1, 0.8), 2.0, true)
+	c.draw_colored_polygon(PackedVector2Array([centre + Vector2(-5, 26), centre + Vector2(5, 26),
+		centre + Vector2(7, 34), centre + Vector2(-7, 34)]), BALLOON.darkened(0.3))

@@ -25,7 +25,7 @@ const PIP_GAP := 6.0
 const PIPS_WIDTH := 3 * PIP + 2 * PIP_GAP + 8.0
 const ARROW_SIZE := Vector2(60, 40)
 const SIDE_WIDTH := 200.0  ## each side column of row 2
-const BAND_COLORS := [Color("f2efe6"), Color("7fd3c4"), Color("f5c04a")]
+const BAND_COLORS := [Color("f2efe6"), Color("8fd0f0"), Color("f5c04a")]
 const BAND_NAMES := ["LOW", "MID", "HIGH"]
 ## Warnings by force: the text and its fill.
 const WARNINGS := {
@@ -58,7 +58,7 @@ var _steer := false
 
 
 func _init(theme: GameTheme = null) -> void:
-	look = theme if theme else GameTheme.new(Color("2fd3b0"), Color("0b2620"), 0.08)
+	look = theme if theme else GameTheme.new(Color("ff7a59"), Color("12233a"), 0.08)
 	name = "KeepyStatus"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := look.panel_style()
@@ -82,7 +82,7 @@ func _init(theme: GameTheme = null) -> void:
 		chip.name = "Band%s" % BAND_NAMES[i]
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.custom_minimum_size = CHIP_SIZE
-		var l := look.label("%s %d×" % [tr(BAND_NAMES[i]), i + 1], HudTheme.SMALL + 4, BAND_COLORS[i], true)
+		var l := look.label("%s %d×" % [tr(BAND_NAMES[i]), KeepyLogic.multiplier(i as KeepyLogic.Band)], HudTheme.SMALL + 4, BAND_COLORS[i], true)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		chip.add_child(l)

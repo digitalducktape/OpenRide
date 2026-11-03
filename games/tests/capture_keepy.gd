@@ -6,12 +6,15 @@ extends SceneTree
 ## downdraft, a pop, Steer with the wind), then ends the ride for the summary. With --stats each
 ## shot also prints its draw calls and primitives. With --play=SECONDS it instead rides with a
 ## scripted rider through the weather (for Movie Maker: add --write-movie FILE.avi --fixed-fps 30).
-## --steer turns Steer on (the scripted rider leans into the wind).
+## --steer turns Steer on (the scripted rider leans into the wind). --places takes one still per
+## place; --place=ID stages the shots in that place.
 
 var _session: Node
 var _director: Node
 var _out := "user://captures"
 var _stats := false
+var _places := false  ## --places: one still per place
+var _place := -1  ## --place=ID: stage the shots in that place
 
 
 func _initialize() -> void:
@@ -30,6 +33,10 @@ func _run() -> void:
 			_stats = true
 		elif arg == "--steer":
 			steer = true
+		elif arg == "--places":
+			_places = true
+		elif arg.begins_with("--place="):
+			_place = KeepyPlaces.index_of(arg.get_slice("=", 1))
 	DirAccess.make_dir_recursive_absolute(_out)
 	_session = root.get_node("Session")
 	_director = _session.director
@@ -68,6 +75,16 @@ func _run() -> void:
 	var logic: KeepyLogic = game.logic
 	logic._next_force = 1.0e9
 	logic._next_gust = 1.0e9
+	if _places:
+		# Every place, the balloon in the mid band.
+		for i in KeepyPlaces.count():
+			game._set_place(i, false)
+			await _hold(game, 0.55, 40)
+			await _shot("place_%s" % KeepyPlaces.place(i).id)
+		quit()
+		return
+	if _place >= 0:
+		game._set_place(_place, false)
 	# Mid band, calm.
 	await _hold(game, 0.5, 90)
 	await _shot("play_mid")
