@@ -203,9 +203,10 @@ game build.
 
 All original and synthesised by `games/tools/music/songs/the_pull.py` (no samples). The music is
 "Heavy Haul", a county-fair boogie at 116 bpm in E: driving drums, octave bass, chugs and power
-chords, a twang guitar lead, then brass and piano in the chorus. Its stem gates are harmony at
-0.5 (the sled is rolling) and lead at 0.85 (within 15 m of the best flag, or 20 m of the Full
-Pull line). The intensity is 0.4 while setting, 0.6 while pulling and 0.3 at rest.
+chords, a strum, a twang guitar lead, then brass and piano in the chorus and a sax in the bridge.
+Its stem gates are harmony at 0.5 (the sled is rolling) and lead at 0.85 (the sled at 1 m/s or
+more, within 15 m of the best flag, or within 20 m of the Full Pull line). The intensity is 0.4
+while setting, 0.6 while pulling and 0.3 at rest. `AUDIO_POLISH.md` has the parity pass.
 
 | Event | Sound | Level | Notes |
 | --- | --- | --- | --- |
@@ -225,7 +226,7 @@ The loops play on the game's own players on the SFX bus, eased over 0.25 s so th
 don't step them, and paused with the game. The bus effects are an outdoor reverb and a glue
 compressor on the music, a reverb and a limiter on the effects, and the shared -1 dBFS Master
 limiter. An offline render (`tests/render_game_audio.gd --game=the_pull`, 90 s) measured the mix
-at -18.4 LUFS with a -2.5 dBFS peak before the limiter and no clipping. The horn cuts through by
+at -17.6 LUFS with a -2.2 dBFS peak before the limiter and no clipping. The horn cuts through by
 14 dB broadband, and the stall horn by 10 dB.
 
 ## GodotPrompter pattern choices

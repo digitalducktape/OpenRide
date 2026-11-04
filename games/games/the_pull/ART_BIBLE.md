@@ -1,6 +1,7 @@
 # The Pull: art bible
 
-> **Status:** v1, 2026-11-02: the look-and-sound slice (#79). **Owner:** whoever changes the
+> **Status:** v2, 2026-11-02: the graphics pass for wave 1 parity (`GFX_POLISH.md`) on v1, the
+> look-and-sound slice (#79). **Owner:** whoever changes the
 > look. Change this file in the same commit as any change to the palette, the light, the sled or
 > the effects. **Sources of truth:** `PullWorld.gd` (layout, per frame), `PullMeshes.gd` (every
 > mesh), `shaders/*.gdshader` and `shaders/pull_look.gdshaderinc` (the grade), `ThePull.look`
@@ -104,6 +105,9 @@ warm-on-cool dusk with floodlight pools.
 - **Strain:** a camera shake that grows as the speed falls below 0.6 m/s with power on, plus a
   red-amber flush tint on the view's image during Dig in! (its modulate, no overlay).
 - **Flare:** the lamps' glow uniform jumps at a Full Pull and eases back.
+- **Halos and motes:** an additive halo on every floodlight head (one MultiMesh) and 36 dust
+  motes drifting in the light around the rider, both on `glow.gdshader`.
+- **The crowd cheers** with raised arms, each figure on its own beat, in its shader.
 
 ## 8. Camera
 
@@ -121,3 +125,22 @@ warm-on-cool dusk with floodlight pools.
 - No per-pixel `sin` hashes: noise from the shared texture, at most three reads a pixel on the
   track.
 - `prewarm` draws the confetti and dust behind the intro card so their shaders compile then.
+
+## 10. Silhouette check (rider, 2026-11-02; required)
+
+Every main shape, checked in silhouette at small size for unintended readings. The rule: no
+moving marker, cursor or particle may have a round head with a wavy or tapering tail.
+
+| Shape | Moves? | Silhouette | Verdict |
+| --- | --- | --- | --- |
+| Sled and weight box | yes | a boxy frame and blocks | clean |
+| Chain | yes | a straight run of rings, sagging a little when slack | clean: rings, no head, no tail |
+| Crowd figures | hop | a round head on a straight, rounded body; arms straight up | clean: a person |
+| Dust puffs, motes, halos | drift | soft round dots with no trail | clean: no tail |
+| Confetti | falls | small squares | clean |
+| Pennants | sway | triangles on a line | clean |
+| Best flag | waves | a rectangle on a pole | clean |
+| Gloves and sleeves | bob | fists on the bar, sleeves leaving the frame | clean; the first version's green cuffs read as cans and were replaced |
+| Mirror | bobs | an oval on a thin angled stalk | clean: a straight jointed stalk, far too rigid to read as a tail. Keep it straight, and keep the rim and dark back |
+| HUD bar | fills | a pill with a flag tick and a checked end | clean |
+| Intro picture | still | a sled, blocks, a straight arrow, a row of rings | clean |

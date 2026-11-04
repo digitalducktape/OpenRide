@@ -1057,6 +1057,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | Tug of War | Heave Together | 132 bpm, D minor | Stomp-clap sea shanty: strums, accordion, tin whistle, brass | harmony with the rope tight, lead in a surge |
 | Safe Cracker | Night Shift | 120 bpm swung, C minor | Spy jazz: ride and brushes, walking bass, vibes, muted trumpet, sax, spy guitar | harmony and lead while steady; the bed alone while the alarm rings |
 | Cadence Karaoke | Neon Lines | the cadence (70-130 bpm), A major | Synth-funk: slap bass, Rhodes, plucks, supersaw hook | the tempo is the target cadence; the lead only in the band |
+| The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -2127,8 +2128,12 @@ per difficulty (for the flag on the track). `ThePull.gd` wires them to the frame
   Metres come from `PullLogic.shown_m()` everywhere (`the_pull_scene_test`).
 - **Look:** a floodlit clay track, hand-lit like every 3D game here (pools from a `mod`, no
   loop). One baked scenery mesh, a billboard crowd MultiMesh, the sled with its sliding box and
-  an 18-link chain, a handlebar mirror (a 256×166 SubViewport) and a look back over the shoulder
-  at each pull's start. 68-85 draw calls in play on the desktop with the HUD.
+  an 18-link chain, a handlebar mirror (a 256×166 SubViewport, every other frame) and a look back
+  over the shoulder at each pull's start. Stands with bunting and bulbs, a cheering crowd,
+  floodlight halos, dust motes, a turning wheel (`GFX_POLISH.md`, `UI_POLISH.md`,
+  `AUDIO_POLISH.md`). 71-74 draw calls in play on the desktop with the HUD.
+- **Intro copy:** "Reach the Full Pull line at N m" (from the segment's `d_ref_m` and
+  `full_factor`), or "Your best: N m" once the rider has one. No number is hard-coded.
 - **Captures:** `tests/capture_pull.gd` (review shots; `--play=SECONDS` for a recording) and
   `tests/render_game_audio.gd --game=the_pull`.
 

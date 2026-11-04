@@ -30,6 +30,7 @@ const DIG_IN_TINT := Color(1.0, 0.62, 0.45)
 const LOOK_TURN_SEC := 1.2  ## the look back turns to the track over the end of SET
 const RESULT_END_DELAY := 2.0  ## after the last pull's result, the segment ends this much later
 const NEAR_FULL_M := 20.0
+const LEAD_SPEED := 1.0  ## m/s: under what a half-FTP rider starts at (1.34), so every rider hears the hook
 
 ## The look (framework/ui/UI_STYLE.md): tractor green on a dark field green, a slight lean.
 static var look := GameTheme.new(PullMeshes.ACCENT, PullMeshes.INK, 0.08)
@@ -245,7 +246,8 @@ func _update_view(delta: float, power: float) -> void:
 	var intensity := 0.4
 	if pulling:
 		intensity = 0.6
-		if near_best or logic.distance >= logic.full_m - NEAR_FULL_M:
+		# The hook (the lead stem) while the sled rolls well, and near the best or the line.
+		if near_best or logic.distance >= logic.full_m - NEAR_FULL_M or logic.speed >= LEAD_SPEED:
 			intensity = 1.0
 	elif logic.phase == PullLogic.Phase.RECOVERY:
 		intensity = 0.3

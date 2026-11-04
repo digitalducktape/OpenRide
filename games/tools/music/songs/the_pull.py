@@ -36,13 +36,22 @@ SONG = dict(
         bridge="G5:2 E5:2 | F#5:2 D5:2 | G#5:1 B5:1 E6:2 | D6:3 r:1 | G5:2 C6:2 | A5:2 F#5:2 | D#5:1 F#5:1 B5:2 | A5:2 F#5:2",
     ),
     parts=dict(
-        intro=[("comp", "chug", 0.7)],
-        verse=[("comp", "chug", 0.85), ("comp", "piano_off", 0.5), ("lead", "verse", "twang", "lead", 0, 0.9)],
-        chorus=[("comp", "power", 0.9), ("comp", "piano8", 0.55), ("comp", "stabs", 0.6),
+        intro=[("comp", "chug", 0.7), ("comp", "strum", 0.5)],
+        # Verse: palm-muted chugs and a barrelhouse off-beat piano under the twang lead, with an
+        # acoustic strum doubling the rhythm for the fairground feel.
+        verse=[("comp", "chug", 0.85), ("comp", "piano_off", 0.55), ("comp", "strum", 0.55),
+               ("lead", "verse", "twang", "lead", 0, 0.9)],
+        # Chorus: open power chords, boogie piano eighths and horn stabs; brass carries the hook
+        # with the twang an octave down.
+        chorus=[("comp", "power", 0.9), ("comp", "piano8", 0.6), ("comp", "stabs", 0.65), ("comp", "strum", 0.45),
                 ("lead", "chorus", "brass", "lead", 0, 0.9), ("lead", "chorus", "twang", "lead2", -12, 0.5)],
-        bridge=[("comp", "power", 0.75), ("comp", "pad", 0.5), ("lead", "bridge", "twang", "lead", 0, 0.8)],
-        chorus2=[("comp", "power", 0.9), ("comp", "piano8", 0.55), ("comp", "stabs", 0.6),
-                 ("lead", "chorus", "brass", "lead", 0, 0.9, True), ("lead", "chorus", "twang", "lead2", 12, 0.4)],
+        # Bridge: half-time drums (the arranger's), held horn stabs and a pad; a honking sax
+        # answers the twang.
+        bridge=[("comp", "power", 0.7), ("comp", "stabs_hold", 0.55), ("comp", "pad", 0.45),
+                ("lead", "bridge", "twang", "lead", 0, 0.8), ("lead", "bridge", "sax", "lead2", -12, 0.5)],
+        chorus2=[("comp", "power", 0.9), ("comp", "piano8", 0.6), ("comp", "stabs", 0.65), ("comp", "strum", 0.45),
+                 ("lead", "chorus", "brass", "lead", 0, 0.9, True), ("lead", "chorus", "twang", "lead2", 12, 0.4),
+                 ("counter", "sax", "lead2", 0.45)],
     ),
 )
 
