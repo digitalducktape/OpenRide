@@ -254,6 +254,9 @@ calm weather and a balloon in the air. My call, so a long ride stays fresh as Sa
 
 ## Gate reviews (ccgs, for the 2D rework)
 
+These are the builder's own passes against the gate questions, not independent reviews; the
+fresh reviewer comes next.
+
 - **AD-VISUAL: APPROVE.** One coral hero near the centre, an illustrated fan, four distinct lit
   places, no fairground props (distinct from Balloon Pump), every force visible before it acts,
   and the silhouette check recorded in ART_BIBLE §3: the balloon's old curly string is gone. It
@@ -268,7 +271,7 @@ calm weather and a balloon in the air. My call, so a long ride stays fresh as Sa
   its tallest), the callout lane, the intro copy word for word with its numbers from the segment,
   no redraws in play and one bake a place; `KeepyUppyCatalogTest` covers Kotlin. Gaps, for the
   bike: how the thresholds and Steer feel, which no test can say.
-- **TD-FEASIBILITY: APPROVE.** Safe Cracker's 2D recipe: no 3D view, one baked opaque sprite,
+- **TD-FEASIBILITY: VIABLE.** Safe Cracker's 2D recipe: no 3D view, one baked opaque sprite,
   batched layers, nothing redrawn in play. Desktop: 56-73 draw calls with the HUD, 15-24k
   primitives. Tablet (Gen 2, mock build, 2026-11-04): 60-62 fps for a minute with Steer off, and
   60-61 fps for 75 s of play with Steer on and the camera's load running (`tracker_load`, no
