@@ -283,8 +283,9 @@ class SessionPlansTest {
             assertEquals(withCamera.segments.map { it.durationSec }, without.segments.map { it.durationSec })
             assertEquals(withCamera.segments.map { it.effort }, without.segments.map { it.effort })
             assertEquals(withCamera.planId, without.planId)
-            // Today Tug of War is the only camera-free work game, so it plays every work slot.
-            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertEquals("tug_of_war", it.gameId) }
+            // Every work slot plays a camera-free work game.
+            val camFree = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id }
+            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertTrue(it.gameId in camFree) }
         }
         // With the camera, Dodge Ball plays its share.
         assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId == "dodge_ball" })
@@ -330,14 +331,14 @@ class SessionPlansTest {
 
     /** Eleven games, as the epic plans them: some only fit the 1:30 work slot, three need the camera. */
     private val elevenGames = GameCatalog(
-        GameCatalog.DEFAULT.games + listOf(
+        GameCatalog.DEFAULT.games + listOf(  // a stand-in only until the real game is in the catalog
             poolGame("power_grid", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.WORK),
             poolGame("watt_lane", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.RECOVERY),
             poolGame("gate_crasher", SegmentRole.WORK, camera = true),
             poolGame("ready_for_launch", SegmentRole.WORK, minSec = 90),
             poolGame("keepy_uppy", SegmentRole.RECOVERY),
             poolGame("the_pull"),
-        ),
+        ).filter { GameCatalog.DEFAULT[it.id] == null },
     )
 
     private val catalogs = listOf(GameCatalog.DEFAULT, elevenGames)
@@ -421,8 +422,10 @@ class SessionPlansTest {
     fun `pools come from the catalog's roles and leave out the demo and, without the camera, camera games`() {
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP).map { it.id })
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.COOLDOWN).map { it.id })
-        assertEquals(setOf("dodge_ball", "tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
-        assertEquals(listOf("tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
+        assertTrue(GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.containsAll(listOf("dodge_ball", "tug_of_war", "keepy_uppy")))
+        val camFree = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id }
+        assertTrue(camFree.containsAll(listOf("tug_of_war", "keepy_uppy")))
+        assertFalse("dodge_ball" in camFree)
         assertEquals(setOf("cadence_karaoke", "power_grid", "watt_lane"), elevenGames.circuitPool(SegmentRole.WARMUP).map { it.id }.toSet())
         assertFalse(elevenGames.circuitPool(SegmentRole.WORK, cameraGames = false).any { it.usesCamera })
         assertTrue(SegmentRole.entries.none { role -> elevenGames.circuitPool(role).any { it.id == "the_pull" || it.id == "kart_race" } })

@@ -168,6 +168,8 @@ func _send_eleven_games() -> void:
 	HubState.test_ids = FAKE_GAMES.keys()
 	var s: Dictionary = local.hub.state()
 	for id in FAKE_GAMES:
+		if s.catalog.any(func(g): return g.id == id):
+			continue  # already a real game: it's in the catalog once
 		var e: Dictionary = s.catalog[1].duplicate(true)
 		e.id = id
 		e.title = id.capitalize()
@@ -276,7 +278,9 @@ func test_bakes_go_quiet_when_settled() -> void:
 	await _settle(20)
 	assert_int(_renders(bakes)).override_failure_message("a bake rendered on an idle frame").is_equal(before)
 	for b in bakes:
-		assert_bool(b.is_pending()).is_false()
+		# A card on another page of games waits, hidden, until its page shows.
+		if b.is_visible_in_tree():
+			assert_bool(b.is_pending()).is_false()
 
 
 func test_the_frame_cap_in_the_hub() -> void:

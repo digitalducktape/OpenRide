@@ -2,7 +2,12 @@
 
 Keep a balloon in the air over a fan your pedalling drives. The weather tries to push it down.
 This is the game's source of truth for its rules and tuning. The issue (#77) is the spec; every
-change from it is listed under **Changes from the issue**. The look is in `ART_BIBLE.md`.
+change from it is listed under **Changes from the issue**. The look is in `ART_BIBLE.md`; the
+polish records are `GFX_POLISH.md`, `UI_POLISH.md` and `AUDIO_POLISH.md`.
+
+**2D rework (rider, 2026-11-02):** the game is 2D, like Safe Cracker: the balloon near the centre
+of the screen above an illustrated pedal fan, in four lit outdoor places. The rules, their tests
+and the Steer option didn't change. Only the picture, the UI colours and the music did.
 
 - Game id `keepy_uppy`, role **work**, effort multiplier on (also in Just Rides).
 - Tracker `off`, or `lean_x` with the **Steer** option on (`tracker_mode_for_segment`, Tug of
@@ -87,8 +92,8 @@ The weather sends one force at a time: the first 8-14 s in, then every 10-16 s a
 one ends (seeded from the segment). The pick is weighted rain 35%, bird 40%, downdraft 25%;
 with three birds already perched, no more birds.
 
-- **Rain cloud.** Telegraph **3 s**: the cloud slides in from the horizon and its shadow
-  creeps across the meadow toward the fan ("Rain cloud coming"). Then 8-12 s overhead, with
+- **Rain cloud.** Telegraph **3 s**: the cloud sails in from the right and its shadow
+  creeps across the ground toward the fan ("Rain cloud coming"). Then 8-12 s overhead, with
   rain: the balloon is **heavier by 10% of FTP** (`rain_watts`). Answer: about 10% of FTP more,
   or ride it out a band lower.
 - **Birds.** Telegraph **2.5 s**: a bird flies in from the side ("Bird incoming"). It lands
@@ -96,8 +101,8 @@ with three birds already perched, no more birds.
   high band for 3 s in a row and every bird flies off (`birds_shaken` counts them). A pop also
   scares them off, and they get bored and leave by themselves 20 s after the last one landed
   (`BIRD_STAY`; neither is counted), so a rider who never rides high isn't buried under them.
-- **Downdraft.** Telegraph **2.5 s**: the grass flattens in a dark band rolling in and a low
-  whoosh builds ("Downdraft! Push!"). Then for 1.5 s the air pushes down: the balloon sinks at
+- **Downdraft.** Telegraph **2.5 s**: a curtain of dark slanting air sweeps in from the right and
+  a low whoosh builds ("Downdraft! Push!"). Then for 1.5 s the air pushes down: the balloon sinks at
   up to `DOWNDRAFT_SINK = 0.25` a second (the floaty limit is lifted) and the lift is pushed down
   by 20% of FTP (`downdraft_watts`). Unanswered, it drops a balloon from the middle of the mid
   band (0.5) to about 0.13, low but alive; from the low band it pops. Spinning up during the
@@ -132,13 +137,13 @@ the center of the screen but might move."
   `EDGE = 1.2 m`, `MAX_LOSS = 0.5`. A fan fully out from under the balloon halves its lift,
   which sinks it from anywhere. Leaning the wrong way makes the offset bigger: that is how a
   lean "could miss keeping the balloon up".
-- **The wind** changes every 6-10 s and eases to its new strength over up to 3 s; the windsock
+- **The wind** changes every 6-10 s and eases to its new strength over up to 3 s; the streamers
   on the height pole and the HUD's wind arrow show the new wind as soon as it's chosen, and the
   balloon's 2 s drift lag adds to that, so the rider sees it coming. Holding a full wind takes
   a moderate lean (about 0.6 of the tracker's range, less with the free zone).
-- **The camera follows the balloon gently** (it pans toward the balloon's x with a 1.2 s lag
-  and pitches with its height), so the balloon stays near the centre of the screen and its
-  sideways drift reads against the fan and the meadow.
+- **The balloon stays near the centre of the screen**: 140 px a metre, drawn at most 1.6 m
+  (224 px) either side, so its drift reads against the fan on its rails and it never reaches a
+  HUD panel.
 - **Without a face** (`tracker_state` not tracking: face lost, camera off, calibrating) the
   wind dies away over 2 s and the fan glides back to the centre, so a lost camera never drops
   the balloon.
@@ -237,36 +242,35 @@ Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin se
 - Play it on the desktop by running `KeepyUppy.tscn` (F6), which gives a local Just Ride with the
   keyboard simulator (`+`/`-` cadence, `[`/`]` resistance, arrows to lean with Steer on), or
   `tests/capture_keepy.gd` (`--play=SECONDS` rides with a scripted rider).
-- **Not in the desktop hub's list yet** (`LocalHub.ORDER`): the hub's home row fits five game
-  cards at 1920 wide, and a sixth falls off the right edge (`hub_layout_test` fails). Issue #75
-  ("the hub shows every game") owns that layout; once it lands, append `keepy_uppy` to
-  `LocalHub.ORDER` and `USES_CAMERA` (`false`). On the bike the Kotlin catalog already lists it,
-  so until #75 its card sits partly off screen (checked on the tablet: still tappable).
+- It's in the desktop hub and the bike's: #75's paged home row shows it (`LocalHub.order()`
+  adds any registered game after the first five). With six games the home row now pages: four
+  cards, then two.
 
-## Gate reviews (ccgs, before the slice goes to the rider)
+### Places
 
-- **AD-VISUAL: APPROVE.** The slice matches the bible: one coral hero near the centre, a
-  cool-fresh meadow with no fairground props (distinct from Balloon Pump), every force visible
-  in the world before it acts (the cloud and its shadow, the incoming bird, the downdraft's dark
-  curtain, the whipping streamers). Two adjustments were made in the pass: the clouds' painted
-  AO darkened them to grey (fixed), and the downdraft's ground band was invisible at a grazing
-  angle, so a curtain of dark slanting air carries it (ART_BIBLE §7 updated).
-- **LP-CODE-REVIEW: APPROVE.** Rules in a `RefCounted` with two enum machines, no scene
-  access; the scene only wires; no per-frame allocations beyond the event array; labels set
-  only on change; sound names namespaced (`keepy_*`) so a parallel game can't replace them.
-  Concern noted, not blocking: a handful of shader uniforms are set every frame (cloud shadow,
-  downdraft band, column), as Tug of War does for its deck shadow.
-- **QL-TEST-COVERAGE: ADEQUATE.** Every acceptance item of #77 maps to a test in
-  `keepy_logic_test` (lift against weight, bands, each force and its ≥ 2 s warning, pop and
-  respawn, Steer's lift loss and the #71 forgiveness, stars) and `keepy_scene_test` (camera
-  only with Steer, the pop's penalty, stats, rounds ending, the HUD widget's budget), plus
-  `KeepyUppyCatalogTest` on the Kotlin side. Gap left for the bike: how the thresholds feel.
-- **TD-FEASIBILITY: APPROVE.** The family's tablet recipe (0.62 SubViewport, no MSAA, unshaded
-  hand light, one baked meadow mesh, the sky from its cubemap, `RenderScaleStep`). Desktop: 53-69
-  draw calls in play with the HUD, about 40-44k primitives. Tablet (Gen 2, mock build,
-  2026-11-01): 60-61 fps in play with Steer off (a minute, a mock rider at 80-190 W), and 60-61
-  for a minute of play with Steer on and the camera's full load running (`tracker_load`, no
-  face, about 2.1 cores busy); the quality step never tripped.
+The **Place** option (under More options; random by default) picks one of four places, or keeps
+one. On random, the place changes every 3 minutes of play with a 1.6 s cross-fade, waiting for
+calm weather and a balloon in the air. My call, so a long ride stays fresh as Safe Cracker's does.
+
+## Gate reviews (ccgs, for the 2D rework)
+
+- **AD-VISUAL: APPROVE.** One coral hero near the centre, an illustrated fan, four distinct lit
+  places, no fairground props (distinct from Balloon Pump), every force visible before it acts,
+  and the silhouette check recorded in ART_BIBLE §3: the balloon's old curly string is gone. It
+  changed the build: GFX_POLISH items 1-6, and a smaller, lower rain cloud clear of the status
+  widget.
+- **LP-CODE-REVIEW: APPROVE, with one concern.** Rules untouched in a `RefCounted`; the scene only
+  wires; shapes drawn once, labels set on change. Concern: the game reuses Safe Cracker's
+  `SafeMesh` and `SafeDial.Layer`, so it depends on another game's classes (as Tug does on Kart's
+  mesh kit). Promoting them to the framework is a job for a later pass.
+- **QL-TEST-COVERAGE: ADEQUATE.** `keepy_logic_test` covers every rule in #77; `keepy_scene_test`
+  adds the frame check (the balloon, fan and pole against the stage, the grille and the HUD at
+  its tallest), the callout lane, the intro copy word for word with its numbers from the segment,
+  no redraws in play and one bake a place; `KeepyUppyCatalogTest` covers Kotlin. Gaps, for the
+  bike: how the thresholds and Steer feel, which no test can say.
+- **TD-FEASIBILITY: see the tablet line below.** Safe Cracker's 2D recipe: no 3D view, one baked
+  opaque sprite, batched layers, nothing redrawn in play. Desktop: 56-73 draw calls with the HUD,
+  15-24k primitives.
 
 ## GodotPrompter patterns (picked, rejected, why)
 
@@ -274,9 +278,9 @@ Every value lives in `KeepyLogic`'s constants or the segment's params; Kotlin se
 | --- | --- | --- | --- | --- |
 | Rules | `gdscript-patterns`, `state-machine` | A `RefCounted` logic class with an enum FSM for the balloon (flying, popped, arriving) and the weather (idle, telegraph, active) | Node-based states | Two small machines with a handful of states; enum `match` is headless-testable and allocation-free, as `TugLogic` |
 | Tests | `godot-testing` | GdUnit4 suites driving the logic with scripted power at 60 Hz | Scene-level sims for the rules | The rules are deterministic and fast to test without a tree; one scene test covers the wiring |
-| Scene | `scene-organization` | One scene root (`Game`) with a SubViewport world, a HUD widget, and an Audio helper, as Tug of War | One script doing everything | Matches the family: logic, world, status, audio |
-| 3D | `3d-essentials` | Unshaded, hand-lit on the shared `WorldLook`, statics baked into one vertex-coloured mesh, sky cubemap | Engine lights, fog and shadows | The tablet is fill-bound; the family's recipe holds 60 fps |
-| Effects | `particles-vfx` | `CPUParticles3D` one-shot for the pop and the rain streaks in a shader on one card | GPUParticles | Compatibility renderer, tiny counts; GPU particles compile slower on the tablet |
-| HUD | `hud-system` | One themed `PanelContainer` widget in the top-centre slot, labels set only on change | A per-frame redraw gauge | The framework's budget rules (UI_STYLE.md §8) |
-| Motion | `tween-animation` | `GameTheme.pop`/`pulse` on the widget; the balloon's bob and the pop in code | AnimationPlayer | Procedural motion follows the logic each frame |
+| Scene | `scene-organization` | One `Game` root over small Node2D parts (backdrop, rig, balloon, weather), each owning its layers | One big `_draw` | Safe Cracker's structure: static layers never redraw, only positions move |
+| 2D drawing | `2d-essentials`, `shader-basics` | Shapes batched by `SafeMesh`, the place baked once into a SubViewport texture, life in small canvas shaders | `Parallax2D` layers and `PointLight2D` | 2D is all blended on a fill-bound tablet: one opaque sprite costs one screen; live layers and 2D lights cost several |
+| Effects | `particles-vfx` | `CPUParticles2D` for the pop, butterflies and leaves; rain and the downdraft in a streak shader on one rect each | `GPUParticles2D` | Tiny counts (10-26), and Safe Cracker's dust and sparkles already work this way on the tablet |
+| HUD | `hud-system` | One themed `PanelContainer` widget in the top-centre slot, labels set only on change, and callouts in the game's own banner lane | The HUD's centre message | It sits on the balloon; Safe Cracker's banner solved the same problem |
+| Motion | `tween-animation` | Tweens for one-offs (the pop's ring, the cross-fade, callouts); the balloon's bob and squash set each frame from the logic | AnimationPlayer | Motion follows the logic; nothing is keyframed |
 | Audio | `audio-system` | Rendered OGG theme with three stems gated by height, effects registered by name, fan hum as a looping sfx pitched to lift | MusicGen at runtime | The family's #55 pipeline |

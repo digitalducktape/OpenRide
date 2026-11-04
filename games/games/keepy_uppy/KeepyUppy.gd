@@ -20,14 +20,14 @@ const KeepyMusic := preload("res://games/keepy_uppy/KeepyMusic.gd")
 ## The theme (KeepyMusic): the bed always; the harmony once the balloon is off the ground (the
 ## mid band), the lead in the high band.
 const MUSIC_STYLE := {
-	"name": "keepy_theme",
+	"name": "updraft",
 	"stem_files": KeepyMusic.STEM_FILES,
 	"loop_from": KeepyMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
 }
 const MUSIC_BPM := KeepyMusic.BPM
 const ROUND_SEC := 60.0  ## a "round" of a rounds Just Ride: a minute of air time
-const HUM_DB := -9.0  ## the fan's hum at full lift
+const HUM_DB := -14.0  ## the fan's hum at full lift
 const RAIN_DB := -10.0
 const SQUEAK_BELOW := 0.1  ## the balloon squeaks on the grille below this height, sinking
 const MESSAGE_SEC := 1.6
@@ -292,13 +292,15 @@ func _handle(event: Dictionary) -> void:
 		"telegraph":
 			match event.force:
 				"rain":
-					AudioDirector.play_sfx("keepy_rain_warn", -2.0)
+					AudioDirector.play_sfx("keepy_rain_warn", 1.0)
+					GameMix.duck_for_moment(2.0)
 					_show_message("Rain cloud coming", GameTheme.WARN)
 				"bird":
-					AudioDirector.play_sfx("keepy_bird_flutter", -3.0)
+					AudioDirector.play_sfx("keepy_bird_flutter", 0.0)
+					GameMix.duck_for_moment(1.2)
 					_show_message("Bird incoming", GameTheme.WARN)
 				"downdraft":
-					AudioDirector.play_sfx("keepy_downdraft_warn", -1.0)
+					AudioDirector.play_sfx("keepy_downdraft_warn", 1.0)
 					GameMix.duck_for_moment(2.4)
 					_show_message("Downdraft! Push!", GameTheme.BAD)
 		"bird_land":
@@ -312,14 +314,15 @@ func _handle(event: Dictionary) -> void:
 			if event.force == "downdraft" and event.get("beaten", false):
 				_show_message("Held it!", GameTheme.GOOD)
 		"gust_warn":
-			AudioDirector.play_sfx("keepy_gust", -4.0)
+			AudioDirector.play_sfx("keepy_gust", 0.0)
+			GameMix.duck_for_moment(2.0)
 		"band":
 			if event.band == KeepyLogic.Band.HIGH:
 				AudioDirector.play_sfx("keepy_high_chime", -6.0)
 		"pop":
 			penalize(event.points)
 			balloon.pop()
-			AudioDirector.play_sfx("keepy_pop")
+			AudioDirector.play_sfx("keepy_pop", 1.0)
 			GameMix.duck_for_sting(1.5)
 			_show_message("POP! −%d" % roundi(event.points), GameTheme.BAD)
 			GameTheme.pop(hud.score, 1.2)

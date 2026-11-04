@@ -24,12 +24,15 @@ const REELS := {
 	"cadence_karaoke": ["beat_tick", "streak_up", "band_exit", "ease_off_chime"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
+	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
+		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
 }
 const GAME_SCRIPTS := {
 	"dodge_ball": "res://games/dodge_ball/DodgeAudio.gd",
 	"tug_of_war": "res://games/tug_of_war/TugAudio.gd",
 	"safe_cracker": "res://games/safe_cracker/SafeAudio.gd",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceAudio.gd",
+	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
 }
 
 var out_dir := ""
@@ -118,6 +121,8 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"power_cap_watts": 160.0}
 		"cadence_karaoke":
 			params = {"ftp_watts": 250.0, "pace": 70}
+		"keepy_uppy":
+			params = {"ftp_watts": 200.0, "weight_watts": 80.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -185,6 +190,18 @@ func _ride(game_id: String, director: Node) -> void:
 					_paced = 2
 			if t > 25.0 and t < 31.0:
 				cad += 12.0
+		"keepy_uppy":
+			# The mid band (about 105 W), the high band (20-40 s), the low band (40-50 s), a stop
+			# that pops the balloon (50-56 s), then the mid band again. Resistance 30%: the
+			# simulator makes 1.65 W an rpm.
+			res = 30.0
+			cad = 64.0
+			if t > 20.0 and t < 40.0:
+				cad = 82.0
+			elif t > 40.0 and t < 50.0:
+				cad = 57.0
+			elif t > 50.0 and t < 56.0:
+				cad = 20.0
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8
@@ -271,10 +288,11 @@ func _mix_frame() -> void:
 	sfx.resize(n_out)
 	var master_db := AudioServer.get_bus_volume_db(0)
 	for v in _voices.duplicate():
-		var player: AudioStreamPlayer = v.player
-		if not is_instance_valid(player):
+		# A game's own player (Keepy Uppy's loops) is freed with its scene: check before typing it.
+		if not is_instance_valid(v.player):
 			_voices.erase(v)
 			continue
+		var player: AudioStreamPlayer = v.player
 		if player.stream_paused:
 			continue
 		if not player.playing:

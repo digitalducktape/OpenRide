@@ -2,13 +2,13 @@ extends RefCounted
 ## Keepy Uppy's own sounds (#77), registered with AudioDirector by the game scene.
 ##
 ## Rendered effects (`music/sfx/*.ogg`, games/tools/music/songs/keepy_uppy.py, in the music's key
-## of G), named `keepy_*` because AudioDirector keeps one sound per name across every game:
+## of B-flat), named `keepy_*` because AudioDirector keeps one sound per name across every game:
 ## keepy_squeak (the balloon near the ground), keepy_pop, keepy_bird_flutter, keepy_birds_shaken,
 ## keepy_gust, keepy_downdraft_warn, keepy_rain_warn, keepy_new_balloon and keepy_high_chime are
 ## one-shots through `AudioDirector.play_sfx`. keepy_fan_hum and keepy_rain are seamless loops the
 ## game plays on its own two players (`loop_player`), because a one-shot voice can't be pitched
-## or faded while it plays. The music is "Meadow Breeze" (KeepyMusic). Bus effects for this game
-## only: a wide, airy reverb (an open field, not a room) and a glue compressor on the music.
+## or faded while it plays. The music is "Updraft" (KeepyMusic). Bus effects for this game
+## only: a wide, airy reverb (open air, not a room) and a glue compressor on the music.
 
 const KeepyMusic := preload("res://games/keepy_uppy/KeepyMusic.gd")
 const LOOPS := ["keepy_fan_hum", "keepy_rain"]
