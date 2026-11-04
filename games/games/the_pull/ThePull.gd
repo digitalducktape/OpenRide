@@ -49,6 +49,7 @@ var _pull_points := 0.0  ## this pull's points as counted (multiplier included)
 var _best_pull_points := 0.0
 var _total_full := 0
 var _peak_power := 0.0
+var _bonus_shown := 0
 var _start_best := 0.0
 var _message_left := 0.0
 var _tint := 0.0
@@ -62,7 +63,7 @@ func info() -> GameInfo:
 	var i := GameInfo.new()
 	i.id = "the_pull"
 	i.title = "The Pull"
-	i.how_to = "Pull the sled as far as you can: it gets heavier every metre"
+	i.how_to = "How far can you pull it? It only gets heavier"
 	i.supports = ["rounds", "minutes", "open"]
 	i.min_sec = 300
 	i.max_sec = 3600
@@ -70,6 +71,8 @@ func info() -> GameInfo:
 	i.max_rounds = 5
 	i.roles = []  # Just Ride only; a custom circuit plays it as a free slot (DESIGN.md "Modes")
 	i.tracker_mode = "off"
+	i.summary_stats = [{"key": "distance_m", "label": "best pull", "suffix": " m"}, {"key": "pulls", "label": "pulls"},
+		{"key": "peak_power", "label": "peak watts"}]
 	i.effort_in_just_ride = true
 	i.timed_end_mode = "game"  # a pull in progress finishes when the timer runs out
 	# The best single pull's points (the game sets the result's stars itself, from the sled's
@@ -85,9 +88,9 @@ func how_to_text(seg: Dictionary) -> String:
 	match _mode_for(seg):
 		"rounds":
 			var n := int(seg.get("params", {}).get("rounds", 1))
-			return "%d pulls: the sled gets heavier every metre. How far can you go?" % n if n > 1 else declared().how_to
+			return "%d pulls: how far can you drag it?" % n if n > 1 else declared().how_to
 		"timed":
-			return "Pull after pull until the time is up: the sled gets heavier every metre"
+			return "Pull again and again until time's up"
 	return declared().how_to
 
 
@@ -271,11 +274,11 @@ func _update_status() -> void:
 			_status.set_chip("set", 0)
 		PullLogic.Phase.PULL:
 			if logic.warned:
-				_status.set_chip("dig_in", ceili(PullLogic.STALL_SEC - logic.stall_sec))
+				_status.set_chip("dig_in", ceili(PullLogic.STALL_SEC - logic.stall_sec), need)
 			else:
 				_status.set_chip("need", need)
 		PullLogic.Phase.RESULT, PullLogic.Phase.DONE:
-			_status.set_chip({"stall": "stalled", "full": "full", "time": "time"}.get(logic.last_end, "stalled"), 0)
+			_status.set_chip({"stall": "stalled", "full": "full", "time": "time"}.get(logic.last_end, "stalled"), _bonus_shown)
 		PullLogic.Phase.RECOVERY:
 			_status.set_chip("rest", ceili(logic.phase_left))
 	var shown := need if band else -1
@@ -328,13 +331,16 @@ func _pull_ended(event: Dictionary) -> void:
 	var metres := PullLogic.shown_m(event.distance)
 	match event.how:
 		"full":
-			_pull_points += award(event.points)
+			var bonus := award(event.points)
+			_pull_points += bonus
+			_bonus_shown = roundi(bonus)
 			_total_full += 1
 			world.full_pull_burst()
 			AudioDirector.play_sfx("full_pull")
 			AudioDirector.play_sfx("crowd_swell", -2.0)
 			GameMix.duck_for_sting(2.5)
-			_show_message("FULL PULL! %d m" % metres, PullLogic.RESULT_SEC, GameTheme.GOOD)
+			# The words only: the distance is the hero number, and the chip shows the bonus.
+			_show_message("FULL PULL!", PullLogic.RESULT_SEC, GameTheme.TARGET)
 			GameTheme.pop(hud.score, 1.2)
 		"stall":
 			world.stall_dip()
@@ -381,6 +387,8 @@ func finish() -> Dictionary:
 		"full_pulls": _total_full,
 	}
 	var result := super.finish()
+	# The HUD shows the score floored, and Game.finish rounds: the last point could differ.
+	result["score"] = floori(score())
 	result["stars"] = Stars.count(_best_pull_points, PullLogic.star_thresholds_for(logic.d_ref))
 	return result
 

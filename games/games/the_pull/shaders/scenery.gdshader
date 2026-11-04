@@ -12,7 +12,8 @@ render_mode unshaded, fog_disabled, cull_back;
 uniform float sway = 0.0;  // metres at full weight
 uniform float wave = 0.0;  // the flag: a travelling wave along local x
 uniform float glow_gain = 1.0;  // the Full Pull flare lifts it
-uniform float self_lit = 0.0;  // 0-1: share of light that ignores the dusk (the bars up close)
+uniform float self_lit = 0.0;  // 0-1: share of light that ignores the dusk (the bike, the sled)
+uniform float rim = 0.0;  // a warm rim of floodlight round the edges (the bike up close)
 
 varying vec3 v_light;
 varying float v_haze;
@@ -29,6 +30,8 @@ void vertex() {
 	vec3 wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	vec3 light = sun_light(wn) * 0.7 + flood_color * pool_at(wp.xz) * UV.x * (0.65 + 0.35 * max(wn.y, 0.0)) * 1.2;
 	light = mix(light, vec3(1.0), self_lit);
+	float facing = max(dot(wn, normalize(CAMERA_POSITION_WORLD - wp)), 0.0);
+	light += flood_color * rim * pow(1.0 - facing, 2.5);
 	v_light = mix(light, vec3(1.15 * glow_gain), UV.y);
 	v_haze = haze_amount(length((MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz)) * (1.0 - UV.y * 0.6);
 }

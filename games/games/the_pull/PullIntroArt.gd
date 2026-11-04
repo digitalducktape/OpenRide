@@ -5,19 +5,21 @@ extends Control
 ## bike. Drawn once (no `_process`), in the game's look. Shapes only: blocks, a frame and an
 ## arrow, nothing that reads as anything else at a small size (ART_BIBLE §10).
 
-const SIZE := Vector2(460, 170)
+const SIZE := Vector2(460, 170)  ## the drawing's own units
+const SCALE := 1.75  ## on the card
 
 var look: GameTheme
 
 
 func _init(theme: GameTheme) -> void:
 	look = theme
-	custom_minimum_size = SIZE
-	size = SIZE
+	custom_minimum_size = SIZE * SCALE
+	size = SIZE * SCALE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _draw() -> void:
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(SCALE, SCALE))
 	var ground := 150.0
 	var ink := look.ink
 	# The track, and tread marks.

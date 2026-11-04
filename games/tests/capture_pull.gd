@@ -11,13 +11,20 @@ extends SceneTree
 ##   the_pull_6_summary.png   the session summary
 ## Each line prints the frame rate and draw calls. With --play=SECONDS it instead rides one
 ## scripted pull for a recording (add --write-movie FILE.avi --fixed-fps 30): steady near FTP,
-## a fade to a stall, then the rest card. With --stats it prints the 3D view's draw calls in play.
+## a fade to a stall, then the rest card. With --silhouette it saves the handlebar view in solid
+## black on white, full size and at 240 px (ART_BIBLE §10).
+## Moving the pull along credits its points, so the summary matches what's on screen. The run
+## keeps its bests apart from the desktop's, plants a flag at 210 m after the intro, and so the
+## intro shows the first-ride line.
+
+const BESTS := "user://capture_pull_bests.cfg"
 
 var _session: Node
 var _director: Node
 var _bus: Node
 var _out := "user://captures"
 var _play := 0.0
+var _silhouette := false
 
 
 func _initialize() -> void:
@@ -30,7 +37,12 @@ func _run() -> void:
 			_out = arg.get_slice("=", 1)
 		elif arg.begins_with("--play="):
 			_play = float(arg.get_slice("=", 1))
+		elif arg == "--silhouette":
+			_silhouette = true
 	DirAccess.make_dir_recursive_absolute(_out)
+	# Loaded here: a -s script compiles before the autoloads, and PullBests needs Session's.
+	load("res://games/the_pull/PullBests.gd").path = BESTS
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(BESTS))
 	_session = root.get_node("Session")
 	_director = _session.director
 	_bus = root.get_node("InputBus")
@@ -39,7 +51,7 @@ func _run() -> void:
 		"segments": [{"game_id": "the_pull", "role": "free", "duration_sec": 600, "end_mode": "game"}]})
 	var deadline := Time.get_ticks_msec() + 30000
 	await create_timer(1.5).timeout
-	if _play <= 0.0:
+	if _play <= 0.0 and not _silhouette:
 		_shot("1_intro")
 	while _director.phase_name() != "PLAYING" and Time.get_ticks_msec() < deadline:
 		await process_frame
@@ -48,6 +60,11 @@ func _run() -> void:
 		quit(1)
 		return
 	var game: Node = _director.game
+	_plant_flag(game)
+	if _silhouette:
+		await _black_bike(game)
+		quit()
+		return
 	if _play > 0.0:
 		await _ride(game)
 		quit()
@@ -59,7 +76,7 @@ func _run() -> void:
 	await create_timer(14.0).timeout
 	_shot("3_pull")
 	# Bog down: move the pull far along, then ease off until the warning.
-	game.logic.distance = 230.0
+	_move_pull(game, 230.0)
 	_bus._sim_cadence = 60.0
 	_bus._sim_resistance = 25.0
 	deadline = Time.get_ticks_msec() + 30000
@@ -71,7 +88,7 @@ func _run() -> void:
 	_bus._sim_cadence = 110.0
 	_bus._sim_resistance = 60.0
 	await create_timer(1.0).timeout
-	game.logic.distance = game.logic.full_m - 3.0
+	_move_pull(game, game.logic.full_m - 3.0)
 	game.logic.speed = 2.0
 	deadline = Time.get_ticks_msec() + 15000
 	while game.logic.last_end != "full" and Time.get_ticks_msec() < deadline:
@@ -93,11 +110,49 @@ func _ride(game: Node) -> void:
 	_bus._sim_cadence = 88.0
 	_bus._sim_resistance = 34.0
 	await create_timer(minf(_play * 0.45, 14.0)).timeout
-	game.logic.distance = maxf(game.logic.distance, 150.0)
+	_move_pull(game, maxf(game.logic.distance, 150.0))
 	await create_timer(minf(_play * 0.2, 6.0)).timeout
 	_bus._sim_cadence = 55.0
 	_bus._sim_resistance = 22.0
 	await create_timer(_play * 0.35).timeout
+
+
+## Moves the pull along, crediting the points it would have earned.
+func _move_pull(game: Node, metres: float) -> void:
+	game._pull_points += game.award((metres - game.logic.distance) * PullLogic.POINTS_PER_M)
+	game.logic.distance = metres
+
+
+## A best to show the flag and the crowd's rise.
+func _plant_flag(game: Node) -> void:
+	game.logic.best_distance = 210.0
+	game.logic._best_at_start = 210.0
+	game._start_best = 210.0
+	game.world.set_best(210.0)
+	game._status.set_track(game.logic.full_m, 210.0)
+
+
+## The handlebar view alone, in solid black on white.
+func _black_bike(game: Node) -> void:
+	await create_timer(PullLogic.SET_SEC + 0.5).timeout
+	_director.hud.visible = false
+	game.set_process(false)
+	var black := StandardMaterial3D.new()
+	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	black.albedo_color = Color.BLACK
+	var world: Node3D = game.world
+	for child in world.get_children():
+		if child is Node3D and child.name != "Rig":
+			child.visible = false
+	(world.get_node("Environment") as WorldEnvironment).environment.background_color = Color.WHITE
+	for node in world.get_node("Rig").find_children("*", "MeshInstance3D", true, false):
+		node.material_override = black
+	await create_timer(0.3).timeout
+	var img := root.get_viewport().get_texture().get_image()
+	img.save_png("%s/the_pull_silhouette.png" % _out)
+	img.resize(240, roundi(240.0 * img.get_height() / img.get_width()), Image.INTERPOLATE_LANCZOS)
+	img.save_png("%s/the_pull_silhouette_small.png" % _out)
+	print("CAPTURE silhouette")
 
 
 func _shot(state: String) -> void:

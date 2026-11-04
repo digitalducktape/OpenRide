@@ -84,8 +84,9 @@ warm-on-cool dusk with floodlight pools.
 - **The sled:** a 4.2 m long, 1.8 m wide pan with upturned runners, a yellow box-frame and a
   hitch tower at the front. The weight box is a 1.2 m cage of slate blocks on two rails. Its
   front faces the bike.
-- **The bike:** first person. The handlebars and gloves sit low at the bottom of the view. A round
-  mirror on a stalk at the right end shows the sled.
+- **The bike:** first person. Only the handlebars show (the rider's ask; no arms or hands), low at
+  the bottom of the view like Dodge Ball's. An oval mirror on a stalk at the right end shows the
+  sled.
 
 ## 6. Environment
 
@@ -113,8 +114,8 @@ warm-on-cool dusk with floodlight pools.
 
 - First person at an eye height of 1.55 m, pitch −6°, FOV 68°. A pedal-stroke bob of ±1.5 cm.
 - Set: a yaw of up to 150° right over the shoulder, eased, then back for the horn.
-- The mirror: a 256×144 SubViewport with a camera at head height looking back. It shows on the
-  mirror glass, updated every frame at that size.
+- The mirror: a 400×248 SubViewport with a tight camera (27°) at head height looking back at the
+  sled. It shows on the mirror glass, rendered every other frame.
 
 ## 9. Tablet budget (Gen 2, PowerVR GX6250, Compatibility; no tracker)
 
@@ -140,7 +141,7 @@ moving marker, cursor or particle may have a round head with a wavy or tapering 
 | Confetti | falls | small squares | clean |
 | Pennants | sway | triangles on a line | clean |
 | Best flag | waves | a rectangle on a pole | clean |
-| Gloves and sleeves | bob | fists on the bar, sleeves leaving the frame | clean; the first version's green cuffs read as cans and were replaced |
+| Handlebars | bob | a wide thin bar, grips at its ends, two short drops, one short squared stem block running off the bottom | clean in solid black at 240 px (`capture_pull.gd --silhouette`): a plain T, as Dodge Ball's. No hands, and nothing round at its ends or on the stem. Keep the stem squared and short: round fists with a stem and a round cap were the mildly risky version, and they are gone |
 | Mirror | bobs | an oval on a thin angled stalk | clean: a straight jointed stalk, far too rigid to read as a tail. Keep it straight, and keep the rim and dark back |
 | HUD bar | fills | a pill with a flag tick and a checked end | clean |
 | Intro picture | still | a sled, blocks, a straight arrow, a row of rings | clean |

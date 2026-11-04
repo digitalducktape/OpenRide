@@ -663,6 +663,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
 | `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
+| `summary_stats` | A one-game summary's extra tiles from the result's `stats`: `[{key, label, suffix, of}]` (`of`: a second stat, shown "3/4"); at most three. Watt Lane shows in-lane %, best streak and steps caught. |
 | `options` | The game's own settings, shown on its hub screen and in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings, plus the optional `where`, `kind`, `cards`, `columns`, `group` and `rider_badge`. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
@@ -2128,7 +2129,7 @@ per difficulty (for the flag on the track). `ThePull.gd` wires them to the frame
   Metres come from `PullLogic.shown_m()` everywhere (`the_pull_scene_test`).
 - **Look:** a floodlit clay track, hand-lit like every 3D game here (pools from a `mod`, no
   loop). One baked scenery mesh, a billboard crowd MultiMesh, the sled with its sliding box and
-  an 18-link chain, a handlebar mirror (a 256×166 SubViewport, every other frame) and a look back
+  an 18-link chain, a handlebar mirror (a 400×248 SubViewport, every other frame) and a look back
   over the shoulder at each pull's start. Stands with bunting and bulbs, a cheering crowd,
   floodlight halos, dust motes, a turning wheel (`GFX_POLISH.md`, `UI_POLISH.md`,
   `AUDIO_POLISH.md`). 71-74 draw calls in play on the desktop with the HUD.

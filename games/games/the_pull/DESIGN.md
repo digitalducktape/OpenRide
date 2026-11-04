@@ -197,7 +197,7 @@ game build.
    at least 10 s would be left after the rest.
 5. The Full Pull line sits at 1.12 × `d_ref` (108% FTP at the end).
 6. The sled is seen in a handlebar mirror and in a look back over the shoulder at each pull's
-   `SET`.
+   `SET`. Only the handlebars show up front (rider, 2026-11-02: no arms).
 
 ## Audio (sound-designer pass)
 
@@ -240,7 +240,7 @@ Filled in at each pass. The pattern picked, the alternative rejected, and why.
 | Typing | `gdscript-patterns` | typed everything, typed float loops over literal arrays (`for side: float in [...]`) | inferred `:=` from an untyped loop variable | the untyped form failed to compile ("cannot infer the type") |
 | World look | `3d-essentials` | unshaded hand-lit materials on the shared `WorldLook`, floodlight pools computed in the shader | engine `OmniLight3D`/`SpotLight3D` floodlights with shadows, `Environment` fog | the skill's default; the repo measured per-pixel lights and fog at about a third of the tablet's frame |
 | Floodlight pools, sky | `shader-basics` | spatial shaders sharing one include (`pull_look.gdshaderinc`), pools per vertex on a fine grid, a gradient dome on the camera | a `sky` shader with a radiance cubemap; additive light-cone meshes | the dome is one cheap draw; cones cost overdraw on a fill-bound GPU |
-| Sled view | `3d-essentials` | a 256×166 `SubViewport` mirror, rendered every other frame, plus a look back at SET | a third-person chase view | the brief says first person from the bike; the mirror keeps the sled in sight all the pull |
+| Sled view | `3d-essentials` | a 400×248 `SubViewport` mirror, rendered every other frame, plus a look back at SET | a third-person chase view | the brief says first person from the bike; the mirror keeps the sled in sight all the pull |
 | Crowd | `3d-essentials` (MultiMesh) | one billboard `MultiMeshInstance3D`, the figure drawn in the fragment shader | `Sprite3D` per spectator | about 1,500 figures in one draw call |
 | HUD widget | `hud-system` | a `PanelContainer` in the HUD's top-centre slot whose labels change only with their values, drawn shapes for the bar | a `ProgressBar` tweened every frame | the HUD kit's rule (re-layout costs the tablet), and the bar needs the best flag and checked end |
 | Tweens | `tween-animation` (via `GameTheme`) | the kit's `pop`/`pulse` on the chip | hand-rolled `_process` animation | the house motion rules; no per-frame code |

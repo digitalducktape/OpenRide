@@ -77,7 +77,9 @@ func test_the_dig_in_chip_counts_down_to_the_stall() -> void:
 	while not game.logic.warned:
 		game._on_frame(DT)
 	assert_str(game._status.chip_state()).is_equal("dig_in")
-	assert_str(game._status.chip_label.text).is_equal("DIG IN! %d" % ceili(PullLogic.STALL_SEC - game.logic.stall_sec))
+	assert_str(game._status.chip_label.text).is_equal("DIG IN! NEEDS %d W · %d" % [game.logic.shown_need(),
+		ceili(PullLogic.STALL_SEC - game.logic.stall_sec)])
+	assert_float(game.hud.metrics.power_low).is_equal(float(game.logic.shown_need()))
 
 
 func test_the_widget_fits_its_budget_with_the_longest_texts() -> void:
@@ -85,10 +87,11 @@ func test_the_widget_fits_its_budget_with_the_longest_texts() -> void:
 	add_child(status)
 	status.set_distance(1888)
 	status.set_pull(5, 5)
-	status.set_chip("need", 1888)
+	status.set_chip("dig_in", 5, 1888)  # the longest chip
 	var size := status.get_combined_minimum_size()
 	assert_float(size.x).is_less_equal(820.0)
 	assert_float(size.y).is_less_equal(120.0)
+	assert_int(status.pull_label.get_theme_font_size("font_size")).is_greater_equal(HudTheme.BODY)
 	for label: Label in status.find_children("*", "Label", true, false):
 		assert_int(label.get_theme_font_size("font_size")).is_greater_equal(HudTheme.SMALL)
 	status.free()
@@ -178,7 +181,7 @@ func _stage_rect(centre: Vector3, half: Vector3) -> Rect2:
 
 func test_nothing_is_clipped_by_the_frame_or_a_hud_panel() -> void:
 	_ride(PullLogic.SET_SEC + 5.0, 200.0)  # facing the track, mid-pull
-	game.hud.show_message("FULL PULL! 1888 m", GameTheme.GOOD)  # the longest centre message
+	game.hud.show_message("Stalled at 1888 m", GameTheme.INK)  # the longest centre message
 	game._status.set_distance(1888)
 	game._status.set_chip("need", 1888)
 	for i in 4:
@@ -189,8 +192,7 @@ func test_nothing_is_clipped_by_the_frame_or_a_hud_panel() -> void:
 		"end": hud.end_button, "status widget": game._status, "message": hud._message}
 	var mirror := _stage_rect(PullWorld.MIRROR, Vector3(PullWorld.MIRROR_SIZE.x / 2.0 + 0.012, PullWorld.MIRROR_SIZE.y / 2.0 + 0.012, 0.01))
 	var things := {"mirror": mirror}
-	for side in [-1.0, 1.0]:
-		things["fist %d" % side] = _stage_rect(PullWorld.BARS + Vector3(side * 0.24, 0.035, 0.02), Vector3(0.08, 0.07, 0.07))
+	things["handlebars"] = _stage_rect(PullWorld.BARS, Vector3(PullMeshes.BAR_HALF, 0.03, 0.03))
 	for thing in things:
 		var rect: Rect2 = things[thing]
 		assert_float(rect.size.x).override_failure_message("%s projects to nothing" % thing).is_greater(40.0)
@@ -208,3 +210,25 @@ func test_nothing_is_clipped_by_the_frame_or_a_hud_panel() -> void:
 	for name in panels:
 		if name != "message":
 			assert_bool(stage.encloses((panels[name] as Control).get_global_rect())).override_failure_message(name).is_true()
+
+
+func test_the_result_score_is_the_number_the_hud_showed() -> void:
+	_ride(PullLogic.SET_SEC + 20.0, 200.0)
+	Effort.award(0.7)  # a fraction the HUD floors and a plain round would lift
+	var shown := floori(Effort.score)
+	assert_int(int(game.finish().score)).is_equal(shown)
+
+
+func test_the_summary_shows_distance_and_pulls() -> void:
+	var tiles := SummaryScreen._stat_tiles(game.declared(), [{"stats": {"distance_m": 214, "pulls": 3, "peak_power": 310}}])
+	assert_array(tiles).is_equal([["214 m", "best pull"], ["3", "pulls"], ["310", "peak watts"]])
+
+
+func test_the_intro_line_fits_on_one_line() -> void:
+	var font := GameTheme.display_font()
+	var width := IntroCard.CARD_SIZE.x - 120.0
+	for seg in [{"duration_sec": -1}, {"duration_sec": 600, "end_mode": "game", "params": {}},
+			{"duration_sec": 900, "end_mode": "game", "params": {"rounds": 3}}]:
+		var text: String = game.how_to_text(seg)
+		assert_float(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, HudTheme.BODY).x).override_failure_message(text).is_less(width)
+		assert_str(text).not_contains("metre")

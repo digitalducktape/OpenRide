@@ -17,11 +17,13 @@ const CAMERA_PITCH := -6.0
 const FOV := 68.0
 const FAR := 900.0
 const SKY_RADIUS := 850.0  ## inside FAR; the dome follows the camera
-const BARS := Vector3(0.0, 1.16, -0.74)
-const MIRROR := Vector3(0.56, 1.27, -0.8)
-const MIRROR_SIZE := Vector2(0.2, 0.13)
-const MIRROR_VIEW := Vector2i(256, 166)
-const MIRROR_CAMERA := Vector3(0.3, 1.5, 0.15)
+const BARS := Vector3(0.0, 1.15, -0.62)
+const MIRROR := Vector3(0.64, 1.33, -0.8)
+const MIRROR_SIZE := Vector2(0.34, 0.21)
+const MIRROR_VIEW := Vector2i(400, 248)
+const MIRROR_CAMERA := Vector3(0.25, 1.55, 0.1)
+const MIRROR_FOV := 27.0  ## tight on the sled, so it reads at 1 m
+const MIRROR_AIM := Vector3(0.0, 0.65, 6.0)  ## what the mirror looks at, from the rig
 const SLED_GAP := 3.4  ## the chain's length: the sled's hitch is this far behind the rig
 const BOX_REAR := 3.7  ## the weight box's centre on the sled at the start...
 const BOX_FRONT := 1.0  ## ...and at the Full Pull line
@@ -58,6 +60,8 @@ var _lit: Array[ShaderMaterial] = []
 var _track_mat: ShaderMaterial
 var _infield_mat: ShaderMaterial
 var _scenery_mat: ShaderMaterial
+var _bike_mat: ShaderMaterial
+var _sled_mat: ShaderMaterial
 var _flag_mat: ShaderMaterial
 var _crowd_mat: ShaderMaterial
 var _sky_mat: ShaderMaterial
@@ -145,7 +149,7 @@ func update_view(delta: float, distance: float, speed: float, box_t: float, cade
 	_mirror_frame += 1
 	if _mirror_frame % 2 == 0:
 		_mirror_view.render_target_update_mode = SubViewport.UPDATE_ONCE
-	mirror_camera.global_transform = Transform3D(Basis.from_euler(Vector3(deg_to_rad(-12.0), PI, 0.0)),
+	mirror_camera.global_transform = Transform3D(Basis.looking_at(MIRROR_AIM - MIRROR_CAMERA, Vector3.UP),
 		_rig.position + MIRROR_CAMERA)
 	if _warming == 0:
 		_dust.emitting = speed > 0.25
@@ -215,6 +219,12 @@ func _build_materials() -> void:
 	_infield_mat.set_shader_parameter("lines", 0.0)
 	_infield_mat.set_shader_parameter("grain_scale", 0.6)
 	_scenery_mat = _material("scenery.gdshader")
+	# The bike and the sled keep most of their light wherever they are on the track.
+	_bike_mat = _material("scenery.gdshader")
+	_bike_mat.set_shader_parameter("self_lit", 0.6)
+	_bike_mat.set_shader_parameter("rim", 0.5)
+	_sled_mat = _material("scenery.gdshader")
+	_sled_mat.set_shader_parameter("self_lit", 0.6)
 	_flag_mat = _material("scenery.gdshader")
 	_flag_mat.set_shader_parameter("wave", 0.05)
 	_flag_mat.set_shader_parameter("sway", 0.03)
@@ -273,7 +283,7 @@ func _build_rig() -> void:
 	camera.far = FAR
 	camera.current = true
 	_rig.add_child(camera)
-	_rig.add_child(KartMeshKit.mesh_node(PullMeshes.bike(BARS, MIRROR), _scenery_mat, "Bike"))
+	_rig.add_child(KartMeshKit.mesh_node(PullMeshes.bike(BARS, MIRROR, MIRROR_SIZE), _bike_mat, "Bike"))
 	# The mirror: a small camera looking back, shown on the glass.
 	_mirror_view = SubViewport.new()
 	_mirror_view.name = "MirrorView"
@@ -285,7 +295,7 @@ func _build_rig() -> void:
 	add_child(_mirror_view)
 	mirror_camera = Camera3D.new()
 	mirror_camera.name = "MirrorCamera"
-	mirror_camera.fov = 42.0
+	mirror_camera.fov = MIRROR_FOV
 	mirror_camera.far = 160.0
 	mirror_camera.current = true
 	_mirror_view.add_child(mirror_camera)
@@ -303,14 +313,14 @@ func _build_sled() -> void:
 	_sled = Node3D.new()
 	_sled.name = "Sled"
 	add_child(_sled)
-	_sled.add_child(KartMeshKit.mesh_node(PullMeshes.sled(), _scenery_mat, "Pan"))
-	_box = KartMeshKit.mesh_node(PullMeshes.weight_box(), _scenery_mat, "WeightBox")
+	_sled.add_child(KartMeshKit.mesh_node(PullMeshes.sled(), _sled_mat, "Pan"))
+	_box = KartMeshKit.mesh_node(PullMeshes.weight_box(), _sled_mat, "WeightBox")
 	_sled.add_child(_box)
 	var transforms := []
 	for i in CHAIN_LINKS:
 		transforms.append(Transform3D())
 	var chain := KartMeshKit.multimesh_node(PullMeshes.chain_link(), transforms, "Chain")
-	chain.material_override = _scenery_mat
+	chain.material_override = _sled_mat
 	# Its links are placed in world space along the whole track.
 	chain.custom_aabb = AABB(Vector3(-2, -1, -PullMeshes.LENGTH - 20.0), Vector3(4, 4, PullMeshes.LENGTH + 40.0))
 	add_child(chain)

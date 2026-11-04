@@ -13,16 +13,21 @@ uniform float ruts = 1.0;  // 0 on the infield
 uniform float lines = 1.0;  // the chalk side lines and the start line
 uniform float half_width = 5.8;  // the chalk lines' x
 uniform float grain_scale = 1.4;
+uniform float near_pool = 0.7;  // the steady light around the rider
 
 varying vec3 v_light;
 varying vec2 v_xz;
 varying float v_haze;
 varying float v_pool;
+varying float v_near;
 
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_xz = wp.xz;
-	v_pool = pool_at(wp.xz);
+	// Close to the rider the light holds steady, wherever the towers are: the lower frame was
+	// a bright slab under a tower and dark brown between them. The pools show further off.
+	v_near = 1.0 - smoothstep(5.0, 26.0, length(wp.xz - CAMERA_POSITION_WORLD.xz));
+	v_pool = mix(pool_at(wp.xz), near_pool, v_near);
 	v_light = hemi(vec3(0.0, 1.0, 0.0)) * 0.42 + flood_color * v_pool * 1.65;
 	v_haze = haze_amount(length((MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz));
 }
@@ -41,6 +46,18 @@ void fragment() {
 	float chevron = fract(v_xz.y * 2.2 + rx * 1.6 + g * 0.3);
 	float tread = smoothstep(0.42, 0.5, chevron) * (1.0 - smoothstep(0.62, 0.7, chevron)) * groove;
 	col *= 1.0 - groove * 0.2 - tread * 0.18;
+	// Raked lines down the track, cross ripples from earlier pulls, and fine grit up close (the
+	// third noise read). The rake fades with distance, before it can shimmer.
+	float rk = fract(v_xz.x * 3.0 + g2 * 0.8);
+	float rake = smoothstep(0.0, 0.12, rk) * (1.0 - smoothstep(0.2, 0.36, rk));
+	rake *= 1.0 - smoothstep(0.12, 0.45, fwidth(v_xz.x * 3.0));
+	float cr = fract(v_xz.y * 0.6 + g2 * 1.3);
+	float ripple = smoothstep(0.0, 0.06, cr) * (1.0 - smoothstep(0.06, 0.18, cr));
+	float fine = vnoise(v_xz * 7.0) - 0.5;
+	col *= 1.0 - (rake * 0.11 + ripple * 0.07) * ruts;
+	col *= 1.0 + fine * 0.34 * v_near * ruts;
+	// The floods come from the sides: the middle of the track sits a little darker.
+	col *= mix(0.86, 1.1, smoothstep(0.0, 5.0, abs(v_xz.x)) * v_near + (1.0 - v_near) * 0.55);
 	// The berm: loose clay banked against each barrier, darker and redder.
 	float berm = smoothstep(half_width - 0.9, half_width + 0.3, abs(v_xz.x)) * ruts;
 	col = mix(col, clay * vec3(0.78, 0.62, 0.55), berm * 0.6);

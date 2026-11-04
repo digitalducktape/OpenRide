@@ -29,17 +29,24 @@ frame. The tablet still needs a run.
    saturated orange and the pools didn't read. Now the clay is less saturated (`clay`
    0.47/0.30/0.22) and darker between the pools (ambient 0.42, pools ×1.65). It has chevron tyre
    treads in the runner grooves, clods from the brightest grain (no extra noise read), a redder
-   berm banked against each barrier, and a damp sheen inside the pools. Still two noise reads a
-   pixel.
-2. [x] **The bike up front was three blobs and a pole.** It now has taped bar tops with brake
-   hoods and levers, a stem with a top cap, the top of the front tyre, and gloved fists (four
-   knuckles, a thumb, an accent strap) on sleeves that run back out of frame. One mesh, as
-   before. The first try put an accent cuff on each wrist, which read as two green cans at the
-   foot of the screen (`pull/after1/the_pull_3_pull.png`), so it became a strap on the back of
-   the hand.
-3. [x] **The mirror was a thick black oval.** It now hangs on a jointed two-part stalk in a slim
-   chrome rim with a dark back. The glass has a diagonal sheen. It moved to (0.56, 1.27, -0.8),
-   clear of the longest centre message (the scene test's bounds check).
+   berm banked against each barrier, and a damp sheen inside the pools. The review of 2026-11-04
+   found the lower frame still swung from a bright slab under a tower to dark brown between
+   them, and had nothing in it. Within about 5-26 m of the rider the light now holds at a steady
+   level (`near_pool`), with raked lines, cross ripples and fine grit in the lower frame (a third
+   noise read), and the middle of the track sits a little darker than its edges.
+2. [x] **The bike up front: just the handlebars.** The first version was three blobs and a
+   pole. Two rounds of gloves followed, and the reviewer and the rider rejected them: they read
+   as small dark blobs, then the rider asked for no arms at all ("be consistent and just show the
+   bike handles"). The view now matches Dodge Ball's bars: a thin steel bar low in the frame,
+   rubber grips, short drops and a short squared stem in the accent. No hands, no round cap, no
+   tyre.
+
+3. [x] **The mirror didn't show the sled.** The sled couldn't be read at 1 m (the review of
+   2026-11-04). The glass is now 0.34 × 0.21 m in a slim chrome rim on a jointed stalk, the oval
+   fills its quad, and its camera is tight on the sled (27°). The sled and chain keep most of
+   their light anywhere on the track (`self_lit` 0.6), and the glass lifts the image 1.3×. It
+   stays clear of the frame, the HUD and the longest centre message (the scene test's bounds
+   check).
 
 ## P1: the place
 

@@ -45,6 +45,7 @@ const ROOF := Color("4a5868")
 ## The wheel on the far right horizon (its own mesh: it turns, PullWorld).
 const WHEEL_HUB := Vector3(36.0, 18.0, -540.0)
 const WHEEL_RADIUS := 13.7
+const BAR_HALF := 0.42  ## the handlebar's half width, grips included
 
 
 ## A flat grid in the xz plane, `width` across and from z = `z0` to `z0 - length`, with `cols`
@@ -328,55 +329,34 @@ static func weight_box() -> ArrayMesh:
 	return kit.commit()
 
 
-## The rider's bike up front, in the rig's space: the bar tops with tape and brake hoods, the
-## stem and its top cap, the top of the front tyre, gloved fists (knuckles, a thumb over the bar,
-## an accent cuff) on sleeves that run back out of the frame, and the mirror's jointed stalk and
-## slim chrome housing (the glass is its own quad).
-static func bike(bars: Vector3, mirror: Vector3) -> ArrayMesh:
+## The bike's handlebars, in the rig's space, as the other first-person games show them (Dodge
+## Ball's bars; rider, 2026-11-02: no arms or hands): a thin bar low in the frame, rubber grips,
+## short drops and a short, squared stem in the accent. The mirror stands on a straight jointed
+## stalk off the right end (its glass is its own quad). ART_BIBLE §10 has the silhouette check.
+static func bike(bars: Vector3, mirror: Vector3, mirror_size: Vector2) -> ArrayMesh:
 	var kit := _kit()
 	kit.outline = 0.4
-	var metal := Color("2a2e33")
-	var tape := Color("1b1d20")
-	var glove := Color("4a525c")
-	var sleeve := Color("1f2a3a")
-	# The bar: a straight centre and taped tops either side.
-	kit.add(KartMeshKit.cylinder(0.024, 0.024, 0.2, 10), KartMeshKit.xf(bars, Vector3(0, 0, 90)), metal)
+	var steel := Color("7a818c")
+	var rubber := Color("17181b")
+	kit.add(KartMeshKit.cylinder(0.017, 0.017, BAR_HALF * 2.0 - 0.1, 10), KartMeshKit.xf(bars, Vector3(0, 0, 90)), steel)
 	for side: float in [-1.0, 1.0]:
-		kit.add(KartMeshKit.cylinder(0.021, 0.021, 0.24, 10), KartMeshKit.xf(bars + Vector3(side * 0.22, 0, 0), Vector3(0, 0, 90)), tape)
-		# A brake hood forward of the bar end.
-		var hood := bars + Vector3(side * 0.34, 0.01, -0.06)
-		kit.add(KartMeshKit.capsule(0.026, 0.12, 8, 2), KartMeshKit.xf(hood, Vector3(-70, 0, 0)), tape)
-		kit.add(KartMeshKit.box(Vector3(0.012, 0.11, 0.02)), KartMeshKit.xf(hood + Vector3(0, -0.06, -0.03), Vector3(20, 0, 0)), Color("8a9098"))
-		# The fist on the bar top: palm, four knuckles, a thumb wrapped under, the cuff and sleeve.
-		var fist := bars + Vector3(side * 0.24, 0.035, 0.02)
-		kit.add(KartMeshKit.sphere(0.058, 10, 6), KartMeshKit.xf(fist, Vector3.ZERO, Vector3(1.2, 0.85, 1.1)), glove)
-		for k in 4:
-			var kx := side * (0.012 + 0.024 * k) - side * 0.045
-			kit.add(KartMeshKit.sphere(0.02, 8, 4), KartMeshKit.xf(fist + Vector3(kx, 0.035, -0.035), Vector3.ZERO, Vector3(1.0, 0.8, 1.0)),
-				glove.lightened(0.12))
-		kit.add(KartMeshKit.capsule(0.017, 0.07, 6, 2), KartMeshKit.xf(fist + Vector3(-side * 0.05, -0.03, -0.02), Vector3(0, 0, 70 * side)),
-			glove.darkened(0.15))
-		# An accent strap across the back of the hand, and the sleeve running back out of frame.
-		kit.add(KartMeshKit.box(Vector3(0.075, 0.008, 0.028)), KartMeshKit.xf(fist + Vector3(0, 0.046, 0.03)), ACCENT.darkened(0.3))
-		kit.add(KartMeshKit.cylinder(0.05, 0.075, 0.6, 10), KartMeshKit.xf(fist + Vector3(side * 0.02, -0.16, 0.3), Vector3(55, 0, 0)), sleeve)
-	# The stem, its top cap and the steerer down to the front tyre.
-	kit.add(KartMeshKit.box(Vector3(0.05, 0.045, 0.12)), KartMeshKit.xf(bars + Vector3(0, -0.01, 0.06), Vector3(-8, 0, 0)), metal)
-	kit.add(KartMeshKit.cylinder(0.022, 0.022, 0.012, 10), KartMeshKit.xf(bars + Vector3(0, 0.02, 0.12)), Color("8a9098"))
-	kit.add(KartMeshKit.cylinder(0.022, 0.024, 0.35, 8), KartMeshKit.xf(bars + Vector3(0, -0.2, 0.12), Vector3(-15, 0, 0)), metal)
-	kit.add(KartMeshKit.torus(0.3, 0.35, 20, 5), KartMeshKit.xf(bars + Vector3(0, -0.72, -0.2), Vector3(0, 90, 0)), Color("161616"))
-	# The mirror: a two-part stalk from the right bar end, then a slim chrome rim and a dark back.
-	var bar_end := bars + Vector3(0.36, 0, -0.02)
-	var joint := bar_end + Vector3(0.07, 0.06, -0.02)
-	var glass_bottom := mirror + Vector3(-0.04, -0.06, 0.012)
-	kit.add(KartMeshKit.box(Vector3(0.014, 1.0, 0.014)), KartMeshKit.between(bar_end, joint, Vector3.ONE), metal)
-	kit.add(KartMeshKit.sphere(0.014, 6, 4), KartMeshKit.xf(joint), Color("8a9098"))
-	kit.add(KartMeshKit.box(Vector3(0.012, 1.0, 0.012)), KartMeshKit.between(joint, glass_bottom, Vector3.ONE), metal)
-	kit.glow = 0.25
-	kit.add(KartMeshKit.torus(0.096, 0.106, 24, 4), KartMeshKit.xf(mirror + Vector3(0, 0, -0.002), Vector3(90, 0, 0), Vector3(1.0, 1.0, 0.66)),
-		Color("c9ced6"))
+		kit.add(KartMeshKit.cylinder(0.023, 0.023, 0.15, 10), KartMeshKit.xf(bars + Vector3(side * (BAR_HALF - 0.075), 0, 0), Vector3(0, 0, 90)), rubber)
+		kit.add(KartMeshKit.cylinder(0.015, 0.015, 0.12, 8), KartMeshKit.xf(bars + Vector3(side * (BAR_HALF - 0.16), -0.05, -0.02), Vector3(25, 0, 0)), steel)
+	_box(kit, Vector3(0.06, 0.05, 0.16), bars + Vector3(0, -0.02, 0.07), ACCENT.darkened(0.15))
+	_box(kit, Vector3(0.07, 0.3, 0.06), bars + Vector3(0, -0.17, 0.14), ACCENT.darkened(0.25))
+	# The mirror's straight stalk, a chrome rim and a dark back.
+	var bar_end := bars + Vector3(BAR_HALF, 0.0, 0.0)
+	var joint := bar_end + Vector3(0.07, 0.05, -0.02)
+	var foot := mirror + Vector3(-0.05, -mirror_size.y / 2.0 + 0.006, -0.01)
+	kit.add(KartMeshKit.box(Vector3(0.016, 1.0, 0.016)), KartMeshKit.between(bar_end, joint), steel)
+	kit.add(KartMeshKit.box(Vector3(0.03, 0.03, 0.03)), KartMeshKit.xf(joint), Color("8a9098"))
+	kit.add(KartMeshKit.box(Vector3(0.014, 1.0, 0.014)), KartMeshKit.between(joint, foot), steel)
+	var half := mirror_size.x / 2.0
+	kit.glow = 0.3
+	kit.add(KartMeshKit.torus(half - 0.002, half + 0.012, 28, 4), KartMeshKit.xf(mirror + Vector3(0, 0, -0.002), Vector3(90, 0, 0),
+		Vector3(1.0, 1.0, mirror_size.y / mirror_size.x)), Color("d4d9e0"))
 	kit.glow = 0.0
-	kit.add(KartMeshKit.sphere(0.1, 14, 6, true), KartMeshKit.xf(mirror + Vector3(0, 0, -0.008), Vector3(-90, 0, 0), Vector3(1.0, 0.35, 0.66)),
-		Color("1a1c1f"))
+	kit.add(KartMeshKit.blob(Vector3(half, mirror_size.y / 2.0, 0.03), 1.0, 1.0, 16, 8), KartMeshKit.xf(mirror + Vector3(0, 0, -0.034)), Color("1a1c1f"))
 	return kit.commit()
 
 

@@ -9,8 +9,9 @@ extends PanelContainer
 ## Left: the distance, the hero (80 px, the green gradient). Right, on top: a state chip. Between pulls
 ## and while things are fine the chip shows the sled's need in watts, the same rounded number
 ## as the ride metrics' power band tick (`PullLogic.shown_need`), so the two never disagree.
-## Other states take its place, each with words, not only colour: GET SET, DIG IN! n (amber,
-## breathing, n = seconds to the stall), STALLED, FULL PULL!, TIME!, REST n.
+## Other states take its place, each with words, not only colour: GET SET, DIG IN! NEEDS n W · s
+## (amber, breathing; the sled's need again, and s seconds to the stall), STALLED, BONUS +n (a
+## Full Pull: the centre message says the words), TIME!, REST n.
 ## Right, under it: the pull count and the progress bar from the start to the Full Pull line: filled to
 ## the distance in the accent, a gold flag tick at the rider's best, a checked end.
 ## The widget never shows the rider's watts: the ride metrics are the only place they appear
@@ -19,7 +20,8 @@ extends PanelContainer
 ## Budget (UI_STYLE.md §8): labels change only with their values, the bar redraws only when its
 ## fill moves a pixel, and the warning's breathing is a tween.
 
-const BAR_SIZE := Vector2(380, 26)
+const BAR_SIZE := Vector2(310, 26)
+const PULL_WIDTH := 190.0  ## "PULL 5/5" at BODY size
 const HERO_SIZE := 80
 const DISTANCE_WIDTH := 170.0  ## "1888" at the hero size, right-aligned so the "m" stays put
 
@@ -81,8 +83,8 @@ func _init(theme: GameTheme = null) -> void:
 	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_theme_constant_override("separation", 14)
 	right.add_child(bottom)
-	pull_label = look.label("PULL 1", HudTheme.SMALL, GameTheme.MUTED, true)
-	pull_label.custom_minimum_size = Vector2(130, 0)
+	pull_label = look.label("PULL 1", HudTheme.BODY, GameTheme.INK, true)
+	pull_label.custom_minimum_size = Vector2(PULL_WIDTH, 0)
 	pull_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bottom.add_child(pull_label)
 	bar = Control.new()
@@ -125,9 +127,10 @@ func set_pull(index: int, of := 0) -> void:
 
 
 ## The chip's state: "need" (value: the sled's need in W), "set", "dig_in" (value: seconds to the
-## stall), "stalled", "full", "time" or "rest" (value: seconds left).
-func set_chip(state: String, value: int) -> void:
-	var key := "%s:%d" % [state, value]
+## stall, need: the sled's need in W), "stalled", "full" (value: the bonus as counted), "time" or
+## "rest" (value: seconds left).
+func set_chip(state: String, value: int, need := 0) -> void:
+	var key := "%s:%d:%d" % [state, value, need]
 	if key == _chip_key:
 		return
 	var was := _chip_key.get_slice(":", 0)
@@ -143,13 +146,13 @@ func set_chip(state: String, value: int) -> void:
 			text = "GET SET"
 			color = GameTheme.TARGET
 		"dig_in":
-			text = "DIG IN! %d" % value
+			text = "DIG IN! NEEDS %d W · %d" % [need, value]
 			fill = GameTheme.WARN.darkened(0.35)
 		"stalled":
 			text = "STALLED"
 			fill = GameTheme.BAD.darkened(0.3)
 		"full":
-			text = "FULL PULL!"
+			text = "BONUS +%d" % value
 			fill = look.accent.darkened(0.2)
 		"time":
 			text = "TIME!"
