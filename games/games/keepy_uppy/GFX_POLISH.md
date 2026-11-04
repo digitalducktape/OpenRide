@@ -64,4 +64,7 @@ the grille or a HUD panel), that playing redraws nothing, and that a new place b
 - The rain cloud was too big and sat under the HUD's status widget: smaller (340 px), lower
   (y 380), sailing in from the right at the balloon's height.
 - The pop's shards were specks: twice the size.
+- The lighthouse's top and the meadow's, seaside's and park's suns sat behind HUD panels: the
+  tower is shorter, and each sun moved clear of the ride panel, the clock and Pause.
+- The rain's rect showed hard sides: its streaks and haze fade out toward both edges.
 - The bird used to fly in at the ride panel's height: it now comes in low from the left.

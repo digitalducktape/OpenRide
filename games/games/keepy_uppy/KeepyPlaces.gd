@@ -33,11 +33,11 @@ const POLE_TOP := 236.0
 
 const PLACES := [
 	{"id": "meadow", "name": "Summer meadow",
-		"sky_top": Color("3f8fdc"), "sky_low": Color("c9e6f6"), "sun": Vector2(380, 150), "sun_col": Color(1.0, 0.95, 0.78),
+		"sky_top": Color("3f8fdc"), "sky_low": Color("c9e6f6"), "sun": Vector2(700, 240), "sun_col": Color(1.0, 0.95, 0.78),
 		"far": Color("8fbf86"), "mid": Color("6aa859"), "near": Color("5d9e3f"), "near2": Color("3f7f2e"),
 		"haze": Color("d6ebf2"), "accent": Color("f5d547"), "dark": Color("2c4f22")},
 	{"id": "seaside", "name": "Seaside cliffs",
-		"sky_top": Color("3c78c4"), "sky_low": Color("f7d7a6"), "sun": Vector2(1540, 330), "sun_col": Color(1.0, 0.86, 0.6),
+		"sky_top": Color("3c78c4"), "sky_low": Color("f7d7a6"), "sun": Vector2(1560, 420), "sun_col": Color(1.0, 0.86, 0.6),
 		"far": Color("5f8fb4"), "mid": Color("8a9f6a"), "near": Color("7aa04c"), "near2": Color("546f34"),
 		"haze": Color("f3dfc0"), "accent": Color("f2efe6"), "dark": Color("3b4a3a")},
 	{"id": "rooftop", "name": "City rooftop at dusk",
@@ -45,7 +45,7 @@ const PLACES := [
 		"far": Color("4a4a7a"), "mid": Color("35355e"), "near": Color("5a4a48"), "near2": Color("3a302f"),
 		"haze": Color("d9889a"), "accent": Color("ffcf7a"), "dark": Color("1c1a30")},
 	{"id": "park", "name": "Autumn park",
-		"sky_top": Color("5e9ad0"), "sky_low": Color("f4e2c4"), "sun": Vector2(1500, 190), "sun_col": Color(1.0, 0.88, 0.62),
+		"sky_top": Color("5e9ad0"), "sky_low": Color("f4e2c4"), "sun": Vector2(300, 420), "sun_col": Color(1.0, 0.88, 0.62),
 		"far": Color("b9a173"), "mid": Color("9c7a3c"), "near": Color("7f8f3c"), "near2": Color("586a2a"),
 		"haze": Color("efdcbc"), "accent": Color("e8833a"), "dark": Color("3a2e1c")},
 ]
@@ -249,12 +249,13 @@ static func _seaside(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> 
 		var y := HORIZON_Y - 100 + k * 40.0
 		m.line(Vector2(-BLEED, y), Vector2(360 - k * 10.0, y + 8), 3.0, cliff.darkened(0.2))
 	# The lighthouse: a white tower with one dark band, a lamp room and a warm light.
+	# Short enough to stand clear under the HUD's ride panel (its bottom is about y 315).
 	var lh := Vector2(140, HORIZON_Y - 168)
-	m.quad(lh + Vector2(-26, 0), lh + Vector2(26, 0), lh + Vector2(18, -150), lh + Vector2(-18, -150), Color("f2efe6"))
-	m.quad(lh + Vector2(-23, -50), lh + Vector2(23, -50), lh + Vector2(21, -80), lh + Vector2(-21, -80), Color("39506a"))
-	m.rect(Rect2(lh.x - 22, lh.y - 172, 44, 22), Color("39506a"))
-	m.glow(lh + Vector2(0, -160), Vector2(60, 40), Color(1.0, 0.9, 0.6, 0.6), 6)
-	m.quad(lh + Vector2(-14, -172), lh + Vector2(14, -172), lh + Vector2(0, -192), lh + Vector2(0, -192), Color("39506a"))
+	m.quad(lh + Vector2(-22, 0), lh + Vector2(22, 0), lh + Vector2(15, -100), lh + Vector2(-15, -100), Color("f2efe6"))
+	m.quad(lh + Vector2(-19.5, -34), lh + Vector2(19.5, -34), lh + Vector2(17.5, -56), lh + Vector2(-17.5, -56), Color("39506a"))
+	m.rect(Rect2(lh.x - 18, lh.y - 118, 36, 18), Color("39506a"))
+	m.glow(lh + Vector2(0, -110), Vector2(52, 34), Color(1.0, 0.9, 0.6, 0.6), 6)
+	m.fill(PackedVector2Array([lh + Vector2(-12, -118), lh + Vector2(12, -118), lh + Vector2(0, -134)]), Color("39506a"))
 	ridge(m, HORIZON_Y + 140, 40, 0.004, 2.2, p.near, p.near2, GROUND_Y + 10, 20)
 	_ground(m, p, GROUND_Y - 20)
 	# A wooden fence along the headland, posts and two rails.

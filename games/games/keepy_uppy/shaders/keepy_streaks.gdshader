@@ -30,5 +30,6 @@ void fragment() {
 	// The curtain's leading edge comes in from the right: covered where UV.x > 1 - reach.
 	float covered = smoothstep(1.0 - reach - soft_edge, 1.0 - reach, UV.x);
 	float fade = smoothstep(0.0, 0.08, UV.y) * (1.0 - smoothstep(0.9, 1.0, UV.y));
+	fade *= smoothstep(0.0, 0.14, UV.x) * (1.0 - smoothstep(0.86, 1.0, UV.x));  // no hard sides
 	COLOR = vec4(tint.rgb, (streak + 0.12) * covered * fade * amount * opacity);
 }
