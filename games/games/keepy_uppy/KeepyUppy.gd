@@ -89,6 +89,11 @@ func info() -> GameInfo:
 	for p in KeepyPlaces.PLACES:
 		place_ids.append(p.id)
 		place_names.append(p.name)
+	i.summary_stats = [
+		{"key": "seconds_high", "label": "seconds high"},
+		{"key": "pops", "label": "pops"},
+		{"key": "birds_shaken", "label": "birds shaken"},
+	]
 	i.options = [
 		{"key": "steer", "label": "Steer", "choices": ["off", "on"], "labels": ["Off", "On"],
 			"default": "off", "kind": "segmented"},
@@ -114,7 +119,7 @@ func target_text(seg: Dictionary) -> String:
 	var ftp := float(p.get("ftp_watts", p.get("ftp", KeepyLogic.DEFAULT_FTP)))
 	var share: float = KeepyLogic.WEIGHT_SHARE.get(str(seg.get("difficulty", "standard")), 0.4)
 	var w := float(p.get("weight_watts", ftp * share))
-	return "About %d W holds it in the middle" % (roundi(KeepyLogic.power_for(0.5, w) / 5.0) * 5)
+	return "About %d W holds it in the middle" % _holds_watts(w)
 
 
 func ui_theme() -> GameTheme:
@@ -273,15 +278,16 @@ func _draw_state(delta: float) -> void:
 			var tilt := sin(_t * 1.3) * 4.0 + clampf((logic.x - logic.fan_x) * 12.0, -16.0, 16.0)
 			balloon.show_at(at, clampf(logic.rate, -0.3, 0.3), tilt, logic.birds)
 			rig.set_shadow(logic.h, at.x - rig.fan.position.x)
+			rig.marker.position.y = at.y
 		KeepyLogic.Balloon.POPPED:
 			balloon.hide_balloon()
 			rig.set_shadow(-1.0, 0.0)
 		KeepyLogic.Balloon.ARRIVING:
 			var p := clampf(1.0 - logic.state_left / KeepyLogic.ARRIVE_SEC, 0.0, 1.0)
 			var e := ease(p, -2.0)
-			var from := Vector2(-140.0, 380.0)
+			var from := Vector2(-140.0, 470.0)
 			var to := KeepyPlaces.balloon_at(KeepyLogic.START_HEIGHT, logic.fan_x)
-			_balloon_at = from.lerp(to, e) + Vector2(0.0, -sin(p * PI) * 80.0)
+			_balloon_at = from.lerp(to, e) + Vector2(0.0, -sin(p * PI) * 40.0)
 			balloon.show_at(_balloon_at, 0.0, (1.0 - e) * 20.0, 0)
 			rig.set_shadow(-1.0, 0.0)
 	weather.update(delta, logic, _balloon_at)
@@ -294,17 +300,20 @@ func _handle(event: Dictionary) -> void:
 				"rain":
 					AudioDirector.play_sfx("keepy_rain_warn", 1.0)
 					GameMix.duck_for_moment(2.0)
-					_show_message("Rain cloud coming", GameTheme.WARN)
+					_show_message("Rain: %d W holds it up" % _holds_watts(logic.weight() + logic.rain_watts), GameTheme.WARN, 3.0)
 				"bird":
 					AudioDirector.play_sfx("keepy_bird_flutter", 0.0)
 					GameMix.duck_for_moment(1.2)
-					_show_message("Bird incoming", GameTheme.WARN)
+					_show_message("Bird incoming", GameTheme.WARN, 2.5)
 				"downdraft":
 					AudioDirector.play_sfx("keepy_downdraft_warn", 1.0)
 					GameMix.duck_for_moment(2.4)
-					_show_message("Downdraft! Push!", GameTheme.BAD)
+					_show_message("Downdraft! Push!", GameTheme.BAD, 2.5)
 		"bird_land":
 			GameTheme.pop(_status, 1.06)
+		"force_start":
+			if event.force == "rain":
+				_show_message("Raining: %d W holds it up" % _holds_watts(logic.weight()), GameTheme.WARN, 4.0)
 		"birds_shaken":
 			AudioDirector.play_sfx("keepy_birds_shaken")
 			_show_message("Shook off %d!" % event.count if event.count > 1 else "Shook it off!", GameTheme.GOOD)
@@ -315,6 +324,7 @@ func _handle(event: Dictionary) -> void:
 				_show_message("Held it!", GameTheme.GOOD)
 		"gust_warn":
 			AudioDirector.play_sfx("keepy_gust", 0.0)
+			_show_message("Gust!", GameTheme.WARN, 2.0)
 			GameMix.duck_for_moment(2.0)
 		"band":
 			if event.band == KeepyLogic.Band.HIGH:
@@ -354,19 +364,14 @@ func _update_sound(delta: float) -> void:
 
 
 func _update_status() -> void:
-	var warning := ""
-	if logic.balloon == KeepyLogic.Balloon.ARRIVING:
-		warning = "new"
-	elif logic.weather == KeepyLogic.Weather.TELEGRAPH:
-		warning = logic.force
-	elif logic.weather == KeepyLogic.Weather.ACTIVE and logic.force == "downdraft":
-		warning = "downdraft"
-	elif logic.gust != "":
-		warning = "gust"
-	elif logic.raining:
-		warning = "raining"
 	var wind := logic.wind_target / KeepyLogic.WIND_MAX if logic.steer else 0.0
-	_status.set_state(logic.band, warning, logic.birds, logic.shake_progress, logic.steer, wind)
+	_status.set_state(logic.band, logic.birds, logic.shake_progress, logic.steer, wind)
+
+
+## The watts, to the nearest 5, that hold the balloon in the middle of the mid band against a
+## weight `w`: the same figure as the intro's target line.
+static func _holds_watts(w: float) -> int:
+	return roundi(KeepyLogic.power_for(0.5, w) / 5.0) * 5
 
 
 ## The result's stats, built once at the end.
@@ -386,39 +391,39 @@ func finish() -> Dictionary:
 	return super.finish()
 
 
-## A callout in the banner's lane, left of the column (never the HUD's centre message, which
+## A callout in the banner's lane under the status widget (never the HUD's centre message, which
 ## would sit on the balloon).
-func _show_message(text: String, color := GameTheme.INK) -> void:
-	banner.show_callout(text, color, MESSAGE_SEC)
+func _show_message(text: String, color := GameTheme.INK, seconds := MESSAGE_SEC) -> void:
+	banner.show_callout(text, color, seconds)
 
 
 ## Grass tufts along the bottom edge, in front of the fan's feet, swaying (UV.x = sway weight).
 func _paint_foreground(ci: CanvasItem) -> void:
 	var m := SafeMesh.new()
+	_grass(m)
+	m.flush(ci)
+
+
+func _grass(m: SafeMesh) -> void:
 	var pl := KeepyPlaces.place(_place)
+	if pl.id == "rooftop":
+		return  # a deck has no grass
 	var base: Color = pl.near2
 	var tip: Color = (pl.near as Color).lightened(0.15)
-	if pl.id == "rooftop":
-		# Pot plants' leaves at the corners instead of grass.
-		base = Color("2f5a2a")
-		tip = Color("5f9a48")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 31 + _place
 	var x := -KeepyPlaces.BLEED
 	while x < KeepyPlaces.SIZE.x + KeepyPlaces.BLEED:
-		var near_fan := absf(x - KeepyPlaces.FAN_AT.x) < 230.0
-		if pl.id != "rooftop" or absf(x - 960.0) > 760.0:
-			var h := rng.randf_range(26.0, 54.0) * (0.6 if near_fan else 1.0)
-			var y := KeepyPlaces.SIZE.y + 4.0
-			for blade in 3:
-				var lean := rng.randf_range(-14.0, 14.0)
-				var bx := x + blade * 7.0
-				m.depth = 0.0
-				var i := m.vert(Vector2(bx - 5.0, y), base)
-				m.vert(Vector2(bx + 5.0, y), base)
-				m.depth = 1.0
-				m.vert(Vector2(bx + lean, y - h * rng.randf_range(0.7, 1.0)), tip)
-				m.tri(i, i + 1, i + 2)
+		var h := rng.randf_range(26.0, 54.0)
+		var y := KeepyPlaces.SIZE.y + 4.0
+		for blade in 3:
+			var lean := rng.randf_range(-14.0, 14.0)
+			var bx := x + blade * 7.0
+			m.depth = 0.0
+			var i := m.vert(Vector2(bx - 5.0, y), base)
+			m.vert(Vector2(bx + 5.0, y), base)
+			m.depth = 1.0
+			m.vert(Vector2(bx + lean, y - h * rng.randf_range(0.7, 1.0)), tip)
+			m.tri(i, i + 1, i + 2)
 		x += rng.randf_range(16.0, 30.0)
 	m.depth = 0.0
-	m.flush(ci)

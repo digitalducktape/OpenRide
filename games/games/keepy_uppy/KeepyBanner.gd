@@ -1,18 +1,19 @@
 class_name KeepyBanner
 extends CanvasLayer
-## Keepy Uppy's callouts ("Rain cloud coming", "Downdraft! Push!", "POP! −50", "Shook it off!"),
-## in a lane left of the balloon's column (UI_POLISH.md item 1). The HUD's centre message sat on
-## the balloon and the column, exactly where the rider looks; Safe Cracker solved the same
-## problem with its own banner (`SafeBanner`). The lane is clear of every HUD panel and of the
-## balloon's widest drift (keepy_scene_test checks both).
+## Keepy Uppy's callouts ("Rain: 130 W holds it up", "Downdraft! Push!", "POP! −50", "Shook it
+## off!"), centred in a lane just under the status widget (UI_POLISH.md item 1). The HUD's centre
+## message sat on the balloon and the column, exactly where the rider looks; Safe Cracker solved
+## the same problem with its own banner (`SafeBanner`). The lane is clear of every HUD panel and
+## above the balloon at its highest, birds included (keepy_scene_test checks both).
 ##
-## One label, slammed in and faded out, in the meaning colour it's given. Under the HUD (layer 10),
-## a child of the game, so it pauses with it.
+## One label with a heavy ink outline, so it reads over any sky; slammed in and faded out in the
+## meaning colour it's given. Under the HUD (layer 10), a child of the game, so it pauses with it.
 
 const LAYER := 6
-## The lane (1920x1080 canvas): under the ride panel, above the ground, left of the balloon.
-const LANE := Rect2(120, 380, 500, 200)
-const SIZE := HudTheme.MEDIUM + 4
+## The lane (1920x1080 canvas): under the status widget, between the side panels.
+const LANE := Rect2(660, 124, 720, 70)
+const SIZE := HudTheme.MEDIUM
+const OUTLINE := 14
 
 var label: Label
 var _box: CenterContainer
@@ -30,7 +31,8 @@ func _init(look: GameTheme) -> void:
 	label = look.label("", SIZE, GameTheme.INK, true)
 	label.name = "Callout"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_constant_override("outline_size", OUTLINE)
+	label.add_theme_color_override("font_outline_color", look.ink)
 	label.custom_minimum_size = Vector2(LANE.size.x, 0)
 	label.visible = false
 	_box.add_child(label)

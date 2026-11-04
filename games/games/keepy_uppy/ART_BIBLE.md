@@ -22,7 +22,7 @@ sky is about to do read faster.
 | Pillar | Design test |
 | --- | --- |
 | **The balloon is the hero** | The most saturated thing on screen and always near the centre (it travels between y 340 and 756 on the 1080 canvas, x within ±224 px). Nothing else is coral. |
-| **The fan is the built thing** | One illustrated object with real material detail, like Safe Cracker's safe: pine planks with grain and gaps, brass corner brackets with rivets, a brass grille over turning blades, a drive pulley and the belt down to the rider's bike. |
+| **The fan is the built thing** | One illustrated object with real material detail, like Safe Cracker's safe: pine planks with grain and gaps, brass corner brackets with rivets, a brass grille over turning blades and a drive pulley. |
 | **The weather shows before it acts** | Each force is visible from its warning: the rain cloud sailing in and its shadow, the bird flapping in, the downdraft's dark curtain sweeping across, the streamers whipping. Text only confirms. |
 
 **Distinct from Balloon Pump (#76):** that's a high-noon fairground stall, pastel mint, cream and
@@ -105,12 +105,13 @@ character, facing the camera's side.
 ## 6. Environment and layout (1920 x 1080 stage, painted 160 px past each side)
 
 - **Horizon** at y 640; the land under it everywhere, ridges and props over it.
-- **The fan** stands at x 960 (± 224 px on its rails with Steer), its grille's centre at y 858,
-  the crate's front 340 x 150 below it, its feet on two steel rails at y about 1054; the belt
-  runs down off the bottom edge to the bike.
-- **The balloon** rests on the grille at y 756 (h = 0) and rises to y 340 (h = 1).
-- **The pole** stands at x 1300 from the ground to y 236, painted cream to the mid line, sky blue
-  to the high line, sun above; a streamer at each band line and an orange pennant at the top.
+- **The fan** stands at x 960 (± 224 px on its rails with Steer), its grille's centre at y 798,
+  the crate's front 340 x 150 below it, its feet on two steel rails at y about 994, its ground
+  shadow under them, all inside the frame.
+- **The balloon** rests on the grille at y 696 (h = 0) and rises to y 380 (h = 1).
+- **The pole** stands at x 1790 from the ground to y 362, painted cream to the mid line, sky blue
+  to the high line, sun above; a streamer at each band line and an orange pennant at the top; a
+  coral pointer beside it shows the balloon's height.
 - **Props stay wide of the column** (x 660-1260 above the horizon is kept for the balloon).
 
 ## 7. VFX language
@@ -159,3 +160,17 @@ around it, slate weather); the shape language follows from the identity (soft na
 fan); the budget fits the 2D recipe Safe Cracker proved on the tablet. Notes carried into the
 build: keep the column faint; keep props wide of the balloon's lane; run the silhouette check
 again for any new moving shape.
+
+## 12. Layout after the reviewer's pass
+
+- The fan stands at (960, 798): its whole base, rails and ground shadow show, 60 px higher than
+  the first 2D cut. The balloon's highest centre is y 380, under the callout lane.
+- The height pole is at x 1790, under the clock, top y 362: out of the scenery and clear of every
+  HUD panel, Recalibrate included. A small coral pointer beside it follows the balloon's height.
+- The belt is gone. It ran off the frame toward a rider who is never shown,.
+- Nothing tall stands under the HUD panels: clouds and gulls keep below y 420, the seaside cliff
+  and lighthouse were lowered, the rooftop's towers shortened.
+- The rooftop has no foreground grass (a deck has none).
+- The hedges are bushes of small leaf clusters, lit toward the sun.
+- Silhouette rule, checked again: the height pointer is a plain triangle, the HUD's bird pips are
+  bare wing chevrons. Neither has a head or a tail.

@@ -12,13 +12,14 @@ extends Node2D
 ## and the cloud sit behind the balloon (`back`); the rain, the curtain and the wind lines in
 ## front of it (`front`, added by the scene above the balloon).
 
-const CLOUD_FROM := Vector2(2300, 330)
+const CLOUD_FROM := Vector2(2150, 500)  ## low and small on the horizon, under the HUD's panels
 const CLOUD_OVER := Vector2(1150, 380)
-const CLOUD_GONE := Vector2(-500, 350)
+const CLOUD_GONE := Vector2(-260, 500)
 const CLOUD_W := 340.0
 const RAIN_W := 460.0
 const BIRD_FROM := Vector2(-180, 520)
-const SHADOW_Y := 990.0
+const SHADOW_Y := 930.0
+const CLOUD_FAR_SCALE := 0.4
 
 var back: Node2D
 var front: Node2D
@@ -112,6 +113,7 @@ func update(delta: float, logic: KeepyLogic, balloon_at: Vector2) -> void:
 	var e := ease(_cloud_t, -1.8)
 	var from := CLOUD_GONE if _leaving else CLOUD_FROM
 	cloud.position = from.lerp(CLOUD_OVER, e) + Vector2(sin(_t * 0.3) * 8.0, 0.0)
+	cloud.scale = Vector2.ONE * lerpf(CLOUD_FAR_SCALE, 1.0, e)  # it grows as it nears
 	cloud.visible = _cloud_t > 0.001 or _warming
 	shadow.visible = cloud.visible
 	shadow.position = Vector2(cloud.position.x - 60.0, SHADOW_Y)

@@ -68,3 +68,9 @@ the grille or a HUD panel), that playing redraws nothing, and that a new place b
   tower is shorter, and each sun moved clear of the ride panel, the clock and Pause.
 - The rain's rect showed hard sides: its streaks and haze fade out toward both edges.
 - The bird used to fly in at the ride panel's height: it now comes in low from the left.
+
+## After the reviewer's pass
+
+Items 7 (the ridges' lit crest) and 8 (motes in the light) are done, so nothing here is open.
+Also done from the punch list: the fan lifted with its ground shadow, props clear of the HUD in
+all four places, the pole at the edge, hedge leaves, no rooftop grass, the belt removed.

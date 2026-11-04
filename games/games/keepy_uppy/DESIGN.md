@@ -290,3 +290,14 @@ fresh reviewer comes next.
 | HUD | `hud-system` | One themed `PanelContainer` widget in the top-centre slot, labels set only on change, and callouts in the game's own banner lane | The HUD's centre message | It sits on the balloon; Safe Cracker's banner solved the same problem |
 | Motion | `tween-animation` | Tweens for one-offs (the pop's ring, the cross-fade, callouts); the balloon's bob and squash set each frame from the logic | AnimationPlayer | Motion follows the logic; nothing is keyframed |
 | Audio | `audio-system` | Rendered OGG theme with three stems gated by height, effects registered by name, fan hum as a looping sfx pitched to lift | MusicGen at runtime | The family's #55 pipeline |
+
+## Notes from the 2D review
+
+- **Target line.** "About N W holds it in the middle" is `power_for(0.5, weight)` to the nearest
+  5 W. A rider holding that figure rests in the mid band at every weight tested
+  (`keepy_logic_test`). Birds, rain and downdrafts add weight, so the line holds in calm air.
+- **Rain.** It raises the watts, so its callouts give the new figure. The same rounding applies.
+- **HUD words.** Bands show stars, not multipliers or rates (UI_POLISH.md). The 1×, 2×, 3× above
+  are the rules' figures and stay here.
+- **Summary.** `summary_stats` adds seconds high, pops and birds shaken.
+- **Belt.** Removed from the rig: nothing in the rules used it.

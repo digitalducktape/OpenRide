@@ -483,3 +483,12 @@ func test_three_stars_needs_about_one_point_three_times_effort() -> void:
 	var ppm := _points_a_minute(func(l: KeepyLogic): return 0.65 * FTP + (l.weight() - 80.0) * 1.5)
 	assert_float(ppm).is_less(float(stars[2]))
 	assert_float(ppm * 1.3).is_greater_equal(float(stars[2]))
+
+
+func test_the_intro_s_rounded_watts_rest_in_the_mid_band() -> void:
+	# The target line rounds to 5 W: at that figure, the balloon still settles in the mid band.
+	for w in [40.0, 80.0, 120.0, 150.0]:
+		var said := roundf(KeepyLogic.power_for(0.5, w) / 5.0) * 5.0
+		var h := KeepyLogic.resting_height(said, w)
+		assert_float(h).override_failure_message("%d W against %d W rests at %.2f" % [said, w, h]) \
+			.is_between(KeepyLogic.MID_FROM, KeepyLogic.HIGH_FROM)

@@ -50,3 +50,18 @@ orange agrees with its rope) and stays clear of the meaning colours: it is warme
 - Every label 34 px or more (`keepy_scene_test`), the widget within 800 x 125 with the longest
   texts.
 - Buttons are the HUD's (Pause, End); the game adds no touch targets in play.
+
+## After the reviewer's pass
+
+- Callouts moved from the left lane to a centred lane under the status widget, with a heavy ink
+  outline. That lane clears every panel and stays above the balloon at its highest, birds perched.
+- The status widget is one row, content centred, 80 px tall. The warning badge went: callouts say
+  the same thing in words, with a number where one helps.
+- Chips show LOW, MID and HIGH with one to three stars, not "2×". The ride panel beside them shows
+  the effort multiplier, and two multipliers read as a contradiction. A points rate was rejected
+  too: the effort multiplier scales every band, so "20/s" would disagree with the score.
+- Rain now says what it costs, with the same rounding as the intro's target line:
+  "Rain: 130 W holds it up", then "Raining: 130 W holds it up".
+- The intro's picture is a small scene, 440 x 250, with the bands and their stars beside it.
+- The summary has three extra tiles through `GameInfo.summary_stats`: seconds high, pops, birds
+  shaken.

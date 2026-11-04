@@ -4,7 +4,8 @@ extends Node2D
 ## vignette, baked into a texture when the place changes (a SubViewport rendered once, as Safe
 ## Cracker's `SafeBackdrop`), shown as one opaque sprite, and the place's slow ambient life as
 ## children that never redraw:
-##   every place   three cumulus clouds drifting across (moved, not redrawn)
+##   every place   three small cumulus drifting low across, under the HUD's panels (moved, not
+##                 redrawn), and motes in the light
 ##   meadow        butterflies flitting over the grass (CPUParticles2D)
 ##   seaside       the sea's glitter on the sun's path (a shader on one rect), two gulls gliding
 ##   rooftop       lit windows that come and go (a shader on one rect over the towers)
@@ -30,6 +31,7 @@ var sea: ColorRect
 var windows: ColorRect
 var butterflies: CPUParticles2D
 var leaves: CPUParticles2D
+var motes: CPUParticles2D
 var gulls: Array[Node2D] = []
 var _cloud_speed: Array[float] = []
 var _t := 0.0
@@ -68,12 +70,12 @@ func _init() -> void:
 	for i in CLOUDS:
 		var c := SafeDial.Layer.new()
 		c.name = "Cloud%d" % i
-		var w := rng.randf_range(220.0, 340.0)
+		var w := rng.randf_range(150.0, 220.0)
 		c.paint = func(ci: CanvasItem) -> void:
 			var m := SafeMesh.new()
 			KeepyPlaces.cumulus(m, Vector2.ZERO, w, Color(1, 1, 1, 0.95), Color(0.82, 0.86, 0.92, 0.95))
 			m.flush(ci)
-		c.position = Vector2(rng.randf_range(-100.0, 2000.0), rng.randf_range(150.0, 400.0))
+		c.position = Vector2(rng.randf_range(-100.0, 2000.0), rng.randf_range(450.0, 520.0))  # under the HUD's panels
 		add_child(c)
 		clouds.append(c)
 		_cloud_speed.append(rng.randf_range(CLOUD_SPEED.x, CLOUD_SPEED.y))
@@ -83,7 +85,7 @@ func _init() -> void:
 		var g := SafeDial.Layer.new()
 		g.name = "Gull%d" % i
 		g.paint = _paint_gull
-		g.position = Vector2(300 + i * 900, 230 + i * 70)
+		g.position = Vector2(300 + i * 900, 420 + i * 50)
 		add_child(g)
 		gulls.append(g)
 	butterflies = _particles("Butterflies", 10, KeepyPlaces.WIDE.x * 0.45, Vector2(960, 860), Vector2(900, 90))
@@ -94,6 +96,15 @@ func _init() -> void:
 	butterflies.initial_velocity_max = 30.0
 	butterflies.angular_velocity_min = -40.0
 	butterflies.angular_velocity_max = 40.0
+	# Motes drifting in the light over the middle of the scene (GFX_POLISH item 8).
+	motes = _particles("Motes", 14, 0.0, Vector2(960, 560), Vector2(760, 240))
+	motes.texture = SafePlaces.soft_dot()
+	motes.scale_amount_min = 0.12
+	motes.scale_amount_max = 0.24
+	motes.gravity = Vector2(4, -3)
+	motes.initial_velocity_min = 3.0
+	motes.initial_velocity_max = 10.0
+	motes.color_ramp = _ramp([Color(1, 0.97, 0.85, 0.3)])
 	leaves = _particles("Leaves", 22, 0.0, Vector2(960, -40), Vector2(1100, 10))
 	leaves.texture = _leaf_texture()
 	leaves.color_ramp = _ramp([Color("d9792f"), Color("c9502c"), Color("e3a83a")])
@@ -140,8 +151,8 @@ static func _ramp(cols: Array) -> Gradient:
 	var g := Gradient.new()
 	g.set_color(0, Color(cols[0], 0.0))
 	g.set_color(1, Color(cols[0], 0.0))
-	g.add_point(0.1, Color(cols[0], 1.0))
-	g.add_point(0.9, Color(cols[cols.size() - 1], 1.0))
+	g.add_point(0.1, cols[0])
+	g.add_point(0.9, cols[cols.size() - 1])
 	return g
 
 
@@ -231,7 +242,7 @@ func step(delta: float) -> void:
 		for i in gulls.size():
 			var g := gulls[i]
 			g.position.x = fposmod(300.0 + i * 900.0 + _t * (38.0 + i * 9.0), KeepyPlaces.WIDE.x) - KeepyPlaces.BLEED
-			g.position.y = 230.0 + i * 70.0 + sin(_t * 0.4 + i) * 18.0
+			g.position.y = 420.0 + i * 50.0 + sin(_t * 0.4 + i) * 18.0
 			g.scale.y = 0.75 + 0.25 * sin(_t * (3.0 + i))
 
 

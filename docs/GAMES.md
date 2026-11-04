@@ -663,6 +663,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
 | `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
+| `summary_stats` | A one-game summary's extra tiles from the result's `stats`: `[{key, label, suffix, of}]` (`of`: a second stat, shown "3/4"); at most three. Watt Lane shows in-lane %, best streak and steps caught. |
 | `options` | The game's own settings, shown on its hub screen and in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings, plus the optional `where`, `kind`, `cards`, `columns`, `group` and `rider_badge`. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at

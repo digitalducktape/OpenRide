@@ -1,21 +1,21 @@
 class_name KeepyRig
 extends Node2D
 ## Keepy Uppy's built things (#77, 2D; ART_BIBLE.md §3 and §5): the hero pedal fan (a pine crate
-## with brass corner brackets and rivets, a brass grille over four turning blades, a drive pulley
-## and the belt running down to the rider's bike), its rails, the height pole painted in the three
+## with brass corner brackets and rivets, a brass grille over four turning blades, a drive pulley),
+## its rails, the height pole painted in the three
 ## bands with its streamers, and the column of air the fan blows. Every shape goes through
 ## `SafeMesh` (one draw call a layer) and is drawn once per place; per frame only the fan's x, the
 ## blades' rotation and the column's two uniforms change.
 ##
 ## Layers, back to front: Pole, Streamers (sway shader), Rails, Fan (its Column, Crate, Bowl,
-## Blades, Grille), Belt. The balloon is drawn between this and the foreground (`KeepyUppy`).
+## Blades, Grille), HeightMarker. The balloon is drawn between this and the foreground (`KeepyUppy`).
 
 const PLANK := Color("c9a577")
 const PLANK_DARK := Color("8a6a44")
 const BRASS := Color("d9a441")
 const IRON := Color("2b2a2e")
-const RUBBER := Color("1d1b1c")
 const TOP_DEPTH := 46.0  ## the crate's top face, from the grille's centre to its front edge
+const SHADOW_BELOW := 46.0  ## the feet, rails and ground shadow reach this far under the crate
 const BLADE_SPIN := 34.0  ## radians a second at a power of FTP
 const COLUMN_W := 420.0
 
@@ -29,7 +29,7 @@ var column: ColorRect
 var pole: Node2D
 var streamers: Node2D
 var rails: Node2D
-var belt: Line2D
+var marker: Node2D
 var place_index := 0
 var _blade_angle := 0.0
 
@@ -70,13 +70,13 @@ func _init() -> void:
 		m.glow(Vector2.ZERO, Vector2(110, 26), Color(0, 0, 0, 0.55), 8)
 		m.flush(ci), fan)
 	shadow.position = Vector2(0, KeepyPlaces.FAN_AT.y - 4.0)
-	belt = Line2D.new()
-	belt.name = "Belt"
-	belt.width = 16.0
-	belt.default_color = RUBBER
-	belt.points = PackedVector2Array([Vector2.ZERO, Vector2.ZERO])
-	add_child(belt)
-	_place_belt()
+	# The balloon's height on the pole: a small coral pointer beside the bands.
+	marker = _layer("HeightMarker", func(ci: CanvasItem) -> void:
+		var m := SafeMesh.new()
+		m.fill(PackedVector2Array([Vector2(-26, -13), Vector2(0, 0), Vector2(-26, 13)]), Color("12233a"))
+		m.fill(PackedVector2Array([Vector2(-22, -8), Vector2(-5, 0), Vector2(-22, 8)]), KeepyBalloon.CORAL)
+		m.flush(ci), self)
+	marker.position = Vector2(KeepyPlaces.POLE_X - 10.0, KeepyPlaces.BALLOON_LOW)
 
 
 func _layer(layer_name: String, paint: Callable, parent: Node) -> Node2D:
@@ -105,7 +105,6 @@ func update(delta: float, fan_x_m: float, power_share: float, strength: float, c
 	var sm := streamers.material as ShaderMaterial
 	sm.set_shader_parameter("gust", gust)
 	sm.set_shader_parameter("wind", wind)
-	_place_belt()
 
 
 ## The balloon's shadow on the grille for its height `h` (0-1, -1 when there is no balloon)
@@ -117,14 +116,6 @@ func set_shadow(h: float, dx: float) -> void:
 		shadow.modulate.a = k
 		shadow.scale = Vector2.ONE * lerpf(1.4, 0.8, k)
 		shadow.position.x = clampf(dx, -KeepyPlaces.GRILLE.x, KeepyPlaces.GRILLE.x)
-
-
-## The belt from the drive pulley down off the bottom edge, toward the bike (centre, below).
-func _place_belt() -> void:
-	var pulley := fan.position + Vector2(0, pulley_y())
-	var to := Vector2(KeepyPlaces.FAN_AT.x, KeepyPlaces.SIZE.y + 40.0)
-	if belt.points[0] != pulley:
-		belt.points = PackedVector2Array([pulley, to])
 
 
 static func pulley_y() -> float:
@@ -142,7 +133,7 @@ static func bounds(fan_x_m: float) -> Rect2:
 	var x := KeepyPlaces.FAN_AT.x + clampf(fan_x_m, -KeepyPlaces.X_SHOWN, KeepyPlaces.X_SHOWN) * KeepyPlaces.PX_PER_M
 	var r := front_rect()
 	var top := KeepyPlaces.FAN_AT.y - TOP_DEPTH
-	return Rect2(x + r.position.x - 10.0, top, r.size.x + 20.0, r.end.y + 16.0 - top)
+	return Rect2(x + r.position.x - 10.0, top, r.size.x + 20.0, r.end.y + SHADOW_BELOW - top)
 
 
 func _shade() -> Callable:
@@ -163,7 +154,7 @@ func _paint_crate(ci: CanvasItem) -> void:
 	var hw := KeepyPlaces.CRATE_W * 0.5
 	# A soft contact shadow on the ground, away from the sun.
 	var away := -KeepyPlaces.to_sun(place_index)
-	m.glow(Vector2(away.x * 60.0, r.end.y + 10.0), Vector2(hw + 90.0, 34.0), Color(0, 0, 0, 0.35), 10)
+	m.glow(Vector2(away.x * 60.0, r.end.y + 14.0), Vector2(hw + 90.0, 30.0), Color(0, 0, 0, 0.55), 10)
 	m.shade = _shade()
 	# Feet on the rails.
 	for x in [-hw + 26.0, hw - 26.0]:
@@ -312,9 +303,9 @@ func _paint_pole(ci: CanvasItem) -> void:
 func _paint_streamers(ci: CanvasItem) -> void:
 	var m := SafeMesh.new()
 	var x := KeepyPlaces.POLE_X + 10.0
-	var lines := [[KeepyPlaces.band_y(KeepyLogic.MID_FROM), KeepyStatus.BAND_COLORS[1], 120.0, 11.0],
-		[KeepyPlaces.band_y(KeepyLogic.HIGH_FROM), KeepyStatus.BAND_COLORS[2], 120.0, 11.0],
-		[KeepyPlaces.POLE_TOP + 14.0, Color("ff8c42"), 150.0, 20.0]]
+	var lines := [[KeepyPlaces.band_y(KeepyLogic.MID_FROM), KeepyStatus.BAND_COLORS[1], 96.0, 11.0],
+		[KeepyPlaces.band_y(KeepyLogic.HIGH_FROM), KeepyStatus.BAND_COLORS[2], 96.0, 11.0],
+		[KeepyPlaces.POLE_TOP + 14.0, Color("ff8c42"), 104.0, 18.0]]
 	for line in lines:
 		var y: float = line[0]
 		var c: Color = line[1]

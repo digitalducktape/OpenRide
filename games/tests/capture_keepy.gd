@@ -24,6 +24,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var play_sec := 0.0
 	var steer := false
+	var place_id := "random"
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			_out = arg.get_slice("=", 1)
@@ -36,7 +37,8 @@ func _run() -> void:
 		elif arg == "--places":
 			_places = true
 		elif arg.begins_with("--place="):
-			_place = KeepyPlaces.index_of(arg.get_slice("=", 1))
+			place_id = arg.get_slice("=", 1)
+			_place = KeepyPlaces.index_of(place_id)
 	DirAccess.make_dir_recursive_absolute(_out)
 	_session = root.get_node("Session")
 	_director = _session.director
@@ -44,6 +46,8 @@ func _run() -> void:
 	var options: Variant = load("res://framework/GameOptions.gd")
 	var registry: Variant = load("res://games/Registry.gd")
 	options.set_value(registry.info("keepy_uppy"), "steer", "on" if steer else "off")
+	# The game opens in its chosen place, so the intro behind the card and the play match.
+	options.set_value(registry.info("keepy_uppy"), "place", place_id)
 	var bus: Node = root.get_node("InputBus")
 	bus._sim_resistance = 30.0
 	bus._sim_cadence = 62.0
@@ -221,9 +225,9 @@ func _ride(game: Node, seconds: float, bus: Node) -> void:
 			target = 0.66 * 200.0 + (logic.weight() - 80.0) * 1.3
 		if logic.force == "downdraft" and logic.weather != KeepyLogic.Weather.CALM:
 			target = 0.85 * 200.0
-		if t > 50.0 and t < 56.0:
-			target = 40.0  # let one pop, for the recording
-		bus._sim_cadence = move_toward(bus._sim_cadence, target / (0.3 + bus._sim_resistance * 0.045), 0.8)
+		if t > 48.0 and t < 60.0:
+			target = 0.0  # stop pedalling: the balloon sinks and pops, for the recording
+		bus._sim_cadence = move_toward(bus._sim_cadence, target / (0.3 + bus._sim_resistance * 0.045), 0.8 if target > 0.0 else 4.0)
 		await process_frame
 	if held != 0:
 		_key(held, false)

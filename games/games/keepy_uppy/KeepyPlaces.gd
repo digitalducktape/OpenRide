@@ -15,21 +15,22 @@ const WIDE := Vector2(SIZE.x + 2.0 * BLEED, SIZE.y)
 const HORIZON_Y := 640.0  ## where the far land meets the sky
 const GROUND_Y := 900.0  ## the near ground the fan stands on (its feet)
 ## The fan: its grille's centre (the top of the crate, seen from a little above) and size.
-const FAN_AT := Vector2(960, 858)
+const FAN_AT := Vector2(960, 798)
 const GRILLE := Vector2(150, 36)  ## the grille's half axes (an ellipse)
 const CRATE_W := 340.0
 const CRATE_H := 150.0
 ## The balloon's centre: BALLOON_LOW at h = 0 (resting on the grille), BALLOON_HIGH at h = 1.
 const BALLOON_R := Vector2(80, 94)
 const BALLOON_LOW := FAN_AT.y - BALLOON_R.y - 8.0
-const BALLOON_HIGH := 340.0
+const BALLOON_HIGH := 380.0
 ## Steer: screen pixels a metre of the fan's rail (KeepyLogic's metres). The balloon is drawn
 ## no further than X_SHOWN metres either side, so it never reaches a HUD panel.
 const PX_PER_M := 140.0
 const X_SHOWN := 1.6
 ## The height pole beside the column, painted in the three bands.
-const POLE_X := 1300.0
-const POLE_TOP := 236.0
+const POLE_X := 1790.0  ## at the right edge, out of the scenery and under the clock
+const POLE_TOP := 362.0
+const LEAF_LIT := Color("8fbf5f")  ## a hedge's sunlit leaves
 
 const PLACES := [
 	{"id": "meadow", "name": "Summer meadow",
@@ -155,6 +156,9 @@ static func ridge(m: SafeMesh, base_y: float, amp: float, freq: float, phase: fl
 			m.quad4(prev, cur, Vector2(cur.x, bottom), Vector2(prev.x, bottom), top_col, top_col, low_col, low_col)
 			m.quad4(prev - Vector2(0, SafeMesh.FEATHER), cur - Vector2(0, SafeMesh.FEATHER), cur, prev,
 				Color(top_col, 0.0), Color(top_col, 0.0), top_col, top_col)
+			# A lit rim along the crest (GFX_POLISH item 7).
+			var rim := top_col.lightened(0.16)
+			m.quad4(prev, cur, cur + Vector2(0, 7), prev + Vector2(0, 7), rim, rim, top_col, top_col)
 		prev = cur
 		first = false
 		x += step
@@ -213,13 +217,10 @@ static func _meadow(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> v
 	ridge(m, HORIZON_Y - 40, 46, 0.004, 1.2, (p.far as Color).lerp(haze, 0.45), (p.far as Color).lerp(haze, 0.25), HORIZON_Y + 60)
 	ridge(m, HORIZON_Y + 10, 34, 0.006, 3.1, p.far, (p.mid as Color).lerp(p.far, 0.4), HORIZON_Y + 120)
 	# Hedgerows and trees on the far hill, wide of the column.
+	var sun_dir := ((p.sun as Vector2) - Vector2(960, 600)).normalized()
 	var hedge := (p.dark as Color).lightened(0.25)
 	for row in [[HORIZON_Y + 40, -BLEED, 760.0], [HORIZON_Y + 52, 1160.0, SIZE.x + BLEED]]:
-		var x: float = row[1]
-		while x < row[2]:
-			m.circle(Vector2(x, row[0]), rng.randf_range(16, 24), hedge)
-			x += rng.randf_range(18, 30)
-	var sun_dir := ((p.sun as Vector2) - Vector2(960, 600)).normalized()
+		_hedge(m, row[1], row[2], row[0], hedge, sun_dir, rng)
 	for t in [[Vector2(180, HORIZON_Y + 60), 150.0], [Vector2(320, HORIZON_Y + 70), 110.0], [Vector2(1620, HORIZON_Y + 64), 170.0],
 			[Vector2(1770, HORIZON_Y + 76), 120.0], [Vector2(-60, HORIZON_Y + 80), 130.0]]:
 		tree(m, t[0], t[1], (p.mid as Color).darkened(0.12), Color("5a4030"), sun_dir)
@@ -232,25 +233,40 @@ static func _meadow(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> v
 	_flowers(m, rng, HORIZON_Y + 140, [Color("f7f4e8"), Color("f5d547"), Color("b8a1e3"), Color("f2a5c0")], 150)
 
 
+## A hedgerow: uneven bushes, each a dark mass under clusters of leaves, lit toward the
+## sun and shaded at the foot.
+static func _hedge(m: SafeMesh, x0: float, x1: float, y: float, col: Color, sun_dir: Vector2, rng: RandomNumberGenerator) -> void:
+	m.rect_v(Rect2(x0, y + 8, x1 - x0, 16), Color(col.darkened(0.45), 0.0), Color(col.darkened(0.45), 0.7))
+	var x := x0
+	while x < x1:
+		var r := rng.randf_range(15.0, 29.0)
+		var at := Vector2(x, y - r * 0.35 + rng.randf_range(-3.0, 3.0))
+		m.circle(at + Vector2(0, 4), r, col.darkened(0.28))
+		for k in 16:
+			var d := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.1, 0.85) * r
+			var lit := clampf(0.5 + 0.6 * d.normalized().dot(sun_dir) - 0.3 * d.y / r, 0.0, 1.0)
+			m.circle(at + d, rng.randf_range(2.5, 4.5), col.darkened(0.2).lerp(LEAF_LIT, lit * 0.7))
+		x += r * rng.randf_range(1.0, 1.6)
+
+
 static func _seaside(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	# The sea to the horizon (its glitter is KeepyBackdrop's shader), an island far out.
 	var sea_top := Color("4f86b8")
 	m.rect_v(Rect2(-BLEED, HORIZON_Y - 60, WIDE.x, 200), sea_top.lerp(p.haze, 0.35), Color("2f6a99"))
 	m.glow(Vector2((p.sun as Vector2).x, HORIZON_Y - 50), Vector2(520, 40), Color(p.sun_col, 0.35), 8)
 	m.glow(Vector2(420, HORIZON_Y - 62), Vector2(140, 22), Color(0.35, 0.5, 0.55, 0.9), 6)
-	# The cliffs on the left with a lighthouse, the headland running in from the right.
+	# The cliffs on the left with a lighthouse, the headland running in from the right. Low enough
+	# that the lighthouse stands clear under the HUD's ride panel (its bottom is about y 335).
+	var top := HORIZON_Y - 70.0
 	var cliff := Color("a58a6a")
-	var outline := PackedVector2Array([Vector2(-BLEED, HORIZON_Y - 150), Vector2(120, HORIZON_Y - 170), Vector2(320, HORIZON_Y - 120),
-		Vector2(470, HORIZON_Y + 40), Vector2(420, HORIZON_Y + 160), Vector2(-BLEED, HORIZON_Y + 160)])
-	m.fill(outline, cliff)
-	m.fill(PackedVector2Array([Vector2(-BLEED, HORIZON_Y - 150), Vector2(120, HORIZON_Y - 170), Vector2(320, HORIZON_Y - 120),
-		Vector2(250, HORIZON_Y - 108), Vector2(-BLEED, HORIZON_Y - 128)]), Color("6f8f47"))
-	for k in 6:
-		var y := HORIZON_Y - 100 + k * 40.0
-		m.line(Vector2(-BLEED, y), Vector2(360 - k * 10.0, y + 8), 3.0, cliff.darkened(0.2))
-	# The lighthouse: a white tower with one dark band, a lamp room and a warm light.
-	# Short enough to stand clear under the HUD's ride panel (its bottom is about y 315).
-	var lh := Vector2(140, HORIZON_Y - 168)
+	m.fill(PackedVector2Array([Vector2(-BLEED, top + 20), Vector2(120, top), Vector2(320, top + 40),
+		Vector2(470, HORIZON_Y + 60), Vector2(420, HORIZON_Y + 160), Vector2(-BLEED, HORIZON_Y + 160)]), cliff)
+	m.fill(PackedVector2Array([Vector2(-BLEED, top + 20), Vector2(120, top), Vector2(320, top + 40),
+		Vector2(250, top + 54), Vector2(-BLEED, top + 42)]), Color("6f8f47"))
+	for k in 5:
+		var y := top + 60.0 + k * 36.0
+		m.line(Vector2(-BLEED, y), Vector2(380 - k * 6.0, y + 8), 3.0, cliff.darkened(0.2))
+	var lh := Vector2(140, top + 4)
 	m.quad(lh + Vector2(-22, 0), lh + Vector2(22, 0), lh + Vector2(15, -100), lh + Vector2(-15, -100), Color("f2efe6"))
 	m.quad(lh + Vector2(-19.5, -34), lh + Vector2(19.5, -34), lh + Vector2(17.5, -56), lh + Vector2(-17.5, -56), Color("39506a"))
 	m.rect(Rect2(lh.x - 18, lh.y - 118, 36, 18), Color("39506a"))
@@ -274,14 +290,14 @@ static func _rooftop(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> 
 	var x := -BLEED
 	while x < SIZE.x + BLEED:
 		var w := rng.randf_range(70, 150)
-		var h := rng.randf_range(120, 300)
+		var h := rng.randf_range(110, 260)
 		m.rect_v(Rect2(x, HORIZON_Y - h, w - 6, h + 40), far.lerp(p.haze, 0.25), far)
 		x += w
 	x = -BLEED - 40
 	var mid: Color = p.mid
 	while x < SIZE.x + BLEED:
 		var w := rng.randf_range(110, 210)
-		var h := rng.randf_range(80, 230)
+		var h := rng.randf_range(80, 200)
 		var r := Rect2(x, HORIZON_Y + 20 - h, w - 10, h + 80)
 		m.rect_v(r, mid, mid.darkened(0.25))
 		var col := 0
