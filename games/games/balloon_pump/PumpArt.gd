@@ -245,21 +245,42 @@ static func _stand(m: SafeMesh, lx: float) -> void:
 	m.circle(Vector2(t.x, t.y - 40), 9.0, BRASS.lightened(0.2))
 
 
-## A wicker basket of spare, limp balloons by the pump's foot.
+## A wicker basket of spare balloons by the pump's foot: a low heap of folded, unblown rubber.
+## Nothing stands up out of it: round shapes read as Easter eggs (reviewer, 2026-11-02) and upright
+## rounded tubes fail the silhouette check (ART_BIBLE.md §6), so the heap is flat, wide folds.
 static func _basket(m: SafeMesh, _lx: float) -> void:
 	var r := PumpPlaces.BASKET
-	var limp := [Color("3fd0a8"), Color("ff4f96"), Color("8a7dff"), Color("ff4f96"), Color("3fd0a8")]
-	for k in limp.size():
-		var at := Vector2(r.position.x + 30 + k * 28, r.position.y + 6 - (k % 2) * 10)
-		var c: Color = limp[k]
-		m.fill(SafeMesh._ellipse(at, Vector2(16, 24), 16), c.darkened(0.25))
-		m.circle(at + Vector2(-5, -9), 4.0, Color(1, 1, 1, 0.35))
+	var folds := [Color("3fd0a8"), Color("ff4f96"), Color("8a7dff"), Color("ffc530"), Color("ff4f96"), Color("3fd0a8"), Color("8a7dff")]
 	var wicker := Color(0.62, 0.45, 0.25)
+	# The basket's back rim, behind the heap.
+	m.rect_v(Rect2(r.position.x + 6, r.position.y - 4, r.size.x - 12, 6), wicker.darkened(0.3), wicker.darkened(0.5))
+	# Back row first: three wide folds on top of the heap, four in front, each a flat pillow with a
+	# crease and a soft highlight along its top.
+	for k in folds.size():
+		var back := k < 3
+		var x := r.position.x + (46.0 + k * 40.0 if back else 26.0 + (k - 3) * 39.0)
+		var at := Vector2(x, r.position.y - (9.0 if back else 2.0))
+		var c: Color = folds[k]
+		var half := Vector2(30.0, 9.0)
+		m.fill(SafeMesh._ellipse(at, half, 20), c.darkened(0.3 if back else 0.15))
+		m.line(at + Vector2(-20, -3), at + Vector2(18, -4), 2.0, Color(1, 1, 1, 0.28))
+		m.line(at + Vector2(-16, 3), at + Vector2(20, 2), 1.5, c.darkened(0.5))
+	# A tail of ribbon curling over the front rim.
+	var curl := PackedVector2Array()
+	for i in 13:
+		var t := float(i) / 12.0
+		curl.append(Vector2(r.position.x + 60 + t * 60, r.position.y + 8 + sin(t * TAU * 1.5) * 8.0 + t * 26.0))
+	for i in curl.size() - 1:
+		m.line(curl[i], curl[i + 1], 2.0, Color(0.95, 0.85, 0.9, 0.85))
+	# The basket's front: tapered wicker with woven rows and a rim.
 	m.quad4(r.position, Vector2(r.end.x, r.position.y), Vector2(r.end.x - 14, r.end.y), Vector2(r.position.x + 14, r.end.y),
 		wicker, wicker, wicker.darkened(0.5), wicker.darkened(0.5))
 	for k in 5:
 		var y := r.position.y + 10 + k * 14
 		m.line(Vector2(r.position.x + 4 + k * 2.5, y), Vector2(r.end.x - 4 - k * 2.5, y), 3.0, wicker.darkened(0.35))
+	for k in 8:
+		var x := r.position.x + 14 + k * (r.size.x - 28) / 7.0
+		m.line(Vector2(x, r.position.y + 6), Vector2(x + (k - 3.5) * 1.5, r.end.y - 4), 1.5, wicker.darkened(0.45))
 	m.rect_v(Rect2(r.position.x - 4, r.position.y - 6, r.size.x + 8, 10), wicker.lightened(0.15), wicker.darkened(0.2))
 
 

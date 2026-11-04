@@ -29,5 +29,27 @@
    in the first pass and kept.
 5. **The NEXT icon** shows the next kind at its relative size, gold with a star. Kept.
 
+## The reviewer's punch list (2026-11-02)
+
+6. **Two clocks.** **Done:** the race clock reads "3/5 · HEAT 1:35".
+7. **Two watt readings that disagreed.** **Done:** the status widget has no watts; the ride panel
+   shows the smoothed watts the rules use (`RideMetrics.set_power_source`, from Watt Lane's branch,
+   taken unchanged so the merge is clean).
+8. **"TIED!" read as a tied score.** **Done:** "FULL!".
+9. **Intro card.** **Done:** the rider's copy, every number from the segment's params
+   (`pump_game_test`); "Gold ×3" and "n pts" under balloons about twice the size; the race line
+   above them, which fills the card.
+10. **Small text.** **Done in the widget:** row two at 40 px, the NEXT icon 56 px, the count as
+    "×12" to make room. **Not done:** "more resistance scores more" is the framework's effort badge,
+    shared by every game, at 34 px (UI_STYLE's minimum); left for a framework change.
+11. **Labels far from their numbers.** **Partly done:** the rpm and W columns now carry their gauges
+    (ticked at the keep-pumping floor and the top push line), which fills the gap. The % column
+    keeps its gap: the spacing is the framework's.
+12. **Summary.** **Partly done:** tiles for the balloons, gold and heats won (Watt Lane's
+    `summary_stats`), the heats in Race only. No hero art: the summary shows after the game has
+    left and has no slot for a picture; that needs a framework change.
+13. **"1:40 ridden" against the clock.** Not a bug: "ridden" is the plan's time, which includes the
+    10 s intro card, in every game (8:30 left is 1:30 played, plus the card). Left as it is.
+
 No game buttons: Balloon Pump is played with the legs and the knob, so the touch rules (§6) only
 concern the framework's own Pause and End.

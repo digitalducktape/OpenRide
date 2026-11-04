@@ -62,6 +62,25 @@ slice it replaced is described in git history (`ART_BIBLE.md` v1).
 11. **A per-place tint on the pump's brass** (cooler under the pier's moon). Skipped: one key
     light per place already drives the brass highlight; a second colour would muddy it.
 
+## The reviewer's punch list (2026-11-02)
+
+12. **The bunch grew behind Pause | End, with confetti on the buttons.** The slots were clear: it was
+    the flying balloon (a 180 px arc at nearly full size) and a burst set high over the bunch.
+    **Done:** a 36 px arc, the balloon shrinking early in its flight, both bursts lower and slower.
+    `pump_layout_test` samples every slot's flight and bounds each burst's rise.
+13. **The gauge's push arc was thin and pale at 1 m.** **Done:** nearly twice as wide, saturated,
+    with a dark edge, a bold ink marker across it and a gold tip at the line. Numbers on the dial:
+    skipped, the scale moves with FTP and the marker is what a glance needs.
+14. **Big top:** the handle merged into the brass rail, and the side ropes ended in mid-air.
+    **Done:** the valance sits above the handle's whole stroke; the ropes run to sandbags on the
+    floor (`pump_layout_test`).
+15. **Fair:** the lower 35% was a flat slab. **Done:** duckboards under the pump and stand, planks
+    converging with grain and battens, and mown stripes and two-tone tufts in the grass.
+16. **The basket read as Easter eggs.** **Done:** a low heap of flat folds (ART_BIBLE §6).
+17. **The gold balloon looked lemon-shaped.** The glint was a diagonal seam across a teardrop.
+    **Done:** a rounder foil body and a soft drifting glint.
+18. **The moon sat under the ride panel on the pier.** **Done:** moved clear (`pump_layout_test`).
+
 ## Budget (desktop, 2026-11-02)
 
 | Layer | Draws |

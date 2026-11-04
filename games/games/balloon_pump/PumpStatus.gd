@@ -4,30 +4,31 @@ extends PanelContainer
 ## (UI_STYLE.md §5: "am I over the push line?"). Two rows, at most 800 x 120 px with the longest
 ## texts (`pump_status_test`):
 ##
-##     214 W  ▕▓▓▓▓▓▓▓▓▓▓▓▓|▒▒▒▒▒▒▒▏  FILLING
-##     (●) 12 balloons     RACE 3/5 · 1:24     NEXT (●)
+##     ▕▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓|▒▒▒▒▒▒▒▒▒▏  FILLING
+##     (●) ×12       3/5 · HEAT 1:24       NEXT (●)
 ##
-## Row 1: the smoothed watts (56 px), the pressure bar (400 x 40: the needle as a fill, green over
-## the push line and amber under it, the line as a gold tick with the rest of the scale tinted
-## past it) and a state badge: FILLING (green), PUSH! (amber, breathing), TIED! (gold), PEDAL!
-## (amber), REST (the break between heats). The badge's word carries the meaning, so colour is
+## Row 1: the pressure bar (560 x 40: the needle as a fill, green over the push line and amber
+## under it, the line as a gold tick with the rest of the scale tinted past it) and a state badge:
+## FILLING (green), PUSH! (amber, breathing), FULL! (gold), PEDAL! (amber), REST (the break between
+## heats). The watts are the ride panel's (one number: the game sets its power source to the same
+## smoothed watts the rules use), not repeated here (reviewer, 2026-11-02). The badge's word carries the meaning, so colour is
 ## never alone (§4).
-## Row 2: a drawn balloon and the count; in Race the heat's progress and clock (amber in the last
-## 10 s); the next balloon's kind as a drawn balloon in its colour and size, gold with a star.
+## Row 2 (40 px): a drawn balloon and the count; in Race the heat's progress and its clock,
+## labelled HEAT so it never reads as a second session clock (amber in the last 10 s); the next
+## balloon's kind as a drawn balloon in its colour and size, gold with a star.
 ##
 ## Budget (§8): labels change only on a change (watts round to 5 W, the clock to the second), the
 ## bar redraws only when the fill or the line moves a pixel, every shape goes through ShapeBatch
 ## (one draw call a drawing), and PUSH!'s breathing is a scale tween, not a redraw.
 
-const BAR_SIZE := Vector2(400, 40)
-const SIDE_WIDTH := 150.0
+const BAR_SIZE := Vector2(560, 40)
 const BADGE_WIDTH := 180.0
-const ICON := Vector2(44, 44)
+const ICON := Vector2(56, 56)
+const ROW2 := HudTheme.SMALL + 6  ## 40 px: read at a glance from the saddle
 const BALLOON_COLORS := PumpArt.BALLOON_COLORS
 
 var look: GameTheme
 
-var watts: Label
 var bar: Control
 var badge: PanelContainer
 var badge_label: Label
@@ -37,7 +38,6 @@ var race_label: Label
 var next_caption: Label
 var next_icon: Control
 
-var _watts_text := ""
 var _fill_px := -1
 var _line_px := -1
 var _over := false
@@ -66,19 +66,6 @@ func _init(theme: GameTheme = null) -> void:
 	add_child(box)
 
 	var top := _row(box)
-	var col := HBoxContainer.new()
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.custom_minimum_size = Vector2(SIDE_WIDTH, 0)
-	col.alignment = BoxContainer.ALIGNMENT_END
-	col.add_theme_constant_override("separation", 4)
-	top.add_child(col)
-	watts = look.label("0", HudTheme.MEDIUM, GameTheme.INK, true)
-	watts.name = "Watts"
-	watts.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	col.add_child(watts)
-	var unit := _caption("W", GameTheme.MUTED)
-	unit.size_flags_vertical = Control.SIZE_SHRINK_END
-	col.add_child(unit)
 	bar = Control.new()
 	bar.name = "PressureBar"
 	bar.custom_minimum_size = BAR_SIZE
@@ -102,21 +89,21 @@ func _init(theme: GameTheme = null) -> void:
 	bottom.add_theme_constant_override("separation", 10)
 	count_icon = _icon("CountIcon", _draw_count_icon)
 	bottom.add_child(count_icon)
-	count_label = _caption("", GameTheme.INK)
+	count_label = _caption("", GameTheme.INK, ROW2)
 	count_label.name = "Count"
-	count_label.custom_minimum_size = Vector2(200, 0)
+	count_label.custom_minimum_size = Vector2(100, 0)
 	bottom.add_child(count_label)
-	race_label = _caption("", GameTheme.TARGET)
+	race_label = _caption("", GameTheme.TARGET, ROW2)
 	race_label.name = "Race"
 	race_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	race_label.custom_minimum_size = Vector2(250, 0)
+	race_label.custom_minimum_size = Vector2(300, 0)
 	bottom.add_child(race_label)
-	next_caption = _caption(tr("NEXT"), GameTheme.MUTED)
+	next_caption = _caption(tr("NEXT"), GameTheme.MUTED, ROW2)
 	next_caption.name = "NextCaption"
 	bottom.add_child(next_caption)
 	next_icon = _icon("NextIcon", _draw_next_icon)
 	bottom.add_child(next_icon)
-	set_state(0.0, 0.0, 0.3, "filling")
+	set_state(0.0, 0.3, "filling")
 	set_count(0)
 	set_race(0, 0, -1.0)
 	set_next("small")
@@ -133,8 +120,8 @@ func _row(parent: Control) -> HBoxContainer:
 
 ## A 34 px caption on the panel (ink at 86%, not the 3D scene), so no outline: plain captions of
 ## one size batch into one draw call (Tug's TugStatus).
-func _caption(text: String, color: Color) -> Label:
-	var l := look.label(text, HudTheme.SMALL, color, true)
+func _caption(text: String, color: Color, size := HudTheme.SMALL) -> Label:
+	var l := look.label(text, size, color, true)
 	l.add_theme_constant_override("outline_size", 0)
 	return l
 
@@ -150,13 +137,9 @@ func _icon(node_name: String, painter: Callable) -> Control:
 	return c
 
 
-## Every frame: the smoothed watts, the needle and the push line (0-1 along the gauge's scale),
-## and the state: "filling", "push" (under the line), "tied", "pedal" or "rest".
-func set_state(smoothed_watts: float, needle: float, line: float, state: String) -> void:
-	var text := str(roundi(smoothed_watts / 5.0) * 5)
-	if text != _watts_text:
-		_watts_text = text
-		watts.text = text
+## Every frame: the needle and the push line (0-1 along the gauge's scale), and the state:
+## "filling", "push" (under the line), "full" (tying off), "pedal" or "rest".
+func set_state(needle: float, line: float, state: String) -> void:
 	_fill = clampf(needle, 0.0, 1.0)
 	_line = clampf(line, 0.0, 1.0)
 	var fill_px := roundi(_fill * BAR_SIZE.x)
@@ -184,8 +167,8 @@ func _set_badge(state: String) -> void:
 		"push":
 			text = tr("PUSH!")
 			fill = Color(GameTheme.WARN.darkened(0.2), 0.96)
-		"tied":
-			text = tr("TIED!")
+		"full":
+			text = tr("FULL!")
 			fill = Color(GameTheme.TARGET.darkened(0.15), 0.96)
 		"pedal":
 			text = tr("PEDAL!")
@@ -197,7 +180,7 @@ func _set_badge(state: String) -> void:
 	badge_label.text = text
 	badge.pivot_offset = badge.size * 0.5
 	GameTheme.pulse(badge, state == "push" or state == "pedal")
-	if state == "tied" and was != "tied":
+	if state == "full" and was != "full":
 		GameTheme.pop(badge, 1.3)
 
 
@@ -207,7 +190,7 @@ func set_count(balloons: int) -> void:
 		return
 	var grew := _count >= 0 and balloons > _count
 	_count = balloons
-	count_label.text = tr("1 balloon") if balloons == 1 else tr("%d balloons") % balloons
+	count_label.text = "×%d" % balloons
 	if grew:
 		GameTheme.pop(count_icon, 1.35)
 
@@ -222,7 +205,7 @@ func set_race(done: int, target: int, sec_left: float) -> void:
 	var text := ""
 	var warn := false
 	if target > 0:
-		text = tr("RACE %d/%d · %d:%02d") % [done, target, s / 60, s % 60]
+		text = tr("%d/%d · HEAT %d:%02d") % [done, target, s / 60, s % 60]
 		warn = sec_left <= PumpLogic.WARN_SEC
 	if text != _race_text:
 		_race_text = text
@@ -288,8 +271,8 @@ static func _balloon(b: ShapeBatch, c: Vector2, scale: float, color: Color, ink:
 	b.convex(ring, color)
 	b.circle(body + Vector2(-rx * 0.38, -ry * 0.42), 3.5 * scale + 1.0, Color(1, 1, 1, 0.75), 10)
 	var knot := body + Vector2(0, ry)
-	b.convex(PackedVector2Array([knot + Vector2(-4, 5), knot + Vector2(4, 5), knot]), color.darkened(0.25))
-	b.line(knot + Vector2(0, 4), c + Vector2(2, 22), 2.5, Color(1, 1, 1, 0.8))
+	b.convex(PackedVector2Array([knot + Vector2(-4, 5) * scale, knot + Vector2(4, 5) * scale, knot]), color.darkened(0.25))
+	b.line(knot + Vector2(0, 5) * scale, knot + Vector2(1, 9) * scale, 2.5, Color(1, 1, 1, 0.8))
 	if star:
 		b.star(body, 7.0 * scale, Color.WHITE)
 

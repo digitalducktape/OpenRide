@@ -24,7 +24,7 @@ func before_test() -> void:
 	hud.set_skin(PumpGame.look.hud_skin())
 	var status := PumpStatus.new(PumpGame.look)
 	hud.add_widget(status)
-	status.set_state(1885, 1.0, 0.7, "filling")
+	status.set_state(1.0, 0.7, "filling")
 	status.set_count(999)
 	status.set_race(10, 10, 119.0)
 	hud.metrics.refresh(118, 1888, 100)
@@ -97,3 +97,39 @@ func test_the_ferris_wheel_stands_on_its_horizon_and_clears_the_hud() -> void:
 	assert_float(w.end.y).override_failure_message("the wheel reaches y %.0f" % w.end.y).is_less_equal(PumpPlaces.FAIR_HORIZON + 8.0)
 	# And it never reaches the pump.
 	assert_bool(w.intersects(PumpPlaces.BARREL.grow(20))).is_false()
+
+
+func test_a_tied_balloon_flies_under_the_hud() -> void:
+	var panels := await _panels()
+	var from := Transform2D(0.0, Vector2.ONE * PumpArt.BALLOON_RADIUS.large, 0.0, PumpPlaces.NOZZLE)
+	for slot in PumpStage.BUNCH_MAX:
+		for step in 11:
+			var x := stage.flight_at(from, slot, "large", step / 10.0)
+			var r := x.get_scale().x
+			# The balloon's quad, upright (the flight's slight turn only narrows it).
+			var box := Rect2(x.origin - Vector2(r, r * PumpArt.BALLOON_TALL), Vector2(r * 2.0, r * PumpArt.BALLOON_TALL))
+			_clear_of("slot %d flight %.1f" % [slot, step / 10.0], box, panels)
+
+
+func test_confetti_stays_under_the_hud() -> void:
+	var panels := await _panels()
+	var lowest_panel := 0.0
+	for p in panels:
+		lowest_panel = maxf(lowest_panel, p.end.y)
+	for at in [PumpStage.TIE_BURST, PumpStage.WIN_BURST]:
+		for big in [false, true]:
+			var top := PumpStage.burst_top(at, big)
+			assert_float(top).override_failure_message("a burst at %s reaches %.0f" % [at, top]).is_greater(lowest_panel)
+
+
+func test_the_big_top_valance_clears_the_handle() -> void:
+	# The rail, its scallops and fringe end above the handle at the top of its stroke.
+	assert_float(PumpStage.handle_rect(0.0).position.y).is_greater(PumpPlaces.VALANCE_Y + 56.0)
+	# The rigging ropes stand clear of the pump.
+	for rx in PumpPlaces.BIGTOP_ROPES:
+		assert_bool(PumpPlaces.BARREL.grow(150).has_point(Vector2(rx, 600))).is_false()
+
+
+func test_the_pier_moon_clears_the_hud() -> void:
+	var panels := await _panels()
+	_clear_of("moon", Rect2(PumpPlaces.MOON - Vector2(60, 60), Vector2(120, 120)), panels)

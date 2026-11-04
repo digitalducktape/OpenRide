@@ -85,6 +85,10 @@ balloons have strings, straight and converging on the weight), the bunch, the Fe
 lantern, the basket. Particles are round dots with no tails (hiss, vapour, dust) and rectangles
 (confetti). No moving marker has a round head with a wavy or tapering tail. **Passed.**
 
+One shape failed on the way and was replaced: limp balloons standing up out of the basket (first
+round eggs, then rounded upright tubes). The basket now holds a low heap of flat folds, and nothing
+stands up out of it. Keep it that way.
+
 ## 7. Tablet budget (Gen 2, PowerVR GX6250, Compatibility)
 
 | Item | Budget | Desktop, 2026-11-02 |

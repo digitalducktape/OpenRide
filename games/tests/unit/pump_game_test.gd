@@ -77,3 +77,42 @@ func test_a_rounds_ride_ends_after_its_heats() -> void:
 			break
 	game._handle({"type": "over"})
 	assert_bool(ended[0]).is_true()
+
+
+func test_the_intro_copy_comes_from_the_segments_params() -> void:
+	_set_mode("race")
+	_make({"params": {"ftp_watts": 200.0, "push_lo_watts": 40, "push_hi_watts": 90, "race_balloons": 7, "race_sec": 90}})
+	# The biggest balloon's top line: 40 + 50 × 1.12.
+	assert_str(game.target_text(game.segment)).is_equal("Get above 96 W to finish each balloon")
+	assert_str(game.race_line(game.segment)).is_equal("Race: fill 7 balloons in 1:30")
+	assert_str(game.how_to_text(game.segment).replace("\n", " ")).is_equal(
+		"Pedal to pump up balloons. Each one gets harder to fill near the end")
+	# FTP alone sets the line when the params leave it out, by role.
+	var fallback := {"role": "recovery", "params": {"ftp_watts": 300.0}}
+	assert_str(game.target_text(fallback)).is_equal("Get above 95 W to finish each balloon")
+	# Circuits play Max: no race line.
+	assert_str(game.race_line({"role": "work", "params": {}})).is_equal("")
+
+
+func test_the_intro_picture_labels_gold_and_the_race() -> void:
+	_set_mode("race")
+	_make({"params": {"ftp_watts": 200.0, "race_balloons": 4, "race_sec": 120}})
+	var picture: Control = auto_free(game.intro_visual())
+	var texts: Array = picture.find_children("*", "Label", true, false).map(func(l): return l.text)
+	assert_array(texts).contains(["Race: fill 4 balloons in 2:00", "Gold ×3", "100 pts"])
+
+
+func test_the_ride_panel_shows_the_smoothed_watts_the_rules_use() -> void:
+	_make({})
+	game.logic.smoothed = 123.0
+	assert_float(game.hud.metrics.shown_power()).is_equal(123.0)
+
+
+func test_the_summary_tiles_show_balloons_and_the_race_only_in_race() -> void:
+	_set_mode("max")
+	_make({})
+	var result: Dictionary = game.finish()
+	assert_bool(result.stats.has("balloons")).is_true()
+	assert_bool(result.stats.has("heats_won")).is_false()
+	var keys: Array = game.declared().summary_stats.map(func(t): return t.key)
+	assert_array(keys).contains(["balloons", "gold", "heats_won"])

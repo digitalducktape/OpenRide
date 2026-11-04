@@ -75,12 +75,12 @@ func _assert_layout(state: String) -> void:
 
 
 func test_race_with_the_longest_texts() -> void:
-	status.set_state(1885, 1.0, 0.7, "filling")
+	status.set_state(1.0, 0.7, "filling")
 	status.set_count(999)
 	status.set_race(10, 10, 119.0)
 	status.set_next("large")
 	await _assert_layout("race")
-	assert_str(status.race_label.text).is_equal("RACE 10/10 · 1:59")
+	assert_str(status.race_label.text).is_equal("10/10 · HEAT 1:59")
 	assert_str(status.badge_label.text).is_equal("FILLING")
 
 
@@ -88,19 +88,19 @@ func test_max_hides_the_race_and_every_badge_fits() -> void:
 	status.set_count(1)
 	status.set_race(0, 0, -1.0)
 	assert_str(status.race_label.text).is_equal("")
-	assert_str(status.count_label.text).is_equal("1 balloon")
-	for state in ["filling", "push", "tied", "pedal", "rest"]:
-		status.set_state(1885, 0.4, 0.7, state)
+	assert_str(status.count_label.text).is_equal("×1")
+	for state in ["filling", "push", "full", "pedal", "rest"]:
+		status.set_state(0.4, 0.7, state)
 		await _assert_layout(state)
 	assert_str(status.badge_label.text).is_equal("REST")
 
 
 func test_push_breathes_and_stops() -> void:
-	status.set_state(60, 0.3, 0.6, "push")
+	status.set_state(0.3, 0.6, "push")
 	await _settle()
 	assert_str(status.badge_label.text).is_equal("PUSH!")
 	assert_bool(status.badge.has_meta(&"_ui_pulse")).is_true()
-	status.set_state(120, 0.8, 0.6, "filling")
+	status.set_state(0.8, 0.6, "filling")
 	await _settle()
 	assert_bool(status.badge.has_meta(&"_ui_pulse")).is_false()
 
@@ -109,15 +109,26 @@ func test_the_race_clock_turns_amber_in_its_last_seconds() -> void:
 	status.set_race(2, 5, 30.0)
 	assert_object(status.race_label.get_theme_color("font_color")).is_equal(GameTheme.TARGET)
 	status.set_race(3, 5, 9.2)
-	assert_str(status.race_label.text).is_equal("RACE 3/5 · 0:10")
+	assert_str(status.race_label.text).is_equal("3/5 · HEAT 0:10")
 	assert_object(status.race_label.get_theme_color("font_color")).is_equal(GameTheme.WARN)
 
 
-func test_watts_round_to_five_and_change_only_on_a_change() -> void:
-	status.set_state(212.0, 0.5, 0.4, "filling")
-	assert_str(status.watts.text).is_equal("210")
-	status.set_state(213.4, 0.5, 0.4, "filling")
-	assert_str(status.watts.text).is_equal("215")
+func test_the_widget_shows_no_watts_of_its_own() -> void:
+	# One watts reading on screen: the ride panel's (reviewer, 2026-11-02).
+	var texts: Array = status.find_children("*", "Label", true, false).map(func(l): return l.text)
+	for t in texts:
+		assert_bool(str(t).ends_with("W")).is_false()
+
+
+func test_full_reads_as_full_not_a_tied_score() -> void:
+	status.set_state(0.9, 0.7, "full")
+	assert_str(status.badge_label.text).is_equal("FULL!")
+
+
+func test_row_two_is_readable_from_the_saddle() -> void:
+	for l: Label in [status.count_label, status.race_label, status.next_caption]:
+		assert_int(l.get_theme_font_size("font_size")).is_greater_equal(40)
+	assert_float(status.next_icon.custom_minimum_size.y).is_greater_equal(56.0)
 
 
 func test_no_per_frame_code() -> void:

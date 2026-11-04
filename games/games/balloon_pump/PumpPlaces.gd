@@ -43,7 +43,11 @@ const PLACES := [
 ]
 
 const SEA := Rect2(-160, 610, 2240, 140)  ## the pier's sea, a shader rect under the baked room
-const MOON := Vector2(250, 330)
+const MOON := Vector2(330, 432)  ## clear of the ride panel (pump_layout_test)
+## The big top's valance (its gold rail's foot): above the pump's handle, which must never sit on
+## the rail (reviewer, 2026-11-02; pump_layout_test).
+const VALANCE_Y := 184.0
+const BIGTOP_ROPES := [300.0, 1880.0]
 const FAIR_HORIZON := 700.0
 ## The Ferris wheel stands on the fair's horizon, far off: its lowest car clears the ground line,
 ## its top clears the ride panel (pump_layout_test).
@@ -141,6 +145,17 @@ static func _fair(m: SafeMesh, p: Dictionary) -> void:
 	# The field: dusky grass, a trodden patch where the pump stands, tufts.
 	m.rect_v(Rect2(-BLEED, horizon, WIDE.x, SIZE.y - horizon), Color(0.13, 0.15, 0.13), (p.floor as Color).darkened(0.35))
 	m.glow(Vector2(900, 930), Vector2(860, 120), Color(0.32, 0.26, 0.18, 0.55), 10)
+	# The grass in mown stripes running to the vanishing point, darker toward us.
+	var stripe_x := -BLEED - 400.0
+	var k := 0
+	while stripe_x < SIZE.x + BLEED + 400.0:
+		var a0 := Vector2(floor_x(stripe_x, horizon + 4), horizon + 4)
+		var a1 := Vector2(floor_x(stripe_x + 160.0, horizon + 4), horizon + 4)
+		var c0 := Color(0.22, 0.3, 0.18, 0.0 if k % 2 == 0 else 0.35)
+		m.quad4(a0, a1, Vector2(floor_x(stripe_x + 160.0, SIZE.y), SIZE.y), Vector2(floor_x(stripe_x, SIZE.y), SIZE.y),
+			c0, c0, Color(c0, c0.a * 0.6), Color(c0, c0.a * 0.6))
+		stripe_x += 160.0
+		k += 1
 	# A trodden path from the near field back between the tents, and straw scattered on it.
 	var path := Color(0.3, 0.24, 0.17)
 	m.quad4(Vector2(floor_x(760, horizon + 4), horizon + 4), Vector2(floor_x(1160, horizon + 4), horizon + 4),
@@ -154,6 +169,21 @@ static func _fair(m: SafeMesh, p: Dictionary) -> void:
 		var a := straw.randf_range(0.0, PI)
 		var l := lerpf(3.0, 12.0, (y - horizon) / (SIZE.y - horizon))
 		m.line(Vector2(x, y), Vector2(x, y) + Vector2(cos(a), sin(a) * 0.3) * l, 1.5, Color(0.78, 0.66, 0.38, 0.55))
+	# Duckboards under the pump and the stand: planks running to the vanishing point, lit by the
+	# lantern, their ends and gaps dark (the field's answer to Safe Cracker's boards).
+	_duckboards(m, 570.0, 1380.0, FLOOR_Y - 40.0)
+	# Denser tufts in two greens, bigger toward us.
+	var tufts := RandomNumberGenerator.new()
+	tufts.seed = 23
+	for i in 260:
+		var ty := tufts.randf_range(horizon + 10, SIZE.y)
+		var tx := tufts.randf_range(-BLEED, SIZE.x + BLEED)
+		if ty > FLOOR_Y - 40.0 and tx > floor_x(560, ty) and tx < floor_x(1390, ty):
+			continue
+		var h := lerpf(4.0, 22.0, pow((ty - horizon) / (SIZE.y - horizon), 1.3))
+		var g := Color(0.25, 0.36, 0.2, 0.85) if i % 3 else Color(0.36, 0.46, 0.24, 0.8)
+		for blade in 3:
+			m.line(Vector2(tx + blade * 3, ty), Vector2(tx + blade * 3 + tufts.randf_range(-4, 4), ty - h * tufts.randf_range(0.6, 1.0)), 2.0, g)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9
 	for i in 70:
@@ -184,18 +214,19 @@ static func _bigtop(m: SafeMesh, p: Dictionary) -> void:
 	m.rect_v(Rect2(-BLEED, 0, WIDE.x, 300), Color(0.08, 0.0, 0.02, 0.65), Color(0.08, 0.0, 0.02, 0.0))
 	# The valance: scallops along a gold rail, with a fringe.
 	var acc: Color = p.accent
-	m.rect_v(Rect2(-BLEED, 250, WIDE.x, 22), acc.lightened(0.2), acc.darkened(0.4))
+	var vy := VALANCE_Y
+	m.rect_v(Rect2(-BLEED, vy - 22.0, WIDE.x, 22), acc.lightened(0.2), acc.darkened(0.4))
 	var sx := -BLEED
 	var s := 0
 	while sx < SIZE.x + BLEED:
-		var arc := PackedVector2Array([Vector2(sx, 272)])
+		var arc := PackedVector2Array([Vector2(sx, vy)])
 		for i in 9:
 			var a := PI * i / 8.0
-			arc.append(Vector2(sx + 60.0 - cos(a) * 60.0, 272.0 + sin(a) * 42.0))
+			arc.append(Vector2(sx + 60.0 - cos(a) * 60.0, vy + sin(a) * 42.0))
 		m.fill(arc, red.lightened(0.05) if s % 2 == 0 else red.darkened(0.1))
 		for i in 7:
-			m.line(Vector2(sx + 15 + i * 15, 272 + sin(PI * (i + 1) / 8.0) * 42.0),
-				Vector2(sx + 15 + i * 15, 290 + sin(PI * (i + 1) / 8.0) * 42.0), 3.0, acc.darkened(0.2))
+			m.line(Vector2(sx + 15 + i * 15, vy + sin(PI * (i + 1) / 8.0) * 42.0),
+				Vector2(sx + 15 + i * 15, vy + 14.0 + sin(PI * (i + 1) / 8.0) * 42.0), 3.0, acc.darkened(0.2))
 		sx += 120.0
 		s += 1
 	# The sawdust floor and the ring's curb sweeping past in front.
@@ -227,9 +258,14 @@ static func _bigtop(m: SafeMesh, p: Dictionary) -> void:
 	var top := Vector2(930, -20)
 	m.quad4(top + Vector2(-60, 0), top + Vector2(60, 0), Vector2(1520, FLOOR_Y + 60), Vector2(340, FLOOR_Y + 60),
 		Color(1, 0.95, 0.82, 0.16), Color(1, 0.95, 0.82, 0.16), Color(1, 0.95, 0.82, 0.03), Color(1, 0.95, 0.82, 0.03))
-	# Hanging ropes.
-	for rx in [120.0, 1810.0]:
-		m.line(Vector2(rx, 0), Vector2(rx + 10, 700), 5.0, Color(0.55, 0.45, 0.3, 0.8))
+	# Rigging ropes from the dark above, tied off to sandbags on the floor.
+	for rx in BIGTOP_ROPES:
+		m.line(Vector2(rx, 0), Vector2(rx + 6, FLOOR_Y - 34), 5.0, Color(0.6, 0.5, 0.34, 0.9))
+		m.line(Vector2(rx + 1, 0), Vector2(rx + 7, FLOOR_Y - 34), 1.5, Color(1, 0.9, 0.7, 0.25))
+		var bag := Vector2(rx + 6, FLOOR_Y - 14)
+		m.fill(SafeMesh._ellipse(bag + Vector2(4, 16), Vector2(34, 7), 20), Color(0, 0, 0, 0.35))
+		m.round_rect(Rect2(bag - Vector2(26, 22), Vector2(52, 40)), 16.0, Color(0.62, 0.52, 0.36), Color(0.38, 0.3, 0.2))
+		m.line(bag + Vector2(-14, -16), bag + Vector2(14, -16), 4.0, Color(0.3, 0.22, 0.14))
 
 
 static func _pier(m: SafeMesh, p: Dictionary) -> void:
@@ -279,6 +315,33 @@ static func _pier(m: SafeMesh, p: Dictionary) -> void:
 	m.rect_h(Rect2(998, 420, 14, FLOOR_Y - 420), Color(0.12, 0.09, 0.08), Color(0.28, 0.2, 0.15))
 	_lantern(m, Vector2(1005, 410), p.accent)
 	# Bunting of little lamps along the railing (they twinkle in their own layer).
+
+
+## Planks from x0 to x1 (at the floor line) running from `top` to the bottom of the view, toward
+## the vanishing point, with lit tops and dark gaps, and cross battens.
+static func _duckboards(m: SafeMesh, x0: float, x1: float, top: float) -> void:
+	var wood := Color(0.42, 0.3, 0.2)
+	var n := 9
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	for i in n:
+		var a := lerpf(x0, x1, float(i) / n)
+		var b := lerpf(x0, x1, float(i + 1) / n)
+		var tone := wood.lightened(rng.randf_range(0.0, 0.12)) if i % 2 else wood.darkened(rng.randf_range(0.0, 0.12))
+		var p0 := Vector2(floor_x(a, top), top)
+		var p1 := Vector2(floor_x(b, top), top)
+		var p2 := Vector2(floor_x(b, SIZE.y), SIZE.y)
+		var p3 := Vector2(floor_x(a, SIZE.y), SIZE.y)
+		m.quad4(p0, p1, p2, p3, tone.lightened(0.12), tone.lightened(0.12), tone.darkened(0.3), tone.darkened(0.3))
+		m.line(p0, p3, 3.0, Color(0.06, 0.04, 0.03, 0.75))
+		# The grain: two faint lines along the plank.
+		for g in [0.35, 0.7]:
+			var ga := lerpf(a, b, g)
+			m.line(Vector2(floor_x(ga, top), top), Vector2(floor_x(ga, SIZE.y), SIZE.y), 1.0, Color(0.1, 0.06, 0.04, 0.25))
+	# The front edge (lit) and two battens across.
+	m.line(Vector2(floor_x(x0, top), top), Vector2(floor_x(x1, top), top), 4.0, wood.lightened(0.35))
+	for by in [top + 70.0, top + 170.0]:
+		m.line(Vector2(floor_x(x0, by), by), Vector2(floor_x(x1, by), by), 3.0, Color(0.06, 0.04, 0.03, 0.5))
 
 
 ## A silhouette from a ridge line down to `bottom`.

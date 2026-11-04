@@ -35,7 +35,8 @@ void fragment() {
 	}
 	// The body: an ellipse whose lower half narrows to the knot (a teardrop).
 	float below = clamp((CY - y) / RY, 0.0, 1.0);
-	float k = mix(1.0, 0.42, below * below);
+	// Gold foil balloons are rounder (a foil sphere), latex ones a teardrop.
+	float k = mix(1.0, v_gold > 0.5 ? 0.7 : 0.42, below * below);
 	vec2 q = vec2(x / k, (y - CY) / RY);
 	float d = length(q) - 1.0;
 	// The knot: a small rounded tab under the body, slightly darker.
@@ -69,8 +70,9 @@ void fragment() {
 		// Gold foil: a metallic ramp from the normal, and a glint sweeping across.
 		float m = 0.5 + 0.5 * dot(n, l);
 		col = mix(vec3(0.55, 0.35, 0.06), vec3(1.0, 0.86, 0.42), m) + light_color * pow(nh, 30.0) * 0.8;
-		float sweep = fract(TIME * 0.35);
-		col += vec3(1.0, 0.95, 0.75) * smoothstep(0.06, 0.0, abs(fract(q.x * 0.35 + q.y * 0.25 - sweep) - 0.5)) * 0.5 * body;
+		// A soft glint drifting round the upper body (no seam across it, which read as a lemon).
+		vec2 g = vec2(sin(TIME * 0.9) * 0.45, 0.35 + 0.1 * cos(TIME * 0.7));
+		col += vec3(1.0, 0.95, 0.75) * smoothstep(0.35, 0.0, length(qn - g)) * 0.5 * body;
 	}
 	// The knot: thicker, darker rubber with a pinch line.
 	if (knot > body) {

@@ -13,6 +13,7 @@ const PumpAudioScript := preload("res://games/balloon_pump/PumpAudio.gd")
 
 static var look := GameTheme.new(Color("ff5fa2"), Color("2b0f2a"), 0.1)
 
+const INTRO_ICON := Vector2(160, 200)  ## each balloon's box on the intro card
 ## The place changes after every Race heat, or after this many balloons in Max (ART_BIBLE §6).
 const BALLOONS_PER_PLACE := 6
 ## The gauge's scale ends this far past the biggest balloon's top line.
@@ -58,6 +59,12 @@ func info() -> GameInfo:
 		"standard": [350, 700, 1100],
 		"hard": [300, 650, 1050],
 	}}
+	# The summary's tiles beside points and time: the balloons filled, gold, and the heats won.
+	i.summary_stats = [
+		{"key": "balloons", "label": "balloons"},
+		{"key": "gold", "label": "gold"},
+		{"key": "heats_won", "label": "heats won", "of": "heats"},
+	]
 	i.options = [
 		{"key": "mode", "label": "Mode", "choices": ["race", "max"],
 			"labels": ["Race", "Max"], "default": "race", "kind": "segmented"},
@@ -69,39 +76,59 @@ func ui_theme() -> GameTheme:
 	return look
 
 
-## The intro card's picture: the four balloons with their points, so the kinds are known before
-## the first one loads.
+## The intro card's picture: in Race the heat's goal, then the four balloons, big, with their
+## points (gold labelled "Gold ×3"), so the kinds are known before the first one loads. Every
+## number comes from the segment's params (the race's size and length) or the rules' constants.
 func intro_visual() -> Control:
+	var box := VBoxContainer.new()
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 10)
+	var goal := race_line(segment)
+	if not goal.is_empty():
+		var g := look.label(goal, HudTheme.BODY, GameTheme.TARGET, true)
+		g.name = "RaceLine"
+		g.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(g)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 28)
+	row.add_theme_constant_override("separation", 40)
+	box.add_child(row)
 	for kind in ["small", "medium", "large", "gold"]:
 		var col := VBoxContainer.new()
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.alignment = BoxContainer.ALIGNMENT_END
 		var icon := Control.new()
-		icon.custom_minimum_size = Vector2(100, 100)
+		icon.name = "Balloon_%s" % kind
+		icon.custom_minimum_size = INTRO_ICON
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var size: float = PumpArt.BALLOON_RADIUS[kind] / PumpArt.BALLOON_RADIUS.large
 		icon.draw.connect(func() -> void:
 			var b := ShapeBatch.new()
-			PumpStatus._balloon(b, Vector2(50, 54), 2.1 * size, PumpArt.BALLOON_COLORS[kind], look.ink, kind == "gold")
+			PumpStatus._balloon(b, Vector2(INTRO_ICON.x * 0.5, INTRO_ICON.y * 0.43), 4.4 * size, PumpArt.BALLOON_COLORS[kind], look.ink, kind == "gold")
 			b.draw(icon))
 		col.add_child(icon)
 		var points := PumpLogic.POINTS_PER_AIR * float(PumpLogic.KINDS[kind].air)
-		var text := "×3" if kind == "gold" else str(roundi(points))
-		var l := look.label(text, HudTheme.SMALL, GameTheme.TARGET if kind == "gold" else GameTheme.INK, true)
+		var text := "Gold ×%d" % roundi(PumpLogic.GOLD_FACTOR) if kind == "gold" else "%d pts" % roundi(points)
+		var l := look.label(text, HudTheme.SMALL + 6, GameTheme.TARGET if kind == "gold" else GameTheme.INK, true)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		col.add_child(l)
 		row.add_child(col)
-	return row
+	return box
 
 
-func how_to_text(seg: Dictionary) -> String:
-	if _mode_for(seg) == "race":
-		return "Race: fill %d balloons in %s" % [_race_target(seg), _clock(_race_sec(seg))]
-	return "Fill as many balloons as you can"
+## The intro card's how-to (rider-approved copy), broken at its sentence so "end" isn't left alone
+## on a line.
+func how_to_text(_seg: Dictionary) -> String:
+	return "Pedal to pump up balloons.\nEach one gets harder to fill near the end"
+
+
+## "Race: fill N balloons in M:SS" from the segment's params; "" outside Race.
+func race_line(seg: Dictionary) -> String:
+	if _mode_for(seg) != "race":
+		return ""
+	return "Race: fill %d balloons in %s" % [_race_target(seg), _clock(_race_sec(seg))]
 
 
 func target_text(seg: Dictionary) -> String:
@@ -113,7 +140,7 @@ func target_text(seg: Dictionary) -> String:
 	var hi := float(p.get("push_hi_watts", ftp * line.y))
 	# The biggest balloon's top line: past it, every balloon finishes.
 	var top := lo + (hi - lo) * float(PumpLogic.KINDS.large.line)
-	return "Push past %d W to finish every balloon" % roundi(top)
+	return "Get above %d W to finish each balloon" % roundi(top)
 
 
 ## Circuits always play Max (issue #76); a Just Ride plays the rider's Mode.
@@ -155,6 +182,11 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = PumpStatus.new(look)
 	hud.add_widget(_status)
+	# One watts reading on screen: the ride panel shows the smoothed watts the rules use, with a
+	# gauge ticked at the biggest balloon's push line, and its rpm gauge at the "keep pumping" floor.
+	hud.metrics.set_power_source(func() -> float: return logic.smoothed)
+	hud.metrics.set_power_band(logic.line_at(1.0, "large"))
+	hud.metrics.set_cadence_band(PumpLogic.KEEP_PUMPING_RPM)
 	_audio = PumpAudioScript.new()
 	PumpAudioScript.start_music()
 	PumpStage.prebuild()
@@ -224,10 +256,12 @@ func finish() -> Dictionary:
 		"gold": logic.gold,
 		"avg_power": roundi(logic.avg_power()),
 		"peak_power": roundi(logic.peak_power),
-		"heats": logic.heats_done,
-		"heats_won": logic.heats_won,
 		"fastest_balloon_sec": snappedf(logic.fastest_balloon_sec, 0.1),
 	}
+	# The race's result, for the summary's tiles; Max has none.
+	if logic.mode == "race":
+		stats["heats"] = logic.heats_done
+		stats["heats_won"] = logic.heats_won
 	return super.finish()
 
 
@@ -256,13 +290,13 @@ func _update_status() -> void:
 		PumpLogic.Phase.BREAK, PumpLogic.Phase.OVER:
 			state = "rest"
 		PumpLogic.Phase.TIE, PumpLogic.Phase.LOAD:
-			state = "tied"
+			state = "full"
 		_:
 			if logic.keep_pumping and playing:
 				state = "pedal"
 			elif logic.open < 0.5:
 				state = "push"
-	_status.set_state(logic.smoothed, logic.smoothed / _gauge_max, logic.push_line() / _gauge_max, state)
+	_status.set_state(logic.smoothed / _gauge_max, logic.push_line() / _gauge_max, state)
 	_status.set_count(logic.balloons)
 	_status.set_race(logic.heat_balloons, logic.race_target if logic.mode == "race" else 0, logic.heat_left)
 	_status.set_next(logic.next_kind)

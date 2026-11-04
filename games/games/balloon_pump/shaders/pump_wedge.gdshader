@@ -9,8 +9,8 @@ uniform float line = 0.5;  // 0-1 along the scale
 uniform float filling = 0.0;
 const float FROM = 2.356194;  // PumpArt.GAUGE_FROM (135°, canvas angles: y down)
 const float SWEEP = 4.712389;  // 270°, clockwise on screen
-const float R0 = 0.6;  // the band, as shares of the rect's half-size
-const float R1 = 0.78;
+const float R0 = 0.42;  // the band, as shares of the rect's half-size (wide: read at 1 m)
+const float R1 = 0.75;
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
@@ -24,10 +24,16 @@ void fragment() {
 	// Soft ends along the arc.
 	float ta = fwidth(t) * 2.0;
 	on *= smoothstep(line - ta, line + ta, t);
-	vec3 col = mix(vec3(1.0, 0.76, 0.18), vec3(0.86, 0.16, 0.14), clamp((t - line) / max(1.0 - line, 0.08), 0.0, 1.0));
-	col *= 0.85 + 0.25 * filling;
-	// The line itself: an ink tick across the band.
-	float tick = 1.0 - smoothstep(0.0, ta * 1.5, abs(t - line));
-	vec3 out_col = mix(col, vec3(0.12, 0.06, 0.1), tick);
-	COLOR = vec4(out_col, max(band * on, band * tick) * 0.95);
+	vec3 col = mix(vec3(1.0, 0.72, 0.05), vec3(0.85, 0.08, 0.06), clamp((t - line) / max(1.0 - line, 0.08), 0.0, 1.0));
+	col *= 0.9 + 0.2 * filling;
+	// A dark edge round the band, so it stands off the cream face.
+	float edge = smoothstep(R0 - aa, R0 + 0.025, r) * (1.0 - smoothstep(R1 - 0.025, R1 + aa, r));
+	col *= mix(0.55, 1.0, edge);
+	// The line itself: a bold ink marker across the band and past it, with a gold tip outside.
+	float tick = 1.0 - smoothstep(ta * 0.8, ta * 2.2, abs(t - line));
+	float marker = tick * smoothstep(R0 - 0.08 - aa, R0 - 0.08, r) * (1.0 - smoothstep(R1 + 0.06, R1 + 0.06 + aa, r));
+	float tip = (1.0 - smoothstep(ta * 2.0, ta * 3.5, abs(t - line))) * smoothstep(R1 + 0.06, R1 + 0.07, r) * (1.0 - smoothstep(R1 + 0.13, R1 + 0.14, r));
+	vec3 out_col = mix(col, vec3(0.1, 0.04, 0.08), marker);
+	out_col = mix(out_col, vec3(1.0, 0.8, 0.2), tip);
+	COLOR = vec4(out_col, max(max(band * on, marker), tip));
 }

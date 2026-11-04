@@ -21,6 +21,13 @@ extends Node2D
 const BUNCH_MAX := 40  ## the bunch shows at most this many; later balloons replace the oldest
 const BUNCH_SCALE := 0.42  ## a bunch balloon's size as a share of its nozzle size
 const FLIGHT_SEC := 1.7
+const FLIGHT_ARC := 36.0  ## px the flight bows upward
+## Confetti: the tie-off's and the heat's bursts, and how fast and how far they rise (they stay
+## under the HUD's Pause | End and the status widget; pump_layout_test).
+const TIE_BURST := PumpPlaces.NOZZLE + Vector2(0, -260)
+const WIN_BURST := PumpPlaces.TETHER + Vector2(0, -300)
+const CONFETTI_GRAVITY := 520.0
+const CONFETTI_SPEED := {false: 330.0, true: 380.0}
 const STROKE := 52.0  ## the plunger's travel, px (its handle stays above the collar)
 const PLUNGER_TOP := 262.0  ## the handle's centre at the top of its stroke
 const SWAY_DEG := 1.6
@@ -418,20 +425,24 @@ func tie_off(kind: String) -> void:
 	_nozzle.visible = false
 	_fill_shown = 0.0
 	_kind = ""
-	_burst(PumpPlaces.NOZZLE + Vector2(0, -260), kind == "gold")
+	_burst(TIE_BURST, kind == "gold")
 
 
 func _place_flyer() -> void:
-	var slot := _slot(_flight_slot, _flight_kind)
-	var to: Transform2D = slot[0]
-	var end_knot := _bunch.transform * to.origin
-	var t := ease(_flight, -1.8)
-	var start := _flight_from.origin
-	var p := start.lerp(end_knot, t)
-	p.y -= sin(t * PI) * 180.0
-	var s := lerpf(_flight_from.get_scale().x, to.get_scale().x, t)
-	var rot := lerpf(0.0, to.get_rotation() + _bunch.rotation, t) + sin(t * PI) * 0.25
-	_flyer.transform = Transform2D(rot, Vector2(s, s), 0.0, p)
+	_flyer.transform = flight_at(_flight_from, _flight_slot, _flight_kind, _flight, _bunch.transform)
+
+
+## The flying balloon's transform `progress` (0-1) of the way from the nozzle (`from`) to its
+## bunch slot: a low arc (it shrinks as it rises, so it never reaches the HUD; pump_layout_test).
+func flight_at(from: Transform2D, slot_index: int, kind: String, progress: float, bunch := Transform2D(0.0, PumpPlaces.TETHER)) -> Transform2D:
+	var to: Transform2D = _slot(slot_index, kind)[0]
+	var end_knot := bunch * to.origin
+	var t := ease(progress, -1.8)
+	var p := from.origin.lerp(end_knot, t)
+	p.y -= sin(t * PI) * FLIGHT_ARC
+	var s := lerpf(from.get_scale().x, to.get_scale().x, ease(progress, 0.4))
+	var rot := lerpf(0.0, to.get_rotation() + bunch.get_rotation(), t) + sin(t * PI) * 0.25
+	return Transform2D(rot, Vector2(s, s), 0.0, p)
 
 
 func _land_flyer() -> void:
@@ -450,7 +461,7 @@ func bunch_count() -> int:
 
 ## A Race heat won: confetti over the bunch and the bunch bobs.
 func celebrate() -> void:
-	_burst(PumpPlaces.TETHER + Vector2(0, -560), true)
+	_burst(WIN_BURST, true)
 	var t := create_tween()
 	t.tween_property(_bunch, "scale", Vector2(1.04, 0.96), 0.18).set_trans(Tween.TRANS_SINE)
 	t.tween_property(_bunch, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
@@ -527,6 +538,13 @@ func bunch_rects() -> Array[Rect2]:
 			var c := PumpPlaces.TETHER + centre.rotated(deg_to_rad(sway))
 			out.append(Rect2(c - Vector2(r, r * 1.05), Vector2(r * 2.0, r * 2.3)))
 	return out
+
+
+## The highest a confetti burst at `at` reaches (no drag: an upper bound), `big` for a gold or a
+## heat won.
+static func burst_top(at: Vector2, big: bool) -> float:
+	var v: float = CONFETTI_SPEED[big]
+	return at.y - v * v / (2.0 * CONFETTI_GRAVITY) - 12.0
 
 
 # --- Drawings and effects ---
@@ -615,9 +633,9 @@ func _make_confetti() -> CPUParticles2D:
 	c.explosiveness = 0.92
 	c.direction = Vector2(0, -1)
 	c.spread = 75.0
-	c.initial_velocity_min = 260.0
-	c.initial_velocity_max = 520.0
-	c.gravity = Vector2(0, 520)
+	c.initial_velocity_min = 220.0
+	c.initial_velocity_max = CONFETTI_SPEED[true]
+	c.gravity = Vector2(0, CONFETTI_GRAVITY)
 	c.damping_min = 80.0
 	c.damping_max = 160.0
 	c.angular_velocity_min = -540.0
@@ -687,6 +705,6 @@ func _make_puff() -> CPUParticles2D:
 
 func _burst(at: Vector2, big: bool) -> void:
 	_confetti.position = at
-	_confetti.initial_velocity_max = 520.0 if big else 380.0
+	_confetti.initial_velocity_max = CONFETTI_SPEED[big]
 	_confetti.restart()
 	_confetti.emitting = true
