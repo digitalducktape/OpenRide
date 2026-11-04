@@ -26,6 +26,12 @@ func test_the_shaders_compile_with_their_uniforms() -> void:
 	assert_array(_uniforms("pump_sea")).contains(["moon_u"])
 
 
+func test_the_wedge_takes_no_derivative_of_the_wrapping_scale() -> void:
+	# t jumps at the scale's start: fwidth(t) drew a stray line on the gauge's face along that ray.
+	var shader: Shader = load(SHADERS + "pump_wedge.gdshader")
+	assert_bool(shader.code.contains("= fwidth(t)")).is_false()
+
+
 func test_each_place_bakes_once_and_switches_its_ambient_life() -> void:
 	var before := stage.bakes
 	stage.set_place(1)

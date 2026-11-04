@@ -22,7 +22,9 @@ void fragment() {
 	float band = smoothstep(R0 - aa, R0, r) * (1.0 - smoothstep(R1, R1 + aa, r));
 	float on = step(line, t) * step(t, 1.0);
 	// Soft ends along the arc.
-	float ta = fwidth(t) * 2.0;
+	// A pixel's share of the scale, from r: t wraps at the scale's start, so fwidth(t) spikes along
+	// that ray and the marker drew a stray line there.
+	float ta = fwidth(r) / max(r, 0.05) / SWEEP * 2.4;
 	on *= smoothstep(line - ta, line + ta, t);
 	vec3 col = mix(vec3(1.0, 0.72, 0.05), vec3(0.85, 0.08, 0.06), clamp((t - line) / max(1.0 - line, 0.08), 0.0, 1.0));
 	col *= 0.9 + 0.2 * filling;
