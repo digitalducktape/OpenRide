@@ -175,6 +175,30 @@ class SessionPlansTest {
     }
 
     @Test
+    fun `Watt Lane sends its lane in watts at about half of FTP and joins the work and warm-up pools`() {
+        fun params(role: SegmentRole, d: Difficulty, ftp: FtpBasis = ftp200) =
+            JsonObject(GameCatalog.WATT_LANE.params(role, d, ftp))
+        // Width: 25 / 20 / 15% of FTP, at least 50 / 40 / 30 W, rounded up to 10 W.
+        assertEquals(listOf(50, 40, 30), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_width_watts") })
+        val ftp300 = FtpBasis(300, isFallback = false)
+        assertEquals(listOf(80, 60, 50), Difficulty.entries.map { params(SegmentRole.WORK, it, ftp300).int("lane_width_watts") })
+        // The centre's range: 40-60 / 45-70 / 50-75% of FTP for work, 35-55% for a warm-up, on a 5 W grid.
+        assertEquals(listOf(80, 90, 100), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_min_watts") })
+        assertEquals(listOf(120, 140, 150), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_max_watts") })
+        assertEquals(70, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_min_watts"))
+        assertEquals(110, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_max_watts"))
+        val just = SessionPlans.justRide(GameCatalog.WATT_LANE, JustRideMode.Timed(10), Difficulty.STANDARD, ftp200)
+            .segments.single()
+        assertTrue(just.effort)
+        assertEquals(90, just.params.int("lane_min_watts"))
+        // It joins circuits by its roles alone (#75), camera or not.
+        assertTrue(GameCatalog.WATT_LANE in GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false))
+        assertTrue(GameCatalog.WATT_LANE in GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP, cameraGames = false))
+        assertFalse(GameCatalog.WATT_LANE in GameCatalog.DEFAULT.circuitPool(SegmentRole.RECOVERY))
+        assertEquals(SegmentRole.WORK, GameCatalog.circuitRole(GameCatalog.WATT_LANE))
+    }
+
+    @Test
     fun `Cadence Karaoke sends circuit profiles and no effort, and a Just Ride sends none`() {
         fun params(role: SegmentRole) = GameCatalog.CADENCE_KARAOKE.params(role, Difficulty.STANDARD, ftp200)
         val warmup = params(SegmentRole.WARMUP)["cadence_profile"] as kotlinx.serialization.json.JsonArray
@@ -283,8 +307,8 @@ class SessionPlansTest {
             assertEquals(withCamera.segments.map { it.durationSec }, without.segments.map { it.durationSec })
             assertEquals(withCamera.segments.map { it.effort }, without.segments.map { it.effort })
             assertEquals(withCamera.planId, without.planId)
-            // Today Tug of War is the only camera-free work game, so it plays every work slot.
-            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertEquals("tug_of_war", it.gameId) }
+            // Today Tug of War and Watt Lane are the camera-free work games.
+            without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertTrue(it.gameId in setOf("tug_of_war", "watt_lane")) }
         }
         // With the camera, Dodge Ball plays its share.
         assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId == "dodge_ball" })
@@ -332,7 +356,7 @@ class SessionPlansTest {
     private val elevenGames = GameCatalog(
         GameCatalog.DEFAULT.games + listOf(
             poolGame("power_grid", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.WORK),
-            poolGame("watt_lane", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.RECOVERY),
+            poolGame("glide_path", SegmentRole.WARMUP, SegmentRole.COOLDOWN, SegmentRole.RECOVERY),
             poolGame("gate_crasher", SegmentRole.WORK, camera = true),
             poolGame("ready_for_launch", SegmentRole.WORK, minSec = 90),
             poolGame("keepy_uppy", SegmentRole.RECOVERY),
@@ -344,7 +368,8 @@ class SessionPlansTest {
 
     @Test
     fun `the eleven-game fake catalog has eleven games besides the demo`() {
-        assertEquals(11, elevenGames.games.count { it.id != GameCatalog.DEMO.id })
+        assertEquals(12, elevenGames.games.count { it.id != GameCatalog.DEMO.id }) // Watt Lane (#78) is real now
+        assertEquals(elevenGames.games.size, elevenGames.games.map { it.id }.toSet().size)
     }
 
     @Test
@@ -419,11 +444,11 @@ class SessionPlansTest {
 
     @Test
     fun `pools come from the catalog's roles and leave out the demo and, without the camera, camera games`() {
-        assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP).map { it.id })
+        assertEquals(listOf("cadence_karaoke", "watt_lane"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP).map { it.id })
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.COOLDOWN).map { it.id })
-        assertEquals(setOf("dodge_ball", "tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
-        assertEquals(listOf("tug_of_war"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
-        assertEquals(setOf("cadence_karaoke", "power_grid", "watt_lane"), elevenGames.circuitPool(SegmentRole.WARMUP).map { it.id }.toSet())
+        assertEquals(setOf("dodge_ball", "tug_of_war", "watt_lane"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
+        assertEquals(listOf("tug_of_war", "watt_lane"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
+        assertEquals(setOf("cadence_karaoke", "power_grid", "watt_lane", "glide_path"), elevenGames.circuitPool(SegmentRole.WARMUP).map { it.id }.toSet())
         assertFalse(elevenGames.circuitPool(SegmentRole.WORK, cameraGames = false).any { it.usesCamera })
         assertTrue(SegmentRole.entries.none { role -> elevenGames.circuitPool(role).any { it.id == "the_pull" || it.id == "kart_race" } })
     }

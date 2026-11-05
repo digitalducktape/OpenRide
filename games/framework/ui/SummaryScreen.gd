@@ -290,18 +290,38 @@ func show_summary(summary: Dictionary, plan: Dictionary, looks: Dictionary = {})
 	_stars_note.visible = single and (lit == 0 or results.is_empty())
 	_stars_note.text = "No games finished this time." if results.is_empty() else "No stars this time. Next ride!"
 
-	_tiles.columns = 2
+	var extra := _stat_tiles(first_info, results) if single else []
+	_tiles.columns = 3 if not extra.is_empty() else 2
 	_add_tile("%d" % score, "points", GameTheme.TARGET)
 	if not single:
 		_add_tile("%d" % stars, "star" if stars == 1 else "stars", GameTheme.TARGET)
 	_add_tile(elapsed, "ridden", GameTheme.INK)
 	if not single:
 		_add_tile("%d/%d" % [played, maxi(planned.size(), results.size())], "games", GameTheme.INK)
+	for t in extra:
+		_add_tile(t[0], t[1], GameTheme.INK)
 
 	_show_best(summary.get("bests", {}))
 	_layout(single)
 	visible = true
 	_play_entrance(single)
+
+
+## A one-game summary's extra tiles from the game's `summary_stats` and its result's stats:
+## [[value text, caption], ...], at most three (a row).
+static func _stat_tiles(info: GameInfo, results: Array) -> Array:
+	var out: Array = []
+	if info == null or results.is_empty() or results[0].get("skipped", false):
+		return out
+	var stats: Dictionary = results[0].get("stats", {})
+	for spec in info.summary_stats:
+		if not stats.has(spec.key) or out.size() >= 3:
+			continue
+		var text := "%d%s" % [roundi(float(stats[spec.key])), str(spec.get("suffix", ""))]
+		if spec.has("of") and stats.has(spec.of):
+			text = "%d/%d" % [roundi(float(stats[spec.key])), roundi(float(stats[spec.of]))]
+		out.append([text, str(spec.label)])
+	return out
 
 
 ## The heading: a circuit that played every game is complete; one ended early says so.
@@ -379,7 +399,7 @@ func _add_tile(value: String, caption: String, color: Color) -> void:
 	style.content_margin_top = 10
 	style.content_margin_bottom = 12
 	tile.add_theme_stylebox_override("panel", style)
-	tile.custom_minimum_size = Vector2(SIDE_WIDTH / 2 - 8, 0)
+	tile.custom_minimum_size = Vector2(SIDE_WIDTH / 2 - 8 if _tiles.columns <= 2 else 250.0, 0)
 	_tiles.add_child(tile)
 	var box := _vbox(tile, 0)
 	var v := theme.label(value, HudTheme.MEDIUM + 8, color, true)

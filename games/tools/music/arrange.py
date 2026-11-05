@@ -51,6 +51,9 @@ def _groove(song, b, style, role, odd, double, fill):
     elif style == "house":
         _house(song, b, role, odd, big, end, double)
         return
+    elif style == "synthwave":
+        _synthwave(song, b, role, odd, big, end)
+        return
     else:  # pop
         kicks = [0, 1.5, 2.5] if not odd else [0, 1.5, 2.5, 3.75]
         ghosts = [1.75] if odd else []
@@ -170,6 +173,27 @@ def _house(song, b, role, odd, big, end, double):
         h("hat", b + 3.75, 0.4, "hats", pan=-0.2)
 
 
+def _synthwave(song, b, role, odd, big, end):
+    """Synthwave (Watt Lane, #78): kick on 1 and 3 (and the "and" of 2 in big sections), a big
+    snare with a clap on 2 and 4, straight eighth hats (sixteenths in big sections), a tambourine
+    on the off-beats."""
+    h = song.hit
+    for k in ([0, 1.5, 2] if big else [0, 2]) + ([3.5] if odd else []):
+        if k < end:
+            h("kick", b + k, 1.0 if k in (0, 2) else 0.8, "kick")
+    for s in (1, 3):
+        if s < end:
+            h("snare", b + s, 1.0, "snare")
+            h("clap", b + s, 0.6, "perc", pan=0.15)
+    step = 0.25 if big else 0.5
+    for t in np.arange(0, end, step):
+        on = abs(t % 1) < 1e-6
+        h("hat", b + t, 0.6 if on else 0.42, "hats", pan=0.3)
+    if big:
+        for t in np.arange(0.5, end, 1.0):
+            h("tamb", b + t, 0.5, "perc", pan=-0.5)
+
+
 def _fill(song, b, style, i):
     h = song.hit
     h("kick", b + 2, 0.9, "kick")
@@ -266,6 +290,8 @@ def _bass_pattern(style, dur):
         p = [(0, "r", 0.9, "pick", 1.0), (1.5, "r", 0.4, "pick", 0.7), (2, "5", 0.9, "pick", 0.9), (3.5, "5", 0.4, "pick", 0.7)]
     elif style == "sub":
         p = [(t, "r" if t < 3 else "o", 0.4, "sub", 0.95) for t in (0.5, 1.5, 2.5, 3.5)] + [(0, "r", 0.3, "sub", 0.7)]
+    elif style == "pulse":  # synthwave: driving eighths on the root, an octave lift at the bar's end
+        p = [(t, "o" if t == 3.5 else "r", 0.42, "synth", 1.0 if t % 1 == 0 else 0.8) for t in np.arange(0, 4, 0.5)]
     else:  # pop synth bass
         p = [(0, "r", 1.3, "synth", 1), (1.5, "r", 0.45, "synth", 0.85), (2.5, "r", 0.45, "synth", 0.9),
              (3.0, "5", 0.45, "synth", 0.8), (3.5, "o", 0.45, "synth", 0.8)]
@@ -278,7 +304,7 @@ def _bnote(song, style, beat, dur, m, vel, art, rng):
     sec = dur * song.spb
     if style == "slap":
         x = ins.slap_bass(m, sec, vel, rng, art if art in ("thumb", "pop", "ghost") else "thumb")
-    elif style == "pop":
+    elif style in ("pop", "pulse"):
         x = ins.synth_bass(m, sec, vel, rng)
     elif style == "sub":
         x = ins.sub_bass(m, sec, vel, rng)
@@ -399,6 +425,7 @@ LEADS = {
     "ep": lambda m, s, v, r: ins.epiano([m], s, v, r),
     "piano": lambda m, s, v, r: ins.piano([m], s, v * 1.2, r),
     "pluck": lambda m, s, v, r: ins.pluck(m, s, v, r),
+    "analog": lambda m, s, v, r: ins.supersaw(m, s, v * 0.85, r, voices=3, spread=7.0, cutoff=3600, attack=0.01, release=0.2),
     "strings": lambda m, s, v, r: ins.supersaw(m, s, v * 0.5, r, voices=5, spread=10, cutoff=3200, attack=0.12, release=0.3),
     "whistle": lambda m, s, v, r: ins.whistle(m, s, v * 0.8, r),
     "muted": lambda m, s, v, r: ins.muted_trumpet(m, s, v * 0.9, r),

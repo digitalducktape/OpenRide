@@ -158,8 +158,8 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 	HubPrefs.forget_rider(HubPrefs.rider(hub.state))
 
 
-## Six made-up games on top of the registered five, with their roles: the 11 of wave 2 (#75).
-const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "watt_lane": ["warmup", "recovery", "cooldown"],
+## Six made-up games on top of the registered ones, with their roles (#75; Watt Lane, #78, is real now, so 12).
+const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "glide_path": ["warmup", "recovery", "cooldown"],
 	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"], "the_pull": []}
 
 
@@ -196,7 +196,7 @@ func test_circuit_screens_with_eleven_games() -> void:
 func test_home_pages_through_eleven_games() -> void:
 	await _send_eleven_games()
 	var home: HomeScreen = hub.screen
-	assert_int(home.game_cards.size()).is_equal(11)
+	assert_int(home.game_cards.size()).is_equal(12)
 	assert_int(home.page_count()).is_equal(3)
 	assert_object(home.page_left).is_not_null()
 	var seen := {}
@@ -211,7 +211,7 @@ func test_home_pages_through_eleven_games() -> void:
 			if card.is_visible_in_tree():
 				seen[id] = true
 				assert_float(minf(card.target_rect().size.x, card.target_rect().size.y)).is_greater_equal(HubTheme.CARD_TARGET)
-	assert_int(seen.size()).override_failure_message("every game shows on some page").is_equal(11)
+	assert_int(seen.size()).override_failure_message("every game shows on some page").is_equal(12)
 	# The right button turns the page.
 	home.show_page(0)
 	home.page_right.pressed.emit()
@@ -270,7 +270,9 @@ func test_back_steps_back_then_asks_to_exit() -> void:
 
 func test_bakes_go_quiet_when_settled() -> void:
 	await _settle(30)
-	var bakes := _bakes(hub)
+	# Only what shows: with six games the home row pages (#75), and a hidden page's cards bake
+	# when it is shown.
+	var bakes := _bakes(hub).filter(func(b): return b.is_visible_in_tree())
 	assert_int(bakes.size()).is_greater(8)
 	var before := _renders(bakes)
 	await _settle(20)

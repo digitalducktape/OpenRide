@@ -22,6 +22,7 @@ const REELS := {
 	"tug_of_war": ["rope_creak", "surge_drumroll", "crowd_swell", "win_sting", "lose_sting", "splash"],
 	"safe_cracker": ["proximity_tick", "tumbler_click", "soft_alarm", "vault_open", "door_creak"],
 	"cadence_karaoke": ["beat_tick", "streak_up", "band_exit", "ease_off_chime"],
+	"watt_lane": ["jump_chime", "count_tick", "lane_shift", "caught", "missed", "off_buzz", "streak_up"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
 }
@@ -30,6 +31,7 @@ const GAME_SCRIPTS := {
 	"tug_of_war": "res://games/tug_of_war/TugAudio.gd",
 	"safe_cracker": "res://games/safe_cracker/SafeAudio.gd",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceAudio.gd",
+	"watt_lane": "res://games/watt_lane/WattLaneAudio.gd",
 }
 
 var out_dir := ""
@@ -118,6 +120,8 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"power_cap_watts": 160.0}
 		"cadence_karaoke":
 			params = {"ftp_watts": 250.0, "pace": 70}
+		"watt_lane":
+			params = {"ftp_watts": 250.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -185,6 +189,15 @@ func _ride(game_id: String, director: Node) -> void:
 					_paced = 2
 			if t > 25.0 and t < 31.0:
 				cad += 12.0
+		"watt_lane":
+			# Follows the lane a moment ahead (the 3 s window lags), off it from 30 to 36 s.
+			var game: Node = director.game
+			res = 35.0
+			if game and "logic" in game and game.logic:
+				var want: float = game.logic.course.visual_centre_at(game.logic.time + 1.2)
+				if t > 30.0 and t < 36.0:
+					want -= 50.0
+				cad = want / (0.3 + res * 0.045)
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8
