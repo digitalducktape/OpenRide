@@ -387,8 +387,6 @@ func finish() -> Dictionary:
 		"full_pulls": _total_full,
 	}
 	var result := super.finish()
-	# The HUD shows the score floored, and Game.finish rounds: the last point could differ.
-	result["score"] = floori(score())
 	result["stars"] = Stars.count(_best_pull_points, PullLogic.star_thresholds_for(logic.d_ref))
 	return result
 

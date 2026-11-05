@@ -365,7 +365,7 @@ func set_paused(paused: bool) -> void:
 
 
 func _process(_delta: float) -> void:
-	var shown := str(floori(Effort.score))
+	var shown := str(Effort.whole_points(Effort.score))
 	if shown != _score_text:
 		_score_text = shown
 		score.set_value(shown)

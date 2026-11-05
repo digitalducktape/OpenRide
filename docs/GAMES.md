@@ -764,6 +764,9 @@ The `Effort` autoload applies the epic's multiplier (maths in `EffortMeter`):
 `stats.effort_avg` is the multiplier's average, weighted by time, over the time scoring
 counted.
 
+`Effort.whole_points(points)` is the one rounding of a score: floored, for the HUD and for the
+result's `score` alike, so the summary never differs from the HUD by a point.
+
 ### HUD kit
 
 `Hud` (`games/framework/hud/`) goes over every game. Every element sits in a container slot,
@@ -1060,6 +1063,8 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | Cadence Karaoke | Neon Lines | the cadence (70-130 bpm), A major | Synth-funk: slap bass, Rhodes, plucks, supersaw hook | the tempo is the target cadence; the lead only in the band |
 | Watt Lane | Live Wire | 112 bpm, Eb major | Dream-pop electronica: glockenspiel hook over flute, eighth-note piano, plucked arp, sleigh bells, octave bass, supersaw chorus with brass stabs | harmony near the lane, lead only in it |
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
+| Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | see `balloon_pump/AUDIO_POLISH.md` |
+| Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -2200,6 +2205,30 @@ per place; `PumpStage` adds the live layers (the plunger moving with the cadence
 needle and push wedge, the balloon and the bunch shaded per pixel by `pump_balloon.gdshader`,
 twinkling bulbs, confetti). `pump_layout_test` keeps every element inside the stage and clear of
 the HUD at its extremes. **Music:** "Midnight Carousel" (`AUDIO_POLISH.md`).
+
+## Keepy Uppy (#77)
+
+Keep a balloon in the air over a fan the bike drives, while the weather tries to push it down. The
+rider's watts, smoothed over about 2 s, lift it against its weight, and the lift weakens with
+height. `KeepyLogic` holds the rules (`keepy_logic_test`, `keepy_scene_test`), and
+`games/keepy_uppy/DESIGN.md` is the design record. A work game; Kotlin sends `weight_watts` (30 /
+40 / 50% of FTP), `rain_watts` (10%), `bird_watts` (5%) and `downdraft_watts` (20%).
+
+- **Scoring:** the low, mid and high bands score 1×, 2× and 3× of 10 points a second through
+  `award`, and only with the power to lift the balloon off the grille. Hitting the ground pops it:
+  -50 points through `penalize`, then a new balloon 3 s later. No lives. Stars are points a minute
+  (500 / 1100 / 2000). **Stats:** `pops`, `seconds_high`, `birds_shaken`, `avg_power`,
+  `downdrafts`, `downdrafts_beaten`, `best_air`.
+- **Weather:** one force at a time, each announced at least 2 s ahead: a rain cloud, birds (up to
+  three; hold the high band 3 s to shake them off) or a downdraft.
+- **Modes:** minutes and circuits end on the timer, open when the rider ends it. A round is 60 s
+  of air time.
+- **Steer** (a rider option, off by default): wind drifts the balloon and the rider leans to keep
+  the fan under it. Tracker `off` otherwise, so `usesCamera` stays false (Tug of War's precedent).
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the balloon near the centre of
+the screen above an illustrated pedal fan, in four lit outdoor places (the **Place** option, or a
+new one every 3 minutes on random). **Music:** "Updraft" (`AUDIO_POLISH.md`).
 
 ## Circuits and the Games hub (#37, #38)
 

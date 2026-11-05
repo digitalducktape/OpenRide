@@ -69,6 +69,12 @@ func penalize(points: float) -> float:
 	return taken
 
 
+## A score as whole points, the one rounding: the HUD shows it and the result sends it, so the two
+## never differ by a point. Floored, so the number shown is never above what the stars compare.
+func whole_points(points: float) -> int:
+	return floori(points)
+
+
 ## `stats.effort_avg`: the average multiplier over the segment's scoring time.
 func average() -> float:
 	return _meter.average()
