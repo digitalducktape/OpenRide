@@ -7,7 +7,8 @@ extends Control
 const GAP := 4.0
 const INTRO_SEC := 10
 const SHORT := {"kart_race": "Kart", "dodge_ball": "Dodge", "tug_of_war": "Tug", "safe_cracker": "Safe",
-	"cadence_karaoke": "Cadence", "watt_lane": "Watts", "the_pull": "Pull", "balloon_pump": "Pump"}
+	"cadence_karaoke": "Cadence", "watt_lane": "Watts", "the_pull": "Pull", "balloon_pump": "Pump",
+	"keepy_uppy": "Keepy"}
 
 var slots: Array = []
 var names := false

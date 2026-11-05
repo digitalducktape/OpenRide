@@ -39,6 +39,7 @@ const LOOKS := {
 	"watt_lane": [Color("f0875a"), Color("0f1a2e")],
 	"the_pull": [Color("5fd068"), Color("10200f")],
 	"balloon_pump": [Color("ff5fa2"), Color("2b0f2a")],
+	"keepy_uppy": [Color("ff7a59"), Color("12233a")],
 }
 
 static var _looks := {}

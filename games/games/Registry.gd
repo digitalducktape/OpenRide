@@ -14,6 +14,7 @@ const GAMES := {
 	"watt_lane": "res://games/watt_lane/WattLane.tscn",
 	"the_pull": "res://games/the_pull/ThePull.tscn",
 	"balloon_pump": "res://games/balloon_pump/BalloonPump.tscn",
+	"keepy_uppy": "res://games/keepy_uppy/KeepyUppy.tscn",
 }
 
 static var _infos := {}

@@ -160,7 +160,7 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 
 ## Made-up games on top of the registered ones, with their roles (#75); a real one is skipped.
 const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "glide_path": ["warmup", "recovery", "cooldown"],
-	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"]}
+	"gate_crasher": ["work"], "ready_for_launch": ["work"]}
 
 
 ## How many games _send_eleven_games sent: the registry's real games plus the fakes not yet real

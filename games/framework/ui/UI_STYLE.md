@@ -75,6 +75,7 @@ it between pedal strokes, sweating, and tap with one finger. Design for a half-s
 | Tug of War | rope orange `#FF9F1C` | bark `#2A160B` | 0.12 | rustic fairground, heavy |
 | Safe Cracker | brass `#E8B04A` | soot `#14110D` | 0, upright | noir heist, precise and quiet |
 | Cadence Karaoke | the world's neon (`CadenceWorld.theme_color`) | deep violet `#12052A` | 0.25, italic | synthwave stage, on the beat |
+| Keepy Uppy | sunset coral `#FF7A59` | sky navy `#12233A` | 0.08 | open air, lift |
 | House (`GameTheme.house()`) | periwinkle `#7A7CFF` | deep indigo `#17143A` | 0.12 | the app's own: a circuit's summary, and the summary and calibration of a game without a look |
 
 ## 5. Hierarchy and layout

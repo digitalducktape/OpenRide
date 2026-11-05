@@ -28,6 +28,8 @@ const REELS := {
 		"pump_won", "pump_lost", "pump_tick"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
+	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
+		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
 }
 const GAME_SCRIPTS := {
 	"dodge_ball": "res://games/dodge_ball/DodgeAudio.gd",
@@ -37,6 +39,7 @@ const GAME_SCRIPTS := {
 	"watt_lane": "res://games/watt_lane/WattLaneAudio.gd",
 	"the_pull": "res://games/the_pull/PullAudio.gd",
 	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
+	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
 }
 
 var out_dir := ""
@@ -127,6 +130,8 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"ftp_watts": 250.0, "pace": 70}
 		"watt_lane":
 			params = {"ftp_watts": 250.0}
+		"keepy_uppy":
+			params = {"ftp_watts": 200.0, "weight_watts": 80.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -215,6 +220,18 @@ func _ride(game_id: String, director: Node) -> void:
 				if t > 30.0 and t < 36.0:
 					want -= 50.0
 				cad = want / (0.3 + res * 0.045)
+		"keepy_uppy":
+			# The mid band (about 105 W), the high band (20-40 s), the low band (40-50 s), a stop
+			# that pops the balloon (50-56 s), then the mid band again. Resistance 30%: the
+			# simulator makes 1.65 W an rpm.
+			res = 30.0
+			cad = 64.0
+			if t > 20.0 and t < 40.0:
+				cad = 82.0
+			elif t > 40.0 and t < 50.0:
+				cad = 57.0
+			elif t > 50.0 and t < 56.0:
+				cad = 20.0
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8
