@@ -116,7 +116,7 @@ func target_text(seg: Dictionary) -> String:
 	var p: Dictionary = seg.get("params", {})
 	var ftp := float(p.get("ftp_watts", p.get("ftp", TugLogic.DEFAULT_FTP)))
 	var bot := float(p.get("bot_watts", ftp * TugLogic.BOT_FACTOR))
-	return "Beat the bot's %d W" % roundi(bot)
+	return "Pull harder than the bot's %d W" % roundi(bot)
 
 
 func ui_theme() -> GameTheme:

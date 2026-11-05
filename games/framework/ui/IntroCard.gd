@@ -68,6 +68,7 @@ func _init() -> void:
 	_how_to = _centred(box, HudTheme.BODY)
 	_how_to.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_target = _centred(box, HudTheme.BODY, HudTheme.GOOD)
+	_target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_count = _centred(box, HudTheme.HUGE, HudTheme.WARN)
 	var previous_row := HBoxContainer.new()
 	previous_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -138,9 +139,9 @@ func show_segment(info: GameInfo, segment: Dictionary, target: String, previous:
 	_previous_stars.visible = has_previous and not previous.get("skipped", false)
 	if has_previous:
 		if previous.get("skipped", false):
-			_previous.text = "Last: %s (skipped)" % previous_title
+			_previous.text = "Previous game: %s (skipped)" % previous_title
 		else:
-			_previous.text = "Last: %s  %d points" % [previous_title, int(previous.get("score", 0))]
+			_previous.text = "Previous game: %s · %d points" % [previous_title, int(previous.get("score", 0))]
 			_previous_stars.stars = int(previous.get("stars", 0))
 	can_skip = skippable
 	skip_button.visible = skippable

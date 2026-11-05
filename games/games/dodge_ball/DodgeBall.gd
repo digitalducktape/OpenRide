@@ -120,9 +120,9 @@ func target_text(seg: Dictionary) -> String:
 	var p: Dictionary = seg.get("params", {})
 	var floor_rpm := float(p.get("cadence_floor", DodgeBallLogic.LEVELS.get(str(seg.get("difficulty", "standard")),
 		DodgeBallLogic.LEVELS.standard).cadence_floor))
-	var text := "Keep above %d rpm" % roundi(floor_rpm)
+	var text := "Keep your cadence above %d rpm" % roundi(floor_rpm)
 	if float(p.get("target_watts", 0.0)) > 0.0:
-		text += " · %d W doubles your points" % roundi(float(p.target_watts))
+		text += " · Hold %d W for double points" % roundi(float(p.target_watts))
 	return text
 
 
