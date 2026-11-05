@@ -146,7 +146,8 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 	for r in s.rows:
 		if s.scroll.get_global_rect().encloses(r.remove.get_global_rect()):
 			visible_rows += 1
-	assert_int(visible_rows).is_greater_equal(3)
+	# More than six games wrap the tiles to a second row (#75), which leaves the list two full rows.
+	assert_int(visible_rows).is_greater_equal(2)
 	for i in 3:
 		HubPrefs.save_custom(HubPrefs.rider(hub.state), i, s.builder.to_saved())
 	s.builder.set_length(0, 120)

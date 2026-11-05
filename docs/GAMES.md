@@ -1063,7 +1063,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | Cadence Karaoke | Neon Lines | the cadence (70-130 bpm), A major | Synth-funk: slap bass, Rhodes, plucks, supersaw hook | the tempo is the target cadence; the lead only in the band |
 | Watt Lane | Live Wire | 112 bpm, Eb major | Dream-pop electronica: glockenspiel hook over flute, eighth-note piano, plucked arp, sleigh bells, octave bass, supersaw chorus with brass stabs | harmony near the lane, lead only in it |
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
-| Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | see `balloon_pump/AUDIO_POLISH.md` |
+| Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
 | Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
