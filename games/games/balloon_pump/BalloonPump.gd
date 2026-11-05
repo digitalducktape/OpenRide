@@ -16,8 +16,6 @@ static var look := GameTheme.new(Color("ff5fa2"), Color("2b0f2a"), 0.1)
 const INTRO_ICON := Vector2(160, 200)  ## each balloon's box on the intro card
 ## The place changes after every Race heat, or after this many balloons in Max (ART_BIBLE §6).
 const BALLOONS_PER_PLACE := 6
-## The gauge's scale ends this far past the biggest balloon's top line.
-const GAUGE_HEADROOM := 1.4
 
 var logic: PumpLogic
 var world: PumpStage
@@ -178,7 +176,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	var recovery := str(seg.get("role", "free")) == "recovery"
 	logic = PumpLogic.new(rng.seed, params, _mode_name, rounds > 0, rounds, recovery)
 	variant = "race" if _mode_name == "race" else ""
-	_gauge_max = logic.line_at(1.0, "large") * GAUGE_HEADROOM
+	_gauge_max = logic.gauge_max()
 	hud.set_skin(look.hud_skin())
 	_status = PumpStatus.new(look)
 	hud.add_widget(_status)

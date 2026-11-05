@@ -20,6 +20,8 @@ const DEFAULT_FTP := 150.0  ## Kotlin's fallback FTP
 ## The push line as shares of FTP, empty and full (a medium balloon): work, then recovery.
 const LINE_WORK := Vector2(0.20, 0.45)
 const LINE_RECOVERY := Vector2(0.15, 0.30)
+## The gauge reads up to this share of FTP, so riding at FTP still moves the needle.
+const GAUGE_FULL_FTP := 1.2
 const LINE_EXP := 3.0  ## the line's curve: lo + (hi - lo) × k × f^LINE_EXP
 const VALVE := 0.03  ## of FTP: the flow ramps from 0 at the line to full this far above it
 const FILL_K := 0.25  ## balloon air a second per unit of power / FTP
@@ -120,6 +122,11 @@ func _init(seed_value: int, params := {}, new_mode := "max", use_heats := false,
 func line_at(f: float, of_kind := kind) -> float:
 	var k: float = KINDS[of_kind].line
 	return _lo + (_hi - _lo) * k * pow(clampf(f, 0.0, 1.0), LINE_EXP)
+
+
+## The watts at the top of the gauge's scale.
+func gauge_max() -> float:
+	return ftp * GAUGE_FULL_FTP
 
 
 ## The push line now, for the balloon on the nozzle.
