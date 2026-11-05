@@ -73,6 +73,12 @@ func test_bigger_balloons_take_more_air() -> void:
 	assert_float(times.large / times.small).is_between(1.9, 2.1)
 
 
+func test_the_gauge_still_moves_at_ftp() -> void:
+	var logic := PumpLogic.new(1, PARAMS)
+	assert_float(logic.ftp / logic.gauge_max()).is_less(1.0)
+	assert_float(logic.line_at(1.0, "large") / logic.gauge_max()).is_less(0.6)
+
+
 func test_the_push_line_rises_as_the_balloon_fills() -> void:
 	var logic := PumpLogic.new(1, PARAMS)
 	# Work: 20% of FTP empty, 45% full for a medium; the curve is f³.
