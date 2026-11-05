@@ -74,7 +74,7 @@ class HubStateBuilderTest {
         val catalog = HubStateBuilder.build(inputs()).catalog.associateBy { it.id }
 
         assertFalse("demo" in catalog)
-        assertEquals(listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race", "watt_lane", "the_pull"), catalog.keys.toList())
+        assertEquals(listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race", "watt_lane", "the_pull", "balloon_pump"), catalog.keys.toList())
         assertEquals(listOf(5, 10, 15, 20, 30, 45, 60), catalog["kart_race"]!!.minuteSteps)
         assertEquals(listOf("minutes", "open"), catalog["kart_race"]!!.supports)
         assertEquals(listOf("minutes", "rounds", "open"), catalog["dodge_ball"]!!.supports)

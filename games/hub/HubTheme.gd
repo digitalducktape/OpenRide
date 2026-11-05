@@ -38,6 +38,7 @@ const LOOKS := {
 	"cadence_karaoke": [Color(1.0, 0.45, 0.8), Color("12052a")],
 	"watt_lane": [Color("f0875a"), Color("0f1a2e")],
 	"the_pull": [Color("5fd068"), Color("10200f")],
+	"balloon_pump": [Color("ff5fa2"), Color("2b0f2a")],
 }
 
 static var _looks := {}

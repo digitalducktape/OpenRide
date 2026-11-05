@@ -13,6 +13,7 @@ const GAMES := {
 	"kart_race": "res://games/kart_race/KartRace.tscn",
 	"watt_lane": "res://games/watt_lane/WattLane.tscn",
 	"the_pull": "res://games/the_pull/ThePull.tscn",
+	"balloon_pump": "res://games/balloon_pump/BalloonPump.tscn",
 }
 
 static var _infos := {}

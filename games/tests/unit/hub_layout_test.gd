@@ -158,16 +158,24 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 	HubPrefs.forget_rider(HubPrefs.rider(hub.state))
 
 
-## Made-up games on top of the registered ones, with their roles (#75): 12 in all, as wave 2 will be.
+## Made-up games on top of the registered ones, with their roles (#75); a real one is skipped.
 const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "glide_path": ["warmup", "recovery", "cooldown"],
 	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"]}
+
+
+## How many games _send_eleven_games sent: the registry's real games plus the fakes not yet real
+## (eleven when the wave 2 games are all registered; more than five either way).
+var _game_total := 0
 
 
 ## A hub_state with eleven games, its circuits drawn from all of them.
 func _send_eleven_games() -> void:
 	HubState.test_ids = FAKE_GAMES.keys()
 	var s: Dictionary = local.hub.state()
+	var real: Array = s.catalog.map(func(g): return g.id)
 	for id in FAKE_GAMES:
+		if id in real:
+			continue
 		var e: Dictionary = s.catalog[1].duplicate(true)
 		e.id = id
 		e.title = id.capitalize()
@@ -175,6 +183,7 @@ func _send_eleven_games() -> void:
 		e.uses_camera = id == "gate_crasher"
 		e.circuit_role = local.hub.circuit_role(e.roles)
 		s.catalog.append(e)
+	_game_total = s.catalog.size()
 	for c in s.circuits:
 		var shape: Array = c.slots.map(func(slot): return {"role": slot.role, "duration_sec": slot.duration_sec})
 		c.slots = local.hub.draw_slots(shape, s.catalog, true, 7)
@@ -196,8 +205,8 @@ func test_circuit_screens_with_eleven_games() -> void:
 func test_home_pages_through_eleven_games() -> void:
 	await _send_eleven_games()
 	var home: HomeScreen = hub.screen
-	assert_int(home.game_cards.size()).is_equal(12)
-	assert_int(home.page_count()).is_equal(3)
+	assert_int(home.game_cards.size()).is_equal(_game_total)
+	assert_int(home.page_count()).is_equal(ceili(_game_total / 4.0))
 	assert_object(home.page_left).is_not_null()
 	var seen := {}
 	for page in home.page_count():
@@ -211,7 +220,7 @@ func test_home_pages_through_eleven_games() -> void:
 			if card.is_visible_in_tree():
 				seen[id] = true
 				assert_float(minf(card.target_rect().size.x, card.target_rect().size.y)).is_greater_equal(HubTheme.CARD_TARGET)
-	assert_int(seen.size()).override_failure_message("every game shows on some page").is_equal(12)
+	assert_int(seen.size()).override_failure_message("every game shows on some page").is_equal(_game_total)
 	# The right button turns the page.
 	home.show_page(0)
 	home.page_right.pressed.emit()
@@ -277,9 +286,10 @@ func test_bakes_go_quiet_when_settled() -> void:
 	var before := _renders(bakes)
 	await _settle(20)
 	assert_int(_renders(bakes)).override_failure_message("a bake rendered on an idle frame").is_equal(before)
-	# A bake on a hidden page (more than five games page, #75) waits until it shows, by design.
-	for b in bakes.filter(func(b): return b.is_visible_in_tree()):
-		assert_bool(b.is_pending()).is_false()
+	for b in bakes:
+		# A bake on a hidden page (more than five games page on home, #75) waits until it shows.
+		if b.is_visible_in_tree():
+			assert_bool(b.is_pending()).is_false()
 
 
 func test_the_frame_cap_in_the_hub() -> void:

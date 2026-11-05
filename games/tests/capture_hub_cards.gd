@@ -6,7 +6,7 @@ extends SceneTree
 ##   $GODOT_BIN --path games --resolution 1920x1080 -s res://tests/capture_hub_cards.gd [-- --only=dodge_ball]
 ## Then re-import (`--import`).
 
-const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull"]
+const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull", "balloon_pump"]
 const SIZE := Vector2i(512, 288)
 ## Seconds into the intro before the shot (Kart Race builds its world first).
 const WAIT := {"kart_race": 9.0}
@@ -38,8 +38,11 @@ func _run() -> void:
 			await create_timer(0.1).timeout
 			left -= 0.1
 		_hide_framework()
-		await process_frame
-		await process_frame
+		# A game whose world starts empty (Balloon Pump's bunch) can pose itself for its card.
+		if _director.game and _director.game.has_method("pose_for_card"):
+			_director.game.pose_for_card()
+		for i in 6:
+			await process_frame
 		var img := root.get_viewport().get_texture().get_image()
 		img.resize(SIZE.x, SIZE.y, Image.INTERPOLATE_LANCZOS)
 		var path := "res://games/%s/hub_card.png" % id
