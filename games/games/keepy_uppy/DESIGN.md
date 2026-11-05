@@ -62,16 +62,19 @@ decide when to ride high for 3× points. Session: points a minute, stars, pops.
 
 - **Low** `h < 0.35` scores 1×, **mid** `0.35-0.65` 2×, **high** `≥ 0.65` 3× of
   `BASE_POINTS = 10` a second, awarded every frame through `award()` (the effort multiplier
-  applies). Nothing scores while a new balloon is on its way.
+  applies). Nothing scores while a new balloon is on its way, or without real power: the lower
+  of the live and smoothed power must lift the balloon off the grille against its weight right
+  now (`pedalling_it_up`). So a rider who stops scores nothing from that frame, even high up.
 - Stars are points a minute (`stars_per_minute`), the same for every difficulty because the
   weight already scales with it: **500 / 1100 / 2000**.
   - Modelled over 5 minutes with the weather on (`keepy_logic_test`, three seeds):
 
 | Rider | Points a minute at 1.0× | Stars at 1.0× | At 1.3× |
 | --- | --- | --- | --- |
-| 45% of FTP, ignoring the weather (low band, pops 12-15 times) | 430-470 | 0 | 1 |
-| 51% of FTP, ignoring the weather (pops 3-4 times, mostly to rain) | 820-880 | 1 | 2 |
-| 51% of FTP, answering rain and birds (steady mid) | 1190-1200 | 2 | 2 |
+| Stopped, or under the weight (20% of FTP) | 0 | 0 | 0 |
+| 45% of FTP, ignoring the weather (low band, pops 13-15 times) | 315-375 | 0 | 0 |
+| 51% of FTP, ignoring the weather (pops 2-4 times, mostly to rain) | 800-860 | 1 | 1-2 |
+| 51% of FTP, answering rain and birds (steady mid) | 1185-1195 | 2 | 2 |
 | 65% of FTP, answering the weather (high almost all the time) | 1795 | 2 | **3** (2330) |
 | As high as the column goes, all the time (a perfect run) | 1798 | 2 | 3 |
 

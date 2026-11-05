@@ -111,6 +111,7 @@ var gust_left := 0.0
 var shake_progress := 0.0  ## 0-1 toward shaking the birds off
 var state_left := 0.0  ## seconds left of POPPED or ARRIVING
 var last_points := 0.0  ## this step's points (the scene awards them)
+var _power := 0.0  ## this step's live power
 
 ## Steer state, in metres along the fan's rail (+x is the rider's right).
 var x := 0.0  ## the balloon
@@ -167,6 +168,14 @@ func weight() -> float:
 	if weather == Weather.ACTIVE and force == "downdraft":
 		w += downdraft_watts
 	return w
+
+
+## Whether real power is holding the balloon: enough lift to leave the grille against the weight
+## right now. Taken on the lower of the live and the smoothed power, so stopping scores nothing at
+## once, while the smoothing is still carrying the balloon. Points need this: a balloon sinking,
+## or resting through its grace, doesn't score on its own.
+func pedalling_it_up() -> bool:
+	return minf(_power, smoothed) * efficiency >= weight()
 
 
 ## The fan's lift at height `at_h`, from the smoothed power and the steer offset.
@@ -229,6 +238,7 @@ func step(delta: float, power: float, lean := 0.0, tracking := false, frozen := 
 		_primed = true
 		smoothed = power
 	smoothed += (power - smoothed) * (1.0 - exp(-delta / SMOOTH_TAU))
+	_power = power
 	_power_sum += power * delta
 	_power_sec += delta
 	_step_steer(delta, lean, tracking, events)
@@ -278,7 +288,8 @@ func _step_flying(delta: float, events: Array[Dictionary]) -> void:
 	if h <= 0.0:
 		_pop(events)
 		return
-	last_points = BASE_POINTS * multiplier(band) * delta
+	if pedalling_it_up():
+		last_points = BASE_POINTS * multiplier(band) * delta
 
 
 func _step_birds(delta: float, events: Array[Dictionary]) -> void:

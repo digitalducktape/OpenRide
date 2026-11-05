@@ -115,6 +115,30 @@ func test_bands_score_one_two_and_three_times() -> void:
 		assert_float(points).is_equal_approx(target[1], 0.01)
 
 
+func test_no_points_without_the_power_to_leave_the_grille() -> void:
+	var logic := _calm()
+	# Stopped, the first balloon held by its grace: nothing.
+	for i in roundi(4.0 / DT):
+		logic.step(DT, 0.0, 0.0, true)
+		assert_float(logic.last_points).is_equal(0.0)
+	# Pedalling under the weight, the balloon sinking: nothing.
+	logic = _calm()
+	logic.h = 0.5
+	for i in roundi(2.0 / DT):
+		logic.step(DT, 70.0, 0.0, true)
+		assert_float(logic.last_points).is_equal(0.0)
+	# At the weight and above: it scores.
+	_ride(logic, 8.0, 100.0)
+	logic.step(DT, 100.0, 0.0, true)
+	assert_float(logic.last_points).is_greater(0.0)
+	# Stopping scores nothing from that frame on, though the balloon is still high.
+	logic.h = 0.9
+	for i in roundi(2.0 / DT):
+		logic.step(DT, 0.0, 0.0, true)
+		assert_float(logic.last_points).is_equal(0.0)
+	assert_float(logic.h).is_greater(0.0)
+
+
 func test_band_changes_are_events() -> void:
 	var logic := _calm()
 	var events := _ride(logic, 15.0, 0.7 * FTP)
@@ -460,6 +484,11 @@ func _points_a_minute(power: Callable, seed_value := 11) -> float:
 				points = maxf(points - e.points, 0.0)
 		points += logic.last_points
 	return points / minutes
+
+
+func test_a_rider_who_never_lifts_it_scores_nothing() -> void:
+	assert_float(_points_a_minute(func(_l): return 0.0)).is_equal(0.0)
+	assert_float(_points_a_minute(func(_l): return 0.2 * FTP)).is_equal(0.0)
 
 
 func test_steady_mid_earns_two_stars() -> void:
