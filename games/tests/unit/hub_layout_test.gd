@@ -158,9 +158,9 @@ func test_the_builder_with_twelve_slots_scrolls() -> void:
 	HubPrefs.forget_rider(HubPrefs.rider(hub.state))
 
 
-## Six made-up games on top of the registered ones, with their roles (#75; Watt Lane, #78, is real now, so 12).
+## Made-up games on top of the registered ones, with their roles (#75): 12 in all, as wave 2 will be.
 const FAKE_GAMES := {"power_grid": ["warmup", "work", "cooldown"], "glide_path": ["warmup", "recovery", "cooldown"],
-	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"], "the_pull": []}
+	"gate_crasher": ["work"], "ready_for_launch": ["work"], "keepy_uppy": ["recovery"]}
 
 
 ## A hub_state with eleven games, its circuits drawn from all of them.
@@ -277,7 +277,8 @@ func test_bakes_go_quiet_when_settled() -> void:
 	var before := _renders(bakes)
 	await _settle(20)
 	assert_int(_renders(bakes)).override_failure_message("a bake rendered on an idle frame").is_equal(before)
-	for b in bakes:
+	# A bake on a hidden page (more than five games page, #75) waits until it shows, by design.
+	for b in bakes.filter(func(b): return b.is_visible_in_tree()):
 		assert_bool(b.is_pending()).is_false()
 
 

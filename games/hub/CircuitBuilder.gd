@@ -11,7 +11,7 @@ extends RefCounted
 ## - the plan id is `custom:` plus `<game_id>.<sec>` joined by `,` (the same lineup keys the same
 ##   bests);
 ## - with the camera off, a camera game's slot plays the first camera-free game of its role,
-##   and a slot with no such game (Kart Race) can't play.
+##   and a slot with no such game, or a `free` one (Kart Race), can't play.
 
 const MAX_SLOTS := 12
 const MAX_SEC := 90 * 60
@@ -181,11 +181,15 @@ func to_saved() -> Dictionary:
 
 
 ## What a slot plays with the camera off: its game, the first camera-free game of the same
-## `circuit_role` (Kotlin's customGame), or "" when there is none.
+## `circuit_role` (Kotlin's customGame), or "" when there is none. A `free` slot (a game with no
+## circuit role, like Kart Race) has no stand-in: The Pull is free too, but no substitute for a
+## race (#79).
 func stand_in(game_id: String) -> String:
 	var e: Dictionary = catalog.get(game_id, {})
 	if not bool(e.get("uses_camera", false)):
 		return game_id
+	if str(e.get("circuit_role", "free")) == "free":
+		return ""
 	for other in catalog.values():
 		if not bool(other.get("uses_camera", false)) and str(other.circuit_role) == str(e.get("circuit_role", "")):
 			return str(other.id)

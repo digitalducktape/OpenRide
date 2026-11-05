@@ -23,6 +23,7 @@ const REELS := {
 	"safe_cracker": ["proximity_tick", "tumbler_click", "soft_alarm", "vault_open", "door_creak"],
 	"cadence_karaoke": ["beat_tick", "streak_up", "band_exit", "ease_off_chime"],
 	"watt_lane": ["jump_chime", "count_tick", "lane_shift", "caught", "missed", "off_buzz", "streak_up"],
+	"the_pull": ["pull_horn", "board_pass", "dig_in", "best_pass", "full_pull", "stall_horn", "crowd_swell"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
 }
@@ -32,6 +33,7 @@ const GAME_SCRIPTS := {
 	"safe_cracker": "res://games/safe_cracker/SafeAudio.gd",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceAudio.gd",
 	"watt_lane": "res://games/watt_lane/WattLaneAudio.gd",
+	"the_pull": "res://games/the_pull/PullAudio.gd",
 }
 
 var out_dir := ""
@@ -160,6 +162,11 @@ func _ride(game_id: String, director: Node) -> void:
 		"tug_of_war":
 			cad = 85.0
 			res = 30.0 + 30.0 * (0.5 + 0.5 * sin(t * 0.25))
+		"the_pull":
+			# A strong pull past the boards (the loops follow the watts and the speed), then a
+			# fade from 50 s into the warning and the stall, and the rest.
+			cad = 88.0 if t < 50.0 else 45.0
+			res = 38.0 if t < 50.0 else 20.0
 		"safe_cracker":
 			# A rider who reads the dial: the knob eases toward each number, overshoots a little
 			# and settles; one hard burst (50-56 s) trips the alarm.
@@ -284,10 +291,10 @@ func _mix_frame() -> void:
 	sfx.resize(n_out)
 	var master_db := AudioServer.get_bus_volume_db(0)
 	for v in _voices.duplicate():
-		var player: AudioStreamPlayer = v.player
-		if not is_instance_valid(player):
+		if not is_instance_valid(v.player):  # a game's own players go with the game
 			_voices.erase(v)
 			continue
+		var player: AudioStreamPlayer = v.player
 		if player.stream_paused:
 			continue
 		if not player.playing:

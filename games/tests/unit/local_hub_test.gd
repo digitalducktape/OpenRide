@@ -53,7 +53,7 @@ func test_a_visit_starts_with_a_full_hub_state() -> void:
 	assert_str(s.phase).is_equal("hub")
 	assert_str(s.visit_id).is_equal(Session.visit_id)
 	var ids: Array = s.catalog.map(func(g): return g.id)
-	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane"])
+	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull"])
 	var kart: Dictionary = s.catalog[0]
 	assert_array(kart.minute_steps).is_equal([5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0])
 	assert_str(kart.circuit_role).is_equal("free")
@@ -120,7 +120,7 @@ static func _eleven() -> Array:
 		["safe_cracker", ["recovery"], 60, false], ["cadence_karaoke", ["warmup", "recovery", "cooldown"], 60, false],
 		["power_grid", ["warmup", "work", "cooldown"], 60, false], ["watt_lane", ["warmup", "recovery", "cooldown"], 60, false],
 		["gate_crasher", ["work"], 60, true], ["ready_for_launch", ["work"], 90, false],
-		["keepy_uppy", ["recovery"], 60, false], ["the_pull", [], 60, false],
+		["keepy_uppy", ["recovery"], 60, false], ["the_pull", [], 300, false],
 	]
 	return games.map(func(g): return {"id": g[0], "roles": g[1], "min_sec": g[2], "max_sec": 3600, "uses_camera": g[3]})
 

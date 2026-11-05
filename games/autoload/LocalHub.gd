@@ -17,13 +17,13 @@ const MIN_SAVED_SEC := 60.0  ## a visit with less gameplay is discarded (v1's ru
 ## As HubStateBuilder.MINUTE_STEPS.
 const MINUTE_STEPS := [5, 10, 15, 20, 30, 45, 60]
 ## GameCatalog's roundSec, which GameInfo doesn't declare (60 when not listed).
-const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75}
+const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75, "the_pull": 300}
 ## GameCatalog's usesCamera where it differs from the game's tracker mode (Tug of War's camera
 ## is an option, decided per segment).
 const USES_CAMERA := {"tug_of_war": false}
 ## The display order of the first games (GameCatalog's, without the demo); every other
 ## registered game follows, by id (`order()`).
-const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane"]
+const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull"]
 ## CircuitPresets: warm-up, N blocks, cool-down. Shapes only: each slot's game is drawn from its
 ## role's pool (`draw_slots`, as Kotlin's CircuitDraw).
 const WARMUP := {"role": "warmup", "duration_sec": 180}
@@ -344,11 +344,12 @@ func _custom(request: Dictionary, difficulty: String) -> Dictionary:
 		elif i == slots.size() - 1 and slots.size() > 1 and "cooldown" in e.roles:
 			role = "cooldown"
 		# Camera off: the first camera-free game of the same circuit role plays it (the id keeps
-		# the requested game), as SessionPlans.customGame; none (Kart Race) rejects it.
+		# the requested game), as SessionPlans.customGame; none, or a free slot (Kart Race),
+		# rejects it.
 		var plays := id
 		if e.uses_camera and not camera_available():
 			plays = ""
-			for other_id in order():
+			for other_id in (order() if e.circuit_role != "free" else []):
 				var other := entry(GameRegistry.info(other_id))
 				if not other.uses_camera and other.circuit_role == e.circuit_role:
 					plays = other_id
