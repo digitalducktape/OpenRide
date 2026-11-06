@@ -14,7 +14,7 @@ void fragment() {
 	vec2 p = UV * vec2(90.0, 12.0);
 	p.x += p.y * 0.55;
 	float col = floor(p.x);
-	float y = p.y + fall * (0.8 + hash(vec2(col, 2.0)) * 0.5) + hash(vec2(col, 1.0)) * 9.0;
+	float y = p.y - fall * (0.8 + hash(vec2(col, 2.0)) * 0.5) + hash(vec2(col, 1.0)) * 9.0;
 	float cell = fract(y);
 	float show = step(0.62, hash(vec2(col, floor(y))));
 	float across = 1.0 - abs(fract(p.x) - 0.5) * 2.0;
