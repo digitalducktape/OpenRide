@@ -76,6 +76,7 @@ it between pedal strokes, sweating, and tap with one finger. Design for a half-s
 | Safe Cracker | brass `#E8B04A` | soot `#14110D` | 0, upright | noir heist, precise and quiet |
 | Cadence Karaoke | the world's neon (`CadenceWorld.theme_color`) | deep violet `#12052A` | 0.25, italic | synthwave stage, on the beat |
 | Keepy Uppy | sunset coral `#FF7A59` | sky navy `#12233A` | 0.08 | open air, lift |
+| Power Grid | arc blue `#8FD8FF` | dusk indigo `#151336` | 0.06 | a calm valley evening, the warm town against a cold spark |
 | House (`GameTheme.house()`) | periwinkle `#7A7CFF` | deep indigo `#17143A` | 0.12 | the app's own: a circuit's summary, and the summary and calibration of a game without a look |
 
 ## 5. Hierarchy and layout

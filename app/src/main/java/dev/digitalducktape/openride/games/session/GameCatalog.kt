@@ -384,6 +384,40 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Power Grid (#81), `games/games/power_grid/`: the bike turns a valley town's generator.
+         * Demand follows an evening curve between `demand_lo_watts` and `demand_hi_watts`: 40-60 /
+         * 45-70 / 50-75% of FTP in work, 30-50% in a warm-up or cool-down, 30-42% in a recovery
+         * (difficulty never moves an easy role, and each stays under its power cap). A storm's
+         * repair asks `storm_watts` (15%) over demand. No rounds: an evening is the ride. See its
+         * DESIGN.md.
+         */
+        val POWER_GRID = GameDeclaration(
+            id = "power_grid",
+            title = "Power Grid",
+            supports = setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            roles = setOf(SegmentRole.WARMUP, SegmentRole.WORK, SegmentRole.RECOVERY, SegmentRole.COOLDOWN),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (lo, hi) = when (role) {
+                    SegmentRole.WARMUP, SegmentRole.COOLDOWN -> 0.30 to 0.50
+                    SegmentRole.RECOVERY -> 0.30 to 0.42
+                    else -> when (difficulty) {
+                        Difficulty.EASY -> 0.40 to 0.60
+                        Difficulty.STANDARD -> 0.45 to 0.70
+                        Difficulty.HARD -> 0.50 to 0.75
+                    }
+                }
+                mapOf(
+                    "demand_lo_watts" to JsonPrimitive((ftp.watts * lo).roundToInt()),
+                    "demand_hi_watts" to JsonPrimitive((ftp.watts * hi).roundToInt()),
+                    "storm_watts" to JsonPrimitive((ftp.watts * 0.15).roundToInt()),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race, The Pull). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -399,7 +433,7 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /** Every registered game. Each game issue adds its declaration here. */
         val DEFAULT = GameCatalog(
-            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY),
+            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY, POWER_GRID),
         )
     }
 }
