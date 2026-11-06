@@ -69,7 +69,7 @@ fuel, count, push, coast, a result to beat. Ride: a bigger rocket, a new pad, yo
 - Launches share a timed slot evenly: `planned = floor(sec / 90)`, `launch_sec = sec / planned`. The
   spare time goes 60% to fuelling, 40% to the coast, and points scale by `launch_sec / 90`, so stars
   a minute hold. A 5-minute ride is three launches of 100 s; no launch is ever cut short.
-- `min_sec` is 90. Rounds: one launch a round, 90 s, and the game ends itself. Open: until the rider
+- `min_sec` is 90, so the circuit draw leaves it out of 60 s work slots and it plays the 90 s ones. Rounds: one launch a round, 90 s, and the game ends itself. Open: until the rider
   ends it. After a timed slot's last launch the result holds for Kotlin's timer.
 - A single-launch slot gets any rocket; a longer ride starts at Mk I and builds up, then repeats.
 

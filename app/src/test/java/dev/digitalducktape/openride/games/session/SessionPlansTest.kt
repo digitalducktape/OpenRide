@@ -375,8 +375,10 @@ class SessionPlansTest {
             val free = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id }.toSet()
             without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertTrue(it.gameId in free) }
         }
-        // With the camera, Dodge Ball plays its share.
-        assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId == "dodge_ball" })
+        // With the camera, Dodge Ball plays its share: not in every draw now the pool is bigger.
+        assertTrue((0L until 20L).any { seed ->
+            SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT, seed = seed).segments.any { it.gameId == "dodge_ball" }
+        })
     }
 
     @Test

@@ -205,7 +205,7 @@ static func paint_moon(m: SafeMesh) -> void:
 	var r := MOON_R
 	m.glow(Vector2.ZERO, Vector2(r + 70.0, r + 70.0), Color(0.86, 0.9, 1.0, 0.07), 8, 0.86, r - 30.0)
 	m.circle(Vector2.ZERO, r, Color("b9b7b2"))
-	m.glow(Vector2(r * 0.34, -r * 0.3), Vector2(r * 1.1, r * 1.1), Color("e6e3da"), 12)
+	m.glow(Vector2(r * 0.26, -r * 0.24), Vector2(r * 0.62, r * 0.62), Color("e6e3da"), 12)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 61
 	for i in 9:

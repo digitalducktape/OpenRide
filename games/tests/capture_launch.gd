@@ -15,6 +15,7 @@ var _out := "user://captures"
 var _stats := false
 var _places := false
 var _mark := -1
+var _short := false  ## --short: with --play, only the last few seconds of the fuelling
 
 
 func _initialize() -> void:
@@ -32,6 +33,8 @@ func _run() -> void:
 			play_sec = float(arg.get_slice("=", 1))
 		elif arg == "--stats":
 			_stats = true
+		elif arg == "--short":
+			_short = true
 		elif arg == "--places":
 			_places = true
 		elif arg == "--silhouette":
@@ -75,6 +78,9 @@ func _run() -> void:
 		return
 	var game: Node = _director.game
 	if play_sec > 0.0:
+		if _mark >= 0:
+			game._mark = _mark
+			game._stage_launch()
 		await _ride(game, play_sec, bus)
 		quit()
 		return
@@ -181,6 +187,9 @@ func _save(shot: String) -> void:
 ## the push, an easy spin after.
 func _ride(game: Node, seconds: float, bus: Node) -> void:
 	var logic: LaunchLogic = game.logic
+	if _short:
+		logic.fuel = 0.8
+		logic.phase_left = 5.0
 	for frame in roundi(seconds * 30.0):
 		var want := 125.0
 		match logic.phase:

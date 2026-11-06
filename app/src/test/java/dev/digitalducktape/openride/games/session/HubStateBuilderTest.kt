@@ -117,7 +117,10 @@ class HubStateBuilderTest {
         val on = HubStateBuilder.build(inputs()).circuits.first { it.id == "circuit-20" }
         assertEquals(20, on.minutes)
         assertEquals(1120, on.totalSec)
-        assertTrue(on.slots.any { it.gameId == "dodge_ball" })
+        // Dodge Ball is in some draws, not all, now the work pool is bigger.
+        assertTrue((1L..20L).any { seed ->
+            HubStateBuilder.build(inputs().copy(circuitSeed = seed)).circuits.first { it.id == "circuit-20" }.slots.any { it.gameId == "dodge_ball" }
+        })
 
         val off = HubStateBuilder.build(inputs(permission = CameraPermission.DENIED)).circuits.first { it.id == "circuit-20" }
         assertFalse(off.slots.any { it.gameId == "dodge_ball" })

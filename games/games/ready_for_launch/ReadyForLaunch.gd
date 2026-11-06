@@ -384,14 +384,14 @@ func _handle(event: Dictionary) -> void:
 		"count":
 			_on_count(event.n)
 		"ignition":
-			AudioDirector.play_sfx("rfl_ignition", 1.0)
+			AudioDirector.play_sfx("rfl_ignition", -1.0)
 			GameMix.duck_for_sting(1.2)
 			pad.ignite(1.0)
 			_show_message("PUSH past %d W!" % roundi(logic.target), GameTheme.TARGET, 3.0)
 			_set_band()
 			GameTheme.pop(_status, 1.08)
 		"liftoff":
-			AudioDirector.play_sfx("rfl_liftoff", 0.0)
+			AudioDirector.play_sfx("rfl_liftoff", -3.0)
 		"push_ending":
 			_show_message("3 seconds, then spin easy", GameTheme.WARN, 2.8)
 		"coast":
@@ -400,7 +400,7 @@ func _handle(event: Dictionary) -> void:
 				_show_message("You made it! Spin to touch down", GameTheme.GOOD, 3.5)
 			else:
 				AudioDirector.play_sfx("rfl_cutoff", -2.0)
-				_show_message("Engines off: spin easy to keep climbing", GameTheme.GOOD, 3.5)
+				_show_message("Engines off: spin easy to climb on", GameTheme.GOOD, 3.5)
 		"scrub":
 			_set_band()
 			AudioDirector.play_sfx("rfl_scrub", 0.0)
@@ -437,7 +437,10 @@ func _on_milestone(event: Dictionary) -> void:
 	AudioDirector.play_sfx("rfl_moon" if id == "moon" else "rfl_milestone", -1.0 if id == "moon" else -3.0)
 	GameMix.duck_for_moment(1.2)
 	var km := int(LaunchLogic.MILESTONES[event.index].km)
-	_show_message("%s! %s km" % [event.name, _grouped(km)], GameTheme.GOOD, MESSAGE_SEC)
+	var text := "%s! %s km" % [event.name, _grouped(km)]
+	if event.index + 1 < LaunchLogic.MILESTONES.size():
+		text = "%s! Next stop %s km" % [event.name, _grouped(int(LaunchLogic.MILESTONES[event.index + 1].km))]
+	_show_message(text, GameTheme.GOOD, MESSAGE_SEC)
 	GameTheme.pop(hud.score, 1.15)
 
 
@@ -457,7 +460,7 @@ func _next_launch(launch: int) -> void:
 	t.tween_callback(_stage_launch)
 	t.tween_callback(func() -> void:
 		_set_band()
-		_show_message("Launch %d: hold %d W to fill the tank" % [launch, roundi(logic.fuel_full)], FUEL_COLOR, 3.5))
+		_show_message("Launch %d: hold %d W to fill up" % [launch, roundi(logic.fuel_full)], FUEL_COLOR, 3.5))
 	t.tween_property(shutter, "color:a", 0.0, SHUTTER_SEC)
 	t.tween_callback(func() -> void: shutter.visible = false)
 

@@ -245,8 +245,8 @@ func test_every_callout_fits_its_lane_clear_of_the_hud() -> void:
 		if p != game._status.get_global_rect():
 			assert_bool(lane.intersects(p)).override_failure_message("the lane %s under %s" % [lane, p]).is_false()
 	var font: Font = game.banner.label.get_theme_font("font")
-	var longest := ["Fuel 100%: push past 2100 W at zero", "Engines off: spin easy to keep climbing", "Tank full! Ease off, save your legs",
-		"Scrubbed: push past 525 W next time", "Launch 40: hold 1200 W to fill the tank", "Pedal past 1000 W to fill the tank",
+	var longest := ["Fuel 100%: push past 2100 W at zero", "Engines off: spin easy to climb on", "Edge of space! Next stop 400 km", "Tank full! Ease off, save your legs",
+		"Scrubbed: push past 525 W next time", "Launch 40: hold 1200 W to fill up", "Pedal past 1000 W to fill the tank",
 		"The Moon! 384,400 km", "You made it! Spin to touch down", "Edge of space: 100 km"]
 	for text in longest:
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, LaunchBanner.SIZE).x
@@ -255,7 +255,7 @@ func test_every_callout_fits_its_lane_clear_of_the_hud() -> void:
 
 func test_the_status_widget_is_one_short_row_with_big_text() -> void:
 	var s: LaunchStatus = game._status
-	s.show_state("COAST", LaunchLogic.Phase.COAST, 1.0, Color.WHITE, "384,400 km")
+	s.show_state("COAST", Color.WHITE, 1.0, Color.WHITE, "384,400 km")
 	s.reset_size()
 	await get_tree().process_frame
 	assert_float(s.get_combined_minimum_size().x).is_less_equal(800.0)

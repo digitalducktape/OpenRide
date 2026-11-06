@@ -7,9 +7,9 @@ extends CanvasLayer
 ## with it. Every callout tells the rider what to do, with a number the rules use.
 
 const LAYER := 6
-const LANE := Rect2(620, 132, 790, 72)
-const SIZE := 52
-const OUTLINE := 15
+const LANE := Rect2(640, 132, 810, 72)
+const SIZE := 48
+const OUTLINE := 14
 
 var label: Label
 var _box: CenterContainer

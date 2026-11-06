@@ -10,7 +10,7 @@ extends Node2D
 ## Silhouette: the smoke is a low, wide bank spreading left and right, and steam is short flat
 ## wisps. Neither ever forms a ball with a tail.
 
-const CLOCK_RECT := Rect2(130, 352, 380, 176)  ## the mission clock's board
+const CLOCK_RECT := Rect2(130, 372, 380, 176)  ## the mission clock's board
 const TOWER_HALF := 48.0  ## the lattice, either side of LaunchPlaces.TOWER_X
 const ARM_RETRACT_AT := 5  ## seconds on the count when the arms swing back
 const HOSE_DROP_AT := 3  ## and when the fuel hose lets go
@@ -210,6 +210,7 @@ static func paint_tower(m: SafeMesh, mark: int, place: int) -> void:
 	var half := TOWER_HALF
 	var steel := Color("5b6275").lerp(p.dark, 0.25)
 	var lit := steel.lerp(p.sun_col, 0.5)
+	_floods(m, mark, p)
 	m.soft_shadow(Rect2(x - 80.0, base - 6.0, 170.0, 20.0), 8.0, 14.0, Color(p.dark, 0.4))
 	# The far legs, darker, then the bracing.
 	m.line(Vector2(x - half + 16.0, top), Vector2(x - half + 16.0, base), 6.0, steel.darkened(0.3))
@@ -239,6 +240,22 @@ static func paint_tower(m: SafeMesh, mark: int, place: int) -> void:
 	m.rect(Rect2(cap.position.x, cap.position.y + 11.0, cap.size.x, 11.0), Color("efe7d8"))
 	# The tower's foot on the apron, and the hose reel.
 	m.rect_v(Rect2(x - half - 18.0, base - 18.0, 2.0 * half + 36.0, 28.0), steel.lightened(0.15), steel.darkened(0.22))
+
+
+## The rocket's contact shadow on the deck, and two floodlight cones up its sides from the table's
+## corners (faint at dawn, strong in the dark): what ties the hero to its place.
+static func _floods(m: SafeMesh, mark: int, p: Dictionary) -> void:
+	var cx := LaunchPlaces.PAD_X
+	var deck := LaunchPlaces.PAD_Y
+	var top := deck - LaunchRocket.height_of(mark) * 0.8
+	var strength: float = p.flood
+	for s in [-1.0, 1.0]:
+		var lamp := Vector2(cx + s * 262.0, deck - 4.0)
+		var clear := Color(p.lit, 0.0)
+		var col := Color(p.lit, strength)
+		m.quad4(lamp + Vector2(-8.0, 0.0), lamp + Vector2(8.0, 0.0), Vector2(cx + s * 30.0, top), Vector2(cx + s * 170.0, top), col, col, clear, clear)
+	var half := LaunchRocket.half_width_of(mark)
+	m.glow(Vector2(cx, deck + 4.0), Vector2(half + 20.0, 16.0), Color(p.dark, 0.6), 6)
 
 
 ## A swing arm from the tower to the rocket: a boxed truss with a hand rail.
@@ -488,6 +505,8 @@ static func puff_texture() -> Texture2D:
 			for b in blobs:
 				var d := u.distance_to(Vector2(b.x, b.y)) / b.z
 				a = maxf(a, 1.0 - smoothstep(0.55, 1.0, d))
-			img.set_pixel(x, y, Color(1, 1, 1, a))
+			# Lit from above, so a bank of puffs has volume rather than one flat colour.
+			var v := lerpf(1.0, 0.68, u.y)
+			img.set_pixel(x, y, Color(v, v, v, a))
 	_puff = ImageTexture.create_from_image(img)
 	return _puff

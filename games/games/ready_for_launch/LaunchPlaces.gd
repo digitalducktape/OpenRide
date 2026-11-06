@@ -19,19 +19,19 @@ const TOWER_X := 684.0  ## the service tower's centre
 const PLACES := [
 	{"id": "coast", "name": "Coast at first light",
 		"sky_top": Color("24406f"), "sky_mid": Color("7f7fb4"), "sky_low": Color("f2ad8f"), "sky_edge": Color("ffdca6"),
-		"sun": Vector2(1490, 640), "sun_col": Color(1.0, 0.86, 0.62),
+		"flood": 0.1, "sun": Vector2(1490, 640), "sun_col": Color(1.0, 0.86, 0.62),
 		"far": Color("6d6f9c"), "mid": Color("4f5a7c"), "near": Color("b39a84"), "near2": Color("5f5560"),
 		"concrete": Color("9b93a0"), "concrete2": Color("5d5866"), "dark": Color("2a2a40"), "lit": Color("ffd08a"),
 		"light": Color(1.0, 0.93, 0.86), "cloud": Color(1.0, 0.86, 0.8), "cloud2": Color("9a8fb8")},
 	{"id": "desert", "name": "Desert flats at dusk",
 		"sky_top": Color("231f52"), "sky_mid": Color("6d3372"), "sky_low": Color("e0653f"), "sky_edge": Color("ffb257"),
-		"sun": Vector2(1400, 655), "sun_col": Color(1.0, 0.7, 0.42),
+		"flood": 0.16, "sun": Vector2(1400, 655), "sun_col": Color(1.0, 0.7, 0.42),
 		"far": Color("8a4a6a"), "mid": Color("6f3550"), "near": Color("a85f3e"), "near2": Color("55303a"),
 		"concrete": Color("a2806f"), "concrete2": Color("5f4048"), "dark": Color("2a1730"), "lit": Color("ffc27a"),
 		"light": Color(1.0, 0.83, 0.72), "cloud": Color(1.0, 0.72, 0.62), "cloud2": Color("8a4f7c")},
 	{"id": "polar", "name": "Polar shelf at night",
 		"sky_top": Color("050b22"), "sky_mid": Color("0c2748"), "sky_low": Color("1b5a70"), "sky_edge": Color("56a8a6"),
-		"sun": Vector2(1560, 720), "sun_col": Color(0.65, 0.95, 0.9),
+		"flood": 0.3, "sun": Vector2(1560, 720), "sun_col": Color(0.65, 0.95, 0.9),
 		"far": Color("2a5a7a"), "mid": Color("1f4563"), "near": Color("a9c6dc"), "near2": Color("3f6488"),
 		"concrete": Color("7f93a8"), "concrete2": Color("3f5168"), "dark": Color("0e1a30"), "lit": Color("ffe2a8"),
 		"light": Color(0.82, 0.92, 1.0), "cloud": Color(0.72, 0.86, 0.95), "cloud2": Color("35587c")},
@@ -257,9 +257,12 @@ static func _pipes(m: SafeMesh, p: Dictionary) -> void:
 	for k in 2:
 		var r := Rect2(1486.0 + k * 40.0, 756.0 + k * 44.0, 300.0, 74.0)
 		m.soft_shadow(Rect2(r.position + Vector2(-12.0, 54.0), Vector2(r.size.x + 20.0, 26.0)), 12.0, 16.0, Color(p.dark, 0.3))
-		m.round_rect(r, 16.0, steel.lightened(0.42), steel.darkened(0.12))
-		m.rect(Rect2(r.position.x + 40.0, r.position.y + 2.0, 12.0, r.size.y - 4.0), Color(p.dark, 0.3))
-		m.rect(Rect2(r.end.x - 52.0, r.position.y + 2.0, 12.0, r.size.y - 4.0), Color(p.dark, 0.3))
+		# Square-ended on saddles: a rounded pill lying down isn't a shape to leave to chance.
+		for sx in [r.position.x + 40.0, r.end.x - 70.0]:
+			m.rect(Rect2(sx, r.end.y - 4.0, 30.0, 14.0), steel.darkened(0.3))
+		m.round_rect(r, 5.0, steel.lightened(0.42), steel.darkened(0.12))
+		m.rect(Rect2(r.position.x, r.position.y, 10.0, r.size.y), Color(p.dark, 0.34))
+		m.rect(Rect2(r.end.x - 10.0, r.position.y, 10.0, r.size.y), Color(p.dark, 0.34))
 		m.rect(Rect2(r.position.x + 70.0, r.position.y + 28.0, 150.0, 12.0), Color("e8b84a"))
 	m.rect_v(Rect2(1234.0, y, 300.0, 16.0), steel.lightened(0.34), steel.darkened(0.2))
 	for k in 6:

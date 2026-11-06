@@ -11,7 +11,7 @@ extends PanelContainer
 ## redraws only when its fill moves a pixel.
 
 const CHIP_SIZE := Vector2(190, 62)
-const BAR_SIZE := Vector2(300, 34)
+const BAR_SIZE := Vector2(262, 34)
 const VALUE_W := 256.0
 const CHIP_GOOD := Color("2fd6c8")
 
