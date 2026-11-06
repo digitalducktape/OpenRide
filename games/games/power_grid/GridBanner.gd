@@ -10,10 +10,10 @@ extends CanvasLayer
 
 const LAYER := 6
 ## The lane (1920x1080 canvas): under the status widget, between the side panels. A circuit's
-## progress strip pushes the widget down, so `set_lane_top` moves it.
+## progress strip pushes the widget down, so `set_lane` moves it.
 const LANE := Rect2(650, 150, 830, 70)
 const SIZE := HudTheme.BODY + 4  ## 48 px: the longest instruction fits the lane on one line
-const NARROW_SIZE := HudTheme.BODY  ## the longest instruction in a lane cut short by `set_lane_end`
+const NARROW_SIZE := HudTheme.BODY  ## the longest instruction in a lane cut short by `set_lane`
 const OUTLINE := 14
 
 var label: Label
@@ -40,18 +40,14 @@ func _init(look: GameTheme) -> void:
 	_box.add_child(label)
 
 
-## Moves the lane's top (under a taller status area).
-func set_lane_top(y: float) -> void:
-	_box.position.y = y
-
-
-## Ends the lane at `x` (the Music button, in a circuit: `PowerGrid._fit_lane`), or at its own end
-## again. The text is centred in what's left, a size down so the longest instruction still fits.
-func set_lane_end(x: float) -> void:
-	var width := minf(x, LANE.end.x) - LANE.position.x
-	label.add_theme_font_size_override("font_size", SIZE if width >= LANE.size.x else NARROW_SIZE)
-	label.custom_minimum_size.x = width
-	_box.size.x = width
+## Moves the lane (under a circuit's taller status area, clear of the ride panel and the Music
+## button: `PowerGrid._fit_lane`). The text is centred in it, a size down in a shorter lane so the
+## longest instruction still fits.
+func set_lane(lane: Rect2) -> void:
+	label.add_theme_font_size_override("font_size", SIZE if lane.size.x >= LANE.size.x else NARROW_SIZE)
+	label.custom_minimum_size.x = lane.size.x
+	_box.position = lane.position
+	_box.size = lane.size
 
 
 ## Slams `text` in, holds it for `seconds` and fades it out. A callout of lower `priority` never

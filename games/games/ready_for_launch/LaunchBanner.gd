@@ -9,6 +9,7 @@ extends CanvasLayer
 const LAYER := 6
 const LANE := Rect2(640, 132, 810, 72)
 const SIZE := 48
+const NARROW_SIZE := HudTheme.BODY  ## the longest callout in a lane cut short by `set_lane`
 const OUTLINE := 14
 
 var label: Label
@@ -34,6 +35,16 @@ func _init(look: GameTheme) -> void:
 	_box.add_child(label)
 
 
+## Moves the lane (under a circuit's taller status area, clear of the ride panel and the Music
+## button: `ReadyForLaunch._fit_lane`). The text is centred in it, a size down in a shorter lane so
+## the longest callout still fits.
+func set_lane(lane: Rect2) -> void:
+	label.add_theme_font_size_override("font_size", SIZE if lane.size.x >= LANE.size.x else NARROW_SIZE)
+	label.custom_minimum_size.x = lane.size.x
+	_box.position = lane.position
+	_box.size = lane.size
+
+
 ## Slams `text` in, holds it for `seconds` and fades it out.
 func show_callout(text: String, color: Color, seconds: float) -> void:
 	label.text = text
@@ -43,7 +54,7 @@ func show_callout(text: String, color: Color, seconds: float) -> void:
 	label.modulate.a = 1.0
 	if _tween and _tween.is_valid():
 		_tween.kill()
-	label.pivot_offset = Vector2(LANE.size.x * 0.5, SIZE * 0.6)
+	label.pivot_offset = Vector2(_box.size.x * 0.5, SIZE * 0.6)
 	GameTheme.slam(label, 1.4, 0.3)
 	_tween = label.create_tween()
 	_tween.tween_interval(maxf(seconds - GameTheme.FADE_SEC, 0.4))

@@ -41,6 +41,8 @@ const CLIMB_COLOR := Color("2fd6c8")
 ## badges leaning a little. Clear of Dodge Ball's sky blue and the meaning colours.
 static var look := GameTheme.new(Color("2fd6c8"), Color("0a1a2e"), 0.1)
 
+const LANE_MUSIC_GAP := 8.0  ## px kept between the callouts' lane and the Music button
+
 var logic: LaunchLogic
 var sky: LaunchSky
 var ground: Node2D
@@ -90,7 +92,7 @@ func info() -> GameInfo:
 		"hard": [300, 950, 2000],
 	}
 	i.summary_stats = [
-		{"key": "best_altitude", "label": "best altitude", "suffix": " km"},
+		{"key": "best_altitude", "label": "best altitude", "suffix": " km", "grouped": true},
 		{"key": "fuel_pct_avg", "label": "average tank", "suffix": "%"},
 		{"key": "launches", "label": "launches"},
 	]
@@ -179,6 +181,10 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = LaunchStatus.new(look)
 	hud.add_widget(_status)
+	_status.resized.connect(_fit_lane)
+	hud.top_bar_moved.connect(_fit_lane)
+	hud.ride_panel.resized.connect(_fit_lane)
+	hud.music_button.visibility_changed.connect(_fit_lane)
 	hud.metrics.set_power_source(func() -> float: return logic.smoothed)
 	_set_band()
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
@@ -188,6 +194,21 @@ func _on_prepare(seg: Dictionary) -> void:
 	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
 	_draw_state(0.0)
 	_update_status()
+
+
+## Keeps the callouts' lane under the status area, clear of a ride panel a heart strap widens and,
+## when a circuit's strip brings it down beside the Music button, short of the button.
+func _fit_lane() -> void:
+	if not is_instance_valid(_status):
+		return
+	var lane := LaunchBanner.LANE
+	lane.position.y = maxf(lane.position.y, _status.get_global_rect().end.y + 4.0)
+	var left := maxf(lane.position.x, hud.ride_panel.get_global_rect().end.x + LANE_MUSIC_GAP)
+	var right := lane.end.x
+	var music := hud.music_button.get_global_rect().grow(LANE_MUSIC_GAP)
+	if hud.music_button.visible and lane.intersects(music):
+		right = music.position.x
+	banner.set_lane(Rect2(left, lane.position.y, right - left, lane.size.y))
 
 
 func _on_start() -> void:
@@ -554,9 +575,4 @@ func _show_message(text: String, color := GameTheme.INK, seconds := MESSAGE_SEC)
 
 ## 384400 as "384,400".
 static func _grouped(n: int) -> String:
-	var s := str(n)
-	var out := ""
-	while s.length() > 3:
-		out = "," + s.right(3) + out
-		s = s.left(s.length() - 3)
-	return s + out
+	return HudTheme.grouped(n)

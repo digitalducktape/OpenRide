@@ -258,6 +258,7 @@ starts).
   the top bar's width (`Hud._ButtonRow`), so a track moves nothing. `game_music_ui_test` plays each
   wave 2 game with a track: the button's place, the panel and `rider_music`. A new game adds one
   row to its table.
+  A game with its own callout lane keeps it under the status widget and short of the button.
 - `visit_ended(result_json)`: `{visit_id, ride_id (or null), saved, discarded_reason: "" |
   too_short | no_pedalling | not_recording, next: app | edit_profile | hub, reason: exit | idle |
   app_resumed | replaced}`. Sent after the ride is saved or discarded. Godot calls nothing after

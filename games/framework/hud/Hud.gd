@@ -30,14 +30,18 @@ signal end_pressed
 signal recalibrate_pressed
 ## The Music button: SessionDirector opens the music panel (it doesn't pause).
 signal music_pressed
-## The button row moved on screen: a game keeping clear of the Music button looks again.
-signal music_moved
+## The status widgets or the button row moved on screen: a game keeping its callouts clear of them
+## looks again.
+signal top_bar_moved
 
 const LAYER := 10
 const GAP := 16
 const SIDE_BUTTON_WIDTH := 160.0
 const MUSIC_BUTTON_WIDTH := 110.0
 const MESSAGE_ALPHA := 0.85
+## About what the clock panel gives back at `HudTheme.MEDIUM`: the top bar has to have this spare
+## before the clock grows again.
+const CLOCK_SQUEEZE_PX := 60.0
 
 var timer: SegmentTimer
 var score: BigNumber
@@ -62,6 +66,7 @@ var circuit_strip: CircuitStrip
 var _widgets: HBoxContainer
 var _message: Label
 var _score_text := ""
+var _clock_squeezed := false  ## `_fit_clock`: the time and score at `HudTheme.MEDIUM`
 var _message_pop := false  ## a skin's `message_font`: the message pops in
 ## What `set_skin` overrode, to put back: [Control, kind, name, had_override, old value].
 var _skin_saved: Array = []
@@ -99,7 +104,8 @@ func _init() -> void:
 	centre.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	circuit_strip = CircuitStrip.new()
 	centre.add_child(circuit_strip)
-	_widgets = _box(HBoxContainer.new(), centre, "Widgets")
+	_widgets = _box(_WidgetRow.new(), centre, "Widgets")
+	(_widgets as _WidgetRow).moved.connect(func(): top_bar_moved.emit())
 	_widgets.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var right := _box(VBoxContainer.new(), top, "Right")
@@ -112,13 +118,14 @@ func _init() -> void:
 	timer = SegmentTimer.new(true)
 	clock.add_child(timer)
 	score = BigNumber.new("score", "0", HudTheme.INK, true)
+	score.tight_from = 5
 	clock.add_child(score)
 	var buttons := _ButtonRow.new()
 	buttons.name = "Buttons"
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_END
 	right.add_child(buttons)
-	buttons.moved.connect(func(): music_moved.emit())
+	buttons.moved.connect(func(): top_bar_moved.emit())
 	# A drawn note rather than the word: three text buttons are wider than the right column, so
 	# it hangs off the row's left end (`_ButtonRow`), under the status widget's end.
 	music_button = HudTheme.button("", func(): music_pressed.emit())
@@ -152,6 +159,8 @@ func _init() -> void:
 
 	status_slot = _box(HBoxContainer.new(), rows, "StatusSlot")
 	status_slot.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	top.minimum_size_changed.connect(_fit_clock)
 
 	var bottom := _box(HBoxContainer.new(), rows, "BottomBar")
 	bottom_bar = bottom
@@ -215,6 +224,7 @@ func clear_widgets() -> void:
 ## `message_outline_color` (Color). `GameTheme.hud_skin()` sets both.
 func set_skin(skin: Dictionary) -> void:
 	clear_skin()
+	_squeeze_clock(false)
 	if skin.has("message_font"):
 		_skin_set(_message, "font", "font", skin.message_font)
 		_message_pop = true
@@ -285,6 +295,7 @@ func set_status_area(width: float, reserve_bottom: float) -> void:
 
 
 func clear_skin() -> void:
+	_squeeze_clock(false)
 	_message_pop = false
 	for i in range(_skin_saved.size() - 1, -1, -1):
 		var entry: Array = _skin_saved[i]
@@ -326,6 +337,27 @@ func clear_skin() -> void:
 				if had:
 					c.add_theme_stylebox_override(key, entry[4])
 	_skin_saved.clear()
+
+
+## The top bar too wide for the screen (a heart strap's column, the widest status widget and a long
+## clock together) would push End off it: the time and score drop to `HudTheme.MEDIUM` until there's
+## room again. Every other state keeps the big clock.
+func _fit_clock() -> void:
+	var spare := HudTheme.W - 2.0 * HudTheme.MARGIN - top_bar.get_combined_minimum_size().x
+	if spare < 0.0:
+		_squeeze_clock(true)
+	elif spare >= CLOCK_SQUEEZE_PX:
+		_squeeze_clock(false)
+
+
+func _squeeze_clock(on: bool) -> void:
+	if on == _clock_squeezed:
+		return
+	_clock_squeezed = on
+	# The panel keeps its height, so the buttons under it stay put.
+	clock_panel.custom_minimum_size.y = clock_panel.size.y if on else 0.0
+	timer.set_value_size(HudTheme.MEDIUM if on else 0)
+	score.set_value_size(HudTheme.MEDIUM if on else 0)
 
 
 func _skin_set(c: Control, kind: String, key: StringName, value: Variant) -> void:
@@ -394,6 +426,18 @@ func _box(box: BoxContainer, parent: Control, node_name: String) -> BoxContainer
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(box)
 	return box
+
+
+## The status widgets' row, saying when it moves (a circuit's strip pushes it down).
+class _WidgetRow extends HBoxContainer:
+	signal moved
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			moved.emit()
 
 
 ## [Music |] Pause | End, packed against the right. The Music button first in the row doesn't count

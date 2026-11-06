@@ -251,3 +251,10 @@ func test_the_entrance_lands_and_a_second_summary_starts_clean() -> void:
 	assert_int(screen._rows.get_child_count()).is_equal(1)
 	assert_int(screen._tiles.get_child_count()).is_equal(2)
 	assert_bool(screen.done_button.visible).is_true()  # Done works from the first frame
+
+
+func test_a_grouped_stat_tile_has_its_comma() -> void:
+	var tiles: Array = SummaryScreen._stat_tiles(GameRegistry.info("ready_for_launch"),
+		[{"stats": {"best_altitude": 384400.0, "fuel_pct_avg": 88.0, "launches": 2.0}}])
+	assert_str(tiles[0][0]).is_equal("384,400 km")
+	assert_str(tiles[1][0]).is_equal("88%")

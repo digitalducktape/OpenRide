@@ -131,7 +131,8 @@ func _on_prepare(seg: Dictionary) -> void:
 	GridAudioScript.start_music()
 	_update_status()
 	_status.resized.connect(_fit_lane)
-	hud.music_moved.connect(_fit_lane)
+	hud.top_bar_moved.connect(_fit_lane)
+	hud.ride_panel.resized.connect(_fit_lane)
 	hud.music_button.visibility_changed.connect(_fit_lane)
 	_fit_lane()
 	world.pose(_levels(), logic.night(), 0.0, logic.need() / _scale)
@@ -227,14 +228,19 @@ func pose_for_card() -> void:
 	world.pose(Vector4.ONE, 0.82, 0.7, 0.62)
 
 
-## Keeps the callouts' lane under the status area and, when that brings it down beside the Music
-## button (a circuit's strip does), short of the button.
+## Keeps the callouts' lane under the status area, clear of a ride panel a heart strap widens and,
+## when a circuit's strip brings it down beside the Music button, short of the button.
 func _fit_lane() -> void:
-	var top := lane_top(_status.get_global_rect().end.y)
-	banner.set_lane_top(top)
+	if not is_instance_valid(_status):
+		return
+	var lane := GridBanner.LANE
+	lane.position.y = lane_top(_status.get_global_rect().end.y)
+	var left := maxf(lane.position.x, hud.ride_panel.get_global_rect().end.x + LANE_MUSIC_GAP)
+	var right := lane.end.x
 	var music := hud.music_button.get_global_rect().grow(LANE_MUSIC_GAP)
-	var lane := Rect2(GridBanner.LANE.position.x, top, GridBanner.LANE.size.x, GridBanner.LANE.size.y)
-	banner.set_lane_end(music.position.x if hud.music_button.visible and lane.intersects(music) else GridBanner.LANE.end.x)
+	if hud.music_button.visible and lane.intersects(music):
+		right = music.position.x
+	banner.set_lane(Rect2(left, lane.position.y, right - left, lane.size.y))
 
 
 ## The callout lane's top, a little under a status area ending at `status_bottom`.

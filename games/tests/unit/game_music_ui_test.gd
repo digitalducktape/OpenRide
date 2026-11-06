@@ -6,8 +6,7 @@ extends GdUnitTestSuite
 ##   - the Music button shows, on screen, clear of the game's status widget, its callouts or
 ##     banners, its key art, Pause, End and Recalibrate, in a Just Ride and in a circuit (whose
 ##     strip moves the status widget down), the HUD at its widest (the effort badge, the longest
-##     texts), with a heart strap's column and without (the End and Pause checks are strap-off,
-##     as in the games' own layout tests: a strap and a five-digit score crowd them with no track);
+##     texts, a five-digit score), with a heart strap's column and without;
 ##   - the music panel opens and closes over the game, which stays paused and unchanged meanwhile
 ##     and takes the rider's input again after;
 ##   - `rider_music` stops the game's music and keeps its effects and loops, and the music comes
@@ -92,6 +91,14 @@ func _games() -> Array[Dictionary]:
 			"callout": "Fuel 100%: push past 2100 W at zero",
 			"art": _launch_art,
 			"effect": func(g: Node) -> void: g._handle({"type": "tank_full"})},
+		{"name": "Gate Crasher", "id": "gate_crasher", "role": "work", "camera": true,
+			"params": {"ftp_watts": 200.0, "pace_watts": 110.0, "window_sec": 1.2, "stand_lag_sec": 0.5, "fences": 8},
+			"widest": func(g: Node) -> void:
+				g._status.set_progress(7, 9, [0, 1, 1, 0, 1, 1, 0, 1] as Array[int])
+				g._status.set_chip("faults", 32),
+			"callout": "4 faults: too early",
+			"art": _gate_art,
+			"effect": func(g: Node) -> void: g._handle({"type": "line"})},
 	]
 
 
@@ -135,6 +142,23 @@ func _pull_art(g: Node) -> Dictionary:
 		return r
 	return {"mirror": box.call(PullWorld.MIRROR, Vector3(PullWorld.MIRROR_SIZE.x / 2.0 + 0.012, PullWorld.MIRROR_SIZE.y / 2.0 + 0.012, 0.01)),
 		"handlebars": box.call(PullWorld.BARS, Vector3(PullMeshes.BAR_HALF, 0.03, 0.03))}
+
+
+func _gate_art(g: Node) -> Dictionary:
+	var world: GateWorld = g.world
+	var view: SubViewport = g.get_node("View3D")
+	var out := {}
+	var logic: GateLogic = g.logic
+	for k in logic.fences:
+		world.update_view(0.0, logic.line_s(k), GateLogic.V_PACE, 0.0, 0.0, 7.0)
+		var f := GateCourse.frame(logic.fence_s(k))
+		var half := GateMeshes.RAIL_WIDTH / 2.0
+		var at: Vector2 = world.camera.unproject_position(f * Vector3(-half, 0.0, 0.0)) / Vector2(view.size) * Stage.visible_size - Stage.pad
+		var r := Rect2(at, Vector2.ZERO)
+		for corner: Vector3 in [Vector3(half, 0.0, 0.0), Vector3(-half, 1.75, 0.0), Vector3(half, 1.75, 0.0)]:
+			r = r.expand(world.camera.unproject_position(f * corner) / Vector2(view.size) * Stage.visible_size - Stage.pad)
+		out["fence %d at its line" % k] = r
+	return out
 
 
 func _grid_art(_g: Node) -> Dictionary:
@@ -291,10 +315,9 @@ func _check_layout(row: Dictionary, kind: String) -> void:
 		InputBus._sim_heart_rate = strap
 		await _frames()
 		_check_music_clear("%s, strap %d" % [state, strap], game, art)
-		if strap < 0.0:
-			for b: Button in [hud.pause_button, hud.end_button]:
-				assert_bool(STAGE.encloses(b.get_global_rect())).override_failure_message(
-					"%s: %s %s leaves the stage" % [state, b.text, b.get_global_rect()]).is_true()
+		for b: Button in [hud.pause_button, hud.end_button]:
+			assert_float(b.get_global_rect().end.x).override_failure_message(
+				"%s: %s %s passes the margin" % [state, b.text, b.get_global_rect()]).is_less_equal(STAGE.end.x - HudTheme.MARGIN)
 	_leave()
 	Session._on_now_playing({})
 
@@ -319,6 +342,18 @@ func _check_music_clear(state: String, game: Node, art: Dictionary) -> void:
 		_clear_of_music(state, "the callout lane", lane)
 		assert_bool(lane.encloses(_text_rect(game.banner.label))).override_failure_message(
 			"%s: the callout %s leaves its lane %s" % [state, _text_rect(game.banner.label), lane]).is_true()
+		# A circuit's strip pushes the status widget down: the lane stays under it and clear of the
+		# ride panel. Only a Just Ride has room above the tallest art (the top of Keepy's balloon,
+		# Launch's biggest rocket, Grid's moon): in a circuit the callout crosses it briefly, in
+		# front, rather than hide behind the widget.
+		var text := _text_rect(game.banner.label)
+		assert_float(lane.position.y).override_failure_message("%s: the lane %s is under the status widget %s" % [
+			state, lane, game._status.get_global_rect()]).is_greater_equal(game._status.get_global_rect().end.y - 0.5)
+		assert_bool(text.intersects(hud.ride_panel.get_global_rect())).override_failure_message("%s: the callout %s is under the ride panel %s" % [
+			state, text, hud.ride_panel.get_global_rect()]).is_false()
+		for name: String in (art if not state.contains("circuit") else {}):
+			assert_bool(text.intersects(art[name])).override_failure_message("%s: the callout %s covers %s %s" % [
+				state, text, name, art[name]]).is_false()
 	else:
 		_clear_of_music(state, "the centre message", _text_rect(hud._message))
 	for name: String in art:

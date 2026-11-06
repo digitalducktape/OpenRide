@@ -58,6 +58,8 @@ const STRIP_TEXTS := {
 	"lost": ["Can't see you: face the camera, and check the room is lit", "TAP TO RECALIBRATE"],
 	"unavailable": ["Camera steering is off: no face found. Turn a light on and face the camera", "TAP TO TRY AGAIN"],
 }
+## A game that reads the rider standing (`lean_stand`) has nothing to steer.
+const STAND_UNAVAILABLE := "Can't see you stand: no face found. Turn a light on and face the camera"
 const ARROWS := {"left": Vector2.LEFT, "right": Vector2.RIGHT, "in": Vector2.UP, "back": Vector2.DOWN}
 
 ## Set by Session: whether the game on screen uses the camera.
@@ -331,12 +333,19 @@ func _show(new_mode: String) -> void:
 		if was != "needs":
 			GameTheme.slam(_prompt, 1.3)
 	elif mode == "lost" or mode == "unavailable":
-		_strip_text.text = STRIP_TEXTS[mode][0]
+		_strip_text.text = strip_text(mode, Session.tracker_mode)
 		_strip_action.text = STRIP_TEXTS[mode][1]
 		_strip_icon.crossed = mode == "unavailable"
 		_style_strip()
 		if was != mode:
 			GameTheme.pop(_strip, 1.06)
+
+
+## The strip's words for `strip_mode`, in the camera's `tracker_mode`.
+static func strip_text(strip_mode: String, tracker_mode: String) -> String:
+	if strip_mode == "unavailable" and tracker_mode == "lean_stand":
+		return STAND_UNAVAILABLE
+	return STRIP_TEXTS[strip_mode][0]
 
 
 ## The strip's panel: amber for "can't see you" (it may come back by itself), the ink with an

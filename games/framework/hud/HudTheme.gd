@@ -101,6 +101,15 @@ static func style_button(b: Button, color := Color(0.22, 0.28, 0.5)) -> void:
 
 
 ## "12:05" (or "1:02:03"); negative input reads "--:--".
+static func grouped(n: int) -> String:
+	var s := str(absi(n))
+	var out := ""
+	while s.length() > 3:
+		out = "," + s.right(3) + out
+		s = s.left(s.length() - 3)
+	return ("-" if n < 0 else "") + s + out
+
+
 static func clock(seconds: float) -> String:
 	if seconds < 0.0:
 		return "--:--"

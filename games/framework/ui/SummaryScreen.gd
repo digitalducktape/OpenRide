@@ -319,7 +319,8 @@ static func _stat_tiles(info: GameInfo, results: Array) -> Array:
 	for spec in info.summary_stats:
 		if not stats.has(spec.key) or out.size() >= 3:
 			continue
-		var text := "%d%s" % [roundi(float(stats[spec.key])), str(spec.get("suffix", ""))]
+		var value := roundi(float(stats[spec.key]))
+		var text := (HudTheme.grouped(value) if spec.get("grouped", false) else str(value)) + str(spec.get("suffix", ""))
 		if spec.has("of") and stats.has(spec.of):
 			text = "%d/%d" % [roundi(float(stats[spec.key])), roundi(float(stats[spec.of]))]
 		out.append([text, str(spec.label)])

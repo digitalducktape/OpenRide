@@ -38,6 +38,11 @@ func _init(look: GameTheme) -> void:
 	_box.add_child(label)
 
 
+## Moves the lane's top (under a circuit's taller status area).
+func set_lane_top(y: float) -> void:
+	_box.position.y = y
+
+
 ## Slams `text` in, holds it for `seconds` and fades it out.
 func show_callout(text: String, color: Color, seconds: float) -> void:
 	label.text = text

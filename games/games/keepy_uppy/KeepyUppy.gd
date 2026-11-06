@@ -176,6 +176,8 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = KeepyStatus.new(look)
 	hud.add_widget(_status)
+	_status.resized.connect(_fit_lane)
+	hud.top_bar_moved.connect(_fit_lane)
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.55)
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, KeepyAudioScript.music_effects())
@@ -201,6 +203,13 @@ func _set_place(index: int, fade: bool) -> void:
 	rig.set_place(index)
 	balloon.set_place(index)
 	foreground.queue_redraw()
+
+
+## Keeps the callouts' lane under the status area (a circuit's strip pushes it down).
+func _fit_lane() -> void:
+	if not is_instance_valid(_status):
+		return
+	banner.set_lane_top(maxf(KeepyBanner.LANE.position.y, _status.get_global_rect().end.y + 4.0))
 
 
 func _on_start() -> void:
