@@ -14,7 +14,8 @@ extends CanvasLayer
 ##     │  │                  game's floor or band), watts and resistance
 ##     │  ├ Centre:          the game's own status widgets (`add_widget`), compact
 ##     │  └ Right (expand):  time left over the score in one panel, [Music |] Pause | End under it
-##     │                     (Music while the rider's own music app has a track: opens the panel)
+##     │                     (Music while the rider's own music app has a track: opens the panel;
+##     │                     it hangs left of the column, which keeps its width: `_ButtonRow`)
 ##     ├ Middle (expand):    a brief centred message (`show_message`), translucent
 ##     ├ status slot:        the camera strip ("Camera steering is off", …), when showing
 ##     └ BottomBar (HBox):   Recalibrate on the right (camera games)
@@ -29,6 +30,8 @@ signal end_pressed
 signal recalibrate_pressed
 ## The Music button: SessionDirector opens the music panel (it doesn't pause).
 signal music_pressed
+## The button row moved on screen: a game keeping clear of the Music button looks again.
+signal music_moved
 
 const LAYER := 10
 const GAP := 16
@@ -110,9 +113,14 @@ func _init() -> void:
 	clock.add_child(timer)
 	score = BigNumber.new("score", "0", HudTheme.INK, true)
 	clock.add_child(score)
-	var buttons := _box(HBoxContainer.new(), right, "Buttons")
+	var buttons := _ButtonRow.new()
+	buttons.name = "Buttons"
+	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_END
-	# A drawn note rather than the word: three text buttons are wider than the right column.
+	right.add_child(buttons)
+	buttons.moved.connect(func(): music_moved.emit())
+	# A drawn note rather than the word: three text buttons are wider than the right column, so
+	# it hangs off the row's left end (`_ButtonRow`), under the status widget's end.
 	music_button = HudTheme.button("", func(): music_pressed.emit())
 	music_button.name = "Music"
 	music_button.tooltip_text = "Music"
@@ -386,6 +394,54 @@ func _box(box: BoxContainer, parent: Control, node_name: String) -> BoxContainer
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(box)
 	return box
+
+
+## [Music |] Pause | End, packed against the right. The Music button first in the row doesn't count
+## towards the row's width: it hangs off the left end, so a track showing leaves the top bar's
+## columns as they were (with it counted, the widest status widget and ride panel pushed End off
+## the screen). Kart Race's row starts with Recalibrate and has room saved for all of it, so there
+## every button counts.
+class _ButtonRow extends Container:
+	signal moved
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _shown() -> Array[Control]:
+		var out: Array[Control] = []
+		for child in get_children():
+			if child is Control and (child as Control).visible:
+				out.append(child)
+		return out
+
+	func _hangs(c: Control) -> bool:
+		return c.name == &"Music" and c.get_index() == 0
+
+	func _get_minimum_size() -> Vector2:
+		var total := Vector2.ZERO
+		var counted := 0
+		for c in _shown():
+			var m := c.get_combined_minimum_size()
+			total.y = maxf(total.y, m.y)
+			if not _hangs(c):
+				total.x += m.x
+				counted += 1
+		total.x += GAP * maxi(counted - 1, 0)
+		return total
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			moved.emit()
+		if what != NOTIFICATION_SORT_CHILDREN:
+			return
+		var x := size.x
+		var shown := _shown()
+		shown.reverse()
+		for c in shown:
+			var w := c.get_combined_minimum_size().x
+			x -= w
+			fit_child_in_rect(c, Rect2(x, 0.0, w, size.y))
+			x -= GAP
 
 
 ## The Music button's note, drawn (the faces have no ♪); it follows the button's text colour.

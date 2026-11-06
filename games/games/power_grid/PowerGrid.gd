@@ -20,6 +20,7 @@ const BAND_STEP := 5.0  ## the ride panel's tick moves in steps this big (a re-l
 ## Short names for the callouts, so the longest still fits the lane.
 const NAMES := ["Houses", "Street lamps", "Funfair", "Stadium"]
 const REST_LINES := ["", "Street lamps off for the night", "The funfair's closing up", "The stadium's emptying"]
+const LANE_MUSIC_GAP := 8.0  ## px kept between the callouts' lane and the Music button
 ## Which callouts may cut in on which (GridBanner): a storm's instruction outranks all news.
 const NEWS := 0
 const WARNING := 2
@@ -129,7 +130,10 @@ func _on_prepare(seg: Dictionary) -> void:
 	_update_band()
 	GridAudioScript.start_music()
 	_update_status()
-	_status.resized.connect(func() -> void: banner.set_lane_top(lane_top(_status.get_global_rect().end.y)))
+	_status.resized.connect(_fit_lane)
+	hud.music_moved.connect(_fit_lane)
+	hud.music_button.visibility_changed.connect(_fit_lane)
+	_fit_lane()
 	world.pose(_levels(), logic.night(), 0.0, logic.need() / _scale)
 	world.prewarm()
 
@@ -221,6 +225,16 @@ func finish() -> Dictionary:
 ## The hub card's picture (tests/capture_hub_cards.gd): the whole town lit, deep in the evening.
 func pose_for_card() -> void:
 	world.pose(Vector4.ONE, 0.82, 0.7, 0.62)
+
+
+## Keeps the callouts' lane under the status area and, when that brings it down beside the Music
+## button (a circuit's strip does), short of the button.
+func _fit_lane() -> void:
+	var top := lane_top(_status.get_global_rect().end.y)
+	banner.set_lane_top(top)
+	var music := hud.music_button.get_global_rect().grow(LANE_MUSIC_GAP)
+	var lane := Rect2(GridBanner.LANE.position.x, top, GridBanner.LANE.size.x, GridBanner.LANE.size.y)
+	banner.set_lane_end(music.position.x if hud.music_button.visible and lane.intersects(music) else GridBanner.LANE.end.x)
 
 
 ## The callout lane's top, a little under a status area ending at `status_bottom`.

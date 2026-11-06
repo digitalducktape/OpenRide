@@ -254,6 +254,10 @@ starts).
   art, playing, can_previous, can_next}` (`art` a PNG path in the app's cache, or ""), or `{}`
   with nothing. Sent when it changes, and again on the first input-frame poll after a session
   attaches (the engine drops signals sent before it runs). Guarded with `has_signal`.
+  In a game the HUD's Music button hangs off the left end of Pause | End and doesn't count towards
+  the top bar's width (`Hud._ButtonRow`), so a track moves nothing. `game_music_ui_test` plays each
+  wave 2 game with a track: the button's place, the panel and `rider_music`. A new game adds one
+  row to its table.
 - `visit_ended(result_json)`: `{visit_id, ride_id (or null), saved, discarded_reason: "" |
   too_short | no_pedalling | not_recording, next: app | edit_profile | hub, reason: exit | idle |
   app_resumed | replaced}`. Sent after the ride is saved or discarded. Godot calls nothing after
