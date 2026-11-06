@@ -1,16 +1,16 @@
 extends RefCounted
-## First Light: the game's rendered music and effects (#55). Written by
+## Moon Shot: the game's rendered music and effects (#55). Written by
 ## games/tools/music/render_music.py from songs/ready_for_launch.py; don't edit by hand.
 
-const TITLE := "First Light"
-const BPM := 104.0
-const KEY := 2  ## the key's pitch class (0 = C)
-const LOOP_FROM := 9.2308  ## seconds: the intro plays once, the rest loops
+const TITLE := "Moon Shot"
+const BPM := 156.0
+const KEY := 9  ## the key's pitch class (0 = C)
+const LOOP_FROM := 6.1538  ## seconds: the intro plays once, the rest loops
 ## The stems: the bed always plays; harmony and lead are gated by the game.
 const STEM_FILES := {
-	"bed": "res://games/ready_for_launch/music/first_light_bed.ogg",
-	"harmony": "res://games/ready_for_launch/music/first_light_harmony.ogg",
-	"lead": "res://games/ready_for_launch/music/first_light_lead.ogg",
+	"bed": "res://games/ready_for_launch/music/moon_shot_bed.ogg",
+	"harmony": "res://games/ready_for_launch/music/moon_shot_harmony.ogg",
+	"lead": "res://games/ready_for_launch/music/moon_shot_lead.ogg",
 }
 const SOUNDS := {
 	"rfl_hiss": "res://games/ready_for_launch/music/sfx/rfl_hiss.ogg",

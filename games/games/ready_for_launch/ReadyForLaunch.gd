@@ -14,10 +14,10 @@ extends Game
 const LaunchAudioScript := preload("res://games/ready_for_launch/LaunchAudio.gd")
 const LaunchMusic := preload("res://games/ready_for_launch/LaunchMusic.gd")
 
-## The theme: the bed always; the harmony while the tank fills and from the count on, the lead on
-## the push.
+## The theme ("Moon Shot"): the bed always; the harmony, with the guitar riff, while the tank fills
+## and from the count on; the theremin and horns on the push.
 const MUSIC_STYLE := {
-	"name": "first_light",
+	"name": "moon_shot",
 	"stem_files": LaunchMusic.STEM_FILES,
 	"loop_from": LaunchMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
@@ -384,7 +384,7 @@ func _handle(event: Dictionary) -> void:
 		"count":
 			_on_count(event.n)
 		"ignition":
-			AudioDirector.play_sfx("rfl_ignition", -1.0)
+			AudioDirector.play_sfx("rfl_ignition", -2.5)
 			GameMix.duck_for_sting(1.2)
 			pad.ignite(1.0)
 			_show_message("PUSH past %d W!" % roundi(logic.target), GameTheme.TARGET, 3.0)
@@ -422,11 +422,10 @@ func _on_count(n: int) -> void:
 	pad.on_count(n)
 	# The tone "voice": rising a semitone a second, the last three brighter.
 	var pitch := pow(2.0, (10 - n) / 12.0)
-	AudioDirector.play_sfx("rfl_count_final" if n <= 3 else "rfl_count", -1.0 if n <= 3 else -4.0, pitch)
+	AudioDirector.play_sfx("rfl_count_final" if n <= 3 else "rfl_count", -2.0 if n <= 3 else -3.0, pitch)
+	GameMix.duck_for_moment(1.0)
 	if n == 5:
 		_show_message("Arms back. Get ready to push", GameTheme.TARGET, 2.2)
-	if n <= 3:
-		GameMix.duck_for_moment(1.0)
 
 
 func _on_milestone(event: Dictionary) -> void:
