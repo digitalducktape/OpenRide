@@ -15,6 +15,7 @@ const GAMES := {
 	"the_pull": "res://games/the_pull/ThePull.tscn",
 	"balloon_pump": "res://games/balloon_pump/BalloonPump.tscn",
 	"keepy_uppy": "res://games/keepy_uppy/KeepyUppy.tscn",
+	"ready_for_launch": "res://games/ready_for_launch/ReadyForLaunch.tscn",
 }
 
 static var _infos := {}

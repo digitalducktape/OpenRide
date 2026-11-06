@@ -40,6 +40,7 @@ const LOOKS := {
 	"the_pull": [Color("5fd068"), Color("10200f")],
 	"balloon_pump": [Color("ff5fa2"), Color("2b0f2a")],
 	"keepy_uppy": [Color("ff7a59"), Color("12233a")],
+	"ready_for_launch": [Color("2fd6c8"), Color("0a1a2e")],
 }
 
 static var _looks := {}

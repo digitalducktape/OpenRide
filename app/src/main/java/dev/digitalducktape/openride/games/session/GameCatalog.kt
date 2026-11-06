@@ -384,6 +384,36 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Ready for Launch (#82), `games/games/ready_for_launch/`: each round is one rocket
+         * launch of about 90 s, so a 1:30 slot plays one. Fuel flows above `fuel_line_watts` (45 /
+         * 50 / 55% of FTP) and `fuel_full_watts` (55 / 60 / 65%) held fills the tank; the push's
+         * target is the plan's `target_watts`. See its DESIGN.md.
+         */
+        val READY_FOR_LAUNCH = GameDeclaration(
+            id = "ready_for_launch",
+            title = "Ready for Launch",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 90,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 90,
+            roles = setOf(SegmentRole.WORK),
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val line = when (difficulty) {
+                    Difficulty.EASY -> 0.45
+                    Difficulty.STANDARD -> 0.50
+                    Difficulty.HARD -> 0.55
+                }
+                mapOf(
+                    "fuel_line_watts" to JsonPrimitive((ftp.watts * line).roundToInt()),
+                    "fuel_full_watts" to JsonPrimitive((ftp.watts * (line + 0.10)).roundToInt()),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race, The Pull). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -399,7 +429,7 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /** Every registered game. Each game issue adds its declaration here. */
         val DEFAULT = GameCatalog(
-            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY),
+            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY, READY_FOR_LAUNCH),
         )
     }
 }

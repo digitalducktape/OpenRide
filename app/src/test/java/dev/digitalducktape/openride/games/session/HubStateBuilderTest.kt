@@ -75,7 +75,7 @@ class HubStateBuilderTest {
 
         assertFalse("demo" in catalog)
         assertEquals(
-            listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race", "watt_lane", "the_pull", "balloon_pump", "keepy_uppy"),
+            listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race", "watt_lane", "the_pull", "balloon_pump", "keepy_uppy", "ready_for_launch"),
             catalog.keys.toList(),
         )
         assertEquals(listOf(5, 10, 15, 20, 30, 45, 60), catalog["kart_race"]!!.minuteSteps)

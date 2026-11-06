@@ -54,6 +54,9 @@ def _groove(song, b, style, role, odd, double, fill):
     elif style == "synthwave":
         _synthwave(song, b, role, odd, big, end)
         return
+    elif style == "cinematic":
+        _cinematic(song, b, role, odd, big, end)
+        return
     else:  # pop
         kicks = [0, 1.5, 2.5] if not odd else [0, 1.5, 2.5, 3.75]
         ghosts = [1.75] if odd else []
@@ -119,6 +122,29 @@ def _stomp(song, b, role, odd, big, end):
     if big:
         for t in np.arange(0, end, 0.5):
             h("hat", b + t, 0.4, "hats", pan=-0.3)
+
+
+def _cinematic(song, b, role, odd, big, end):
+    """Orchestral-synth: a timpani figure (low toms under a kick), a snare-roll lift into each odd
+    bar's end in big sections, and a crash at the head of a big phrase."""
+    h = song.hit
+    figure = [0, 1.5, 2, 3, 3.5] if big else [0, 2.5] if odd else [0, 1.5, 2]
+    for k in figure:
+        if k < end:
+            song.put("kick", b + k, ins.tom(1.0 if k in (0, 2) else 0.75, song.rng, pitch=0.62), human=0.0)
+            if k in (0, 2):
+                h("kick", b + k, 0.5, "kick")
+    if big:
+        for c in (1, 3):
+            if c < end:
+                h("snare", b + c, 0.55, "snare")
+        for t in np.arange(0, end, 0.5):
+            h("hat", b + t, 0.3, "hats", pan=-0.25)
+        if not odd:
+            h("crash", b, 0.5, "cym", pan=0.2)
+    else:
+        for t in np.arange(0, end, 1.0):
+            h("shaker", b + t + 0.5, 0.45, "perc", pan=0.35)
 
 
 def _spy(song, b, role, odd, big, end):
@@ -367,6 +393,8 @@ def _comp_hits(kind, dur, i):
         return [(0.5, 0.25, 0.8, "stab"), (1.5, 0.4, 0.7, "stab")] if i % 2 == 0 else [(0, 0.6, 0.85, "stab"), (3.5, 0.3, 0.7, "stab")]
     if kind == "piano_off":
         return [(t, 0.3, 0.75, "chord") for t in (0.5, 1.5, 2.5, 3.5)]
+    if kind == "ostinato":
+        return [(t, 0.42, 0.9 if t % 2 == 0 else 0.65, k) for k, t in enumerate(np.arange(0, 4, 0.5))]
     return []
 
 
@@ -411,6 +439,10 @@ def _comp_note(song, kind, beat, d, sym, v, mode, rng):
             song.put("brass", beat, ins.muted_trumpet(m, sec, v * 0.5, rng), pan=rng.uniform(-0.4, 0.4))
     elif kind == "piano_off":
         song.put("keys", beat, ins.piano(voicing(sym, 66, drop_root=False), sec, v, rng), pan=0.3)
+    elif kind == "ostinato":
+        r = bass_root(sym) + 12 + (7 if mode % 4 == 3 else 0)
+        song.put("gtr2", beat, ins.supersaw(r, sec, v * 0.55, rng, voices=5, spread=9, cutoff=1500, attack=0.012, release=0.08, vib=False), pan=-0.3)
+        song.put("gtr2", beat + 0.008 / song.spb, ins.supersaw(r + 12, sec, v * 0.32, rng, voices=5, spread=9, cutoff=2200, attack=0.012, release=0.08, vib=False), pan=0.3)
 
 
 # --- Lines ---
