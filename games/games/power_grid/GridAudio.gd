@@ -5,14 +5,14 @@ extends RefCounted
 ## Rendered effects (`music/sfx/*.ogg`, games/tools/music/songs/power_grid.py, in the music's key of
 ## A-flat), named `grid_*` because AudioDirector keeps one sound per name across every game. The
 ## dynamo's hum and the storm's rain are seamless loops on the game's own two players, because a
-## one-shot voice can't be pitched or faded while it plays. The music is "Lamplighter" (GridMusic):
+## one-shot voice can't be pitched or faded while it plays. The music is "Evening Current" (GridMusic):
 ## the bed always, the harmony while the rider meets demand, the lead with the whole town lit.
 ## Bus effects for this game only: an open evening reverb and a glue compressor on the music.
 
 const GridMusic := preload("res://games/power_grid/GridMusic.gd")
 
 const MUSIC_STYLE := {
-	"name": "lamplighter",
+	"name": "evening_current",
 	"stem_files": GridMusic.STEM_FILES,
 	"loop_from": GridMusic.LOOP_FROM,
 	"stem_gates": {"harmony": 0.5, "lead": 0.85},
@@ -109,7 +109,7 @@ func step(delta: float, logic: GridLogic) -> void:
 		_crackle_left -= delta
 		if _crackle_left <= 0.0:
 			_crackle_left = CRACKLE_GAP
-			AudioDirector.play_sfx("grid_crackle", -2.0)
+			AudioDirector.play_sfx("grid_crackle", 1.0)
 	else:
 		_crackle_left = 0.0
 

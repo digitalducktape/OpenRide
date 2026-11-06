@@ -1,11 +1,12 @@
-"""Power Grid (#81): "Lamplighter", warm porch folk-soul at 92 bpm in A-flat major, for a valley town
-at dusk. Brushes and a cross-stick over a soft kick, a shaker, a round picked bass; Rhodes and a
-plucked arpeggio under a muted horn in the verse; the chorus opens with an acoustic strum and a
-flute doubled on vibes. Real song form: an intro, verse, chorus, a bridge that drops to vibes and
-piano, and a last chorus with the flute in thirds and the horn answering. Calm enough for a
-recovery ride, with a tune worth earning. Distinct from the family: no spy jazz (Safe), no shanty
-(Tug), no boogie (The Pull), no band organ (Balloon Pump), no glockenspiel hook (Keepy Uppy, Watt
-Lane), and the slowest theme of them all.
+"""Power Grid (#81, the music rework): "Evening Current", a bossa nova at 132 bpm in A-flat major,
+for a valley town coming on at dusk. Committed to the genre: a nylon guitar's syncopated two-bar
+pattern with its thumb on the bass, an upright in the dotted two-feel, a cross-stick clave, shaker
+and brushes. A flugelhorn sings the verse's three-note hook, answered by the flute in the gaps; the
+chorus opens with flugelhorn and flute together over wordless voices and a small string section,
+with congas and a ride. The bridge drops a major third to E for a Rhodes solo over guitar and
+clave alone, then strings and a riser climb back for a last chorus with the flute in thirds and a
+horn answering. Nothing in the family sounds like it: no spy jazz (Safe), shanty (Tug), boogie (The
+Pull), band organ (Balloon Pump) or indie-pop (Keepy Uppy), and bossa stays relaxed at any effort.
 
 The harmony comes in while the rider meets demand, the lead with the whole town lit.
 
@@ -13,7 +14,7 @@ Effects, in the key: the dynamo's hum (a seamless loop the game pitches to the s
 district switch-on chords climbing through the key, the flicker's crackle, the power-down of a
 district going dark, its relight, far thunder and the storm's rain (a seamless loop), the strike, the
 repair's rising chord, the crew's quiet fix, the full town's cheer and fireworks, and the church
-bell that opens a new evening. Written for this repo."""
+bell that opens a new evening. Written for this repo; no existing tune is quoted."""
 import numpy as np
 
 import dsp
@@ -25,40 +26,59 @@ from dsp import SR, secs, lp, hp, bp
 PREFIX = "Grid"
 
 SONG = dict(
-    file="lamplighter", title="Lamplighter", bpm=92, key="Ab", scale=[0, 2, 4, 5, 7, 9, 11], seed=81,
-    drums="porch", bass="root5", swing=0.05, verb_sec=2.2,
+    file="evening_current", title="Evening Current", bpm=132, key="Ab", scale=[0, 2, 4, 5, 7, 9, 11], seed=181,
+    drums="bossa", bass="bossa", verb_sec=1.9,
     form=([("intro", 4)], [("verse", 8), ("chorus", 8), ("bridge", 8), ("chorus2", 8)]),
     chords=dict(
-        intro=["Abmaj7", "Fm7", "Dbmaj7", "Eb7sus4"],
-        verse=["Abmaj7", "Cm7", "Dbmaj7", "Eb7sus4 Eb7", "Abmaj7", "Fm7", "Bbm7", "Eb7"],
-        chorus=["Dbmaj7", "Eb", "Cm7", "Fm7", "Dbmaj7", "Eb", "Abmaj7", "Ab7"],
-        bridge=["Fm7", "Db", "Ab", "Eb", "Fm7", "Bbm7", "Dbmaj7", "Eb7sus4"],
+        intro=["Abmaj9", "Abmaj9", "Dbmaj9", "Bbm7 Eb13"],
+        verse=["Abmaj9", "Bbm9 Eb13", "Abmaj9", "Ebm7 Ab13", "Dbmaj9", "Dbm7 Gb13", "Cm7 F7b9", "Bbm7 Eb13"],
+        chorus=["Dbmaj9", "Eb13", "Cm7", "F7b9", "Bbm9", "Eb13", "Abmaj9", "Ebm7 Ab13"],
+        bridge=["Emaj9", "C#m7", "F#m9", "B13", "Emaj9", "Am9 D13", "Bbm9", "Ebm7 Ab13"],
     ),
     melody=dict(
-        verse="C5:1.5 Eb5:0.5 G5:2 | G5:1 F5:0.5 Eb5:0.5 C5:2 | Db5:1 F5:1 Ab5:1.5 G5:0.5 | F5:2 Eb5:1 r:1 |"
-              " C5:1.5 Eb5:0.5 Ab5:1 G5:1 | F5:1.5 Eb5:0.5 C5:2 | Db5:1 F5:1 Bb5:1 Ab5:1 | G5:2 Bb4:1 r:1",
-        chorus="Ab5:1.5 Bb5:0.5 C6:2 | Bb5:1 G5:1 Eb5:2 | Eb5:0.5 G5:0.5 C6:1 Bb5:1 G5:1 | Ab5:1.5 G5:0.5 F5:2 |"
-               " Ab5:1.5 Bb5:0.5 Db6:2 | C6:1 Bb5:1 G5:2 | Ab5:1 C6:1 Eb6:2 | C6:3 r:1",
-        bridge="F5:2 Ab5:2 | Ab5:1 F5:1 Db5:2 | C5:1 Eb5:1 Ab5:2 | G5:3 r:1 | C6:2 Ab5:2 | Bb5:1 Db6:1 F5:2 |"
-               " F5:1 Ab5:1 C6:2 | Bb5:2 G5:2",
+        intro="r:4 | r:4 | r:0.5 Ab5:0.5 C6:1.5 Bb5:0.5 Ab5:1 | F5:1.5 G5:1.5 r:1",
+        # The hook: a pickup and three notes leaning over the bar (C, E-flat, F), said three times,
+        # a step higher each time, and a chromatic drop in bar 6 to turn the corner.
+        verse="r:0.5 C5:0.5 Eb5:0.5 F5:1 Eb5:0.5 C5:1 | Db5:0.5 Eb5:0.5 Bb4:1 r:0.5 G4:0.5 Bb4:1 |"
+              " r:0.5 C5:0.5 Eb5:0.5 Ab5:1 G5:0.5 Eb5:1 | Gb5:0.5 F5:0.5 Eb5:1 r:0.5 C5:0.5 Eb5:1 |"
+              " r:0.5 F5:0.5 Ab5:0.5 C6:1 Bb5:0.5 Ab5:1 | Ab5:1 Fb5:1 Eb5:1 Bb4:1 |"
+              " G5:0.5 Eb5:0.5 C5:1 A5:1 Gb5:1 | F5:1.5 Db5:0.5 C5:1 Bb4:1",
+        # The flute answers in the rests.
+        verse_fill="r:4 | r:2.5 Eb6:0.5 C6:0.5 Bb5:0.5 | r:4 | r:2.5 Bb5:0.5 Ab5:0.5 Gb5:0.5 | r:4 | r:3 Db6:0.5 Bb5:0.5 |"
+                   " r:4 | r:3 Eb6:0.5 Db6:0.5",
+        # The refrain: the hook's rhythm stretched, up a sixth, ending on a held tonic.
+        chorus="r:0.5 Ab5:0.5 C6:1.5 Bb5:0.5 Ab5:1 | Bb5:1.5 G5:1.5 Eb5:1 | r:0.5 G5:0.5 C6:1.5 Bb5:0.5 G5:1 |"
+               " A5:1.5 C6:0.5 Eb6:2 | Db6:1.5 C6:0.5 Bb5:1 F5:1 | G5:1 Bb5:1 Eb6:1.5 Db6:0.5 |"
+               " C6:2.5 Ab5:0.5 Eb5:1 | F5:0.5 G5:0.5 Ab5:1 r:2",
+        # The strings' long line over the refrain.
+        chorus_str="F5:4 | G5:4 | Eb5:4 | Eb5:4 | Db5:4 | Db5:2 Eb5:2 | C5:4 | Db5:2 C5:2",
+        bridge="G#5:1.5 B5:0.5 E5:2 | G#5:1 E5:1 C#5:2 | A5:1.5 C#6:0.5 G#5:2 | F#5:1 D#5:1 A5:2 |"
+               " B5:1.5 G#5:0.5 D#6:2 | C6:1 A5:1 F#5:1 C6:1 | Db6:1 Bb5:1 Ab5:1 F5:1 | Gb5:1 Bb5:1 Eb6:1 C6:1",
+        # The strings climb back in the bridge's second half.
+        bridge_str="r:4 | r:4 | r:4 | r:4 | G#4:4 | A4:2 C5:2 | Db5:4 | Eb5:2 Gb5:2",
     ),
     parts=dict(
-        intro=[("comp", "ep_hold", 0.7), ("comp", "arp", 0.4)],
-        verse=[("comp", "ep", 0.75), ("comp", "arp", 0.5), ("lead", "verse", "muted", "lead", 0, 0.9)],
-        chorus=[("comp", "strum", 0.75), ("comp", "ep_hold", 0.5), ("comp", "pad", 0.5),
-                ("lead", "chorus", "flute", "lead", 0, 0.85), ("lead", "chorus", "vibes", "lead2", 0, 0.6)],
-        bridge=[("comp", "vibes", 0.75), ("comp", "pad", 0.6), ("lead", "bridge", "piano", "lead", 0, 0.8)],
-        chorus2=[("comp", "strum", 0.8), ("comp", "ep_hold", 0.55), ("comp", "arp", 0.4), ("comp", "pad", 0.55),
-                 ("lead", "chorus", "flute", "lead", 0, 0.85, True), ("lead", "chorus", "vibes", "lead2", 0, 0.55),
-                 ("counter", "muted", "lead2", 0.4)],
+        intro=[("comp", "bossa", 0.85), ("lead", "intro", "silver", "lead2", 0, 0.6)],
+        verse=[("comp", "bossa", 0.72), ("comp", "ep_bossa", 0.35), ("lead", "verse", "flugel", "lead", 0, 1.3),
+               ("lead", "verse_fill", "silver", "lead2", 0, 0.8)],
+        chorus=[("comp", "bossa", 1.0), ("comp", "ep_bossa", 0.45), ("comp", "oohs", 0.95),
+                ("lead", "chorus_str", "section", "pad", 0, 0.8), ("lead", "chorus", "flugel", "lead", 0, 0.9),
+                ("lead", "chorus", "silver", "lead2", 12, 0.5)],
+        bridge=[("comp", "bossa", 0.62), ("comp", "vibes", 0.42), ("lead", "bridge_str", "section", "pad", 0, 0.8),
+                ("lead", "bridge", "ep", "lead", 0, 0.62)],
+        chorus2=[("comp", "bossa", 1.05), ("comp", "ep_bossa", 0.45), ("comp", "oohs", 1.1), ("comp", "muted_stabs", 0.45),
+                 ("lead", "chorus_str", "section", "pad", 12, 0.75), ("lead", "chorus", "flugel", "lead", 0, 0.9),
+                 ("lead", "chorus", "silver", "lead2", 12, 0.55, True), ("counter", "vibes", "lead2", 0.35)],
     ),
     roles={"chorus2": "chorus"},
     risers=("bridge",),
-    levels={"cym": -33, "perc": -30, "snare": -25, "kick": -21, "hats": -32, "lead": -20.5, "fx": -36},
-    lufs_offset=-2.0,
+    levels={"cym": -32, "perc": -29, "snare": -25, "kick": -24, "hats": -27, "bass": -19, "gtr": -22, "keys": -27,
+            "pad": -25, "brass": -29, "lead": -20, "lead2": -24, "fx": -36},
+    sidechain={"pad": 0.0, "bass": 0.0, "keys": 0.0, "gtr2": 0.0, "lead2": 0.0},
+    lufs_offset=-1.5,
 )
 
-BEAT = 60 / 92
+BEAT = 60 / 132
 AB = note("Ab2")
 
 

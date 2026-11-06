@@ -491,3 +491,109 @@ def sub_bass(m, dur, vel, rng):
     x = np.sin(2 * np.pi * f * t) + lp(osc("saw", f, n), 900) * 0.35
     x = drive(x * 1.2, 1.3) * adsr(n, a=0.004, d=0.12, s=0.8, r=0.03, gate=secs(dur))
     return fade_out(x) * vel
+
+
+# --- Added for Power Grid's bossa (#81) ---
+
+def nylon(chord, dur, vel, rng):
+    """A nylon-string guitar, fingered: all the strings of a chord almost at once, soft and woody,
+    a body resonance low down and no steel brightness."""
+    notes = sorted(chord)
+    n = secs(dur + 0.5)
+    out = np.zeros(n)
+    for i, m in enumerate(notes):
+        at = secs(0.006 * i + rng.uniform(0, 0.003))
+        s = ks(hz(m), dur + 0.5, rng, bright=0.55, damp=0.9975, pick=0.32)
+        out[at:] += s[: n - at] * (0.95 ** i)
+    out = hp(out, 85)
+    out = peak_eq(out, 210, 4, 1.2)
+    out = peak_eq(out, 2400, -2, 0.8)
+    out = lp(out, 7000)
+    out *= adsr(n, a=0.001, d=0.05, s=0.92, r=0.16, gate=secs(dur))
+    return fade_out(out) * vel / max(1, len(notes)) ** 0.75 * 1.5
+
+
+def upright(m, dur, vel, rng):
+    """An upright bass: a round sine body under a plucked string, a thump at the finger."""
+    f = hz(m)
+    n = secs(dur + 0.18)
+    t = np.arange(n) / SR
+    string = ks(f, dur + 0.18, rng, bright=0.42, damp=0.9955, pick=0.3)[:n]
+    body = (np.sin(2 * np.pi * f * t) + 0.3 * np.sin(4 * np.pi * f * t)) * np.exp(-t / 0.7)
+    thump = lp(rng.uniform(-1, 1, n), 420) * np.exp(-t / 0.018) * 0.6
+    x = lp(string * 0.8 + body * 0.75 + thump, 1500)
+    x = drive(x * 1.1, 1.2) * adsr(n, a=0.003, d=0.1, s=0.82, r=0.09, gate=secs(dur))
+    return fade_out(x) * vel
+
+
+def flugel(m, dur, vel, rng):
+    """A flugelhorn: additive harmonics whose brightness swells with the breath, a small scoop
+    into the note, a late vibrato. Darker and rounder than the muted trumpet's filtered saw."""
+    f = hz(m)
+    n = secs(dur + 0.12)
+    t = np.arange(n) / SR
+    v = vibrato(n, 5.0, 9, 0.32, rng) * 2.0 ** (-0.35 * np.exp(-t / 0.03) / 12.0)
+    ph = np.cumsum(f * v) / SR
+    swell = np.clip(t / 0.09, 0, 1) * (0.72 + 0.28 * np.minimum(t / max(dur, 0.1), 1.0)) * (0.55 + 0.45 * vel)
+    x = np.zeros(n)
+    for k in range(1, 13):
+        if f * k > SR * 0.42:
+            break
+        x += np.exp(-(k - 1) * (1.5 - 0.95 * swell)) * np.sin(2 * np.pi * k * ph) / k ** 0.3
+    breath = bp(rng.uniform(-1, 1, n), f * 2, min(f * 7, 10000)) * (0.05 + 0.1 * np.exp(-t / 0.05))
+    y = (x + breath) * adsr(n, a=0.028, d=0.12, s=0.84, r=0.09, gate=secs(dur))
+    return fade_out(y * 0.55) * vel
+
+
+def silver_flute(m, dur, vel, rng):
+    """A concert flute: few harmonics, a tongued chiff, breath that follows the partials, a slow
+    tremolo with the vibrato."""
+    f = hz(m)
+    n = secs(dur + 0.1)
+    t = np.arange(n) / SR
+    v = vibrato(n, 5.2, 11, 0.24, rng)
+    ph = np.cumsum(f * v) / SR
+    x = np.sin(2 * np.pi * ph) + 0.28 * np.sin(4 * np.pi * ph) + 0.1 * np.sin(6 * np.pi * ph) + 0.03 * np.sin(8 * np.pi * ph)
+    x *= 1.0 + 0.09 * np.clip((t - 0.24) / 0.25, 0, 1) * np.sin(2 * np.pi * 5.2 * t)
+    chiff = bp(rng.uniform(-1, 1, n), f * 1.5, min(f * 5, 11000)) * np.exp(-t / 0.02) * 0.32
+    breath = bp(rng.uniform(-1, 1, n), f * 0.9, min(f * 2.4, 11000)) * 0.09 + bp(rng.uniform(-1, 1, n), 4000, 9000) * 0.012
+    y = (x + chiff + breath) * adsr(n, a=0.024, d=0.08, s=0.88, r=0.08, gate=secs(dur))
+    return fade_out(y * 0.7) * vel
+
+
+def string_section(m, dur, vel, rng):
+    """A small string section (stereo): six players, each a little out of tune with their own
+    vibrato, through a body resonance; a slow bow. Returns (2, n)."""
+    f = hz(m)
+    n = secs(dur + 0.45)
+    out = np.zeros((2, n))
+    for i in range(6):
+        cents = rng.uniform(-9, 9)
+        v = vibrato(n, rng.uniform(4.6, 5.8), rng.uniform(8, 14), rng.uniform(0.1, 0.35), rng)
+        x = osc("saw", f * 2 ** (cents / 1200) * v, n, rng.uniform(0, 1))
+        p = (i / 5.0) * 2 - 1
+        out[0] += x * np.sqrt((1 - p * 0.8) / 2)
+        out[1] += x * np.sqrt((1 + p * 0.8) / 2)
+    for c in (0, 1):
+        y = hp(lp(out[c], 3600), 170)
+        out[c] = peak_eq(peak_eq(y, 480, 3, 1.1), 1900, 3, 1.3)
+    out *= adsr(n, a=0.16, d=0.1, s=0.9, r=0.38, gate=secs(dur))
+    return out * vel * 0.2
+
+
+def oohs(chord, dur, vel, rng):
+    """Wordless backing voices on an "ooh" (stereo): three singers a note, a glottal saw through
+    the vowel's formants, each with their own drift. Returns (2, n)."""
+    n = secs(dur + 0.4)
+    out = np.zeros((2, n))
+    for m in chord:
+        f = hz(m)
+        for i in range(3):
+            v = vibrato(n, rng.uniform(4.8, 5.6), rng.uniform(10, 17), rng.uniform(0.15, 0.4), rng)
+            x = osc("saw", f * 2 ** (rng.uniform(-7, 7) / 1200) * v, n, rng.uniform(0, 1))
+            y = lp(x, 340) * 1.1 + bp(x, 300, 480) * 1.0 + bp(x, 720, 980) * 0.3 + bp(x, 2300, 2900) * 0.05
+            p = rng.uniform(-0.75, 0.75)
+            out[0] += y * np.sqrt((1 - p) / 2)
+            out[1] += y * np.sqrt((1 + p) / 2)
+    out *= adsr(n, a=0.14, d=0.1, s=0.9, r=0.32, gate=secs(dur))
+    return out * vel * 0.3 / max(1, len(chord)) ** 0.7

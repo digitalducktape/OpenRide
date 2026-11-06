@@ -1,16 +1,16 @@
 extends RefCounted
-## Lamplighter: the game's rendered music and effects (#55). Written by
+## Evening Current: the game's rendered music and effects (#55). Written by
 ## games/tools/music/render_music.py from songs/power_grid.py; don't edit by hand.
 
-const TITLE := "Lamplighter"
-const BPM := 92.0
+const TITLE := "Evening Current"
+const BPM := 132.0
 const KEY := 8  ## the key's pitch class (0 = C)
-const LOOP_FROM := 10.4348  ## seconds: the intro plays once, the rest loops
+const LOOP_FROM := 7.2727  ## seconds: the intro plays once, the rest loops
 ## The stems: the bed always plays; harmony and lead are gated by the game.
 const STEM_FILES := {
-	"bed": "res://games/power_grid/music/lamplighter_bed.ogg",
-	"harmony": "res://games/power_grid/music/lamplighter_harmony.ogg",
-	"lead": "res://games/power_grid/music/lamplighter_lead.ogg",
+	"bed": "res://games/power_grid/music/evening_current_bed.ogg",
+	"harmony": "res://games/power_grid/music/evening_current_harmony.ogg",
+	"lead": "res://games/power_grid/music/evening_current_lead.ogg",
 }
 const SOUNDS := {
 	"grid_hum": "res://games/power_grid/music/sfx/grid_hum.ogg",
