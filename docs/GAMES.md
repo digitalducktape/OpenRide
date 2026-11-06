@@ -1069,7 +1069,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
 | Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
 | Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
-| Power Grid | Lamplighter | 92 bpm swung, A-flat major | Porch folk-soul: brushes, Rhodes, strum, muted horn, flute on vibes | harmony while meeting demand, lead with the whole town lit |
+| Power Grid | Evening Current | 132 bpm, A-flat major | Bossa nova: nylon guitar, upright bass, cross-stick clave, flugelhorn hook, flute, wordless voices and strings | harmony while meeting demand, lead with the whole town lit |
 | Ready for Launch | First Light | 104 bpm, D minor to D major | Orchestral-synth: string ostinato, timpani figure, sub bass, brass theme, bells and a supersaw final chorus | harmony with fuel flowing and from the count on, lead on the push |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
@@ -2260,7 +2260,7 @@ a recovery) and `storm_watts` (15%).
 scene, the valley and the generator shed, baked in a dusk and a night palette and blended in one opaque
 shader as the evening goes on. Every light in the town is one mesh (`GridLights`) read against four
 uniform levels, so a district comes on window by window with no redraw. `grid_layout_test` keeps
-every prop inside the stage and clear of the HUD. **Music:** "Lamplighter" (`AUDIO_POLISH.md`).
+every prop inside the stage and clear of the HUD. **Music:** "Evening Current" (`AUDIO_POLISH.md`).
 
 ## Ready for Launch (#82)
 

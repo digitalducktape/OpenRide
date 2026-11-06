@@ -12,7 +12,7 @@ def drums(song, bar0, nbars, style, role, double=False):
         b = (bar0 + i) * 4
         last = i == nbars - 1
         odd = i % 2 == 1
-        if i == 0 and role in ("verse", "chorus", "final", "bridge"):
+        if i == 0 and role in ("verse", "chorus", "final", "bridge") and style != "bossa":
             song.hit("crash", b, 0.9 if role != "verse" else 0.7, "cym", pan=0.3)
         if role == "intro":
             _intro_bar(song, b, i, nbars, style)
@@ -58,6 +58,8 @@ def _groove(song, b, style, role, odd, double, fill):
         _porch(song, b, role, odd, big, end)
     elif style == "cinematic":
         _cinematic(song, b, role, odd, big, end)
+    elif style == "bossa":
+        _bossa(song, b, role, odd, big, end)
         return
     else:  # pop
         kicks = [0, 1.5, 2.5] if not odd else [0, 1.5, 2.5, 3.75]
@@ -177,24 +179,33 @@ def _spy(song, b, role, odd, big, end):
             h("brush", b + t, 0.5, "perc", pan=0.2, sweep=True)
 
 
-def _porch(song, b, role, odd, big, end):
-    """A front-porch brush groove: brushes sweeping every beat, a cross-stick on 2 and 4 (a soft
-    snare and a tambourine in big sections), a round kick and a shaker in eighths. Unhurried."""
+def _bossa(song, b, role, odd, big, end):
+    """A bossa nova: the surdo-like kick (one, the and of two, three, the and of four), the
+    cross-stick playing a two-bar clave (`odd` is its second bar), a shaker in eighths with the
+    beat leaning on the off-eighths, brushes in the verse; ride bell, congas and a tambourine in big
+    sections. Everything is light: the groove carries it, not the volume."""
     h = song.hit
-    for t in np.arange(0, end, 1.0):
-        h("brush", b + t, 0.65, "perc", pan=0.2, sweep=True)
-    for t in (1, 3):
+    for t in (0, 1.5, 2, 3.5):
         if t < end:
-            if big:
-                h("snare", b + t, 0.6, "snare")
-                h("tamb", b + t, 0.55, "hats", pan=0.4)
-            else:
-                h("rim", b + t, 0.85, "snare", pan=0.1)
-    for t in ([0, 2.5] if not odd else [0, 1.5, 2.5]):
+            h("kick", b + t, 0.8 if t % 2 == 0 else 0.55, "kick", tone=0.7)
+    for t in ((1, 2.5) if odd else (0, 1.5, 3)):
         if t < end:
-            h("kick", b + t, 0.75, "kick", tone=0.85)
+            h("rim", b + t, 0.9, "snare", pan=0.15)
     for t in np.arange(0, end, 0.5):
-        h("shaker", b + t, 0.5 if t % 1 == 0 else 0.34, "hats", pan=-0.3)
+        h("shaker", b + t, 0.34 if t % 1 == 0 else 0.5, "hats", pan=-0.3)
+    if big:
+        for t, p, v in ((0.5, 1.0, 0.5), (1.0, 1.4, 0.65), (1.5, 1.0, 0.45), (2.5, 1.0, 0.5), (3.0, 1.4, 0.65), (3.5, 0.8, 0.6)):
+            if t < end:
+                h("conga", b + t, v, "perc", pan=-0.5, pitch=p)
+        for t in (0, 1, 2, 3):
+            if t < end:
+                h("ride", b + t, 0.45, "cym", pan=0.35)
+        for t in (1, 3):
+            if t < end:
+                h("tamb", b + t, 0.4, "perc", pan=0.45)
+    else:
+        for t in np.arange(0, end, 1.0):
+            h("brush", b + t, 0.38, "perc", pan=0.2, sweep=True)
 
 
 def _house(song, b, role, odd, big, end, double):
@@ -244,10 +255,10 @@ def _synthwave(song, b, role, odd, big, end):
 
 def _fill(song, b, style, i):
     h = song.hit
-    if style == "porch":  # a soft turnaround, no tom roll
-        for t, v in ((2.5, 0.4), (3.0, 0.5), (3.5, 0.6), (3.75, 0.5)):
-            h("snare", b + t, v, "snare")
-        h("kick", b + 2, 0.7, "kick", tone=0.85)
+    if style == "bossa":  # a light conga-and-rim pickup into the next section
+        for t, p, v in ((2.0, 1.4, 0.6), (2.5, 1.2, 0.65), (2.75, 1.2, 0.5), (3.0, 1.0, 0.7), (3.5, 0.8, 0.75), (3.75, 0.8, 0.6)):
+            h("conga", b + t, v, "perc", pan=-0.4, pitch=p)
+        h("rim", b + 3.5, 0.8, "snare", pan=0.15)
         return
     h("kick", b + 2, 0.9, "kick")
     if style in ("drive", "pop") or i % 2:
@@ -261,10 +272,11 @@ def _fill(song, b, style, i):
 
 def _halftime(song, b, style):
     h = song.hit
-    if style == "porch":  # brushes alone, a kick on the one, the cross-stick on three
-        h("kick", b, 0.65, "kick", tone=0.85)
-        h("rim", b + 2, 0.7, "snare", pan=0.1)
-        for t in range(4):
+    if style == "bossa":  # the breakdown: brushes and the clave alone, a soft kick on the one
+        h("kick", b, 0.6, "kick", tone=0.7)
+        for t in ((0, 1.5, 3) if (b // 4) % 2 == 0 else (1, 2.5)):
+            h("rim", b + t, 0.7, "snare", pan=0.15)
+        for t in np.arange(0, 4, 1.0):
             h("brush", b + t, 0.6, "perc", pan=0.2, sweep=True)
         return
     h("kick", b, 0.9, "kick")
@@ -276,11 +288,10 @@ def _halftime(song, b, style):
 
 def _build(song, b, i, nbars, style, last):
     h = song.hit
-    if style == "porch":  # no snare roll: the groove simply comes back, shaker first
-        _porch(song, b, "verse", i % 2 == 1, False, 4.0)
+    if style == "bossa":  # the groove comes back in, congas climbing into the last chorus
+        _bossa(song, b, "chorus" if last else "verse", i % 2 == 1, last, 4.0 if not last else 2.0)
         if last:
-            for t, v in ((3.0, 0.45), (3.5, 0.55), (3.75, 0.6)):
-                h("snare", b + t, v, "snare")
+            _fill(song, b, style, i)
         return
     for t in range(4):
         h("kick", b + t, 0.85, "kick")
@@ -294,6 +305,16 @@ def _build(song, b, i, nbars, style, last):
 
 def _intro_bar(song, b, i, nbars, style):
     h = song.hit
+    if style == "bossa":  # the guitar alone, then the shaker and the clave join it
+        if i >= 1:
+            for t in np.arange(0, 4, 0.5):
+                h("shaker", b + t, 0.34 if t % 1 == 0 else 0.5, "hats", pan=-0.3)
+        if i >= 2:
+            for t in ((0, 1.5, 3) if i % 2 == 0 else (1, 2.5)):
+                h("rim", b + t, 0.8, "snare", pan=0.15)
+        if i == nbars - 1:
+            _fill(song, b, style, i)
+        return
     if i == nbars - 1:
         for t in (0, 1):
             h("kick", b + t, 0.9, "kick")
@@ -351,6 +372,8 @@ def _bass_pattern(style, dur):
         p = [(0, "r", 0.9, "pick", 0.95), (1, "3", 0.9, "pick", 0.8), (2, "5", 0.9, "pick", 0.85), (3, "n", 0.9, "pick", 0.8)]
         if not full:
             return [(0, "r", 0.9, "pick", 0.95), (1, "5" if dur >= 2 else "n", 0.9, "pick", 0.8)][: int(dur)]
+    elif style == "bossa":  # the dotted two-feel: root, fifth on the and of two, fifth, root
+        p = [(0, "r", 1.4, "pick", 1.0), (1.5, "5", 0.45, "pick", 0.75), (2, "5", 1.4, "pick", 0.95), (3.5, "r", 0.45, "pick", 0.7)]
     elif style == "root5":
         p = [(0, "r", 0.9, "pick", 1.0), (1.5, "r", 0.4, "pick", 0.7), (2, "5", 0.9, "pick", 0.9), (3.5, "5", 0.4, "pick", 0.7)]
     elif style == "sub":
@@ -375,6 +398,8 @@ def _bnote(song, style, beat, dur, m, vel, art, rng):
         x = ins.sub_bass(m, sec, vel, rng)
     elif style == "walk":
         x = ins.dsp_lp(ins.pick_bass(m, sec, vel, rng), 1400)
+    elif style == "bossa":
+        x = ins.upright(m, sec, vel, rng)
     else:
         x = ins.pick_bass(m, sec, vel, rng)
     song.put("bass", beat, x, pan=0.0, human=0.002)
@@ -430,6 +455,15 @@ def _comp_hits(kind, dur, i):
         return [(0, 1.4, 0.8, "vib"), (2.5, 1.2, 0.7, "vib")] if i % 2 == 0 else [(0.5, 1.0, 0.7, "vib"), (2, 1.8, 0.75, "vib")]
     if kind == "muted_stabs":
         return [(0.5, 0.25, 0.8, "stab"), (1.5, 0.4, 0.7, "stab")] if i % 2 == 0 else [(0, 0.6, 0.85, "stab"), (3.5, 0.3, 0.7, "stab")]
+    if kind == "bossa":  # the guitar's syncopated two-bar pattern, the thumb on one and three
+        thumbs = [(0, 0.9, 0.8, "thumb"), (2, 0.9, 0.7, "thumb5")] if dur >= 4 else [(0, 0.9, 0.8, "thumb")]
+        if dur < 4:
+            return thumbs + [(0.5, 0.4, 0.75, "chord"), (1.5, 0.4, 0.8, "chord")]
+        return thumbs + ([(t, 0.45, 0.8, "chord") for t in (0, 1.5, 3)] if i % 2 == 0 else [(t, 0.45, 0.8, "chord") for t in (1, 2.5)])
+    if kind == "ep_bossa":  # Rhodes answering the guitar in the gaps
+        return [(0.5, 0.9, 0.6, "chord"), (2.5, 1.2, 0.7, "chord")] if i % 2 == 0 else [(1.5, 1.0, 0.65, "chord")]
+    if kind == "oohs":
+        return [(0, dur * 0.97, 0.75, "ooh")]
     if kind == "piano_off":
         return [(t, 0.3, 0.75, "chord") for t in (0.5, 1.5, 2.5, 3.5)]
     if kind == "ostinato":
@@ -446,7 +480,15 @@ def _comp_note(song, kind, beat, d, sym, v, mode, rng):
             down = int(beat * 2) % 2 == 0
             song.put("gtr", beat, ins.guitar_chop(voicing(sym, 66, top=3), sec, v, rng, down=down), pan=0.65)
             song.put("gtr", beat + 0.012 / song.spb, ins.guitar_chop(voicing(sym, 66, top=3), sec, v * 0.9, rng, down=down), pan=-0.65)
-    elif kind in ("ep", "ep_hold"):
+    elif kind == "bossa":
+        if mode in ("thumb", "thumb5"):
+            r = bass_root(sym) + 12 + (7 if mode == "thumb5" else 0)
+            song.put("gtr", beat, ins.nylon([r], sec, v * 0.8, rng), pan=-0.2)
+        else:
+            song.put("gtr", beat, ins.nylon(voicing(sym, 65, top=4), sec, v, rng), pan=-0.2)
+    elif kind == "oohs":
+        song.put("pad", beat, ins.oohs(voicing(sym, 62, top=4), sec, v, rng), human=0)
+    elif kind in ("ep", "ep_hold", "ep_bossa"):
         song.put("keys", beat, ins.epiano(voicing(sym, 62), sec, v, rng), pan=-0.4)
     elif kind in ("piano", "piano8"):
         song.put("keys", beat, ins.piano(voicing(sym, 64, drop_root=False), sec, v, rng), pan=-0.25)
@@ -500,6 +542,9 @@ LEADS = {
     "strings": lambda m, s, v, r: ins.supersaw(m, s, v * 0.5, r, voices=5, spread=10, cutoff=3200, attack=0.12, release=0.3),
     "whistle": lambda m, s, v, r: ins.whistle(m, s, v * 0.8, r),
     "muted": lambda m, s, v, r: ins.muted_trumpet(m, s, v * 0.9, r),
+    "flugel": lambda m, s, v, r: ins.flugel(m, s, v, r),
+    "silver": lambda m, s, v, r: ins.silver_flute(m, s, v, r),
+    "section": lambda m, s, v, r: ins.string_section(m, s, v, r),
     "vibes": lambda m, s, v, r: ins.vibes(m, s, v * 1.2, r),
     "accordion": lambda m, s, v, r: ins.accordion([m], s, v * 1.6, r),
     "organ": lambda m, s, v, r: ins.organ([m], s, v * 2.0, r),
