@@ -1,6 +1,7 @@
 """The game music renderer (#43, #55): the instruments. Each takes (midi or a chord, seconds, velocity,
 rng, **options) and returns a mono buffer, except where noted. All synthesised; original code."""
 import numpy as np
+from scipy.signal import lfilter
 from dsp import SR, hz, secs, osc, vibrato, adsr, expdec, fade_out, lp, hp, bp, sweep_lp, drive, ks, peak_eq
 from dsp import lp as dsp_lp
 
@@ -345,6 +346,47 @@ def sax(m, dur, vel, rng):
     y = drive(y * 1.5, 1.4)
     y *= adsr(n, a=0.02, d=0.1, s=0.8, r=0.08, gate=secs(dur))
     return fade_out(y) * vel
+
+
+def theremin(notes, vel, rng):
+    """A whole gliding phrase, [(start sec, seconds, midi), ...], as one continuous voice: pitch
+    slides between notes (the hand moving), a wide vibrato blooms on held notes, and the level
+    closes only at rests. That glide is what per-note synth leads can't do."""
+    last = notes[-1]
+    n = secs(last[0] + last[1] + 0.4)
+    target = np.full(n, float(notes[0][2]))
+    gate = np.zeros(n)
+    since = np.zeros(n)
+    for k, (at, dur, m) in enumerate(notes):
+        a = secs(at)
+        b = secs(notes[k + 1][0]) if k + 1 < len(notes) else n
+        target[a:b] = m
+        gate[a:min(secs(at + dur * 0.97), n)] = 1.0
+        since[a:b] = np.arange(b - a) / SR
+    # Slide: a one-pole glide of the pitch; level: a soft attack and release.
+    pitch = lfilter([1 - np.exp(-1 / (0.05 * SR))], [1, -np.exp(-1 / (0.05 * SR))], target - target[0]) + target[0]
+    level = lfilter([1 - np.exp(-1 / (0.03 * SR))], [1, -np.exp(-1 / (0.03 * SR))], gate)
+    t = np.arange(n) / SR
+    wide = np.clip((since - 0.12) / 0.3, 0, 1) * 0.42 * np.sin(2 * np.pi * (5.9 + 0.3 * np.sin(2 * np.pi * 0.37 * t)) * t)
+    f = 440.0 * 2 ** ((pitch + wide - 69) / 12)
+    ph = np.cumsum(f) / SR
+    x = (np.sin(2 * np.pi * ph) + 0.3 * np.sin(4 * np.pi * ph) + 0.14 * np.sin(6 * np.pi * ph) + 0.05 * np.sin(10 * np.pi * ph))
+    y = drive(x * 0.8, 1.2) * level * (0.92 + 0.08 * np.sin(2 * np.pi * 5.9 * t))
+    return fade_out(y) * vel
+
+
+def combo_organ(chord, dur, vel, rng):
+    """A reedy transistor combo organ (stereo-free): stacked square-ish tones through a nasal
+    peak, with a quick key click."""
+    n = secs(dur + 0.05)
+    out = np.zeros(n)
+    for m in chord:
+        f = hz(m) * vibrato(n, 6.3, 7, 0.0, rng)
+        out += osc("square", f, n) * 0.5 + osc("saw", f * 2, n) * 0.3
+    y = peak_eq(lp(hp(out, 240), 3800), 1500, 6, 0.9)
+    y += bp(rng.uniform(-1, 1, n), 1500, 5000) * np.exp(-np.arange(n) / SR / 0.006) * 0.3
+    y *= adsr(n, a=0.004, d=0.0, s=1.0, r=0.03, gate=secs(dur))
+    return fade_out(y) * vel * 0.3 / max(1, len(chord)) ** 0.7
 
 
 def pad(chord, dur, vel, rng, cutoff=2400):
