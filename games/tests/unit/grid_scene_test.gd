@@ -7,6 +7,7 @@ const FTP := 200.0
 
 var game: Node
 var hud: Hud
+var _cadence := 0.0
 
 
 func _segment(role := "work", duration := 180, params := {}) -> Dictionary:
@@ -28,7 +29,12 @@ func _start(seg: Dictionary) -> void:
 	game.start(seg)
 
 
+func before_test() -> void:
+	_cadence = InputBus._sim_cadence
+
+
 func after_test() -> void:
+	InputBus._sim_cadence = _cadence
 	if hud:
 		hud.clear_widgets()
 		hud.clear_skin()
