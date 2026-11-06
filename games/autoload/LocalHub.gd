@@ -18,14 +18,14 @@ const MIN_SAVED_SEC := 60.0  ## a visit with less gameplay is discarded (v1's ru
 const MINUTE_STEPS := [5, 10, 15, 20, 30, 45, 60]
 ## GameCatalog's roundSec, which GameInfo doesn't declare (60 when not listed).
 const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75, "the_pull": 300, "balloon_pump": 125,
-	"keepy_uppy": 60}
+	"keepy_uppy": 60, "ready_for_launch": 90}
 ## GameCatalog's usesCamera where it differs from the game's tracker mode (Tug of War's camera
 ## is an option, decided per segment).
 const USES_CAMERA := {"tug_of_war": false}
 ## The display order of the first games (GameCatalog's, without the demo); every other
 ## registered game follows, by id (`order()`).
 const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull",
-	"balloon_pump", "keepy_uppy"]
+	"balloon_pump", "keepy_uppy", "power_grid", "ready_for_launch"]
 ## CircuitPresets: warm-up, N blocks, cool-down. Shapes only: each slot's game is drawn from its
 ## role's pool (`draw_slots`, as Kotlin's CircuitDraw).
 const WARMUP := {"role": "warmup", "duration_sec": 180}

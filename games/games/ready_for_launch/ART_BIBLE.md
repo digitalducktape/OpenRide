@@ -1,0 +1,120 @@
+# Ready for Launch: art bible
+
+> **Status:** v1, 2026-11-06. **Owner:** whoever changes the look; change this file in the same
+> commit. **Sources of truth:** `LaunchPlaces.gd` (layout, places), `LaunchBackdrop.gd` (the bake),
+> `LaunchPad.gd` (tower, clock, smoke), `LaunchRocket.gd`, `LaunchSky.gd`, `shaders/*`,
+> `tools/art/make_earth_map.py`. **AD-ART-BIBLE:** §10.
+
+Drawn in code (rider, 2026-11-05: "continue as is for v1"): `SafeMesh` batches, small canvas shaders,
+and one generated texture, `earth_map.png`. No third-party art.
+
+## 1. Identity
+
+**The one rule:** *one chunky, friendly spacecraft you are throwing at the Moon.* When something is
+ambiguous, pick what makes the tank, the count or the climb read faster.
+
+| Pillar | Design test |
+| --- | --- |
+| **The rocket is the hero** | Dead centre, the most detailed thing on screen, the only signal orange. Riveted hull, wrapped colour blocks, ribbed skirts, brass portholes, grime under the seams |
+| **The place is lit** | One low key light from the right on every pad; floodlight cones up the hull, strong in the dark |
+| **The climb is a journey** | Pad, clouds, black sky, the Earth's limb, the whole Earth, the Moon, all from one number |
+
+Distinct from Safe Cracker (a dark room) and Keepy Uppy (daylight places): a low sun or night, a tall
+central built thing, then space.
+
+## 2. Mood by phase
+
+| Phase | Look |
+| --- | --- |
+| Fuel | Steam at the table, the hose's dashes running, the sight glass rising, beacons blinking |
+| Count | Arms swing back at T-5, the hose drops at T-3, the clock pops on the last three |
+| Push | The trench lights up, the smoke bank rolls both ways, the frame shakes, the ground falls away |
+| Clouds | Decks rush past, a stage drops, a floor of cloud below |
+| Space | The sky goes black, stars, the limb rises (Mediterranean, Europe and North Africa) |
+| Orbit, Moon | The capsule alone; the Earth shrinks to the whole Atlantic side; the Moon looms |
+| Landing | Legs out, feet on the surface |
+
+## 3. Shape language and the silhouette check (rider's warning, 2026-11-02)
+
+Square, stepped and angular for everything built. **The rocket is a stepped tower that narrows going
+up**: a wide base with big swept fins, a collar wider than the hull at every joint, ribbed skirts, a
+faceted straight-sided cone ending in a short spike. Width to height about 1:1.7 with the fins.
+No smooth tube, no round nose, no strap-on boosters beside the base.
+
+Checked in solid black at full size, 30% and 14% (`capture_launch.gd --silhouette`), every mark and
+every state of the stack:
+
+| Shape | Reads as | Verdict |
+| --- | --- | --- |
+| Rocket, Mk I-III | a stepped spacecraft with fins | Safe |
+| Tip | first a mast with a crossbar: **read as a steeple's cross** | Fixed: a plain spike |
+| Stack after drops, capsule | a stepped cone on an engine | Safe |
+| Capsule on legs | a lander | Safe |
+| Flame in air | a wide curtain of three tongues, blunt foot | Safe: as wide at the foot as the nozzle |
+| Flame in vacuum | a short wide fan, never longer than wide (tested) | Safe. A first long single flame read as a tail: fixed |
+| Smoke column | widens going down, runs off the frame | Safe: no taper |
+| Pad smoke, steam | a low wide bank; short flat wisps | Safe: no ball with a tail |
+| Separation puff | a brief ring of soft puffs | Safe |
+| Storage tanks | first rounded pills lying down | Fixed: square-ended on saddles |
+| Gulls | a shallow "m" | Safe |
+| Water tower, dish, tower | built shapes | Safe |
+| Status pips | bars and ticks only | Safe |
+
+## 4. Colour
+
+| Role | Colour | Rule |
+| --- | --- | --- |
+| Hull | warm white `#F1ECE0` | Shaded across its width: key right of centre, sky bounce far left |
+| Trim | signal orange `#E4572E`, navy `#24324F` | Orange only on the rocket (and the tower's cap) |
+| Brass | `#D9A441` | Portholes, sight glass |
+| Fuel | amber `#FFB84A` | The sight glass, the hose, the status bar |
+| Climb | teal `#2FD6C8` | UI accent; never in the world |
+
+UI: mission teal on deep night navy `#0A1A2E` (`ReadyForLaunch.look`), badges leaning 0.1. Clear of
+Dodge's sky blue. Meaning colours are the kit's, always with words.
+
+**Places:** coast at first light (sea glitter, gulls), desert flats at dusk (mesas, long shadows,
+low dust), polar shelf at night (ice cliffs, aurora, snow, strongest floods). Each tints the rocket
+(`light`) and the cloud decks (`cloud`, `cloud2`).
+
+## 5. Layout (1920 x 1080, painted 160 px past each side)
+
+Horizon y 700; table deck y 930; rocket x 960, tip at y 234 or lower. Tower x 684, right of the ride
+panel. Clock board (130, 372), under the ride panel. Nothing tall left of x 640 or right of x 1400
+above y 310. In flight the stack centres on y 590, at most 500 px tall.
+
+## 6. The Earth (rider: "earth doesn't even look like earth")
+
+`rfl_earth.gdshader` makes a real sphere on one rect from `earth_map.png` (2048 x 1024, day colours
+in RGB, clouds in alpha), generated by `tools/art/make_earth_map.py` from hand-typed continent
+outlines, roughened with noise. Spiral storms and storm tracks in the clouds, a soft day and night
+terminator warming at its edge, city lights on the night side, a sun glint on the sea, cloud shadows,
+a thin rim and glow of atmosphere. Near, the limb frames the Mediterranean; far, Africa and Europe.
+
+## 7. VFX
+
+| Effect | How |
+| --- | --- |
+| Sky | `rfl_sky`: one opaque rect, two colours from the climb, rush lines at speed |
+| Flame, plume | `rfl_flame`, `rfl_plume` on a rect each |
+| Sea, aurora, hose | `rfl_sea`, `rfl_aurora`, `rfl_flow` |
+| Smoke, steam, snow, dust, separation | `CPUParticles2D`, 12-60 each |
+| Clouds, stars, Moon | meshes painted once, then moved |
+
+## 8. The frame check
+
+`launch_scene_test` checks every mark, tower and the clock on the pad, and the stack at nine heights
+through a flight, against the stage, each HUD panel and the callout lane; the feet on the Moon; the
+Moon's rise clear of the HUD. Clouds may pass behind panels; they are scenery. Foreground rocks and
+grass at the bottom corners run off the frame on purpose.
+
+## 9. Tablet budget (PowerVR GX6250, Compatibility)
+
+60 fps. Draw calls in play: 47-72 with the HUD (desktop). Primitives at most about 26k. No `_draw` in
+play (tested while fuelling). Full-screen: the place's opaque sprite on the ground, the sky's opaque
+rect in flight. **Not measured on the tablet.** The Earth shader's fill is the risk; see DESIGN.md.
+
+## 10. Art-director review
+
+**AD-ART-BIBLE: APPROVE.** **AD-VISUAL: CONCERNS, addressed** (the cross, the tail, the tanks; see
+`GFX_POLISH.md`). Run the silhouette check again for any new moving shape.

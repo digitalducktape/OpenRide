@@ -28,6 +28,8 @@ const REELS := {
 		"pump_won", "pump_lost", "pump_tick"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
+	"ready_for_launch": ["rfl_count", "rfl_count_final", "rfl_count_start", "rfl_ignition", "rfl_liftoff", "rfl_stage",
+		"rfl_milestone", "rfl_moon", "rfl_touchdown", "rfl_tank_full", "rfl_cutoff", "rfl_scrub", "rfl_result"],
 	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
 		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
 	"power_grid": ["grid_on_0", "grid_on_1", "grid_on_2", "grid_on_3", "grid_crackle", "grid_out", "grid_relit", "grid_thunder",
@@ -43,6 +45,7 @@ const GAME_SCRIPTS := {
 	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
 	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
 	"power_grid": "res://games/power_grid/GridAudio.gd",
+	"ready_for_launch": "res://games/ready_for_launch/LaunchAudio.gd",
 }
 
 var out_dir := ""
@@ -137,6 +140,8 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"ftp_watts": 200.0, "weight_watts": 80.0}
 		"power_grid":
 			params = {"ftp_watts": 200.0}
+		"ready_for_launch":
+			params = {"ftp_watts": 200.0, "fuel_line_watts": 100.0, "fuel_full_watts": 120.0, "target_watts": 210.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -247,6 +252,17 @@ func _ride(game_id: String, director: Node) -> void:
 				cad = maxf(l.need_ahead(4.0), l.repair_need if l.storm != GridLogic.Storm.CALM else 0.0) * 1.12 / 1.65
 				if t > 52.0 and t < 62.0:
 					cad = l.need() * 0.6 / 1.65
+		"ready_for_launch":
+			# Steady in the fuelling (about 125 W), an all-out push from T-0 (55 s), an easy spin
+			# after. Resistance 30%: the simulator makes 1.65 W an rpm.
+			res = 30.0
+			cad = 76.0
+			if t > 52.0 and t < 55.0:
+				cad = 110.0
+			elif t >= 55.0 and t < 73.0:
+				cad = 165.0
+			elif t >= 73.0:
+				cad = 58.0
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8
