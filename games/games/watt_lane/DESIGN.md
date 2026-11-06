@@ -203,15 +203,15 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
   path, catch sparks), `WattLaneBackdrop.gd` + `shaders/wl_field.gdshader` (the field),
   `WattLaneStatus.gd` (HUD), `WattLaneAudio.gd` and `WattLaneMusic.gd` (audio; music from
   `games/tools/music/songs/watt_lane.py`), `hub_card.png`.
-- **2D on the full 1080p canvas, no SubViewport**, like Safe Cracker: two shader rects (the field
-  bleeds to the whole window, the lane spans it), one `SafeMesh` batch for the chevron.
+- **2D on the full 1080p canvas**, like Safe Cracker, with the same trick: static layers baked once
+  in a SubViewport. Per frame, one opaque field rect and a strip mesh for the lane.
 - **Shared code touched:** `RideMetrics.set_power_source` and two-sided power bands (the ride
   panel shows the rules' number and is gold exactly in the band; Dodge Ball's one-sided target is
   unchanged), `arrange.py`'s `synthwave` groove, `pulse` bass and `analog` lead (kept for the
   gallery; Live Wire uses `pop` and `octave`), `capture_hub_cards.gd` calls a game's `showcase()`
   if it has one.
-- **Per frame:** three 64-float arrays and a dozen uniforms; no node is laid out or redrawn
-  unless the chevron's state changes.
+- **Per frame:** three 64-float arrays read per vertex and a dozen uniforms; no node is laid out or
+  redrawn unless the chevron's state changes.
 - **Tests:** `watt_lane_logic_test` (26: smoothing, membership, the course, announce timing, the
   switch window, catches, streaks, stars) and `watt_lane_scene_test` (12: the HUD's numbers agree
   every frame, the chip, the widget's budget, the lane follows the course, power is height, the
@@ -223,8 +223,8 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
 | --- | --- | --- | --- | --- |
 | Scene structure | `scene-organization` | One `Game` scene composing plain classes: `WattLaneLogic` (RefCounted rules), `WattLaneBackdrop` and `WattLaneTrack` (2D views), `WattLaneStatus` (HUD widget); the logic returns an event list instead of signals | Child scenes per part (`.tscn` for field, lane, HUD) | The house pattern (Safe, Tug, Cadence): rules testable headless, views built in code, no editor scenes to keep in step |
 | Rules data | `scene-organization` / `resource-pattern` | Constants in the logic and FTP-scaled params from Kotlin | A custom `Resource` for tuning | Kotlin's `GameCatalog` is the tuning's source for the bike; a Resource would be a second copy |
-| 2D view | `2d-essentials` | Full-canvas 2D, no SubViewport; the field and the lane are canvas shaders on two `ColorRect`s, the chevron a `SafeMesh` batch, the glow a `Sprite2D` with additive `CanvasItemMaterial` | A `SubViewport` render or a `Line2D`/`Polygon2D` lane rebuilt each frame | Safe Cracker's measured recipe: 2D fill is what the tablet pays for, so two rects; the lane's shape changes every frame, which a shader reads from arrays for free |
-| The lane's shape | `shader-basics` | Three uniform float arrays (`band_lo`, `band_hi`, `trail`, 64 columns) read in the lane's fragment shader, premultiplied alpha so light adds and strokes cover | Rebuilding a mesh every frame in GDScript | 192 floats a frame instead of hundreds of vertices; the glow, the edges, the beam, the riser and the path all read the same data |
+| 2D view | `2d-essentials` | Full-canvas 2D; static layers baked once in a SubViewport, the field one opaque rect, the lane a strip mesh placed by its vertex shader, the chevron a `SafeMesh` batch | Full-screen per-pixel shaders (31 fps on the tablet), or a lane mesh rebuilt in GDScript each frame | Safe Cracker's recipe: 2D fill is what the tablet pays for, so bake what's still and draw only where the lane is |
+| The lane's shape | `shader-basics`, `godot-optimization` | Uniform float arrays (64 columns) read per vertex; light computed per vertex with rows packed at the edges; premultiplied alpha | The same arrays read per fragment | Dynamic uniform indexing and `exp` per pixel were the GPU cost; about 2000 vertices are nothing next to a million pixels |
 | Effects | `shader-basics` / `particles-vfx` | Chevrons, riser, beam, path and the catch flash in the lane shader; bokeh in the field shader; one `CPUParticles2D` burst for a catch | `GPUParticles2D` for bokeh and sparks | No extra draws for the ambient layers; CPU particles avoid the Compatibility renderer's late particle-shader compile |
 | HUD | `hud-system` | A slim `PanelContainer` widget in the HUD's top-centre slot, labels changed only on new values, framework tweens for pop and fade | A `ProgressBar` power meter of the game's own | A second power bar is what made Balloon Pump's numbers disagree; the ride panel's W (fed the same smoothed value) is the meter |
 | Audio | `audio-system` | Rendered OGG stems through `AudioDirector` (stem gates by intensity), registered one-shots, and two looping `AudioStreamWAV` hums on the SFX bus crossfaded in code | An `AudioStreamSynchronized`/`AudioStreamInteractive` of the game's own | `AudioDirector` already owns crossfades, ducking and the rider's-music rule; the hum is the only continuous sound, so two players are enough |
@@ -254,8 +254,5 @@ reaches at any length and a 1.3× run reaches even in a 60 s slot; on a long Jus
   timing, streaks), the HUD agreement every frame, the lane following the course, power as
   height, the step label and the chevron's silhouette are tested. Not covered: pause (the
   framework's), sensor loss (`Effort`'s) and the on-bike lag (the bike acceptance item).
-- **TD-FEASIBILITY: CONCERNS (manageable).** Not measured on the tablet (the lock was held).
-  Estimated 1.7 screens of fill (Safe Cracker measures 2.1-2.2 at 60 fps). Risks: uniform-array
-  indexing in a fragment shader on the GX6250 (fallback: the arrays as a 64×3 float texture);
-  the field's six noise reads a pixel (fallback: drop the far washes); the hum loops rendered in
-  GDScript once a process (move them to the offline renderer if the first load stutters).
+- **TD-FEASIBILITY: resolved on the tablet.** It first measured 31 fps, GPU-bound; after baking the
+  static layers and moving the lane's light to vertices it holds 60-61 fps (`GFX_POLISH.md`).

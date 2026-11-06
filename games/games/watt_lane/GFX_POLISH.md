@@ -45,9 +45,7 @@ suite green.
 7. **A satisfying "in lane" state.** **Done:** while in the lane a beam runs from the chevron
    along it, the field warms around the lane, the chevron's rim is green; a catch flashes the
    lane and throws gold sparks.
-8. **Tablet cost: not measured** (another agent held the tablet). Estimate: about 1.7 screens of
-   fill, the field's 6 noise reads a pixel. Fallback if under 58 fps: drop the far washes
-   (2 reads) and the bokeh's twinkle.
+8. **Tablet cost.** Done: see "Tablet performance" at the end.
 
 ## Removed with the rework (for the record)
 
@@ -65,3 +63,20 @@ suite green.
 11. **The top 40% of the field was empty next to Safe Cracker.** **Done:** a horizon of light
     behind the top of the scale and two slow ribbons of light (teal and copper) drifting at a
     tenth of the lane's speed, all dimmer than the lane.
+
+## Tablet performance (2026-11-06)
+
+Measured on the bike's tablet (mock build, real play, 5-minute Just Ride): **31 fps, worst 30,
+GPU-bound** before; **60-61 fps** after, for 80 s of play. The GX6250 is fill-bound, and the look
+paid per pixel per frame:
+
+- **The field** ran noise, `exp`, a ribbon loop and a vignette on every pixel. Now everything still
+  is baked once at the window's size (`wl_field_bake.gdshader`), the dots, bokeh and streaks once
+  into a 512 px tile (`wl_tile_bake.gdshader`); per frame, two texture reads and a beat line. The
+  ribbons and bokeh no longer twinkle, and the warm light around the lane is gone.
+- **The lane** indexed uniform arrays and ran `exp` per pixel over two thirds of the screen. Now it
+  is a strip mesh over only the lane and its glow, its light per vertex (rows packed at the
+  edges), with one texture read a pixel. The beam, riser, chevrons and path are small drawings.
+- **The speckled fill:** per-pixel noise thresholds on large coordinates. The streaks are now a
+  soft baked texture, with coordinates worked out per vertex in highp and scrolls wrapped on the
+  CPU.

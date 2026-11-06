@@ -126,7 +126,7 @@ func _hum_player(node_name: String, bright: bool) -> AudioStreamPlayer:
 
 func _on_prepare(seg: Dictionary) -> void:
 	logic = WattLaneLogic.new(difficulty, params, int(seg.get("seed", 0)), str(seg.get("role", "work")))
-	track.setup(logic.ftp, logic.width, look)
+	track.setup(logic.ftp, logic.width, look, backdrop.tile_texture())
 	backdrop.set_beat_px(60.0 / WattLaneMusic.BPM * WattLaneTrack.SPEED)
 	hud.set_skin(look.hud_skin())
 	_status = WattLaneStatus.new(look)
@@ -141,7 +141,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	# The rider starts in the lane's middle on the intro card: one frame of the lane at rest.
 	var centre := float(logic.course.centre_at(0.0))
 	track.update_view(0.0, logic.course, 0.0, centre, true, -1.0, true)
-	backdrop.update_view(0.0, track.scroll, 0.0, track.lane_mid(), true)
+	backdrop.update_view(track.scroll, 0.0)
 	_update_status()
 
 
@@ -170,7 +170,7 @@ func _on_frame(delta: float) -> void:
 	_music_beat(delta)
 	track.update_view(delta, logic.course, logic.time, logic.smoothed, logic.in_lane,
 		float(up.get("at", -1.0)), bool(up.get("up", true)), int(up.get("lo", 0)), int(up.get("hi", 0)), _beat)
-	backdrop.update_view(delta, track.scroll, _beat, track.lane_mid(), logic.in_lane)
+	backdrop.update_view(track.scroll, _beat)
 	_update_status()
 	_update_audio(delta)
 	if _message_left > 0.0:

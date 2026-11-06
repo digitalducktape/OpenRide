@@ -6,9 +6,11 @@ extends Node2D
 ## announced step shows its riser, amber chevrons and its new bounds in watts where it lands.
 ## Behind the cursor, the dashed path it rode.
 ##
-## It only draws: `WattLaneLogic` holds the rules. Cost: the lane is one shader rect fed 64-column
-## arrays a frame (`shaders/wl_lane.gdshader`); the cursor is a static drawing moved by
-## `position`, redrawn only when its state changes; one CPUParticles2D for a catch.
+## It only draws: `WattLaneLogic` holds the rules. Cost (the tablet is fill-bound): the lane is a
+## strip mesh over just the lane and its glow, its light worked out per vertex from 64-column
+## arrays (`shaders/wl_lane.gdshader`), one texture read a pixel; the path a thin strip
+## (`wl_path.gdshader`); the beam, the riser, the step's chevrons and the cursor are small static
+## drawings moved by `position`; one CPUParticles2D for a catch.
 
 const RIDER_X := 520.0  ## the cursor's x on the stage
 const SPEED := 150.0  ## px a second: course time ahead is distance to the right
@@ -20,13 +22,25 @@ const MID_SHARE := 0.60  ## the share of FTP at the middle guide
 const PX_PER_FTP := GUIDE_GAP / 0.125
 const TOP_Y := 372.0  ## the cursor stays between these (clear of the HUD's top bar)
 const BOTTOM_Y := 960.0
-const RECT_Y := 290.0
-const RECT_H := 720.0
 const HIST_DT := 0.05  ## seconds between the path's samples
 const HIST := 90
 const CURSOR_EASE := 12.0
 const SHADER := preload("res://games/watt_lane/shaders/wl_lane.gdshader")
+const PATH_SHADER := preload("res://games/watt_lane/shaders/wl_path.gdshader")
+const TILE := 512.0  ## WattLaneBackdrop.TILE
+const STREAK_SPEED := 1.8  ## of the lane's speed
+## The strip's rows: (t, off): y = mix(hi, lo, t) + off px. Packed around the edges, so the light
+## worked out per vertex stays crisp; the outer rows carry the wide glow.
+const ROWS: Array[Vector2] = [Vector2(0, -110), Vector2(0, -70), Vector2(0, -40), Vector2(0, -20), Vector2(0, -9),
+	Vector2(0, -4), Vector2(0, -2.6), Vector2(0, -1.2), Vector2(0, 0), Vector2(0, 1.2), Vector2(0, 2.6), Vector2(0, 4),
+	Vector2(0, 9), Vector2(0, 20), Vector2(0.25, 0), Vector2(0.5, 0), Vector2(0.75, 0), Vector2(1, -20), Vector2(1, -9),
+	Vector2(1, -4), Vector2(1, -2.6), Vector2(1, -1.2), Vector2(1, 0), Vector2(1, 1.2), Vector2(1, 2.6), Vector2(1, 4),
+	Vector2(1, 9), Vector2(1, 20), Vector2(1, 40), Vector2(1, 70), Vector2(1, 110)]
+const MARKS := 3  ## the step's chevrons
+const MARK_GAP := 70.0
+const MARK_FIRST := 175.0  ## px before the step: the nearest mark stops short of the bend
 const INK := Color("0f1a2e")
+const WARN_LIGHT := Color(1.0, 0.69, 0.13)
 
 var ftp := 150.0
 var width_watts := 40
@@ -34,10 +48,15 @@ var cursor: Node2D
 var label: Label  ## the announced step's new bounds, 56 px, just inside the new lane
 var cursor_y := MID_Y
 var flash := 0.0
-var rect: ColorRect
+var lane: MeshInstance2D
 var scroll := 0.0  ## px the lane has moved (the backdrop's layers follow it)
 
 var _mat: ShaderMaterial
+var _path_mat: ShaderMaterial
+var _path: MeshInstance2D
+var _beam: Node2D
+var _riser: Sprite2D
+var _marks: Array[Node2D] = []
 var _lo := PackedFloat32Array()
 var _hi := PackedFloat32Array()
 var _trail := PackedFloat32Array()
@@ -62,14 +81,21 @@ func _init() -> void:
 	_hist.resize(HIST)
 	_hist.fill(-1.0)
 	_trail.fill(-1.0)
-	rect = ColorRect.new()
-	rect.name = "Lane"
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mat = ShaderMaterial.new()
 	_mat.shader = SHADER
-	_mat.set_shader_parameter("noise_tex", WorldLook.noise_texture())
 	_mat.set_shader_parameter("rider_x", RIDER_X)
-	rect.material = _mat
+	lane = MeshInstance2D.new()
+	lane.name = "Lane"
+	lane.mesh = lane_mesh()
+	lane.material = _mat
+	_path_mat = ShaderMaterial.new()
+	_path_mat.shader = PATH_SHADER
+	_path_mat.set_shader_parameter("rider_x", RIDER_X)
+	_path = MeshInstance2D.new()
+	_path.name = "Path"
+	_path.mesh = path_mesh()
+	_path.material = _path_mat
+	_build_step_marks()
 	_build_cursor()
 	label = Label.new()
 	label.name = "NextBand"
@@ -79,7 +105,15 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	add_child(rect)
+	add_child(lane)
+	add_child(_path)
+	add_child(_beam)
+	add_child(_riser)
+	for m in _marks:
+		add_child(m)
+	# The meshes hold (column, row) until their vertex shaders place them: never cull them.
+	for mesh_node in [lane, _path]:
+		RenderingServer.canvas_item_set_custom_rect(mesh_node.get_canvas_item(), true, Rect2(-4000, -4000, 8000, 8000))
 	add_child(cursor)
 	add_child(_burst)
 	add_child(label)
@@ -92,8 +126,10 @@ func _exit_tree() -> void:
 		Stage.changed.disconnect(_fit)
 
 
-## The rider's FTP, the lane's width (W) and the look (the step label's style).
-func setup(ftp_watts: float, lane_watts: int, look: GameTheme) -> void:
+## The rider's FTP, the lane's width (W), the look (the step label's style) and the repeating
+## tile the lane's streaks come from (WattLaneBackdrop).
+func setup(ftp_watts: float, lane_watts: int, look: GameTheme, tile: Texture2D = null) -> void:
+	_mat.set_shader_parameter("tile_tex", tile)
 	ftp = maxf(ftp_watts, 50.0)
 	width_watts = lane_watts
 	look.style_label(label, HudTheme.MEDIUM, GameTheme.INK, true)
@@ -142,23 +178,45 @@ func update_view(delta: float, course: WattLaneCourse, t: float, watts: float, i
 	_glow = move_toward(_glow, 1.0 if in_lane else 0.68, delta * 2.5)
 	_in = move_toward(_in, 1.0 if in_lane else 0.0, delta * 4.0)
 	flash = maxf(flash - delta * 2.5, 0.0)
-	_apply(step_at, up, beat)
+	_apply(beat)
+	_show_step(course, t, step_at, up)
 	_show_label(step_at, up, lo, hi)
 
 
-func _apply(step_at: float, up: bool, beat: float) -> void:
+func _apply(beat: float) -> void:
 	_mat.set_shader_parameter("band_lo", _lo)
 	_mat.set_shader_parameter("band_hi", _hi)
-	_mat.set_shader_parameter("trail", _trail)
-	_mat.set_shader_parameter("scroll", scroll)
 	_mat.set_shader_parameter("glow", _glow + flash)
-	_mat.set_shader_parameter("in_lane", _in)
-	_mat.set_shader_parameter("rider_y", cursor_y)
 	_mat.set_shader_parameter("beat", beat)
-	var announced := step_at >= 0.0
-	_mat.set_shader_parameter("step_x", RIDER_X + step_at * SPEED if announced else -1.0)
-	_mat.set_shader_parameter("step_dir", -1.0 if up else 1.0)
-	_mat.set_shader_parameter("chevrons", (0.75 + 0.25 * sin(_clock * TAU * 2.0)) if announced else 0.0)
+	_mat.set_shader_parameter("streak_scroll", fposmod(scroll * STREAK_SPEED, TILE))
+	_path_mat.set_shader_parameter("trail", _trail)
+	_path_mat.set_shader_parameter("dash_scroll", fposmod(scroll, 26.0))
+	# The beam: from the cursor along the lane, while the rider is in it.
+	_beam.position = Vector2(RIDER_X + 20.0, cursor_y)
+	_beam.modulate.a = _in
+	_beam.visible = _in > 0.01
+
+
+## The announced step on the lane: a riser of light where it jumps, whole chevrons on the flat
+## lane before the bend.
+func _show_step(course: WattLaneCourse, t: float, step_at: float, up: bool) -> void:
+	var on := step_at >= 0.0
+	_riser.visible = on
+	for m in _marks:
+		m.visible = on
+	if not on:
+		return
+	var pulse := 0.75 + 0.25 * sin(_clock * TAU * 2.0)
+	var x := RIDER_X + step_at * SPEED
+	var mid := y_of(course.visual_centre_at(time_at(x, t)))
+	_riser.position = Vector2(x, mid)
+	_riser.scale = Vector2(70.0, PX_PER_FTP * float(width_watts) / ftp * 1.1) / float(_riser.texture.get_width())
+	_riser.modulate.a = 0.8 * pulse
+	for k in MARKS:
+		var mx := x - MARK_FIRST - MARK_GAP * float(k)
+		_marks[k].position = Vector2(mx, y_of(course.visual_centre_at(time_at(mx, t))))
+		_marks[k].scale.y = 1.0 if up else -1.0
+		_marks[k].modulate.a = pulse
 
 
 ## A catch: the lane and the cursor flash, and gold sparks fly off the cursor.
@@ -198,12 +256,99 @@ func _fit() -> void:
 	var r := Stage.bleed_rect()
 	_x0 = r.position.x
 	_dx = r.size.x / float(COLS - 1)
-	rect.position = Vector2(r.position.x, RECT_Y)
-	rect.size = Vector2(r.size.x, RECT_H)
-	_mat.set_shader_parameter("col_x0", _x0)
-	_mat.set_shader_parameter("col_dx", _dx)
-	_mat.set_shader_parameter("origin", rect.position)
-	_mat.set_shader_parameter("rect_size", rect.size)
+	for mat in [_mat, _path_mat]:
+		mat.set_shader_parameter("col_x0", _x0)
+		mat.set_shader_parameter("col_dx", _dx)
+		mat.set_shader_parameter("view_x0", r.position.x)
+	_mat.set_shader_parameter("view_x1", r.end.x)
+
+
+## The lane's strip: COLS columns of ROWS, VERTEX = (column, row), UV = (t, off).
+static func lane_mesh() -> ArrayMesh:
+	var verts := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	var rows := ROWS.size()
+	for c in COLS:
+		for r in rows:
+			verts.append(Vector2(c, r))
+			uvs.append(ROWS[r])
+	for c in COLS - 1:
+		for r in rows - 1:
+			var a := c * rows + r
+			indices.append_array([a, a + rows, a + 1, a + 1, a + rows, a + rows + 1])
+	return _mesh(verts, uvs, indices)
+
+
+## The path's strip: VERTEX = (column, side -1 or +1).
+static func path_mesh() -> ArrayMesh:
+	var verts := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for c in COLS:
+		verts.append(Vector2(c, -1))
+		verts.append(Vector2(c, 1))
+		uvs.append(Vector2.ZERO)
+		uvs.append(Vector2.ZERO)
+	for c in COLS - 1:
+		var a := c * 2
+		indices.append_array([a, a + 2, a + 1, a + 1, a + 2, a + 3])
+	return _mesh(verts, uvs, indices)
+
+
+static func _mesh(verts: PackedVector2Array, uvs: PackedVector2Array, indices: PackedInt32Array) -> ArrayMesh:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+# --- The beam and the step's marks ---
+
+func _build_step_marks() -> void:
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_beam = WattLaneTrack.Paint.new(_paint_beam)
+	_beam.name = "Beam"
+	_beam.material = add
+	_riser = Sprite2D.new()
+	_riser.name = "Riser"
+	_riser.texture = SafePlaces.soft_dot()
+	_riser.material = add
+	_riser.modulate = Color(WARN_LIGHT, 0.8)
+	_riser.visible = false
+	for k in MARKS:
+		var m := WattLaneTrack.Paint.new(_paint_mark)
+		m.name = "StepMark%d" % k
+		m.visible = false
+		_marks.append(m)
+
+
+## A soft horizontal shaft of light, fading along its length and to either side.
+func _paint_beam(ci: CanvasItem) -> void:
+	var m := SafeMesh.new()
+	var hot := Color(1.0, 0.93, 0.75, 1.0) * Color(0.5, 0.5, 0.5, 1.0)
+	var clear := Color(hot, 0.0)
+	clear.r = 0.0
+	clear.g = 0.0
+	clear.b = 0.0
+	for side in [-1.0, 1.0]:
+		m.quad4(Vector2(0, 0), Vector2(620, 0), Vector2(620, 26.0 * side), Vector2(0, 26.0 * side), hot, clear, clear, clear)
+	m.flush(ci)
+
+
+## One chevron (Λ), amber with an ink edge; `scale.y` -1 points it down.
+func _paint_mark(ci: CanvasItem) -> void:
+	var m := SafeMesh.new()
+	var pts := [Vector2(-28, 14), Vector2(0, -16), Vector2(28, 14)]
+	for pass_ in [[20.0, Color("0f1a2e", 0.5)], [14.0, WARN_LIGHT]]:
+		m.line(pts[0], pts[1], pass_[0], pass_[1])
+		m.line(pts[1], pts[2], pass_[0], pass_[1])
+	m.flush(ci)
 
 
 # --- The cursor ---

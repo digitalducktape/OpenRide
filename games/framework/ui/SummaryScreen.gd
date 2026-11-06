@@ -291,7 +291,9 @@ func show_summary(summary: Dictionary, plan: Dictionary, looks: Dictionary = {})
 	_stars_note.text = "No games finished this time." if results.is_empty() else "No stars this time. Next ride!"
 
 	var extra := _stat_tiles(first_info, results) if single else []
-	_tiles.columns = 3 if not extra.is_empty() else 2
+	# A game's stat tiles share one row with points and time: a second row pushed Done off the
+	# screen with the no-stars note and a best showing (seen on the bike).
+	_tiles.columns = 2 + extra.size() if not extra.is_empty() else 2
 	_add_tile("%d" % score, "points", GameTheme.TARGET)
 	if not single:
 		_add_tile("%d" % stars, "star" if stars == 1 else "stars", GameTheme.TARGET)

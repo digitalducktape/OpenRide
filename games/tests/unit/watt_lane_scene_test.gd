@@ -168,14 +168,37 @@ func test_the_cursor_is_an_angular_chevron() -> void:
 		assert_float(absf(p.y)).is_less_equal(34.0)
 
 
-func test_the_field_follows_the_lane_and_draws_nothing_per_frame() -> void:
+func test_the_field_drifts_with_the_lane_and_bakes_once() -> void:
 	var game := _game()
 	_ride(game, 2.0, float(game.logic.course.watts[0]))
-	game.backdrop.update_view(DT, game.track.scroll, 0.5, game.track.lane_mid(), true)
+	var bakes: int = game.backdrop.bakes
+	game.backdrop.set_beat_px(80.0)
+	game.backdrop.update_view(1000.0, 0.5)
 	var mat: ShaderMaterial = game.backdrop.field.material
-	assert_float(mat.get_shader_parameter("scroll")).is_equal(game.track.scroll)
-	assert_float(mat.get_shader_parameter("lane_mid")).is_equal_approx(game.track.y_of(game.logic.course.visual_centre_at(game.logic.time)), 2.0)
-	assert_int(game.backdrop.get_child_count()).is_equal(1)  # one rect, no geometry
+	assert_float(mat.get_shader_parameter("tile_scroll")).is_equal(fposmod(400.0, 512.0))  # wrapped, 0.4x
+	assert_float(mat.get_shader_parameter("bar_scroll")).is_equal(fposmod(1000.0, 320.0))
+	assert_int(game.backdrop.bakes).is_equal(bakes)  # the static layers aren't drawn again
+
+
+func test_the_lane_is_a_strip_not_a_full_screen_rect() -> void:
+	var game := _game()
+	var mesh: ArrayMesh = game.track.lane.mesh
+	var rows := WattLaneTrack.ROWS.size()
+	assert_int(mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size()).is_equal(WattLaneTrack.COLS * rows)
+	# Its glow reaches 110 px past the lane: under a third of the screen for a 176 px lane.
+	assert_float((176.0 + 220.0) / 1080.0).is_less(0.4)
+
+
+func test_the_step_marks_stop_short_of_the_bend() -> void:
+	var game := _game()
+	var course: WattLaneCourse = game.logic.course
+	var j := course.next_jump_after(0.0)
+	_ride(game, course.times[j] - 3.0, float(course.watts[0]))
+	var step_x := WattLaneTrack.RIDER_X + 3.0 * WattLaneTrack.SPEED
+	for m in game.track.get("_marks"):
+		assert_bool(m.visible).is_true()
+		# The bend starts 90 px before the step; a mark reaches 28 px either side of its centre.
+		assert_float(step_x - m.position.x).is_greater(90.0 + 28.0)
 
 
 func test_the_result_carries_the_stats_and_the_panel_lets_go() -> void:

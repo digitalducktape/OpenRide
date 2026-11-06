@@ -1840,11 +1840,11 @@ the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt
 - **Scoring.** 10 points a second in the lane times a streak (×1 to ×3 over 20 s; it survives
   1 s outside), through `Effort.award`; a warm-up's points count 1.25×. Stars, points a minute:
   250, 1200, 2000 (a perfect 1.0× run earns 1550-1800, 2 stars; 1.3× reaches 3).
-- **Look and cost.** Full-canvas 2D, no SubViewport: the field (`wl_field.gdshader`: far washes,
-  bokeh, a dot grid, the guides and beat lines, each layer at its own speed, flaring on the music's
-  beat) and the lane (`wl_lane.gdshader`, fed three 64-column arrays a frame: glow, edges, a beam
-  from the chevron while in it, the step's riser and chevrons, the dashed path) are one shader rect
-  each; the chevron is one `SafeMesh` batch. `tests/capture_watt_lane.gd` takes the review shots.
+- **Look and cost.** Full-canvas 2D, 60 fps on the tablet (31 before the pass in `GFX_POLISH.md`).
+  The field's static layers are baked once and its dots, bokeh and the lane's streaks into a 512 px
+  tile; per frame `wl_field.gdshader` is two reads and the beat lines. The lane is a strip mesh over
+  only the lane and its glow (`wl_lane.gdshader`, its light per vertex from 64-column arrays); the
+  path is a thin strip, and the beam, riser, step chevrons and cursor are small drawings. `tests/capture_watt_lane.gd` takes the review shots.
 - **Music.** "Live Wire", dream-pop electronica at 112 bpm in Eb major (`songs/watt_lane.py`): a
   glockenspiel hook over a flute, eighth-note piano, a plucked arpeggio, a supersaw chorus; the
   harmony near the lane, the lead only in it, and a hum loop that brightens in the lane.
