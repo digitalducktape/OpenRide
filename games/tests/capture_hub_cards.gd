@@ -7,7 +7,7 @@ extends SceneTree
 ## Then re-import (`--import`).
 
 const GAMES := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke",
-	"watt_lane", "the_pull", "balloon_pump", "keepy_uppy"]
+	"watt_lane", "the_pull", "balloon_pump", "keepy_uppy", "power_grid"]
 const SIZE := Vector2i(512, 288)
 ## Seconds into the intro before the shot (Kart Race builds its world first).
 const WAIT := {"kart_race": 9.0}

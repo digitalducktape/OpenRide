@@ -30,6 +30,8 @@ const REELS := {
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
 	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
 		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
+	"power_grid": ["grid_on_0", "grid_on_1", "grid_on_2", "grid_on_3", "grid_crackle", "grid_out", "grid_relit", "grid_thunder",
+		"grid_strike", "grid_restored", "grid_crew_fixed", "grid_full_town", "grid_firework", "grid_bell"],
 }
 const GAME_SCRIPTS := {
 	"dodge_ball": "res://games/dodge_ball/DodgeAudio.gd",
@@ -40,6 +42,7 @@ const GAME_SCRIPTS := {
 	"the_pull": "res://games/the_pull/PullAudio.gd",
 	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
 	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
+	"power_grid": "res://games/power_grid/GridAudio.gd",
 }
 
 var out_dir := ""
@@ -132,6 +135,8 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"ftp_watts": 250.0}
 		"keepy_uppy":
 			params = {"ftp_watts": 200.0, "weight_watts": 80.0}
+		"power_grid":
+			params = {"ftp_watts": 200.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -232,6 +237,16 @@ func _ride(game_id: String, director: Node) -> void:
 				cad = 57.0
 			elif t > 50.0 and t < 56.0:
 				cad = 20.0
+		"power_grid":
+			# Meets demand and repairs the storms; eases off at 52-62 s for a brown-out. Resistance
+			# 30%: the simulator makes 1.65 W an rpm.
+			res = 30.0
+			var grid: Node = director.game
+			if grid and "logic" in grid and grid.logic:
+				var l: GridLogic = grid.logic
+				cad = maxf(l.need_ahead(4.0), l.repair_need if l.storm != GridLogic.Storm.CALM else 0.0) * 1.12 / 1.65
+				if t > 52.0 and t < 62.0:
+					cad = l.need() * 0.6 / 1.65
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8

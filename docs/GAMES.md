@@ -1065,6 +1065,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
 | Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
 | Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
+| Power Grid | Lamplighter | 92 bpm swung, A-flat major | Porch folk-soul: brushes, Rhodes, strum, muted horn, flute on vibes | harmony while meeting demand, lead with the whole town lit |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -2229,6 +2230,32 @@ height. `KeepyLogic` holds the rules (`keepy_logic_test`, `keepy_scene_test`), a
 **Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the balloon near the centre of
 the screen above an illustrated pedal fan, in four lit outdoor places (the **Place** option, or a
 new one every 3 minutes on random). **Music:** "Updraft" (`AUDIO_POLISH.md`).
+
+## Power Grid (#81)
+
+The bike turns the generator for a valley town at dusk. Demand follows an evening curve; the rider's
+watts, averaged over about 5 s, meet it at 90% of it, and only while pedalling (30 rpm). `GridLogic`
+holds the rules (`grid_logic_test`), and `games/power_grid/DESIGN.md` is the design record. It plays
+all four circuit roles and Just Rides (minutes, open). Kotlin sends `demand_lo_watts`,
+`demand_hi_watts` (40-60 / 45-70 / 50-75% of FTP in work, 30-50% in a warm-up or cool-down, 30-42% in
+a recovery) and `storm_watts` (15%).
+
+- **Districts:** houses, street lamps, the funfair and the stadium come online as demand rises,
+  each announced 4 s ahead. Falling short dims the newest, then turns it off; catching up relights
+  it. Nothing is ever lost. A cool-down runs the curve backwards: the town goes to bed.
+- **Evenings:** a work ride over 5 minutes is several evenings, each winding down into the next.
+- **Storms (work only):** lightning warns 3 s ahead, then a line goes down; 10 s at demand plus 15% of
+  FTP restores it for 100 points, or the crew fixes it after 30 s for none.
+- **Scoring:** 5 points a second per district lit while meeting demand, through `award`. Stars are
+  points a minute (200 / 600 / 1000). Easy roles have no multiplier, so a 1.4 gain stands in for it.
+  **Stats:** `lit_pct`, `districts_max`, `districts_total`, `storms`, `storms_restored`, `avg_power`,
+  `evenings`.
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`, `UI_POLISH.md`): one illustrated
+scene, the valley and the generator shed, baked in a dusk and a night palette and blended in one opaque
+shader as the evening goes on. Every light in the town is one mesh (`GridLights`) read against four
+uniform levels, so a district comes on window by window with no redraw. `grid_layout_test` keeps
+every prop inside the stage and clear of the HUD. **Music:** "Lamplighter" (`AUDIO_POLISH.md`).
 
 ## Circuits and the Games hub (#37, #38)
 

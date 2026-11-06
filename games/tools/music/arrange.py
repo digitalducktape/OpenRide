@@ -54,6 +54,9 @@ def _groove(song, b, style, role, odd, double, fill):
     elif style == "synthwave":
         _synthwave(song, b, role, odd, big, end)
         return
+    elif style == "porch":
+        _porch(song, b, role, odd, big, end)
+        return
     else:  # pop
         kicks = [0, 1.5, 2.5] if not odd else [0, 1.5, 2.5, 3.75]
         ghosts = [1.75] if odd else []
@@ -149,6 +152,26 @@ def _spy(song, b, role, odd, big, end):
             h("brush", b + t, 0.5, "perc", pan=0.2, sweep=True)
 
 
+def _porch(song, b, role, odd, big, end):
+    """A front-porch brush groove: brushes sweeping every beat, a cross-stick on 2 and 4 (a soft
+    snare and a tambourine in big sections), a round kick and a shaker in eighths. Unhurried."""
+    h = song.hit
+    for t in np.arange(0, end, 1.0):
+        h("brush", b + t, 0.65, "perc", pan=0.2, sweep=True)
+    for t in (1, 3):
+        if t < end:
+            if big:
+                h("snare", b + t, 0.6, "snare")
+                h("tamb", b + t, 0.55, "hats", pan=0.4)
+            else:
+                h("rim", b + t, 0.85, "snare", pan=0.1)
+    for t in ([0, 2.5] if not odd else [0, 1.5, 2.5]):
+        if t < end:
+            h("kick", b + t, 0.75, "kick", tone=0.85)
+    for t in np.arange(0, end, 0.5):
+        h("shaker", b + t, 0.5 if t % 1 == 0 else 0.34, "hats", pan=-0.3)
+
+
 def _house(song, b, role, odd, big, end, double):
     """Four on the floor: claps on 2 and 4, open hats on the off-beats, sixteenth closed hats and
     a shaker in big sections."""
@@ -196,6 +219,11 @@ def _synthwave(song, b, role, odd, big, end):
 
 def _fill(song, b, style, i):
     h = song.hit
+    if style == "porch":  # a soft turnaround, no tom roll
+        for t, v in ((2.5, 0.4), (3.0, 0.5), (3.5, 0.6), (3.75, 0.5)):
+            h("snare", b + t, v, "snare")
+        h("kick", b + 2, 0.7, "kick", tone=0.85)
+        return
     h("kick", b + 2, 0.9, "kick")
     if style in ("drive", "pop") or i % 2:
         for k, t in enumerate(np.arange(2, 4, 0.25)):
@@ -208,6 +236,12 @@ def _fill(song, b, style, i):
 
 def _halftime(song, b, style):
     h = song.hit
+    if style == "porch":  # brushes alone, a kick on the one, the cross-stick on three
+        h("kick", b, 0.65, "kick", tone=0.85)
+        h("rim", b + 2, 0.7, "snare", pan=0.1)
+        for t in range(4):
+            h("brush", b + t, 0.6, "perc", pan=0.2, sweep=True)
+        return
     h("kick", b, 0.9, "kick")
     h("kick", b + 2.5, 0.6, "kick")
     h("snare", b + 2, 0.8, "snare")
@@ -217,6 +251,12 @@ def _halftime(song, b, style):
 
 def _build(song, b, i, nbars, style, last):
     h = song.hit
+    if style == "porch":  # no snare roll: the groove simply comes back, shaker first
+        _porch(song, b, "verse", i % 2 == 1, False, 4.0)
+        if last:
+            for t, v in ((3.0, 0.45), (3.5, 0.55), (3.75, 0.6)):
+                h("snare", b + t, v, "snare")
+        return
     for t in range(4):
         h("kick", b + t, 0.85, "kick")
     step = 0.25 if last else 0.5
