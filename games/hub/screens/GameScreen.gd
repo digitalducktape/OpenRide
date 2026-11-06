@@ -219,7 +219,8 @@ func _poster() -> Control:
 	chips.add_theme_constant_override("separation", 14)
 	col.add_child(chips)
 	if bool(entry.get("uses_camera", false)):
-		chips.add_child(_chip("Lean to steer"))
+		var info := GameRegistry.cached_info(str(entry.get("id", "")))
+		chips.add_child(_chip("Stand to jump" if info and info.tracker_mode == "lean_stand" else "Lean to steer"))
 	var best_row := HBoxContainer.new()
 	best_row.add_theme_constant_override("separation", 14)
 	col.add_child(best_row)

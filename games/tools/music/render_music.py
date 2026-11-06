@@ -83,6 +83,8 @@ def render_song(spec, seed):
                 line(song, bar0, mel[p[1]][:n], p[2], p[3], rng, shift=p[4], vel=p[5], harmony=harm)
             elif kind == "counter":
                 line(song, bar0, counter(ch, *p[4:6]) if len(p) > 4 else counter(ch), p[1], p[2], rng, vel=p[3])
+        if "extra" in spec:  # a song's own parts for this section: extra(song, bar0, bars, name, role, rng)
+            spec["extra"](song, bar0, n, name, role, rng)
         if name in spec.get("risers", ("intro", "bridge")):
             song.put("fx", (bar0 + n - 1) * 4, ins.riser(4 * song.spb, rng), human=0)
         bar0 += n

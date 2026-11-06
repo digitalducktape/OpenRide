@@ -56,6 +56,7 @@ def _groove(song, b, style, role, odd, double, fill):
         return
     elif style == "bossa":
         _bossa(song, b, role, odd, big, end)
+        return
     elif style == "surf":
         _surf(song, b, role, odd, big, end)
         return

@@ -42,6 +42,7 @@ const LOOKS := {
 	"keepy_uppy": [Color("ff7a59"), Color("12233a")],
 	"power_grid": [Color("8fd8ff"), Color("151336")],
 	"ready_for_launch": [Color("2fd6c8"), Color("0a1a2e")],
+	"gate_crasher": [Color("2fc4b2"), Color("0c2a2e")],
 }
 
 static var _looks := {}
