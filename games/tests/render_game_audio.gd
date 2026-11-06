@@ -30,6 +30,8 @@ const REELS := {
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
 	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
 		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
+	"gate_crasher": ["hoof_canter", "count_tick", "line_chime", "take_chime", "lift_off", "landing", "rail_clatter",
+		"applause", "clear_round", "rein_warn"],
 }
 const GAME_SCRIPTS := {
 	"dodge_ball": "res://games/dodge_ball/DodgeAudio.gd",
@@ -40,6 +42,7 @@ const GAME_SCRIPTS := {
 	"the_pull": "res://games/the_pull/PullAudio.gd",
 	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
 	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
+	"gate_crasher": "res://games/gate_crasher/GateAudio.gd",
 }
 
 var out_dir := ""
@@ -174,6 +177,15 @@ func _ride(game_id: String, director: Node) -> void:
 			res = 15.0 + 35.0 * (0.5 + 0.5 * sin(t * 0.35))
 			if t > 50.0 and t < 56.0:
 				cad = 35.0
+		"gate_crasher":
+			# A steady canter, standing on the line, seated through one fence for the clatter.
+			cad = 85.0
+			res = 34.0
+			var game: Node = director.game
+			if game and "logic" in game and game.logic and director.phase_name() == "PLAYING":
+				var l = game.logic
+				var past: float = l.distance - l.line_s(l.fence)
+				_input._sim_standing = l.speed > 1.0 and past >= l.speed * 0.5 and past < 18.0 and l.fence != 2
 		"tug_of_war":
 			cad = 85.0
 			res = 30.0 + 30.0 * (0.5 + 0.5 * sin(t * 0.25))

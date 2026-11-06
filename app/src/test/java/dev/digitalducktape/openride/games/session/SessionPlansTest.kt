@@ -375,8 +375,9 @@ class SessionPlansTest {
             val free = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id }.toSet()
             without.segments.filter { it.role == SegmentRole.WORK }.forEach { assertTrue(it.gameId in free) }
         }
-        // With the camera, Dodge Ball plays its share.
-        assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId == "dodge_ball" })
+        // With the camera, the camera games play their share.
+        val cameraWork = GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).filter { it.usesCamera }.map { it.id }
+        assertTrue(SessionPlans.circuit(CircuitPresets.TWENTY, Difficulty.STANDARD, ftp200, GameCatalog.DEFAULT).segments.any { it.gameId in cameraWork })
     }
 
     @Test
@@ -513,7 +514,7 @@ class SessionPlansTest {
     fun `pools come from the catalog's roles and leave out the demo and, without the camera, camera games`() {
         assertEquals(listOf("cadence_karaoke", "watt_lane"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP).map { it.id })
         assertEquals(listOf("cadence_karaoke"), GameCatalog.DEFAULT.circuitPool(SegmentRole.COOLDOWN).map { it.id })
-        assertEquals(setOf("dodge_ball", "tug_of_war", "watt_lane", "balloon_pump", "keepy_uppy"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
+        assertEquals(setOf("dodge_ball", "tug_of_war", "watt_lane", "balloon_pump", "keepy_uppy", "gate_crasher"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK).map { it.id }.toSet())
         assertEquals(listOf("tug_of_war", "watt_lane", "balloon_pump", "keepy_uppy"), GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false).map { it.id })
         assertEquals(setOf("cadence_karaoke", "power_grid", "watt_lane", "glide_path"), elevenGames.circuitPool(SegmentRole.WARMUP).map { it.id }.toSet())
         assertFalse(elevenGames.circuitPool(SegmentRole.WORK, cameraGames = false).any { it.usesCamera })

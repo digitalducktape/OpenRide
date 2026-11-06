@@ -384,6 +384,41 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Gate Crasher (#80), `games/games/gate_crasher/`: show jumping in first person. Pedal to
+         * canter round the course and stand at each take-off line, read by the camera's
+         * StandingDetector, so it needs the camera: a camera-off circuit skips it. `pace_watts`
+         * is the canter's target (45 / 55 / 65% of FTP), `window_sec` the rider's margin round the
+         * line, and `stand_lag_sec` the detector's enter time (`HeadTrackerConfig.standEnterMs`).
+         * A round is one lap of `fences`.
+         */
+        val GATE_CRASHER = GameDeclaration(
+            id = "gate_crasher",
+            title = "Gate Crasher",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 65,
+            roles = setOf(SegmentRole.WORK),
+            usesCamera = true,
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val (pace, window) = when (difficulty) {
+                    Difficulty.EASY -> 0.45 to 1.4
+                    Difficulty.STANDARD -> 0.55 to 1.2
+                    Difficulty.HARD -> 0.65 to 1.2
+                }
+                mapOf(
+                    "pace_watts" to JsonPrimitive((ftp.watts * pace).roundToInt()),
+                    "window_sec" to JsonPrimitive(window),
+                    "stand_lag_sec" to JsonPrimitive(0.5),
+                    "fences" to JsonPrimitive(8),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
          * `free` (Kart Race, The Pull). [SessionPlans.custom] still plays warm-up in the first slot and
@@ -399,7 +434,7 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /** Every registered game. Each game issue adds its declaration here. */
         val DEFAULT = GameCatalog(
-            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY),
+            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY, GATE_CRASHER),
         )
     }
 }

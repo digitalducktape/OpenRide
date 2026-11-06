@@ -1065,6 +1065,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
 | Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
 | Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
+| Gate Crasher | Clear Round | 138 bpm, G major | Show-ring galop: snare drive, octave bass, piano eighths, flute verse, brass fanfare chorus with bells | harmony at a canter, lead while the round is clear |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -2229,6 +2230,29 @@ height. `KeepyLogic` holds the rules (`keepy_logic_test`, `keepy_scene_test`), a
 **Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the balloon near the centre of
 the screen above an illustrated pedal fan, in four lit outdoor places (the **Place** option, or a
 new one every 3 minutes on random). **Music:** "Updraft" (`AUDIO_POLISH.md`).
+
+## Gate Crasher (#80)
+
+Show jumping in first person from the saddle: pedal to canter round a course of fences, and stand
+up on the bike at each take-off line. `games/games/gate_crasher/DESIGN.md` has the rules, the tuning
+and every call, and its `ART_BIBLE.md` the look. `GateLogic` holds the rules
+(`gate_crasher_logic_test`), `GateCourse` the loop, `GateWorld` and `GateMeshes` the 3D view,
+`GateStatus` the HUD widget, and `GateCrasher.gd` wires them (`gate_crasher_scene_test`, with the
+bounds checks).
+
+- **Camera only:** `tracker_mode` `lean_stand` and `usesCamera`, so a camera-off circuit skips it.
+- **The window includes the detector's lag.** Kotlin sends `window_sec` (1.4 easy, else 1.2) and
+  `stand_lag_sec` (0.5, `standEnterMs`). A stand within half a window of the line counts; it reads
+  0.5 s later, so `GateLogic` opens the window at `window_sec / 2 - lag` before the line. Only a
+  stand that starts in the window counts. Fences are at least 5 s apart at the 10 m/s cap.
+- **Pace:** Kotlin sends `pace_watts` (45 / 55 / 65% of FTP), the ride panel's band. Under 30 rpm
+  the horse stops, and nothing scores.
+- **Scoring:** 50 a clear, 0.25 a metre, 100 a clear round; a rail is 4 faults and -30. Stars are
+  points a minute.
+- **Lost camera** (`tracker_state` 4): the horse circles, judging nothing, and comes out with a whole
+  countdown ahead.
+- **Captures:** `tests/capture_gate.gd` (`--play=SECONDS`, `--silhouette`) and
+  `tests/render_game_audio.gd --game=gate_crasher`.
 
 ## Circuits and the Games hub (#37, #38)
 

@@ -54,7 +54,7 @@ func test_a_visit_starts_with_a_full_hub_state() -> void:
 	assert_str(s.visit_id).is_equal(Session.visit_id)
 	var ids: Array = s.catalog.map(func(g): return g.id)
 	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull", "balloon_pump",
-		"keepy_uppy"])
+		"keepy_uppy", "gate_crasher"])
 	var kart: Dictionary = s.catalog[0]
 	assert_array(kart.minute_steps).is_equal([5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0])
 	assert_str(kart.circuit_role).is_equal("free")
