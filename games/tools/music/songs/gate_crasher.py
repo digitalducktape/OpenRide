@@ -1,12 +1,14 @@
-"""Gate Crasher (#80): "Clear Round", a bright show-ring galop at 138 bpm in G major for a morning
-in the arena. A brisk snare drive and a bouncing octave bass under eighth-note piano and acoustic
-strums; a flute sings the verse, a brass fanfare carries the chorus with bells on top, and the
-bridge settles on a pad before a snare build. The harmony comes in at a canter, the lead with
-the round still clear. Written for this repo: no samples, nothing borrowed.
+"""Gate Crasher (#80): "Clear Round", a show-ring galop at 138 bpm in G major for a morning in the
+arena. The hook is the gallop itself: a long-short-short figure leaping to a fanfare, called by
+the brass and answered by a tin whistle in the gaps. A horn call opens it; a clip-clop of congas
+runs under the verses and choruses; the flute sings the verses (each ends teasing the hook); the
+bridge drops to E minor on strings, half time, then climbs on the same figure over a snare roll,
+and the last chorus lifts a whole tone to A before a turnaround back to G. The harmony comes in at
+a canter, the lead with the ride going well. Written for this repo: no samples, nothing borrowed.
 
 The effects are the arena's: a three-beat canter stride the game plays once per stride, the
 countdown tick and take-off chime, the lift and landing, a rail clatter, applause and the clear
-round's fanfare."""
+round's fanfare, which quotes the hook."""
 import numpy as np
 
 import instruments as ins
@@ -16,42 +18,96 @@ from dsp import SR, secs, lp, bp, hp
 
 PREFIX = "Gate"
 
+HOOK = ("G5:0.5 G5:0.25 G5:0.25 C6:1 E6:1.5 D6:0.5 | D6:0.5 D6:0.25 D6:0.25 B5:1 G5:2 |"
+        " A5:0.5 A5:0.25 A5:0.25 D6:1 F#6:1.5 E6:0.5 | E6:0.5 E6:0.25 E6:0.25 B5:1 G5:1 r:1 |"
+        " G5:0.5 G5:0.25 G5:0.25 C6:1 E6:1 G6:1 | F#6:0.5 E6:0.25 D6:0.25 B5:1 G5:2 |"
+        " C6:0.5 C6:0.25 C6:0.25 E6:1 D6:0.5 D6:0.25 D6:0.25 F#6:1 | G6:1 D6:0.5 B5:0.5 G5:1 r:1")
+
 SONG = dict(
     file="clear_round", title="Clear Round", bpm=138, key="G", scale=[0, 2, 4, 5, 7, 9, 11], seed=80,
     drums="drive", bass="octave", verb_sec=1.5,
-    form=([("intro", 4)], [("verse", 8), ("chorus", 8), ("bridge", 8), ("chorus2", 8)]),
+    form=([("intro", 4)], [("verse", 8), ("chorus", 8), ("verse2", 8), ("bridge", 8), ("chorus2", 8)]),
     chords=dict(
         intro=["G", "G", "C D", "G"],
         verse=["G", "D", "Em", "C", "G", "D", "C D", "G"],
         chorus=["C", "G", "D", "Em", "C", "G", "Am D", "G"],
-        bridge=["Em", "C", "G", "D", "Em", "C", "A7", "D7"],
+        bridge=["Em", "C", "Am", "B7", "Em", "C", "D", "E7"],
+        # The last chorus, a whole tone up; its last bar turns back to G for the loop.
+        chorus2=["D", "A", "E", "F#m", "D", "A", "Bm E", "A D7"],
     ),
     melody=dict(
-        verse="G5:0.5 B5:0.5 D6:1 B5:0.5 G5:0.5 D5:1 | F#5:0.5 A5:0.5 D6:1 C6:0.5 A5:0.5 F#5:1 |"
-              " E5:0.5 G5:0.5 B5:1 G5:0.5 E5:0.5 B4:1 | C5:0.5 E5:0.5 G5:1 E5:1 r:1 |"
-              " G5:0.5 B5:0.5 D6:1 E6:0.5 D6:0.5 B5:1 | A5:0.5 F#5:0.5 D5:1 A5:1 r:1 |"
-              " G5:0.5 E5:0.5 C5:1 F#5:0.5 A5:0.5 D6:1 | B5:3 r:1",
-        chorus="G5:1 C6:1 E6:1.5 D6:0.5 | D6:1 B5:1 G5:2 | A5:1 D6:1 F#6:1.5 E6:0.5 | E6:1 B5:1 G5:2 |"
-               " G5:1 C6:1 E6:1.5 G6:0.5 | F#6:0.5 E6:0.5 D6:1 B5:2 | C6:1 E6:1 D6:1 F#6:1 | G6:3 r:1",
-        bridge="B5:2 G5:2 | C6:2 E5:2 | D6:1 B5:1 G5:2 | A5:3 r:1 | B5:2 E6:2 | C6:2 G5:2 |"
-               " C#6:1 E6:1 A5:2 | D6:1 F#6:1 A6:2",
+        # The horn call, then the hook's first figure twice.
+        intro="D5:0.5 G5:0.5 B5:1 D6:2 | B5:0.5 D6:0.5 G6:1 D6:2 |"
+              " G5:0.5 G5:0.25 G5:0.25 C6:1 A5:0.5 A5:0.25 A5:0.25 D6:1 | G5:0.5 G5:0.25 G5:0.25 B5:0.5 D6:0.5 G6:1 r:1",
+        verse="B5:1 D6:0.5 B5:0.5 G5:1 A5:0.5 B5:0.5 | A5:1.5 F#5:0.5 D5:2 |"
+              " G5:1 B5:0.5 G5:0.5 E5:1 F#5:0.5 G5:0.5 | E5:1.5 C5:0.5 G4:1 r:1 |"
+              " B5:1 D6:0.5 B5:0.5 G6:1 F#6:0.5 E6:0.5 | D6:1.5 A5:0.5 F#5:2 |"
+              " E6:1 C6:1 D6:0.5 C6:0.5 A5:1 | G5:0.5 G5:0.25 G5:0.25 B5:0.5 D6:0.5 G6:1 r:1",
+        chorus=HOOK,
+        # The whistle's answers, in the gaps the hook leaves.
+        answer="r:4 | r:2 B5:0.5 C6:0.5 D6:1 | r:4 | r:2 E6:0.5 F#6:0.5 G6:1 | r:4 | r:2 D6:0.5 E6:0.5 G6:1 |"
+               " r:4 | r:3 D6:0.25 E6:0.25 F#6:0.5",
+        bridge="G5:2 B5:2 | C6:2 E5:2 | A5:1 C6:1 E6:2 | D#6:3 r:1 | G5:2 B5:2 | E6:2 C6:2 |"
+               " F#6:2 A6:2 | G#6:2 B6:2",
+        # The climb: the hook's figure, on brass over the last two bars of the bridge.
+        climb="r:4 | r:4 | r:4 | r:4 | r:4 | r:4 | D6:0.5 D6:0.25 D6:0.25 F#6:1 D6:0.5 D6:0.25 D6:0.25 A6:1 |"
+              " E6:0.5 E6:0.25 E6:0.25 G#6:1 E6:0.5 E6:0.25 E6:0.25 B6:1",
     ),
     parts=dict(
-        intro=[("comp", "stabs", 0.75), ("comp", "strum", 0.6)],
-        # Verse: eighth-note piano and strums under the flute.
-        verse=[("comp", "piano8", 0.7), ("comp", "strum", 0.6),
-               ("lead", "verse", "flute", "lead", 0, 0.9)],
-        # Chorus: the fanfare on brass, bells an octave up, stabs answering.
-        chorus=[("comp", "piano8", 0.65), ("comp", "stabs", 0.6), ("comp", "strum", 0.5),
-                ("lead", "chorus", "brass", "lead", -12, 0.9), ("lead", "chorus", "bells", "lead2", 0, 0.45)],
-        # Bridge: half-time drums (the arranger's), a pad, held stabs and the flute low.
-        bridge=[("comp", "pad", 0.55), ("comp", "stabs_hold", 0.5), ("comp", "strum", 0.45),
-                ("lead", "bridge", "flute", "lead", -12, 0.85), ("lead", "bridge", "vibes", "lead2", 0, 0.4)],
-        chorus2=[("comp", "piano8", 0.65), ("comp", "stabs", 0.65), ("comp", "strum", 0.5),
-                 ("lead", "chorus", "brass", "lead", -12, 0.9, True), ("lead", "chorus", "flute", "lead2", 0, 0.5),
-                 ("counter", "bells", "lead2", 0.35)],
+        # On the brass bus, so the call sounds over the intro card (the harmony stem, not the lead).
+        intro=[("comp", "strum", 0.5), ("lead", "intro", "brass", "brass", -12, 0.95)],
+        # Verse: light, off-beat piano and strums under the flute.
+        verse=[("comp", "piano_off", 0.45), ("comp", "strum", 0.4), ("lead", "verse", "flute", "lead", 0, 0.55)],
+        # Chorus: the band at full tilt; brass in thirds calls, the whistle answers.
+        chorus=[("comp", "piano8", 0.8), ("comp", "stabs", 0.8), ("comp", "strum", 0.65),
+                ("lead", "chorus", "brass", "lead", -12, 1.25, True), ("lead", "answer", "whistle", "lead2", 0, 0.9)],
+        # Verse 2: the same tune with piano eighths and a strings counter-line: it has grown.
+        verse2=[("comp", "piano8", 0.5), ("comp", "strum", 0.45), ("lead", "verse", "flute", "lead", 0, 0.6),
+                ("counter", "strings", "lead2", 0.5)],
+        # Bridge: half-time drums then the arranger's build; strings over a pad, vibes behind.
+        bridge=[("comp", "pad", 0.6), ("comp", "stabs_hold", 0.45), ("lead", "bridge", "strings", "lead", -12, 1.5),
+                ("lead", "climb", "brass", "lead2", -12, 0.85)],
+        # The lift: everything, a whole tone up, with bells doubling the hook on top.
+        chorus2=[("comp", "piano8", 0.85), ("comp", "stabs", 0.9), ("comp", "strum", 0.7),
+                 ("lead", "chorus", "brass", "lead", -10, 1.3, True), ("lead", "answer", "whistle", "lead2", 2, 0.9),
+                 ("lead", "chorus", "bells", "lead2", 2, 0.4)],
     ),
+    roles={"verse2": "verse", "chorus2": "chorus"},
+    risers=("bridge",),
+    levels={"perc": -26, "lead2": -23, "brass": -24},
+    extra=lambda song, bar0, n, name, role, rng: _extra(song, bar0, n, name, rng),
 )
+
+## The chord each section's last beat kicks into, as a three-note brass stab.
+_PICKUPS = {"verse": ("C4", "E4", "G4"), "verse2": ("C4", "E4", "G4"), "bridge": ("E4", "G#4", "B4")}
+
+
+def _extra(song, bar0, n, name, rng):
+    """The song's own percussion: the clip-clop that gives it its gait, kettle hits on the chorus's
+    downbeats, a snare roll up the bridge's climb, and a brass pickup into each chorus."""
+    for i in range(n):
+        b = (bar0 + i) * 4
+        level = {"verse": 0.45, "verse2": 0.6, "chorus": 1.0, "chorus2": 1.1}.get(name, 0.0)
+        if name == "intro" and i >= 2:
+            level = 0.7
+        if name == "bridge" and i >= 4:
+            level = 0.4 + 0.15 * (i - 4)
+        if level:
+            for beat in range(4):
+                song.hit("conga", b + beat, 0.8 * level, "perc", pan=-0.3, pitch=1.0)
+                song.hit("conga", b + beat + 0.5, 0.45 * level, "perc", pan=0.3, pitch=1.3)
+                song.hit("conga", b + beat + 0.75, 0.55 * level, "perc", pan=0.3, pitch=1.3)
+        if name in ("chorus", "chorus2") and i % 2 == 0:
+            song.hit("tom", b, 0.9, "perc", pitch=0.55)
+        if name == "bridge" and i >= n - 2:
+            for k in range(16):
+                song.hit("snare", b + k * 0.25, 0.2 + 0.03 * k + 0.25 * (i - (n - 2)), "snare", tight=True)
+    if name in _PICKUPS:
+        last = (bar0 + n - 1) * 4
+        for beat, dur in ((3.0, 0.4), (3.5, 0.2), (3.75, 0.2)):
+            for m in _PICKUPS[name]:
+                song.put("brass", last + beat, ins.brass(note(m), dur * song.spb, 0.8, rng, stab=True), pan=rng.uniform(-0.4, 0.4))
+
 
 BEAT = 60 / 138
 
@@ -121,12 +177,13 @@ def applause(rng):
 
 
 def clear_round(rng):
-    # The round was clear: the chorus's fanfare, to a held G with a crash and a snare flourish.
-    notes = [(0, 0.5, note("D5")), (0.5, 0.5, note("G5")), (1, 0.5, note("B5")), (1.5, 3.0, note("D6"))]
+    # The round was clear: the hook's gallop figure, up to a held G with a crash and a snare flourish.
+    notes = [(0, 0.5, note("G4")), (0.5, 0.25, note("G4")), (0.75, 0.25, note("G4")), (1, 0.5, note("B4")),
+             (1.5, 0.5, note("D5")), (2, 3.0, note("G5"))]
     top = fx.fanfare(notes, BEAT, "brass", rng)
-    under = fx.fanfare([(1.5, 3.0, note("B4")), (1.5, 3.0, note("G4"))], BEAT, "brass", rng, vel=0.6)
-    return fx.mix((0, top), (0, under), (0, fx.drumroll(1.5 * BEAT, rng) * 0.5), (1.5 * BEAT, ins.crash(0.8, rng)),
-                  (1.5 * BEAT, ins.bells(note("G6"), 1.0, 0.7, rng)))
+    under = fx.fanfare([(2, 3.0, note("D5")), (2, 3.0, note("B4"))], BEAT, "brass", rng, vel=0.6)
+    return fx.mix((0, top), (0, under), (0, fx.drumroll(2 * BEAT, rng) * 0.5), (2 * BEAT, ins.crash(0.8, rng)),
+                  (2 * BEAT, ins.bells(note("G6"), 1.0, 0.7, rng)))
 
 
 def rein_warn(rng):

@@ -52,7 +52,8 @@ read). A round of eight clears pays 100.
 
 ### Lost camera
 
-`tracker_state` 4 starts a circle at once: nothing is judged, nothing scores, and any fence in
+Any `tracker_state` but tracking (3) starts a circle at once: face lost (4), and also a calibration
+that failed (0), which on the tablet faulted every fence until this rule covered it. Nothing is judged, nothing scores, and any fence in
 play starts over. The horse circles (7 m radius, 6 m/s) while sliding back along the course, so it
 comes out at least 3.2 s at pace from the line, with a whole countdown ahead. Once the rider is seen
 the circle finishes its turn (at most about 7 s). Sensor loss freezes the ride.
@@ -78,6 +79,12 @@ above the first two, below the third (`gate_crasher_logic_test`).
 | `stand_lag_sec` | 0.5 | 0.5 | 0.5 |
 | `fences` | 8 | 8 | 8 |
 
+## On the tablet
+
+60.4 fps average, 58 minimum, over 52 s of play on the mock build, no render-scale steps. **The camera
+was not running** (nobody was on the bike, so calibration failed); Kart Race loses a few fps on
+a hot tablet with it on, so re-measure with a rider.
+
 ## HUD agreement
 
 The rider's watts appear only in the ride panel, where the pace is the band's tick. The widget has
@@ -88,8 +95,9 @@ segment's params.
 
 1. **Pace share.** 45 / 55 / 65% of FTP is a guess at a comfortable spin with standing efforts.
 2. **"Too early" also covers never sitting.** A rider left standing is warned at the first beat.
-3. **Stand-to-detect time.** The acceptance item to measure it on the bike is **not done**: it needs
-   a person on the bike. The window assumes the detector's configured 0.5 s.
+3. **Stand-to-detect time.** The acceptance items to measure it on the bike, and to check a seated
+   rider never triggers a jump, are **not done**: they need a person on the bike. The window assumes
+   the detector's configured 0.5 s.
 4. **No bike in view.** The rider's direction (view from the saddle) overrides the issue's "in front
    of the bike".
 5. **A fence crossed without pedalling** breaks the clear round but isn't a fault.

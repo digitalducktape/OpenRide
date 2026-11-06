@@ -64,8 +64,8 @@ func _run() -> void:
 	_bus._sim_resistance = 34.0
 	if _play > 0.0:
 		_miss_fence = 2
-		var end := Time.get_ticks_msec() + int(_play * 1000.0)
-		while Time.get_ticks_msec() < end:
+		var frames := int(_play * 30.0)
+		for i in frames:
 			_rider(game)
 			await process_frame
 		quit()

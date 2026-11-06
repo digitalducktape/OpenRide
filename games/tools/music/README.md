@@ -20,6 +20,8 @@ import afterwards. A theme takes 4-8 s to render.
   - `SONG`: the theme (chords, melodies, form, parts per section, drum and bass styles).
   - `SFX`: `{name: function(rng)}`, the game's effects, in the theme's key.
   - `PREFIX`: the index is `games/games/<game>/<PREFIX>Music.gd`.
+  - Optional in `SONG`: `extra(song, bar0, bars, name, role, rng)`, the song's own parts for a
+    section, called after its stock ones (Gate Crasher's clip-clop and pickups).
   - Cadence Karaoke has `SEQ` (a score for the sequencer) instead of `SONG`; `cues.py` has only
     effects, written to `audio/cues/` with the index `audio/CueSounds.gd`.
   - `hub.py` is the Games hub's theme, not a game's: its `DIR`, `INDEX` and `CLASS_NAME` put the

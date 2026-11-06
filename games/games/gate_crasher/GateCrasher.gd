@@ -12,7 +12,8 @@ extends Game
 
 const GateMusic := preload("res://games/gate_crasher/GateMusic.gd")
 
-## "Clear Round" (GateMusic): the bed always; the harmony at a canter; the lead with the round clear.
+## "Clear Round" (GateMusic): the bed always; the harmony (and the horn call, over the intro card)
+## from the start; the lead, which has the hook, at a canter, dropping out for LEAD_REST_SEC after a rail.
 const MUSIC_STYLE := {
 	"name": "clear_round",
 	"stem_files": GateMusic.STEM_FILES,
@@ -28,7 +29,8 @@ const RENDER_SCALE := 0.62
 const RESULT_END_DELAY := 2.5  ## after the last round, the segment ends this much later
 const CALLOUT_SEC := 1.3
 const MIN_STRIDE_SPEED := 1.0  ## m/s: under this the hoofbeats stop
-const CANTER_SPEED := 4.0  ## m/s: the harmony comes in
+const CANTER_SPEED := 4.0  ## m/s: the lead comes in
+const LEAD_REST_SEC := 6.0  ## after a rail, the tune stays out this long: until about the next fence
 
 ## The look (framework/ui/UI_STYLE.md): rosette teal on a dark pine, a slight lean.
 static var look := GameTheme.new(GateMeshes.ACCENT, GateMeshes.INK, 0.08)
@@ -44,6 +46,7 @@ var _stage := 0
 var _message_left := 0.0
 var _round_faults := 0
 var _end_left := -1.0
+var _lead_rest := 0.0
 var _band_set := false
 ## Steps the 3D view down to a lower render scale if the frame rate stays low.
 var governor := RenderScaleStep.new()
@@ -128,6 +131,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_stage = 0
 	_round_faults = 0
 	_end_left = -1.0
+	_lead_rest = 0.0
 	_band_set = false
 	governor = RenderScaleStep.new()
 	_set_render_scale(RENDER_SCALE)
@@ -139,7 +143,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_status.set_fences(logic.fences)
 	_update_status()
 	AudioDirector.play_music(MUSIC_STYLE, GateMusic.BPM)
-	AudioDirector.set_intensity(0.4)
+	AudioDirector.set_intensity(0.6)
 	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, GateAudio.music_effects())
 	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, GateAudio.sfx_effects())
 	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
@@ -152,7 +156,9 @@ func _on_frame(delta: float) -> void:
 		_set_render_scale(governor.render_scale(RENDER_SCALE))
 		print("OPENRIDE_GAMES gate_crasher quality tier=%d fps=%.1f scale=%.2f" % [
 			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
-	var camera_ok := InputBus.tracker_state != InputBus.TRACKER_FACE_LOST
+	# Anything but tracking: a stand can't be seen, so no fence may be judged (a failed calibration
+	# reads 0, and on the tablet it faulted every fence before this).
+	var camera_ok := InputBus.tracker_state == InputBus.TRACKER_TRACKING
 	var events := logic.step(delta, InputBus.power, InputBus.cadence, InputBus.standing, camera_ok, InputBus.sensors_ok)
 	if logic.last_points > 0.0:
 		award(logic.last_points)
@@ -162,10 +168,8 @@ func _on_frame(delta: float) -> void:
 	world.set_marker(logic.fence % logic.fences, _stage)
 	if world.take_stride() and logic.speed >= MIN_STRIDE_SPEED and logic.arc_height() <= 0.0:
 		AudioDirector.play_sfx("hoof_canter", -12.0)
-	var intensity := 0.4
-	if logic.speed >= CANTER_SPEED:
-		intensity = 1.0 if _round_faults == 0 else 0.6
-	AudioDirector.set_intensity(intensity)
+	_lead_rest = maxf(_lead_rest - delta, 0.0)
+	AudioDirector.set_intensity(1.0 if logic.speed >= CANTER_SPEED and _lead_rest <= 0.0 else 0.6)
 	_update_status()
 	if _message_left > 0.0:
 		_message_left -= delta
@@ -220,6 +224,7 @@ func _handle(event: Dictionary) -> void:
 			_stage = 0
 			penalize(event.penalty)
 			_round_faults += GateLogic.FAULTS_PER_RAIL
+			_lead_rest = LEAD_REST_SEC
 			world.knock_rail(event.fence)
 			AudioDirector.play_sfx("rail_clatter", -1.0)
 			GameMix.duck_for_moment(1.0)

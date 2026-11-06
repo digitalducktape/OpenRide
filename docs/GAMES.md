@@ -1065,7 +1065,7 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
 | Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
 | Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
-| Gate Crasher | Clear Round | 138 bpm, G major | Show-ring galop: snare drive, octave bass, piano eighths, flute verse, brass fanfare chorus with bells | harmony at a canter, lead while the round is clear |
+| Gate Crasher | Clear Round | 138 bpm, G major | Show-ring galop: a gallop-figure hook on brass answered by tin whistle, conga clip-clop, flute verses, a key lift for the last chorus | harmony always, lead at a canter, out for 6 s after a rail |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -2249,8 +2249,8 @@ bounds checks).
   the horse stops, and nothing scores.
 - **Scoring:** 50 a clear, 0.25 a metre, 100 a clear round; a rail is 4 faults and -30. Stars are
   points a minute.
-- **Lost camera** (`tracker_state` 4): the horse circles, judging nothing, and comes out with a whole
-  countdown ahead.
+- **Lost camera** (any `tracker_state` but tracking): the horse circles, judging nothing, and comes
+  out with a whole countdown ahead.
 - **Captures:** `tests/capture_gate.gd` (`--play=SECONDS`, `--silhouette`) and
   `tests/render_game_audio.gd --game=gate_crasher`.
 

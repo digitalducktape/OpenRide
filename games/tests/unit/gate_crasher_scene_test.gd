@@ -117,6 +117,17 @@ func test_a_rail_down_shows_on_the_status_and_takes_points() -> void:
 	assert_bool(game.hud.is_showing_message()).is_true()
 
 
+func test_a_rail_rests_the_tune_only_briefly() -> void:
+	_ride_to_line()
+	_ride(3.0)
+	assert_int(game.logic.faults).is_equal(4)
+	assert_float(game._lead_rest).is_greater(0.0)
+	InputBus.cadence = 0.0  # the horse stops short of the next fence, so only the timer runs
+	_ride(game.LEAD_REST_SEC + 0.5, 0.0)
+	assert_float(game._lead_rest).is_equal(0.0)
+	assert_int(game._round_faults).is_equal(4)
+
+
 func test_nothing_scores_without_pedalling() -> void:
 	_ride(4.0)
 	var score: float = Effort.score
@@ -132,6 +143,15 @@ func test_a_lost_camera_shows_the_circle() -> void:
 	_ride(1.0)
 	assert_int(game.logic.phase).is_equal(GateLogic.Phase.CIRCLE)
 	assert_str(game._status.chip_label.text).is_equal("CIRCLING")
+
+
+func test_a_camera_that_never_tracked_faults_nothing() -> void:
+	# What the tablet showed with no rider: a failed calibration reads tracker_state 0.
+	InputBus.tracker_state = InputBus.TRACKER_OFF
+	_ride(30.0)
+	assert_int(game.logic.phase).is_equal(GateLogic.Phase.CIRCLE)
+	assert_int(game.logic.faults).is_equal(0)
+	assert_int(game.logic.fences_done).is_equal(0)
 
 
 func test_the_summary_tiles_come_from_the_stats() -> void:
