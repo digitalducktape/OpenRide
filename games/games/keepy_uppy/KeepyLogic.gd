@@ -19,21 +19,30 @@ enum Weather { CALM, TELEGRAPH, ACTIVE }
 enum Band { LOW, MID, HIGH }
 
 const DEFAULT_FTP := 150.0
-## The balloon's weight as a share of FTP when the segment doesn't send `weight_watts`.
-const WEIGHT_SHARE := {"easy": 0.30, "standard": 0.40, "hard": 0.50}
-const RAIN_SHARE := 0.10
-const BIRD_SHARE := 0.05
-const DOWNDRAFT_SHARE := 0.20
+## The 2026-11 retune (rider feedback: "you have to pedal really fast on a high resistance to
+## prevent it from popping"). The fan holds the balloon at height h with
+## `weight + height_watts × h`, so light pedalling floats it low, a comfortable effort holds the
+## mid band and the high band stays real work. Shares of FTP when the segment doesn't send
+## `weight_watts` and `height_watts` (standard: hover 8%, mid band from 27%, high from 57%).
+const WEIGHT_SHARE := {"easy": 0.06, "standard": 0.08, "hard": 0.10}
+const HEIGHT_SHARE := {"easy": 0.65, "standard": 0.75, "hard": 0.85}
+const RAIN_SHARE := 0.04
+const BIRD_SHARE := 0.02
+const DOWNDRAFT_SHARE := 0.08
 
 ## Power is smoothed with this time constant: a step is 86% in after 2 s ("smoothed (2 s)").
 const SMOOTH_TAU := 1.0
-## The column weakens with height: lift = power × (1 − FALLOFF × h).
-const FALLOFF := 0.45
-const SINK_MAX := 0.15  ## height a second: balloons are floaty
+## Height a second = (power − need) / (height_watts × RATE_SCALE), within the limits below.
+const RATE_SCALE := 0.5
+const SINK_MAX := 0.06  ## height a second: balloons are floaty, so a stop takes 6 s or more to land
 const CLIMB_MAX := 0.25
-const DOWNDRAFT_SINK := 0.25  ## a downdraft lifts the floaty limit to this
-const MID_FROM := 0.35
+const DOWNDRAFT_SINK := 0.10  ## a downdraft lifts the floaty limit to this
+const MID_FROM := 0.25
 const HIGH_FROM := 0.65
+## The intro's target holds the balloon here, just inside the mid band.
+const TARGET_HEIGHT := 0.30
+## Sinking below this height warns ("sinking"), well before the grille.
+const LOW_WARN := 0.15
 const BASE_POINTS := 10.0  ## a second, times the band (1×, 2×, 3×)
 const POP_PENALTY := 50.0
 
@@ -90,7 +99,8 @@ const WIND_FADE_SEC := 2.0  ## without a face the wind dies away over this
 const X_LIMIT := 3.0
 
 var ftp := DEFAULT_FTP
-var base_weight := DEFAULT_FTP * 0.4
+var base_weight := DEFAULT_FTP * 0.08
+var height_watts := DEFAULT_FTP * 0.75  ## the extra watts a full height asks
 var rain_watts := DEFAULT_FTP * RAIN_SHARE
 var bird_watts := DEFAULT_FTP * BIRD_SHARE
 var downdraft_watts := DEFAULT_FTP * DOWNDRAFT_SHARE
@@ -143,13 +153,15 @@ var _downdraft_band := Band.MID
 var _downdraft_low := Band.MID
 var _power_sum := 0.0
 var _power_sec := 0.0
+var _low_warned := false
 
 
 func _init(seed_value: int, params := {}, new_difficulty := "standard", new_steer := false) -> void:
 	_rng.seed = seed_value
 	ftp = maxf(float(params.get("ftp_watts", params.get("ftp", DEFAULT_FTP))), 1.0)
-	var share: float = WEIGHT_SHARE.get(new_difficulty, 0.4)
-	base_weight = float(params.get("weight_watts", ftp * share))
+	var w := weights_for(params, new_difficulty)
+	base_weight = w.x
+	height_watts = w.y
 	rain_watts = float(params.get("rain_watts", ftp * RAIN_SHARE))
 	bird_watts = float(params.get("bird_watts", ftp * BIRD_SHARE))
 	downdraft_watts = float(params.get("downdraft_watts", ftp * DOWNDRAFT_SHARE))
@@ -158,6 +170,13 @@ func _init(seed_value: int, params := {}, new_difficulty := "standard", new_stee
 	_next_gust = _gust_gap()
 	_next_wind = 0.0
 	band = band_of(h)
+
+
+## The balloon's weight and height watts for a segment's `params` (Kotlin's, or the shares).
+static func weights_for(params: Dictionary, difficulty: String) -> Vector2:
+	var f := maxf(float(params.get("ftp_watts", params.get("ftp", DEFAULT_FTP))), 1.0)
+	return Vector2(float(params.get("weight_watts", f * float(WEIGHT_SHARE.get(difficulty, 0.08)))),
+		maxf(float(params.get("height_watts", f * float(HEIGHT_SHARE.get(difficulty, 0.75)))), 1.0))
 
 
 ## The weight the fan holds up now: the balloon, the rain and the birds (and a downdraft's push).
@@ -178,21 +197,20 @@ func pedalling_it_up() -> bool:
 	return minf(_power, smoothed) * efficiency >= weight()
 
 
-## The fan's lift at height `at_h`, from the smoothed power and the steer offset.
-func lift(at_h: float) -> float:
-	return smoothed * efficiency * (1.0 - FALLOFF * at_h)
+## The watts that hold the balloon at height `at_h` now (its weight, the weather, the height).
+func need(at_h: float) -> float:
+	return weight() + height_watts * at_h
 
 
-## Where the balloon comes to rest at a steady `power` and weight `w` (no steer loss).
-static func resting_height(power: float, w: float) -> float:
-	if power <= w:
-		return 0.0
-	return clampf((1.0 - w / power) / FALLOFF, 0.0, 1.0)
+## Where the balloon comes to rest at a steady `power`, weight `w` and height watts `span`
+## (no steer loss).
+static func resting_height(power: float, w: float, span: float) -> float:
+	return clampf((power - w) / maxf(span, 1.0), 0.0, 1.0)
 
 
 ## The steady power that holds the balloon at height `at_h` against weight `w`.
-static func power_for(at_h: float, w: float) -> float:
-	return w / (1.0 - FALLOFF * at_h)
+static func power_for(at_h: float, w: float, span: float) -> float:
+	return w + span * at_h
 
 
 static func band_of(height: float) -> Band:
@@ -261,11 +279,10 @@ func step(delta: float, power: float, lean := 0.0, tracking := false, frozen := 
 
 
 func _step_flying(delta: float, events: Array[Dictionary]) -> void:
-	var w := weight()
 	var sink_max := SINK_MAX
 	if weather == Weather.ACTIVE and force == "downdraft":
 		sink_max = DOWNDRAFT_SINK
-	rate = clampf((lift(h) - w) / maxf(w, 1.0), -sink_max, CLIMB_MAX)
+	rate = clampf((smoothed * efficiency - need(h)) / (height_watts * RATE_SCALE), -sink_max, CLIMB_MAX)
 	if _grace > 0.0:
 		_grace -= delta
 		rate = maxf(rate, 0.0)
@@ -285,6 +302,11 @@ func _step_flying(delta: float, events: Array[Dictionary]) -> void:
 	if band == Band.HIGH:
 		seconds_high += delta
 	_step_birds(delta, events)
+	if h < LOW_WARN and rate < 0.0 and not _low_warned:
+		_low_warned = true
+		events.append({"type": "sinking"})
+	elif h > LOW_WARN + 0.05:
+		_low_warned = false
 	if h <= 0.0:
 		_pop(events)
 		return

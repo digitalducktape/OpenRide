@@ -18,8 +18,8 @@ enum Phase { FILL, TIE, LOAD, BREAK, OVER }
 
 const DEFAULT_FTP := 150.0  ## Kotlin's fallback FTP
 ## The push line as shares of FTP, empty and full (a medium balloon): work, then recovery.
-const LINE_WORK := Vector2(0.20, 0.45)
-const LINE_RECOVERY := Vector2(0.15, 0.30)
+const LINE_WORK := Vector2(0.08, 0.26)
+const LINE_RECOVERY := Vector2(0.05, 0.20)
 ## The gauge reads up to this share of FTP, so riding at FTP still moves the needle.
 const GAUGE_FULL_FTP := 1.2
 const LINE_EXP := 3.0  ## the line's curve: lo + (hi - lo) × k × f^LINE_EXP

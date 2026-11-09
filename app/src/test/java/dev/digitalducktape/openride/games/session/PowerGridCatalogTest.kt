@@ -35,20 +35,21 @@ class PowerGridCatalogTest {
 
     @Test
     fun `work demand follows difficulty`() {
-        assertEquals(90, params(SegmentRole.WORK).int("demand_lo_watts"))
-        assertEquals(140, params(SegmentRole.WORK).int("demand_hi_watts"))
-        assertEquals(120, params(SegmentRole.WORK, Difficulty.EASY).int("demand_hi_watts"))
-        assertEquals(150, params(SegmentRole.WORK, Difficulty.HARD).int("demand_hi_watts"))
+        // The 2026-11 retune: 15-33% of FTP on standard, met at 90%.
+        assertEquals(30, params(SegmentRole.WORK).int("demand_lo_watts"))
+        assertEquals(66, params(SegmentRole.WORK).int("demand_hi_watts"))
+        assertEquals(54, params(SegmentRole.WORK, Difficulty.EASY).int("demand_hi_watts"))
+        assertEquals(90, params(SegmentRole.WORK, Difficulty.HARD).int("demand_hi_watts"))
         assertEquals(30, params(SegmentRole.WORK).int("storm_watts"))
     }
 
     @Test
     fun `the easy roles ignore difficulty and stay under their caps`() {
         for (d in Difficulty.entries) {
-            assertEquals(60, params(SegmentRole.WARMUP, d).int("demand_lo_watts"))
-            assertEquals(100, params(SegmentRole.WARMUP, d).int("demand_hi_watts"))
-            assertEquals(100, params(SegmentRole.COOLDOWN, d).int("demand_hi_watts"))
-            assertEquals(84, params(SegmentRole.RECOVERY, d).int("demand_hi_watts"))
+            assertEquals(24, params(SegmentRole.WARMUP, d).int("demand_lo_watts"))
+            assertEquals(54, params(SegmentRole.WARMUP, d).int("demand_hi_watts"))
+            assertEquals(54, params(SegmentRole.COOLDOWN, d).int("demand_hi_watts"))
+            assertEquals(44, params(SegmentRole.RECOVERY, d).int("demand_hi_watts"))
         }
         val plan = SessionPlans.custom(listOf(CustomSlot("power_grid", 180), CustomSlot("power_grid", 180)), Difficulty.HARD,
             ftp200, GameCatalog(listOf(GameCatalog.DEMO, GameCatalog.POWER_GRID)), cameraGames = false)
@@ -62,7 +63,7 @@ class PowerGridCatalogTest {
         val segment = SessionPlans.justRide(GameCatalog.POWER_GRID, JustRideMode.Timed(10), Difficulty.STANDARD, ftp200)
             .segments.single()
         assertEquals(SegmentRole.FREE, segment.role)
-        assertEquals(140, segment.params.int("demand_hi_watts"))
+        assertEquals(66, segment.params.int("demand_hi_watts"))
         assertTrue(segment.effort)
     }
 

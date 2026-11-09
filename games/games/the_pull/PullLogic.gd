@@ -18,13 +18,13 @@ enum Phase { SET, PULL, RESULT, RECOVERY, DONE }
 
 const DEFAULT_FTP := 150.0
 ## The distance at which the sled needs exactly FTP, per difficulty (Kotlin sends `d_ref_m`).
-## Tuned so a steady pull at FTP lasts 3-5 minutes: ~4.5, ~3.8 and ~3.2.
+## Tuned so a steady pull at 65% of FTP lasts 3-5 minutes: ~4.5, ~3.8 and ~3.2.
 const D_REF := {"easy": 360.0, "standard": 300.0, "hard": 250.0}
-const BASE_SHARE := 0.30  ## the sled's need at the start, × FTP
-const RISE_SHARE := 0.70  ## what it adds by d_ref, × FTP
-const FULL_FACTOR := 1.12  ## the Full Pull line, × d_ref (needs 108% of FTP there)
-const V_MAX := 2.5  ## m/s at the start for a rider at FTP
-const G_FULL := 0.70  ## the gap (× FTP) that gives V_MAX
+const BASE_SHARE := 0.10  ## the sled's need at the start, × FTP (2026-11 retune: was 0.30)
+const RISE_SHARE := 0.55  ## what it adds by d_ref, × FTP: 65% of FTP there (was 0.70, FTP)
+const FULL_FACTOR := 1.12  ## the Full Pull line, × d_ref (needs 72% of FTP there)
+const V_MAX := 2.5  ## m/s at the start for a rider at 65% of FTP
+const G_FULL := 0.55  ## the gap (× FTP) that gives V_MAX (the start, at 65% of FTP)
 const G_CAP := 1.5  ## a sprint tops out at sqrt(1.5) × V_MAX
 const ACCEL := 0.6  ## m/s² at most, speeding up
 const DECEL := 0.5  ## m/s² at most, slowing down
@@ -98,7 +98,7 @@ static func full_line_for(params: Dictionary, difficulty: String) -> float:
 	return d_ref * float(params.get("full_factor", FULL_FACTOR))
 
 
-## The sled's need at `d` metres, in watts: FTP × (0.30 + 0.70 × d / d_ref).
+## The sled's need at `d` metres, in watts: FTP × (0.10 + 0.55 × d / d_ref).
 func required_at(d: float) -> float:
 	return ftp * (BASE_SHARE + RISE_SHARE * d / d_ref)
 

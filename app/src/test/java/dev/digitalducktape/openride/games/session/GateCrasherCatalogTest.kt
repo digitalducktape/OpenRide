@@ -44,9 +44,10 @@ class GateCrasherCatalogTest {
 
     @Test
     fun `the pace scales with FTP and the window eases on easy`() {
-        assertEquals(90, params(Difficulty.EASY).int("pace_watts"))
-        assertEquals(110, params(Difficulty.STANDARD).int("pace_watts"))
-        assertEquals(130, params(Difficulty.HARD).int("pace_watts"))
+        // The 2026-11 retune: 25 / 32 / 42% of FTP.
+        assertEquals(50, params(Difficulty.EASY).int("pace_watts"))
+        assertEquals(64, params(Difficulty.STANDARD).int("pace_watts"))
+        assertEquals(84, params(Difficulty.HARD).int("pace_watts"))
         assertEquals(1.4, params(Difficulty.EASY).double("window_sec"), 1e-9)
         assertEquals(1.2, params(Difficulty.STANDARD).double("window_sec"), 1e-9)
         assertEquals(8, params(Difficulty.STANDARD).int("fences"))

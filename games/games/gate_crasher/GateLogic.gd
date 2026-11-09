@@ -30,9 +30,9 @@ enum Call { NONE, CLEAR, EARLY, LATE, NO_PEDAL }
 
 ## Per difficulty, for a segment without Kotlin's params: pace as a share of FTP and the window.
 const LEVELS := {
-	"easy": {"pace_share": 0.45, "window_sec": 1.4},
-	"standard": {"pace_share": 0.55, "window_sec": 1.2},
-	"hard": {"pace_share": 0.65, "window_sec": 1.2},
+	"easy": {"pace_share": 0.25, "window_sec": 1.4},
+	"standard": {"pace_share": 0.32, "window_sec": 1.2},
+	"hard": {"pace_share": 0.42, "window_sec": 1.2},
 }
 const DEFAULT_FTP := 200.0
 const FENCES := 8  ## a round

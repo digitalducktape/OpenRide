@@ -1,5 +1,9 @@
 # Gate Crasher (#80): design
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 Show jumping in first person from the saddle. Pedal to canter round a course of fences, and stand
 up on the bike at each take-off line to clear it. Issue #80 is the spec, and the epic is #74. This
 file records the rules, the tuning, every call the issue left open ("my call") and the patterns.

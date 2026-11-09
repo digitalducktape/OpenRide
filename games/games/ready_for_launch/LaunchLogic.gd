@@ -17,10 +17,12 @@ extends RefCounted
 enum Phase { FUEL, COUNT, PUSH, COAST, RESULT }
 
 const DEFAULT_FTP := 150.0
-## When the segment doesn't send them (Kotlin's GameCatalog sends all three).
-const LINE_SHARE := {"easy": 0.45, "standard": 0.50, "hard": 0.55}
-const FULL_SHARE := {"easy": 0.55, "standard": 0.60, "hard": 0.65}
-const TARGET_SHARE := {"easy": 0.90, "standard": 1.05, "hard": 1.20}
+## When the segment doesn't send them (Kotlin's GameCatalog sends all three). The 2026-11 retune
+## (rider feedback: the game scored 0 at an easy spin): fuel trickles from light pedalling, a
+## comfortable effort fills the tank, and the push asks 50-70% of FTP, not the plan's work target.
+const LINE_SHARE := {"easy": 0.08, "standard": 0.10, "hard": 0.15}
+const FULL_SHARE := {"easy": 0.28, "standard": 0.30, "hard": 0.35}
+const TARGET_SHARE := {"easy": 0.50, "standard": 0.60, "hard": 0.70}
 
 ## Power is smoothed with this time constant: a step is 86% in after 2 s. The bike reports about
 ## once a second. The ride panel shows this same figure, so the HUD agrees with the rules.
@@ -48,7 +50,7 @@ const FUEL_MAX_MULT := 1.5  ## a full one
 ## The push. Climb a second = CLIMB_RATE × power share of the target × the fuel multiplier.
 const CLIMB_RATE := 1.0
 const PUSH_CAP := 1.3  ## power beyond this share of the target adds no climb
-const LIFT_SHARE := 0.25  ## the clamps let go at this share of the target
+const LIFT_SHARE := 0.2  ## the clamps let go at this share of the target
 const SPEED_TAU := 0.6  ## the rocket's speed eases to what the power asks for
 const COAST_TAU := 3.0  ## momentum fades with this time constant
 ## Below this share of FTP the rider isn't pedalling: no climb, no points. The raw reading, so
@@ -66,9 +68,9 @@ const MILESTONES := [
 ]
 
 var ftp := DEFAULT_FTP
-var fuel_line := DEFAULT_FTP * 0.5  ## watts: fuel flows above this
-var fuel_full := DEFAULT_FTP * 0.6  ## watts: held, this fills the tank
-var target := DEFAULT_FTP * 1.05  ## watts: 1.0 of the push's power share
+var fuel_line := DEFAULT_FTP * 0.10  ## watts: fuel flows above this
+var fuel_full := DEFAULT_FTP * 0.30  ## watts: held, this fills the tank
+var target := DEFAULT_FTP * 0.60  ## watts: 1.0 of the push's power share
 
 var phase := Phase.FUEL
 var phase_left := 0.0  ## seconds left in this phase
@@ -109,9 +111,10 @@ var _warned_push := false
 func _init(params := {}, difficulty := "standard", duration_sec := -1.0, rounds := 0) -> void:
 	_ends_itself = rounds > 0
 	ftp = maxf(float(params.get("ftp_watts", DEFAULT_FTP)), 1.0)
-	fuel_line = float(params.get("fuel_line_watts", ftp * LINE_SHARE.get(difficulty, 0.5)))
-	fuel_full = maxf(float(params.get("fuel_full_watts", ftp * FULL_SHARE.get(difficulty, 0.6))), fuel_line + 1.0)
-	target = maxf(float(params.get("target_watts", ftp * TARGET_SHARE.get(difficulty, 1.05))), 1.0)
+	fuel_line = float(params.get("fuel_line_watts", ftp * LINE_SHARE.get(difficulty, 0.10)))
+	fuel_full = maxf(float(params.get("fuel_full_watts", ftp * FULL_SHARE.get(difficulty, 0.30))), fuel_line + 1.0)
+	# The push's own target (`push_watts`), never the plan's `target_watts` (105% of FTP).
+	target = maxf(float(params.get("push_watts", ftp * TARGET_SHARE.get(difficulty, 0.60))), 1.0)
 	if rounds > 0:
 		planned = rounds
 	elif duration_sec > 0.0:

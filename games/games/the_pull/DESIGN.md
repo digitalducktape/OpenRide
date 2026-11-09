@@ -1,5 +1,9 @@
 # The Pull (#79): design
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 A sled pull at a county fair, in first person from the bike. A chain runs from the bike to a
 heavy steel sled. As the sled moves, its weight box slides forward along the pan, so every metre
 needs more watts than the last. Pull until you max out. Distance is the score.

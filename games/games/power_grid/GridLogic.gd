@@ -39,9 +39,9 @@ const POINTS_PER_DISTRICT := 5.0  ## a second, while meeting demand
 ## its three stars by keeping the lights on, not by working harder (DESIGN.md §4).
 const EASY_GAIN := 1.4
 ## Demand's range as shares of FTP (the fallback for Kotlin's params).
-const WORK_SHARES := {"easy": Vector2(0.40, 0.60), "standard": Vector2(0.45, 0.70), "hard": Vector2(0.50, 0.75)}
-const WARM_SHARES := Vector2(0.30, 0.50)  ## warm-up and cool-down
-const RECOVERY_SHARES := Vector2(0.30, 0.42)
+const WORK_SHARES := {"easy": Vector2(0.12, 0.27), "standard": Vector2(0.15, 0.33), "hard": Vector2(0.20, 0.45)}
+const WARM_SHARES := Vector2(0.12, 0.27)  ## warm-up and cool-down
+const RECOVERY_SHARES := Vector2(0.12, 0.22)
 const CAP_SHARES := {"warmup": 0.65, "cooldown": 0.65, "recovery": 0.60}
 const STORM_SHARE := 0.15  ## of FTP: the extra a repair asks
 const STORM_WARN_SEC := 3.0

@@ -54,7 +54,7 @@ func _run() -> void:
 	var duration := 600 if play_sec > 0.0 else -1
 	_session._local.start({"kind": "just_ride", "plan_id": "capture", "difficulty": "standard", "total_sec": duration,
 		"segments": [{"game_id": "keepy_uppy", "role": "free", "duration_sec": duration, "end_mode": "timer",
-			"seed": 5, "params": {"ftp_watts": 200.0, "weight_watts": 80.0}}]})
+			"seed": 5, "params": {"ftp_watts": 200.0}}]})
 	# The intro card.
 	var deadline := Time.get_ticks_msec() + 20000
 	while _director.phase_name() != "INTRO" and Time.get_ticks_msec() < deadline:
@@ -167,7 +167,7 @@ func _hold(game: Node, h: float, frames: int) -> void:
 	var bus: Node = root.get_node("InputBus")
 	var logic: KeepyLogic = game.logic
 	for i in frames:
-		var watts := KeepyLogic.power_for(h, logic.weight())
+		var watts := KeepyLogic.power_for(h, logic.weight(), logic.height_watts)
 		bus._sim_cadence = watts / (0.3 + bus._sim_resistance * 0.045)
 		if logic.balloon == KeepyLogic.Balloon.FLYING:
 			logic.h = move_toward(logic.h, h, 1.0 / 60.0 * 0.4)
@@ -220,9 +220,9 @@ func _ride(game: Node, seconds: float, bus: Node) -> void:
 					_key(key, true)
 				held = key
 		var t := frame / 30.0
-		var target := 0.52 * 200.0 + (logic.weight() - 80.0) * 1.3
+		var target := logic.need(0.45) + 4.0
 		if fmod(t, 30.0) > 20.0 or logic.birds > 0 and fmod(t, 12.0) > 6.0:
-			target = 0.66 * 200.0 + (logic.weight() - 80.0) * 1.3
+			target = logic.need(0.75) + 4.0
 		if logic.force == "downdraft" and logic.weather != KeepyLogic.Weather.CALM:
 			target = 0.85 * 200.0
 		if t > 48.0 and t < 60.0:

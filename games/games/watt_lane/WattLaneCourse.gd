@@ -17,7 +17,7 @@ const DRIFT_RATE := 0.01  ## of FTP a second, at most
 const JUMP_WORK := Vector2(0.12, 0.20)  ## of FTP
 const JUMP_WARMUP := Vector2(0.06, 0.10)
 const JUMP_MIN_WATTS := 10
-const FLOOR_FTP := 0.30  ## a widened range never puts the centre under this share of FTP
+const FLOOR_FTP := 0.15  ## a widened range never puts the centre under this share of FTP
 const JUMP_RAMP_SEC := 0.6  ## the rails bend over this either side of a jump (visual only)
 const AHEAD_SEC := 60.0  ## generated at least this far ahead of what is asked
 

@@ -22,9 +22,9 @@ const WARMUP_FACTOR := 1.25  ## a warm-up has no effort multiplier: its points c
 ## Width (share of FTP, floor in watts) and centre range (shares of FTP) by difficulty. Kotlin
 ## sends the scaled values (`lane_width_watts`, `lane_min_watts`, `lane_max_watts`); these are the
 ## fallback from `ftp_watts`, and the same maths.
-const WIDTH := {"easy": [0.25, 50], "standard": [0.20, 40], "hard": [0.15, 30]}
-const RANGE := {"easy": [0.40, 0.60], "standard": [0.45, 0.70], "hard": [0.50, 0.75]}
-const WARMUP_RANGE := [0.35, 0.55]
+const WIDTH := {"easy": [0.25, 40], "standard": [0.20, 30], "hard": [0.15, 30]}
+const RANGE := {"easy": [0.20, 0.35], "standard": [0.22, 0.40], "hard": [0.32, 0.55]}
+const WARMUP_RANGE := [0.18, 0.32]
 const DEFAULT_FTP := 150.0
 ## Stars: points per minute, every difficulty (DESIGN.md, "Scoring"). A perfect ride at 1.0×
 ## effort earns 1550-1800 a minute (2 stars); 3 stars needs about 1.3×.

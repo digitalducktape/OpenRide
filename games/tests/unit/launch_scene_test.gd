@@ -5,7 +5,7 @@ extends GdUnitTestSuite
 ## never clipped by the frame or a HUD panel, on the pad or at any stage of a flight.
 
 const STAGE := Rect2(0, 0, 1920, 1080)
-const PARAMS := {"ftp_watts": 200.0, "fuel_line_watts": 100.0, "fuel_full_watts": 120.0, "target_watts": 210.0}
+const PARAMS := {"ftp_watts": 200.0, "fuel_line_watts": 20.0, "fuel_full_watts": 60.0, "push_watts": 120.0}
 
 var game: Node
 
@@ -45,9 +45,9 @@ func test_the_declarations_match_the_issue() -> void:
 
 
 func test_the_target_line_is_computed_from_the_segment() -> void:
-	assert_str(game.target_text({"params": PARAMS})).is_equal("Hold 120 W, then push past 210 W")
-	assert_str(game.target_text({"difficulty": "hard", "params": {"ftp_watts": 300.0}})).is_equal("Hold 195 W, then push past 360 W")
-	assert_str(game.target_text({"difficulty": "easy", "params": {"ftp_watts": 100.0}})).is_equal("Hold 55 W, then push past 90 W")
+	assert_str(game.target_text({"params": PARAMS})).is_equal("Hold 60 W, then push past 120 W")
+	assert_str(game.target_text({"difficulty": "hard", "params": {"ftp_watts": 300.0}})).is_equal("Hold 105 W, then push past 210 W")
+	assert_str(game.target_text({"difficulty": "easy", "params": {"ftp_watts": 100.0}})).is_equal("Hold 28 W, then push past 50 W")
 
 
 func test_the_intro_card_picture_takes_every_number_from_the_segment() -> void:
@@ -56,11 +56,11 @@ func test_the_intro_card_picture_takes_every_number_from_the_segment() -> void:
 	for l: Label in visual.find_children("*", "Label", true, false):
 		words += l.text + "\n"
 		assert_int(l.get_theme_font_size("font_size")).is_greater_equal(40)
-	assert_str(words).contains("45 s at 120 W")
+	assert_str(words).contains("45 s at 60 W")
 	assert_str(words).contains("10 s, keep spinning")
-	assert_str(words).contains("18 s past 210 W")
+	assert_str(words).contains("18 s past 120 W")
 	game.free()
-	game = _make({"duration_sec": 120, "params": {"ftp_watts": 300.0, "fuel_full_watts": 180.0, "target_watts": 315.0}})
+	game = _make({"duration_sec": 120, "params": {"ftp_watts": 300.0, "fuel_full_watts": 180.0, "push_watts": 315.0}})
 	var longer: Control = auto_free(game.intro_visual())
 	words = ""
 	for l: Label in longer.find_children("*", "Label", true, false):
@@ -81,10 +81,10 @@ func test_the_ride_panel_shows_the_rules_watts_and_nothing_else_does() -> void:
 
 
 func test_the_gold_mark_is_what_the_phase_asks_for() -> void:
-	assert_float(game.hud.metrics.power_low).is_equal(120.0)
+	assert_float(game.hud.metrics.power_low).is_equal(60.0)
 	game.logic.phase = LaunchLogic.Phase.PUSH
 	game._set_band()
-	assert_float(game.hud.metrics.power_low).is_equal(210.0)
+	assert_float(game.hud.metrics.power_low).is_equal(120.0)
 	game.logic.phase = LaunchLogic.Phase.COAST
 	game._set_band()
 	assert_float(game.hud.metrics.power_low).is_equal(-INF)

@@ -1,5 +1,9 @@
 # Ready for Launch: design record
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 > Issue #82, epic #74. 2D, like Safe Cracker (rider, 2026-11-02). The rider's calls are marked;
 > everything else is the builder's, for the rider to check. Rules: `LaunchLogic.gd`
 > (`launch_logic_test`); the scene and frame: `launch_scene_test`. The look: `ART_BIBLE.md`.

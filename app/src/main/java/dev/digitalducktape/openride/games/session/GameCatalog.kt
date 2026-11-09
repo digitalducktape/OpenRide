@@ -247,8 +247,9 @@ class GameCatalog(games: List<GameDeclaration>) {
          * power is the rider's place across a night highway; a lane of watts drifts and jumps, and
          * every jump is announced 5 s ahead. Params, in watts on a 5 W grid: the lane's width (a
          * share of FTP with a floor, rounded up to 10 W) and its centre's range (shares of FTP).
-         * Low on purpose (about half of FTP): the forgiving-thresholds lesson. The game widens a
-         * range too narrow for a jump of over half a lane (watt_lane/DESIGN.md).
+         * Low on purpose (about a third of FTP; the 2026-11 retune, after a ride where easy
+         * spinning made 26-29 W): the forgiving-thresholds lesson. The game widens a range too
+         * narrow for a jump of over half a lane (watt_lane/DESIGN.md).
          */
         val WATT_LANE = GameDeclaration(
             id = "watt_lane",
@@ -260,15 +261,15 @@ class GameCatalog(games: List<GameDeclaration>) {
             effortInJustRide = true,
             params = { role, difficulty, ftp ->
                 val (widthShare, widthFloor) = when (difficulty) {
-                    Difficulty.EASY -> 0.25 to 50
-                    Difficulty.STANDARD -> 0.20 to 40
+                    Difficulty.EASY -> 0.25 to 40
+                    Difficulty.STANDARD -> 0.20 to 30
                     Difficulty.HARD -> 0.15 to 30
                 }
                 val (low, high) = when {
-                    role == SegmentRole.WARMUP -> 0.35 to 0.55
-                    difficulty == Difficulty.EASY -> 0.40 to 0.60
-                    difficulty == Difficulty.STANDARD -> 0.45 to 0.70
-                    else -> 0.50 to 0.75
+                    role == SegmentRole.WARMUP -> 0.18 to 0.32
+                    difficulty == Difficulty.EASY -> 0.20 to 0.35
+                    difficulty == Difficulty.STANDARD -> 0.22 to 0.40
+                    else -> 0.32 to 0.55
                 }
                 val width = maxOf(Math.ceil(ftp.watts * widthShare / 10.0).toInt() * 10, widthFloor)
                 fun grid(share: Double) = (ftp.watts * share / 5.0).roundToInt() * 5
@@ -282,12 +283,13 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /**
          * The Pull (#79), `games/games/the_pull/`: drag a weighted sled down a track; it needs
-         * more watts every metre (`30% FTP + d / d_ref_m × 70% FTP`), until the rider maxes out.
+         * more watts every metre (`10% FTP + d / d_ref_m × 55% FTP`, the 2026-11 retune), until the
+         * rider maxes out.
          * Distance is the score. Just Ride only (no circuit roles; a custom circuit plays it as
          * a `free` slot, like Kart Race). A timed ride starts pulls until the timer ends and lets
-         * the last one finish ([EndMode.GAME]). `d_ref_m` is where the sled needs exactly FTP,
-         * tuned so a steady pull at FTP lasts 3-5 minutes; `full_factor` places the Full Pull
-         * line (× d_ref_m).
+         * the last one finish ([EndMode.GAME]). `d_ref_m` is where the sled needs 65% of FTP,
+         * tuned so a steady pull there lasts 3-5 minutes; `full_factor` places the Full Pull
+         * line (× d_ref_m, 72% of FTP).
          */
         val THE_PULL = GameDeclaration(
             id = "the_pull",
@@ -316,8 +318,9 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /**
          * Balloon Pump (#76), `games/games/balloon_pump/`: the bike drives an air pump. A
-         * balloon takes air only over its push line, which rises as it fills (from 20% to 45% of
-         * FTP in work, 15% to 30% in recovery; `PumpLogic` scales it per balloon size). Race
+         * balloon takes air only over its push line, which rises as it fills (from 8% to 26% of
+         * FTP in standard work, 6-22% easy, 10-32% hard, 5-20% in recovery; the 2026-11 retune;
+         * `PumpLogic` scales it per balloon size). Race
          * fills `race_balloons` within `race_sec`; Max fills as many as it can (circuits always).
          * A round is one Race heat and its break.
          */
@@ -333,7 +336,12 @@ class GameCatalog(games: List<GameDeclaration>) {
             roles = setOf(SegmentRole.WORK, SegmentRole.RECOVERY),
             effortInJustRide = true,
             params = { role, difficulty, ftp ->
-                val (lo, hi) = if (role == SegmentRole.RECOVERY) 0.15 to 0.30 else 0.20 to 0.45
+                val (lo, hi) = when {
+                    role == SegmentRole.RECOVERY -> 0.05 to 0.20
+                    difficulty == Difficulty.EASY -> 0.06 to 0.22
+                    difficulty == Difficulty.STANDARD -> 0.08 to 0.26
+                    else -> 0.10 to 0.32
+                }
                 val balloons = when (difficulty) {
                     Difficulty.EASY -> 4
                     Difficulty.STANDARD -> 5
@@ -353,9 +361,10 @@ class GameCatalog(games: List<GameDeclaration>) {
          * pedalling. A work game. Its lean steering is the rider's "Steer" option (off by
          * default), which Godot decides per segment, so [GameDeclaration.usesCamera] stays false
          * (Tug of War's brace-lean precedent). A round is a minute of air time.
-         * `weight_watts` is the balloon's weight, 30 / 40 / 50% of FTP (holding the mid band then
-         * takes about half of FTP on standard); the weather adds `rain_watts` (10%), `bird_watts`
-         * (5% a bird) and `downdraft_watts` (20%, briefly). See its DESIGN.md.
+         * The fan holds the balloon at height h (0-1) with `weight_watts + height_watts × h`:
+         * 6 / 8 / 10% and 65 / 75 / 85% of FTP (the 2026-11 retune: light pedalling floats it low,
+         * about 30% of FTP holds the mid band on standard); the weather adds `rain_watts` (4%),
+         * `bird_watts` (2% a bird) and `downdraft_watts` (8%, briefly). See its DESIGN.md.
          */
         val KEEPY_UPPY = GameDeclaration(
             id = "keepy_uppy",
@@ -369,24 +378,26 @@ class GameCatalog(games: List<GameDeclaration>) {
             roles = setOf(SegmentRole.WORK),
             effortInJustRide = true,
             params = { _, difficulty, ftp ->
-                val weight = when (difficulty) {
-                    Difficulty.EASY -> 0.30
-                    Difficulty.STANDARD -> 0.40
-                    Difficulty.HARD -> 0.50
+                val (weight, height) = when (difficulty) {
+                    Difficulty.EASY -> 0.06 to 0.65
+                    Difficulty.STANDARD -> 0.08 to 0.75
+                    Difficulty.HARD -> 0.10 to 0.85
                 }
                 mapOf(
                     "weight_watts" to JsonPrimitive((ftp.watts * weight).roundToInt()),
-                    "rain_watts" to JsonPrimitive((ftp.watts * 0.10).roundToInt()),
-                    "bird_watts" to JsonPrimitive((ftp.watts * 0.05).roundToInt()),
-                    "downdraft_watts" to JsonPrimitive((ftp.watts * 0.20).roundToInt()),
+                    "height_watts" to JsonPrimitive((ftp.watts * height).roundToInt()),
+                    "rain_watts" to JsonPrimitive((ftp.watts * 0.04).roundToInt()),
+                    "bird_watts" to JsonPrimitive((ftp.watts * 0.02).roundToInt()),
+                    "downdraft_watts" to JsonPrimitive((ftp.watts * 0.08).roundToInt()),
                 )
             },
         )
 
         /**
          * Power Grid (#81), `games/games/power_grid/`: the bike turns a valley town's generator.
-         * Demand follows an evening curve between `demand_lo_watts` and `demand_hi_watts`: 40-60 /
-         * 45-70 / 50-75% of FTP in work, 30-50% in a warm-up or cool-down, 30-42% in a recovery
+         * Demand follows an evening curve between `demand_lo_watts` and `demand_hi_watts`: 12-27 /
+         * 15-33 / 20-45% of FTP in work, 12-27% in a warm-up or cool-down, 12-22% in a recovery
+         * (the 2026-11 retune: met at 90%, so a steady 30% of FTP holds a standard evening)
          * (difficulty never moves an easy role, and each stays under its power cap). A storm's
          * repair asks `storm_watts` (15%) over demand. No rounds: an evening is the ride. See its
          * DESIGN.md.
@@ -401,12 +412,12 @@ class GameCatalog(games: List<GameDeclaration>) {
             effortInJustRide = true,
             params = { role, difficulty, ftp ->
                 val (lo, hi) = when (role) {
-                    SegmentRole.WARMUP, SegmentRole.COOLDOWN -> 0.30 to 0.50
-                    SegmentRole.RECOVERY -> 0.30 to 0.42
+                    SegmentRole.WARMUP, SegmentRole.COOLDOWN -> 0.12 to 0.27
+                    SegmentRole.RECOVERY -> 0.12 to 0.22
                     else -> when (difficulty) {
-                        Difficulty.EASY -> 0.40 to 0.60
-                        Difficulty.STANDARD -> 0.45 to 0.70
-                        Difficulty.HARD -> 0.50 to 0.75
+                        Difficulty.EASY -> 0.12 to 0.27
+                        Difficulty.STANDARD -> 0.15 to 0.33
+                        Difficulty.HARD -> 0.20 to 0.45
                     }
                 }
                 mapOf(
@@ -419,9 +430,10 @@ class GameCatalog(games: List<GameDeclaration>) {
 
         /**
          * Ready for Launch (#82), `games/games/ready_for_launch/`: each round is one rocket
-         * launch of about 90 s, so a 1:30 slot plays one. Fuel flows above `fuel_line_watts` (45 /
-         * 50 / 55% of FTP) and `fuel_full_watts` (55 / 60 / 65%) held fills the tank; the push's
-         * target is the plan's `target_watts`. See its DESIGN.md.
+         * launch of about 90 s, so a 1:30 slot plays one. Fuel flows above `fuel_line_watts` (8 /
+         * 10 / 15% of FTP) and `fuel_full_watts` (28 / 30 / 35%) held fills the tank; the push's
+         * target is `push_watts` (50 / 60 / 70%), not the plan's `target_watts` (the 2026-11
+         * retune). See its DESIGN.md.
          */
         val READY_FOR_LAUNCH = GameDeclaration(
             id = "ready_for_launch",
@@ -435,14 +447,15 @@ class GameCatalog(games: List<GameDeclaration>) {
             roles = setOf(SegmentRole.WORK),
             effortInJustRide = true,
             params = { _, difficulty, ftp ->
-                val line = when (difficulty) {
-                    Difficulty.EASY -> 0.45
-                    Difficulty.STANDARD -> 0.50
-                    Difficulty.HARD -> 0.55
+                val (line, full, push) = when (difficulty) {
+                    Difficulty.EASY -> Triple(0.08, 0.28, 0.50)
+                    Difficulty.STANDARD -> Triple(0.10, 0.30, 0.60)
+                    Difficulty.HARD -> Triple(0.15, 0.35, 0.70)
                 }
                 mapOf(
                     "fuel_line_watts" to JsonPrimitive((ftp.watts * line).roundToInt()),
-                    "fuel_full_watts" to JsonPrimitive((ftp.watts * (line + 0.10)).roundToInt()),
+                    "fuel_full_watts" to JsonPrimitive((ftp.watts * full).roundToInt()),
+                    "push_watts" to JsonPrimitive((ftp.watts * push).roundToInt()),
                 )
             },
         )
@@ -451,7 +464,7 @@ class GameCatalog(games: List<GameDeclaration>) {
          * Gate Crasher (#80), `games/games/gate_crasher/`: show jumping in first person. Pedal to
          * canter round the course and stand at each take-off line, read by the camera's
          * StandingDetector, so it needs the camera: a camera-off circuit skips it. `pace_watts`
-         * is the canter's target (45 / 55 / 65% of FTP), `window_sec` the rider's margin round the
+         * is the canter's target (25 / 32 / 42% of FTP, the 2026-11 retune), `window_sec` the rider's margin round the
          * line, and `stand_lag_sec` the detector's enter time (`HeadTrackerConfig.standEnterMs`).
          * A round is one lap of `fences`.
          */
@@ -469,9 +482,9 @@ class GameCatalog(games: List<GameDeclaration>) {
             effortInJustRide = true,
             params = { _, difficulty, ftp ->
                 val (pace, window) = when (difficulty) {
-                    Difficulty.EASY -> 0.45 to 1.4
-                    Difficulty.STANDARD -> 0.55 to 1.2
-                    Difficulty.HARD -> 0.65 to 1.2
+                    Difficulty.EASY -> 0.25 to 1.4
+                    Difficulty.STANDARD -> 0.32 to 1.2
+                    Difficulty.HARD -> 0.42 to 1.2
                 }
                 mapOf(
                     "pace_watts" to JsonPrimitive((ftp.watts * pace).roundToInt()),

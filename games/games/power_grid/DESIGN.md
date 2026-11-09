@@ -1,5 +1,9 @@
 # Power Grid: design record
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 > Issue #81 (epic #74). **Status:** built 2026-11-04, ready for a fresh review; bike tuning comes
 > after the rider approves. Built against `docs/GAMES.md`. **Owner:** whoever changes the rules.
 > Change this file in the same commit as any change to `GridLogic`, the tuning or the Kotlin

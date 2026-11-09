@@ -115,11 +115,8 @@ func how_to_text(_seg: Dictionary) -> String:
 
 
 func target_text(seg: Dictionary) -> String:
-	var p: Dictionary = seg.get("params", {})
-	var ftp := float(p.get("ftp_watts", p.get("ftp", KeepyLogic.DEFAULT_FTP)))
-	var share: float = KeepyLogic.WEIGHT_SHARE.get(str(seg.get("difficulty", "standard")), 0.4)
-	var w := float(p.get("weight_watts", ftp * share))
-	return "About %d W holds it in the middle" % _holds_watts(w)
+	var w := KeepyLogic.weights_for(seg.get("params", {}), str(seg.get("difficulty", "standard")))
+	return "About %d W holds it in the middle band" % _holds_watts(w.x, w.y)
 
 
 func ui_theme() -> GameTheme:
@@ -264,7 +261,7 @@ func _draw_state(delta: float) -> void:
 	_t += delta
 	backdrop.step(delta)
 	var power_share := logic.smoothed / maxf(logic.ftp, 1.0)
-	var strength := clampf(logic.smoothed / maxf(logic.weight(), 1.0) * 0.7, 0.0, 1.0) * logic.efficiency
+	var strength := clampf(logic.smoothed / maxf(logic.need(logic.h), 1.0) * 0.8, 0.0, 1.0) * logic.efficiency
 	var climb := lerpf(0.25, 1.3, strength)
 	if logic.weather == KeepyLogic.Weather.ACTIVE and logic.force == "downdraft":
 		climb = -0.9
@@ -309,7 +306,7 @@ func _handle(event: Dictionary) -> void:
 				"rain":
 					AudioDirector.play_sfx("keepy_rain_warn", 1.0)
 					GameMix.duck_for_moment(2.0)
-					_show_message("Rain: %d W holds it up" % _holds_watts(logic.weight() + logic.rain_watts), GameTheme.WARN, 3.0)
+					_show_message("Rain: %d W holds it up" % _holds_watts(logic.weight() + logic.rain_watts, logic.height_watts), GameTheme.WARN, 3.0)
 				"bird":
 					AudioDirector.play_sfx("keepy_bird_flutter", 0.0)
 					GameMix.duck_for_moment(1.2)
@@ -322,7 +319,7 @@ func _handle(event: Dictionary) -> void:
 			GameTheme.pop(_status, 1.06)
 		"force_start":
 			if event.force == "rain":
-				_show_message("Raining: %d W holds it up" % _holds_watts(logic.weight()), GameTheme.WARN, 4.0)
+				_show_message("Raining: %d W holds it up" % _holds_watts(logic.weight(), logic.height_watts), GameTheme.WARN, 4.0)
 		"birds_shaken":
 			AudioDirector.play_sfx("keepy_birds_shaken")
 			_show_message("Shook off %d!" % event.count if event.count > 1 else "Shook it off!", GameTheme.GOOD)
@@ -349,12 +346,14 @@ func _handle(event: Dictionary) -> void:
 			AudioDirector.play_sfx("keepy_new_balloon", -3.0)
 		"arrive":
 			_show_message("New balloon!", GameTheme.GOOD)
+		"sinking":
+			_show_message("Sinking! Pedal a little harder", GameTheme.WARN, 3.0)
 
 
 ## The fan hums with the lift; the rain hisses while it rains; the balloon squeaks on the grille;
 ## the music fills out with height.
 func _update_sound(delta: float) -> void:
-	var lift := clampf(logic.smoothed / maxf(logic.weight(), 1.0), 0.0, 1.6)
+	var lift := clampf(logic.smoothed / maxf(logic.need(logic.h), 1.0), 0.0, 1.6)
 	_hum.volume_db = lerpf(-40.0, HUM_DB, clampf(lift / 1.2, 0.0, 1.0)) if lift > 0.05 else -80.0
 	_hum.pitch_scale = lerpf(0.7, 1.35, clampf(lift / 1.6, 0.0, 1.0))
 	_rain_level = move_toward(_rain_level, 1.0 if logic.raining else 0.0, delta / 1.5)
@@ -377,10 +376,10 @@ func _update_status() -> void:
 	_status.set_state(logic.band, logic.birds, logic.shake_progress, logic.steer, wind)
 
 
-## The watts, to the nearest 5, that hold the balloon in the middle of the mid band against a
-## weight `w`: the same figure as the intro's target line.
-static func _holds_watts(w: float) -> int:
-	return roundi(KeepyLogic.power_for(0.5, w) / 5.0) * 5
+## The watts, to the nearest 5, that hold the balloon just inside the mid band against a weight
+## `w` and height watts `span`: the same figure as the intro's target line.
+static func _holds_watts(w: float, span: float) -> int:
+	return roundi(KeepyLogic.power_for(KeepyLogic.TARGET_HEIGHT, w, span) / 5.0) * 5
 
 
 ## The result's stats, built once at the end.

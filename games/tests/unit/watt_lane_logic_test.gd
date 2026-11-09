@@ -3,6 +3,8 @@ extends GdUnitTestSuite
 ## announce timing, the switch window, catches, streaks and the stars.
 
 const DT := 0.05
+## A fixed 40 W lane over 70-105 W, so the timing and scoring tests don't move with a retune.
+const LANE := {"ftp_watts": 150, "lane_width_watts": 40, "lane_min_watts": 70, "lane_max_watts": 105}
 
 
 func _run(logic: WattLaneLogic, seconds: float, power: Variant) -> Array[Dictionary]:
@@ -53,8 +55,8 @@ func test_a_spike_moves_you_only_a_little() -> void:
 # --- The lane ---
 
 func test_width_by_difficulty_with_floors_on_a_10_w_grid() -> void:
-	assert_int(WattLaneLogic.new("easy").width).is_equal(50)
-	assert_int(WattLaneLogic.new("standard").width).is_equal(40)
+	assert_int(WattLaneLogic.new("easy").width).is_equal(40)
+	assert_int(WattLaneLogic.new("standard").width).is_equal(30)
 	assert_int(WattLaneLogic.new("hard").width).is_equal(30)
 	assert_int(WattLaneLogic.new("standard", {"ftp_watts": 300}).width).is_equal(60)
 	assert_int(WattLaneLogic.new("hard", {"ftp_watts": 260}).width).is_equal(40)
@@ -73,7 +75,7 @@ func test_bounds_are_on_the_5_w_grid_and_inside_the_range() -> void:
 
 
 func test_membership_is_inclusive_and_uses_the_shown_number() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 1)
+	var logic := WattLaneLogic.new("standard", LANE, 1)
 	_run(logic, 4.0, float(logic.lane_hi()))
 	assert_bool(logic.in_lane).is_true()
 	_run(logic, 4.0, float(logic.lane_hi()) + 1.0)
@@ -171,7 +173,7 @@ func test_the_visual_centre_eases_but_stays_near_the_rules() -> void:
 # --- Announcing and the switch ---
 
 func test_each_jump_is_announced_five_seconds_ahead_then_counted_down() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var events := _run(logic, 120.0, _perfect)
 	var announces := _of(events, "announce")
 	var jumps := _of(events, "jump")
@@ -183,7 +185,7 @@ func test_each_jump_is_announced_five_seconds_ahead_then_counted_down() -> void:
 
 
 func test_the_announce_names_the_new_lane() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var events := _run(logic, 30.0, _perfect)
 	var a: Dictionary = _of(events, "announce")[0]
 	var j := logic.course.next_jump_after(0.0)
@@ -193,7 +195,7 @@ func test_the_announce_names_the_new_lane() -> void:
 
 
 func test_either_lane_counts_in_the_switch_window() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var j := logic.course.next_jump_after(0.0)
 	var old := logic.course.watts[j - 1]
 	var new := logic.course.watts[j]
@@ -208,13 +210,13 @@ func test_either_lane_counts_in_the_switch_window() -> void:
 
 
 func test_holding_the_old_lane_misses_the_jump_and_following_catches_it() -> void:
-	var stay := WattLaneLogic.new("standard", {}, 21)
+	var stay := WattLaneLogic.new("standard", LANE, 21)
 	var j := stay.course.next_jump_after(0.0)
 	var old := float(stay.course.watts[j - 1])
 	var events := _run(stay, stay.course.times[j] + 4.0, old)
 	assert_int(_of(events, "missed").size()).is_equal(1)
 	assert_int(stay.jumps_caught).is_equal(0)
-	var follow := WattLaneLogic.new("standard", {}, 21)
+	var follow := WattLaneLogic.new("standard", LANE, 21)
 	events = _run(follow, follow.course.times[j] + 4.0, _perfect)
 	assert_int(_of(events, "caught").size()).is_equal(1)
 	assert_int(_of(events, "lane_exit").size()).is_equal(0)
@@ -222,7 +224,7 @@ func test_holding_the_old_lane_misses_the_jump_and_following_catches_it() -> voi
 
 func test_a_rider_who_reacts_only_at_the_jump_still_catches_it() -> void:
 	# The bike's lag: a new reading about once a second, so the rider's change lands up to 1 s late.
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var j := logic.course.next_jump_after(0.0)
 	var at := logic.course.times[j]
 	var lagged := func(l: WattLaneLogic) -> float:
@@ -234,7 +236,7 @@ func test_a_rider_who_reacts_only_at_the_jump_still_catches_it() -> void:
 # --- Scoring ---
 
 func test_the_streak_grows_to_three_and_survives_a_short_slip() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var centre := float(logic.course.centre_at(0.0))
 	var events := _run(logic, 9.9, centre)
 	_run(logic, 0.1, centre)
@@ -248,7 +250,7 @@ func test_the_streak_grows_to_three_and_survives_a_short_slip() -> void:
 
 
 func test_points_only_come_in_the_lane() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var total := 0.0
 	for i in 100:
 		logic.step(DT, 0.0)
@@ -257,7 +259,7 @@ func test_points_only_come_in_the_lane() -> void:
 
 
 func _per_minute(seconds: float, effort: float, role := "work", seed_value := 21) -> float:
-	var logic := WattLaneLogic.new("standard", {}, seed_value, role)
+	var logic := WattLaneLogic.new("standard", LANE, seed_value, role)
 	var total := 0.0
 	for i in roundi(seconds / DT):
 		logic.step(DT, _perfect(logic))
@@ -287,17 +289,42 @@ func test_a_clean_warm_up_can_earn_three_stars() -> void:
 
 
 func test_a_rider_in_the_lane_half_the_time_earns_one_star() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	var total := 0.0
 	for i in roundi(120.0 / DT):
 		var on := fmod(logic.time, 20.0) < 10.0
-		logic.step(DT, _perfect(logic) if on else 20.0)
+		logic.step(DT, _perfect(logic) if on else 0.0)
 		total += logic.last_points
 	assert_int(_stars(total / 2.0)).is_equal(1)
 
 
+## The 2026-11 retune's core goal: the lane sits around a comfortable 30-35% of FTP, so a rider
+## who follows it averages about that, and a steady 30% rider is in it much of the time.
+func test_a_rider_at_thirty_percent_of_ftp_rides_the_lane() -> void:
+	for ftp: float in [140.0, 200.0]:
+		var follower := WattLaneLogic.new("standard", {"ftp_watts": ftp}, 5)
+		var steady := WattLaneLogic.new("standard", {"ftp_watts": ftp}, 5)
+		var power_sum := 0.0
+		var steady_in := 0.0
+		var steady_points := 0.0
+		for i in roundi(600.0 / DT):
+			var p := _perfect(follower)
+			power_sum += p * DT
+			follower.step(DT, p)
+			steady.step(DT, 0.30 * ftp)
+			steady_points += steady.last_points
+			if steady.in_lane:
+				steady_in += DT
+		var mean_share: float = power_sum / 600.0 / ftp
+		assert_float(mean_share).override_failure_message("FTP %d: the lane averages %.2f of FTP" % [ftp, mean_share]) \
+			.is_between(0.25, 0.38)
+		assert_float(steady_in / 600.0).override_failure_message("FTP %d: 30%% is in the lane %.2f of the time" % [ftp, steady_in / 600.0]) \
+			.is_greater(0.4)
+		assert_int(_stars(steady_points / 10.0)).is_greater_equal(1)
+
+
 func test_stats() -> void:
-	var logic := WattLaneLogic.new("standard", {}, 21)
+	var logic := WattLaneLogic.new("standard", LANE, 21)
 	_run(logic, 60.0, _perfect)
 	assert_float(logic.in_lane_pct()).is_greater(95.0)
 	assert_float(logic.longest_streak).is_greater(50.0)

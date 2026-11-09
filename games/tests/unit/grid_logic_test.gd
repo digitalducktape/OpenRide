@@ -51,17 +51,17 @@ func _per_minute(l: GridLogic, seconds: float, watts: Variant, effort := 1.0) ->
 
 # --- The curve ---
 
-func test_work_demand_runs_from_45_to_70_percent_of_ftp() -> void:
+func test_work_demand_runs_from_15_to_33_percent_of_ftp() -> void:
 	var l := _logic("work", 300.0)
-	assert_float(l.demand_at(0.0)).is_equal_approx(90.0, 0.01)
-	assert_float(l.demand_at(0.72 * 300.0)).is_equal_approx(140.0, 0.01)
-	assert_float(l.demand_at(300.0)).is_equal_approx(140.0, 0.01)
+	assert_float(l.demand_at(0.0)).is_equal_approx(30.0, 0.01)
+	assert_float(l.demand_at(0.72 * 300.0)).is_equal_approx(66.0, 0.01)
+	assert_float(l.demand_at(300.0)).is_equal_approx(66.0, 0.01)
 
 
-func test_a_warm_up_rises_gently_within_30_to_50_percent() -> void:
+func test_a_warm_up_rises_gently_within_12_to_27_percent() -> void:
 	var l := _logic("warmup", 180.0)
-	assert_float(l.demand_at(0.0)).is_equal_approx(60.0, 0.01)
-	assert_float(l.demand_at(180.0)).is_equal_approx(100.0, 0.01)
+	assert_float(l.demand_at(0.0)).is_equal_approx(24.0, 0.01)
+	assert_float(l.demand_at(180.0)).is_equal_approx(54.0, 0.01)
 	var last := 0.0
 	for i in 19:
 		var d := l.demand_at(i * 10.0)
@@ -71,17 +71,17 @@ func test_a_warm_up_rises_gently_within_30_to_50_percent() -> void:
 
 func test_a_cool_down_is_the_town_going_to_bed() -> void:
 	var l := _logic("cooldown", 180.0)
-	assert_float(l.demand_at(0.0)).is_equal_approx(100.0, 0.01)
-	assert_float(l.demand_at(180.0)).is_equal_approx(60.0, 0.01)
+	assert_float(l.demand_at(0.0)).is_equal_approx(54.0, 0.01)
+	assert_float(l.demand_at(180.0)).is_equal_approx(24.0, 0.01)
 	assert_int(l.online).is_equal(4)
 	assert_int(l.powered).is_equal(4)
 
 
 func test_a_recovery_stays_low_and_ends_where_it_began() -> void:
 	var l := _logic("recovery", 90.0)
-	assert_float(l.demand_at(0.0)).is_equal_approx(60.0, 0.01)
-	assert_float(l.demand_at(45.0)).is_equal_approx(84.0, 0.01)
-	assert_float(l.demand_at(90.0)).is_equal_approx(60.0, 0.01)
+	assert_float(l.demand_at(0.0)).is_equal_approx(24.0, 0.01)
+	assert_float(l.demand_at(45.0)).is_equal_approx(44.0, 0.01)
+	assert_float(l.demand_at(90.0)).is_equal_approx(24.0, 0.01)
 
 
 func test_every_easy_role_stays_under_its_power_cap() -> void:
@@ -137,10 +137,10 @@ func test_a_one_minute_slot_still_reaches_the_stadium() -> void:
 
 func test_demand_is_met_at_90_percent_of_it() -> void:
 	var l := _logic("work", 300.0)
-	l.step(DT, 81.5, 85.0)
+	l.step(DT, 27.5, 85.0)
 	assert_bool(l.meeting).is_true()
 	var m := _logic("work", 300.0)
-	m.step(DT, 79.0, 85.0)
+	m.step(DT, 26.0, 85.0)
 	assert_bool(m.meeting).is_false()
 
 
@@ -238,14 +238,14 @@ func _full_town(l: GridLogic) -> void:
 func test_falling_short_dims_the_newest_then_turns_it_off_and_relights() -> void:
 	var l := _logic("work", 300.0)
 	_full_town(l)
-	var events := _ride(l, GridLogic.SHORT_SEC + 0.5, 40.0)
+	var events := _ride(l, GridLogic.SHORT_SEC + 0.5, 10.0)
 	# The supply takes a while to fall under the line; ride on until it dims.
 	while _count(events, "dimming") == 0:
-		events.append_array(_ride(l, 0.5, 40.0))
+		events.append_array(_ride(l, 0.5, 10.0))
 	assert_int(_first(events, "dimming").index).is_equal(3)
 	assert_float(float(_first(events, "dimming").need)).is_equal_approx(l.need(), 1.0)
 	assert_int(l.powered).is_equal(4)
-	var out := _ride(l, GridLogic.DIM_SEC + 0.2, 40.0)
+	var out := _ride(l, GridLogic.DIM_SEC + 0.2, 10.0)
 	assert_int(_first(out, "district_out").index).is_equal(3)
 	assert_int(l.powered).is_equal(3)
 	assert_float(l.level(3)).is_equal(0.0)
@@ -278,7 +278,7 @@ func test_a_district_coming_online_while_short_stays_dark_until_caught_up() -> v
 	var l := _logic("work", 300.0)
 	l.storms_on = false
 	_ride(l, 60.0, _steady)
-	var events := _ride(l, 80.0, 40.0)
+	var events := _ride(l, 80.0, 10.0)
 	assert_int(_count(events, "district_missed")).is_greater_equal(1)
 	assert_int(l.powered).is_less(l.online)
 	_ride(l, 40.0, 200.0)
@@ -354,7 +354,7 @@ func test_a_downed_line_takes_out_the_newest_lit_district() -> void:
 func test_ten_seconds_over_the_repair_line_restores_it_for_a_bonus() -> void:
 	var l := _logic("work", 300.0)
 	var strike := _to_strike(l, _steady)
-	var events := _ride(l, GridLogic.STORM_REPAIR_SEC + 0.5, l.repair_need * 1.3)
+	var events := _ride(l, GridLogic.STORM_REPAIR_SEC + 0.5, l.repair_need + 0.2 * FTP)
 	assert_int(_first(events, "restored").index).is_equal(strike.index)
 	assert_float(float(_first(events, "restored").bonus)).is_equal(GridLogic.STORM_BONUS)
 	assert_int(l.storms_restored).is_equal(1)
@@ -365,7 +365,7 @@ func test_ten_seconds_over_the_repair_line_restores_it_for_a_bonus() -> void:
 func test_a_slip_keeps_most_of_the_repair() -> void:
 	var l := _logic("work", 300.0)
 	_to_strike(l, _steady)
-	_ride(l, 6.0, l.repair_need * 1.3)
+	_ride(l, 6.0, l.repair_need + 0.2 * FTP)
 	var done := l.repair
 	assert_float(done).is_greater(4.0)
 	l.supply = 0.0
@@ -449,9 +449,25 @@ func test_a_clean_easy_ride_earns_three_stars_without_any_multiplier() -> void:
 		assert_float(_per_minute(l, setup[1], _steady)).is_greater_equal(float(t[2]))
 
 
+## The 2026-11 retune's core goal: light pedalling lights the houses, and a steady 30% of FTP
+## keeps the whole town lit through a standard work evening.
+func test_a_rider_at_thirty_percent_of_ftp_holds_demand_all_evening() -> void:
+	var light := _logic("work", 300.0)
+	_ride(light, 20.0, 0.15 * FTP)
+	assert_bool(light.meeting).is_true()
+	assert_int(light.lit()).is_greater_equal(1)
+	for difficulty in ["easy", "standard"]:
+		var l := _logic("work", 300.0, difficulty)
+		l.storms_on = false
+		var events := _ride(l, 300.0, 0.30 * FTP)
+		assert_int(_count(events, "district_out")).override_failure_message(difficulty).is_equal(0)
+		assert_int(l.lit_pct()).override_failure_message(difficulty).is_greater_equal(98)
+		assert_int(l.districts_max).is_equal(GridLogic.COUNT)
+
+
 func test_half_the_ride_on_target_is_about_one_star() -> void:
 	var t := _thresholds()
 	var l := _logic("work", 300.0)
 	l.storms_on = false
-	var pm := _per_minute(l, 300.0, func(g: GridLogic) -> float: return _steady(g) if fmod(g.elapsed, 40.0) < 20.0 else 40.0)
+	var pm := _per_minute(l, 300.0, func(g: GridLogic) -> float: return _steady(g) if fmod(g.elapsed, 40.0) < 20.0 else 10.0)
 	assert_float(pm).is_between(float(t[0]), float(t[1]))

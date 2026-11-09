@@ -1,5 +1,9 @@
 # Balloon Pump: design record
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 > Issue #76 (epic #74). **Status:** the 2D rework, 2026-11-02 (rider: "2D, like Safe Cracker",
 > and parity with the wave 1 games' visuals and music; `GFX_POLISH.md`, `UI_POLISH.md`,
 > `AUDIO_POLISH.md`). The rules are unchanged from the slice of 2026-11-01. Bike tuning comes

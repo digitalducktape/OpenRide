@@ -1822,6 +1822,11 @@ for the floor's reflections alike (`cadence_world_test`).
 
 ## Watt Lane (#78)
 
+Retuned 2026-11 after a real ride on the tablet's bike (FTP 140 W), where easy spinning (100 rpm at
+15%) makes only 26-29 W. In every wave 2 game, light pedalling (about 15% of FTP) keeps the game
+going, the core goal takes about 30-35% of FTP, and the top tier 55-70%. Each game has a test that
+a rider at 30% of FTP reaches its core goal.
+
 A work game (and a low-profile warm-up): **a chevron cursor following an illuminated horizontal
 lane.** Your smoothed power is the chevron's height (more watts, higher); the lane comes in from
 the right and steps up or down. 2D and abstract (rider, 2026-11-02: a lane moving sideways on a
@@ -1836,10 +1841,10 @@ the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt
   shows that value, and `set_power_band(lo, hi)` with the rules' band turns it gold exactly when
   the rules say "in" (`RideMetrics.power_color`; a band with a top is amber above it). The lane's
   bounds are whole watts on a 5 W grid and the hero shows them as they are.
-- **The lane.** 20% of FTP wide, at least 40 W (easy 25% / 50 W, hard 15% / 30 W); its centre
+- **The lane.** 20% of FTP wide, at least 30 W (easy 25% / 40 W, hard 15% / 30 W); its centre
   follows a seeded course of slow drifts and steps of over half a lane, at least 20 s apart,
-  within `lane_min_watts`..`lane_max_watts` (Kotlin: work 40-60 / 45-70 / 50-75% of FTP, warm-up
-  35-55%). On screen, a faint guide every 12.5% of FTP; time ahead is distance to the right at
+  within `lane_min_watts`..`lane_max_watts` (Kotlin: work 20-35 / 22-40 / 32-55% of FTP, warm-up
+  18-32%). A range too narrow for those steps widens, never under 15% of FTP. On screen, a faint guide every 12.5% of FTP; time ahead is distance to the right at
   150 px a second (about 9 s visible).
 - **Steps** are announced 5 s ahead: a chime, a countdown chip ("▲ 175–215 in 5", the arrow
   drawn), and on the lane a riser of light, whole amber chevrons before the bend and the new watts
@@ -1853,6 +1858,16 @@ the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt
   tile; per frame `wl_field.gdshader` is two reads and the beat lines. The lane is a strip mesh over
   only the lane and its glow (`wl_lane.gdshader`, its light per vertex from 64-column arrays); the
   path is a thin strip, and the beam, riser, step chevrons and cursor are small drawings. `tests/capture_watt_lane.gd` takes the review shots.
+- **Thresholds** (2026-11 retune; FTP shares):
+
+  | | Before | After |
+  |---|---|---|
+  | Lane centre, work (easy / standard / hard) | 40-60 / 45-70 / 50-75% | 20-35 / 22-40 / 32-55% |
+  | Lane centre, warm-up | 35-55% | 18-32% |
+  | Lane width floor (easy / standard / hard) | 50 / 40 / 30 W | 40 / 30 / 30 W |
+  | Widened range floor | 30% | 15% |
+  | Stars (points a minute) | 250 / 1200 / 2000 | unchanged |
+
 - **Music.** "Live Wire", dream-pop electronica at 112 bpm in Eb major (`songs/watt_lane.py`): a
   glockenspiel hook over a flute, eighth-note piano, a plucked arpeggio, a supersaw chorus; the
   harmony near the lane, the lead only in it, and a hum loop that brightens in the lane.
@@ -2157,11 +2172,11 @@ rules (headless-tested by `the_pull_logic_test`), `PullWorld` and `PullMeshes` t
 `PullStatus` the HUD widget, `PullAudio` the sounds and `PullBests` the rider's best distance
 per difficulty (for the flag on the track). `ThePull.gd` wires them to the framework.
 
-- **Drag:** `FTP × (0.30 + 0.70 × d / d_ref_m)`. Kotlin sends `d_ref_m` (easy 360, standard
-  300, hard 250), so a steady pull at FTP lasts about 4.5, 3.8 and 3.2 minutes. It also sends
-  `full_factor` (1.12), the Full Pull line as a multiple of `d_ref_m` (108% of FTP there).
+- **Drag:** `FTP × (0.10 + 0.55 × d / d_ref_m)`. Kotlin sends `d_ref_m` (easy 360, standard
+  300, hard 250), so a steady pull at 65% of FTP lasts about 4.5, 3.8 and 3.2 minutes. It also
+  sends `full_factor` (1.12), the Full Pull line as a multiple of `d_ref_m` (72% of FTP there).
 - **Speed** follows the square root of the gap between power smoothed over 1.5 s and the drag
-  (at most 2.5 m/s at FTP), eased at 0.6 / 0.5 m/s², never backwards. **Stall:** 5 s in a row
+  (2.5 m/s for a gap of 55% of FTP), eased at 0.6 / 0.5 m/s², never backwards. **Stall:** 5 s in a row
   below 0.2 m/s, once the sled has rolled 1 m (or 15 s after the horn). "Dig in!" shows 3.5 s
   before. Sensor loss and pause freeze the sled.
 - **Modes:** `timed_end_mode: game`. Rounds play N pulls with a 60 s rest. A timed ride starts
@@ -2172,7 +2187,8 @@ per difficulty (for the flag on the track). `ThePull.gd` wires them to the frame
   Kart Race.
 - **Scoring:** 10 points a metre and +500 for a Full Pull, through `award()`. Stars come from
   the **best single pull's** points, against thresholds of 0.2 / 0.667 / 1.2 × `d_ref_m` × 10
-  (the game sets the result's `stars` itself). FTP at 1.0× earns 2 stars, and 1.3× earns 3.
+  (the game sets the result's `stars` itself). 65% of FTP at 1.0× earns 2 stars, and 1.3× earns
+  3; 30% of FTP pulls about a third of `d_ref_m`, 1 star.
   **Stats:** `distance_m`, `best_distance_m`, `peak_power` (the raw reading, what the ride
   metrics showed), `pull_sec`, `pulls`, `full_pulls`.
 - **HUD agreement:** the widget never shows the rider's watts. The sled's need appears in the
@@ -2184,6 +2200,16 @@ per difficulty (for the flag on the track). `ThePull.gd` wires them to the frame
   over the shoulder at each pull's start. Stands with bunting and bulbs, a cheering crowd,
   floodlight halos, dust motes, a turning wheel (`GFX_POLISH.md`, `UI_POLISH.md`,
   `AUDIO_POLISH.md`). 71-74 draw calls in play on the desktop with the HUD.
+- **Thresholds** (2026-11 retune; FTP shares):
+
+  | | Before | After |
+  |---|---|---|
+  | Sled's need at the start | 30% | 10% |
+  | Need at `d_ref_m` | 100% | 65% |
+  | Full Pull line (1.12 × `d_ref_m`) | 108% | 72% |
+  | Gap for 2.5 m/s (`G_FULL`) | 70% | 55% |
+  | Stars (0.2 / 0.667 / 1.2 × `d_ref_m` × 10) | 2 at FTP, 3 with 1.3× | 2 at 65%, 3 with 1.3× |
+
 - **Intro copy:** "Reach the Full Pull line at N m" (from the segment's `d_ref_m` and
   `full_factor`), or "Your best: N m" once the rider has one. No number is hard-coded.
 - **Captures:** `tests/capture_pull.gd` (review shots; `--play=SECONDS` for a recording) and
@@ -2197,13 +2223,22 @@ The Pull. A `free` slot now has no stand-in on all three sides (`SessionPlans.cu
 ## Balloon Pump (#76)
 
 The bike drives a brass air pump; the rider's watts, smoothed over about 2 s, fill a balloon on
-its nozzle. Each balloon pushes back harder as it fills (a push line from 20% to 45% of FTP in
-work, 15% to 30% in recovery, steepest at the end), so the last part asks for the knob; below the
-line it leaks back slowly. A full balloon ties off and floats into the bunch. **Race** fills
+its nozzle. Each balloon pushes back harder as it fills (a push line from 8% to 26% of FTP in
+standard work, 6-22% easy, 10-32% hard, 5-20% in recovery, steepest at the end), so the last part
+asks a little more; below the line it leaks back slowly. A full balloon ties off and floats into the bunch. **Race** fills
 X balloons (4 / 5 / 7) in 2:00 with a time bonus; **Max** fills as many as it can; circuits play
 Max. Points are 100 × the balloon's air (gold ×3) through `award`, so more work is more points.
 `PumpLogic` holds the rules (`pump_logic_test`); `games/balloon_pump/DESIGN.md` is the design
 record.
+
+Thresholds (2026-11 retune; FTP shares, empty to full for a medium balloon, a large ×1.12):
+
+| | Before | After |
+|---|---|---|
+| Push line, work (easy / standard / hard) | 20-45% (all) | 6-22 / 8-26 / 10-32% |
+| Push line, recovery | 15-30% | 5-20% |
+| What 15% of FTP does | nothing (it leaks) | fills a medium about 70% |
+| Stars (points a minute) | 60% at 1.0× is 2, 1.3× is 3 | unchanged |
 
 **Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the pump and its balloon in a
 warm key light at the fair after dark, in three places (a fair at dusk with a Ferris wheel,
@@ -2217,10 +2252,24 @@ the HUD at its extremes. **Music:** "Midnight Carousel" (`AUDIO_POLISH.md`).
 ## Keepy Uppy (#77)
 
 Keep a balloon in the air over a fan the bike drives, while the weather tries to push it down. The
-rider's watts, smoothed over about 2 s, lift it against its weight, and the lift weakens with
-height. `KeepyLogic` holds the rules (`keepy_logic_test`, `keepy_scene_test`), and
-`games/keepy_uppy/DESIGN.md` is the design record. A work game; Kotlin sends `weight_watts` (30 /
-40 / 50% of FTP), `rain_watts` (10%), `bird_watts` (5%) and `downdraft_watts` (20%).
+rider's watts, smoothed over about 2 s, hold it at height h (0-1) when they reach
+`weight_watts + height_watts × h`. `KeepyLogic` holds the rules (`keepy_logic_test`,
+`keepy_scene_test`), and `games/keepy_uppy/DESIGN.md` is the design record. A work game; Kotlin
+sends `weight_watts` (6 / 8 / 10% of FTP), `height_watts` (65 / 75 / 85%), `rain_watts` (4%),
+`bird_watts` (2%) and `downdraft_watts` (8%). Below its need the balloon sinks at most 0.06 a
+second (0.10 in a downdraft), and "Sinking!" shows below 15% height, seconds before the grille.
+
+Thresholds (2026-11 retune; FTP shares, standard):
+
+| | Before | After |
+|---|---|---|
+| Model | lift = power × (1 − 0.45 h) against 40% | need = 8% + 75% × h |
+| Floats low, just off the grille | about 41% | about 10-15% |
+| Mid band (from h 0.35, now 0.25) | 47% | 27% (intro target: about 30%) |
+| High band (from h 0.65) | 57% | 57% |
+| Rain / bird / downdraft | 10 / 5 / 20% | 4 / 2 / 8% |
+| Fastest sink (in a downdraft) | 0.15 (0.25) a second | 0.06 (0.10) a second |
+| Stars (points a minute) | 500 / 1100 / 2000 | unchanged (bands, not watts) |
 
 - **Scoring:** the low, mid and high bands score 1×, 2× and 3× of 10 points a second through
   `award`, and only with the power to lift the balloon off the grille. Hitting the ground pops it:
@@ -2244,8 +2293,18 @@ The bike turns the generator for a valley town at dusk. Demand follows an evenin
 watts, averaged over about 5 s, meet it at 90% of it, and only while pedalling (30 rpm). `GridLogic`
 holds the rules (`grid_logic_test`), and `games/power_grid/DESIGN.md` is the design record. It plays
 all four circuit roles and Just Rides (minutes, open). Kotlin sends `demand_lo_watts`,
-`demand_hi_watts` (40-60 / 45-70 / 50-75% of FTP in work, 30-50% in a warm-up or cool-down, 30-42% in
+`demand_hi_watts` (12-27 / 15-33 / 20-45% of FTP in work, 12-27% in a warm-up or cool-down, 12-22% in
 a recovery) and `storm_watts` (15%).
+
+Thresholds (2026-11 retune; FTP shares of demand, met at 90% of it):
+
+| | Before | After |
+|---|---|---|
+| Work (easy / standard / hard) | 40-60 / 45-70 / 50-75% | 12-27 / 15-33 / 20-45% |
+| Warm-up, cool-down | 30-50% | 12-27% |
+| Recovery | 30-42% | 12-22% |
+| Storm repair | demand + 15% | unchanged |
+| Stars (points a minute) | 200 / 600 / 1000 | unchanged (districts, not watts) |
 
 - **Districts:** houses, street lamps, the funfair and the stadium come online as demand rises,
   each announced 4 s ahead. Falling short dims the newest, then turns it off; catching up relights
@@ -2270,8 +2329,19 @@ Each round is one rocket launch of about 90 s: fuel it with a steady effort (45 
 through the count (10 s), push all out at liftoff (18 s), then coast (15 s). The climb is power × a
 fuel multiplier of 0.5 to 1.5, past the clouds, the edge of space, orbit and the Moon. `LaunchLogic`
 holds the rules (`launch_logic_test`, `launch_scene_test`); `games/ready_for_launch/DESIGN.md` is the
-design record. A work game; Kotlin sends `fuel_line_watts` (45 / 50 / 55% of FTP),
-`fuel_full_watts` (55 / 60 / 65%) and the plan's `target_watts` for the push.
+design record. A work game; Kotlin sends `fuel_line_watts` (8 / 10 / 15% of FTP),
+`fuel_full_watts` (28 / 30 / 35%) and `push_watts` (50 / 60 / 70%), the push's target; the plan's
+`target_watts` (105% of FTP) is no longer used. The clamps let go at 20% of the push's target.
+
+Thresholds (2026-11 retune; FTP shares, easy / standard / hard):
+
+| | Before | After |
+|---|---|---|
+| Fuel line | 45 / 50 / 55% | 8 / 10 / 15% |
+| Full tank held | 55 / 60 / 65% | 28 / 30 / 35% |
+| Push target | the plan's 90 / 105 / 120% | 50 / 60 / 70% |
+| Lift-off | 25% of the target | 20% of the target |
+| Stars (points a minute) | 300 / 950 / 2000 | unchanged (the Moon at 1.3× is 3) |
 
 - **Scoring:** 40 points a climb unit plus 100 / 200 / 300 / 500 at the milestones, through `award`,
   only from climb while pedalling; the Moon caps a launch at 2460. Stars are points a minute (300 /
@@ -2299,8 +2369,14 @@ bounds checks).
   `stand_lag_sec` (0.5, `standEnterMs`). A stand within half a window of the line counts; it reads
   0.5 s later, so `GateLogic` opens the window at `window_sec / 2 - lag` before the line. Only a
   stand that starts in the window counts. Fences are at least 5 s apart at the 10 m/s cap.
-- **Pace:** Kotlin sends `pace_watts` (45 / 55 / 65% of FTP), the ride panel's band. Under 30 rpm
-  the horse stops, and nothing scores.
+- **Pace:** Kotlin sends `pace_watts`, the ride panel's band. The horse walks from 10% of pace,
+  canters at pace and tops out at 1.3×. Under 30 rpm the horse stops, and nothing scores.
+
+  | 2026-11 retune (FTP shares) | Before | After |
+  |---|---|---|
+  | Pace (easy / standard / hard) | 45 / 55 / 65% | 25 / 32 / 42% |
+  | Top speed (1.3 × pace, standard) | 72% | 42% |
+  | Stars (points a minute) | 220-300 / 500-600 / 860-900 | unchanged (clears, not watts) |
 - **Scoring:** 50 a clear, 0.25 a metre, 100 a clear round; a rail is 4 faults and -30. Stars are
   points a minute.
 - **Lost camera** (any `tracker_state` but tracking): the horse circles, judging nothing, and comes

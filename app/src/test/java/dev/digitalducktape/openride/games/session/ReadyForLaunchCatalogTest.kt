@@ -45,13 +45,15 @@ class ReadyForLaunchCatalogTest {
 
     @Test
     fun `fuel lines scale with difficulty and FTP, and the push has its target`() {
-        assertEquals(90, params(Difficulty.EASY).int("fuel_line_watts"))
-        assertEquals(110, params(Difficulty.EASY).int("fuel_full_watts"))
-        assertEquals(100, params(Difficulty.STANDARD).int("fuel_line_watts"))
-        assertEquals(120, params(Difficulty.STANDARD).int("fuel_full_watts"))
-        assertEquals(110, params(Difficulty.HARD).int("fuel_line_watts"))
-        assertEquals(130, params(Difficulty.HARD).int("fuel_full_watts"))
-        assertEquals(210, params(Difficulty.STANDARD).int("target_watts"))
+        // The 2026-11 retune: fuel trickles from light pedalling, ~30% of FTP fills the tank.
+        assertEquals(16, params(Difficulty.EASY).int("fuel_line_watts"))
+        assertEquals(56, params(Difficulty.EASY).int("fuel_full_watts"))
+        assertEquals(20, params(Difficulty.STANDARD).int("fuel_line_watts"))
+        assertEquals(60, params(Difficulty.STANDARD).int("fuel_full_watts"))
+        assertEquals(30, params(Difficulty.HARD).int("fuel_line_watts"))
+        assertEquals(70, params(Difficulty.HARD).int("fuel_full_watts"))
+        // The push asks 50 / 60 / 70% of FTP, not the plan's work target.
+        assertEquals(listOf(100, 120, 140), Difficulty.entries.map { params(it).int("push_watts") })
         assertEquals(200, params(Difficulty.HARD).int("ftp_watts"))
     }
 

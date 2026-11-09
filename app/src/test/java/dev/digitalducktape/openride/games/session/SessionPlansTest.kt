@@ -166,16 +166,18 @@ class SessionPlansTest {
     fun `Balloon Pump scales its push line by role and its race by difficulty`() {
         fun segment(d: Difficulty) =
             SessionPlans.justRide(GameCatalog.BALLOON_PUMP, JustRideMode.Timed(20), d, ftp200).segments.single()
-        // A Just Ride is work: the line runs from 20% to 45% of FTP, with the effort multiplier.
-        assertEquals(40, segment(Difficulty.STANDARD).params.int("push_lo_watts"))
-        assertEquals(90, segment(Difficulty.STANDARD).params.int("push_hi_watts"))
+        // A Just Ride is work: the line runs from 8% to 26% of FTP on standard (the 2026-11
+        // retune), 6-22% easy and 10-32% hard, with the effort multiplier.
+        assertEquals(16, segment(Difficulty.STANDARD).params.int("push_lo_watts"))
+        assertEquals(52, segment(Difficulty.STANDARD).params.int("push_hi_watts"))
+        assertEquals(listOf(44, 52, 64), Difficulty.entries.map { segment(it).params.int("push_hi_watts") })
         assertTrue(segment(Difficulty.STANDARD).effort)
         assertEquals(listOf(4, 5, 7), Difficulty.entries.map { segment(it).params.int("race_balloons") })
         assertEquals(120, segment(Difficulty.HARD).params.int("race_sec"))
-        // Recovery is gentler: 15% to 30% of FTP.
+        // Recovery is gentler: 5% to 20% of FTP.
         val recovery = GameCatalog.BALLOON_PUMP.params(SegmentRole.RECOVERY, Difficulty.STANDARD, ftp200)
-        assertEquals(30, recovery["push_lo_watts"]!!.jsonPrimitive.int)
-        assertEquals(60, recovery["push_hi_watts"]!!.jsonPrimitive.int)
+        assertEquals(10, recovery["push_lo_watts"]!!.jsonPrimitive.int)
+        assertEquals(40, recovery["push_hi_watts"]!!.jsonPrimitive.int)
         assertEquals(SegmentRole.WORK, GameCatalog.circuitRole(GameCatalog.BALLOON_PUMP))
         assertEquals(125, GameCatalog.BALLOON_PUMP.roundSec)
     }
@@ -193,22 +195,23 @@ class SessionPlansTest {
     }
 
     @Test
-    fun `Watt Lane sends its lane in watts at about half of FTP and joins the work and warm-up pools`() {
+    fun `Watt Lane sends its lane in watts at about a third of FTP and joins the work and warm-up pools`() {
         fun params(role: SegmentRole, d: Difficulty, ftp: FtpBasis = ftp200) =
             JsonObject(GameCatalog.WATT_LANE.params(role, d, ftp))
-        // Width: 25 / 20 / 15% of FTP, at least 50 / 40 / 30 W, rounded up to 10 W.
+        // Width: 25 / 20 / 15% of FTP, at least 40 / 30 / 30 W, rounded up to 10 W.
         assertEquals(listOf(50, 40, 30), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_width_watts") })
         val ftp300 = FtpBasis(300, isFallback = false)
         assertEquals(listOf(80, 60, 50), Difficulty.entries.map { params(SegmentRole.WORK, it, ftp300).int("lane_width_watts") })
-        // The centre's range: 40-60 / 45-70 / 50-75% of FTP for work, 35-55% for a warm-up, on a 5 W grid.
-        assertEquals(listOf(80, 90, 100), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_min_watts") })
-        assertEquals(listOf(120, 140, 150), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_max_watts") })
-        assertEquals(70, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_min_watts"))
-        assertEquals(110, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_max_watts"))
+        // The centre's range (the 2026-11 retune): 20-35 / 22-40 / 32-55% of FTP for work, 18-32%
+        // for a warm-up, on a 5 W grid.
+        assertEquals(listOf(40, 45, 65), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_min_watts") })
+        assertEquals(listOf(70, 80, 110), Difficulty.entries.map { params(SegmentRole.WORK, it).int("lane_max_watts") })
+        assertEquals(35, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_min_watts"))
+        assertEquals(65, params(SegmentRole.WARMUP, Difficulty.HARD).int("lane_max_watts"))
         val just = SessionPlans.justRide(GameCatalog.WATT_LANE, JustRideMode.Timed(10), Difficulty.STANDARD, ftp200)
             .segments.single()
         assertTrue(just.effort)
-        assertEquals(90, just.params.int("lane_min_watts"))
+        assertEquals(45, just.params.int("lane_min_watts"))
         // It joins circuits by its roles alone (#75), camera or not.
         assertTrue(GameCatalog.WATT_LANE in GameCatalog.DEFAULT.circuitPool(SegmentRole.WORK, cameraGames = false))
         assertTrue(GameCatalog.WATT_LANE in GameCatalog.DEFAULT.circuitPool(SegmentRole.WARMUP, cameraGames = false))

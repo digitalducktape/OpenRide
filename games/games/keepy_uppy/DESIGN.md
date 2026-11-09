@@ -1,5 +1,9 @@
 # Keepy Uppy: design record (#77)
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 Keep a balloon in the air over a fan your pedalling drives. The weather tries to push it down.
 This is the game's source of truth for its rules and tuning. The issue (#77) is the spec; every
 change from it is listed under **Changes from the issue**. The look is in `ART_BIBLE.md`; the

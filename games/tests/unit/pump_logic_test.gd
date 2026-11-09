@@ -81,23 +81,23 @@ func test_the_gauge_still_moves_at_ftp() -> void:
 
 func test_the_push_line_rises_as_the_balloon_fills() -> void:
 	var logic := PumpLogic.new(1, PARAMS)
-	# Work: 20% of FTP empty, 45% full for a medium; the curve is f³.
-	assert_float(logic.line_at(0.0, "medium")).is_equal_approx(40.0, 0.01)
-	assert_float(logic.line_at(1.0, "medium")).is_equal_approx(90.0, 0.01)
-	assert_float(logic.line_at(0.5, "medium")).is_equal_approx(40.0 + 50.0 * 0.125, 0.01)
-	assert_float(logic.line_at(1.0, "small")).is_equal_approx(80.0, 0.01)
-	assert_float(logic.line_at(1.0, "large")).is_equal_approx(96.0, 0.01)
-	# No balloon asks for more than about half of FTP.
+	# Work (2026-11 retune): 8% of FTP empty, 26% full for a medium; the curve is f³.
+	assert_float(logic.line_at(0.0, "medium")).is_equal_approx(16.0, 0.01)
+	assert_float(logic.line_at(1.0, "medium")).is_equal_approx(52.0, 0.01)
+	assert_float(logic.line_at(0.5, "medium")).is_equal_approx(16.0 + 36.0 * 0.125, 0.01)
+	assert_float(logic.line_at(1.0, "small")).is_equal_approx(44.8, 0.01)
+	assert_float(logic.line_at(1.0, "large")).is_equal_approx(56.32, 0.01)
+	# No balloon asks for more than about 29% of FTP: a comfortable effort finishes every one.
 	for kind in PumpLogic.KINDS:
-		assert_float(logic.line_at(1.0, kind)).is_less_equal(FTP * 0.5)
+		assert_float(logic.line_at(1.0, kind)).is_less_equal(FTP * 0.29)
 
 
 func test_spinning_lightly_gets_most_of_the_way_then_stalls() -> void:
-	# 30% of FTP: a medium stalls where 0.2 + 0.25 f³ = 0.3, f ≈ 0.74.
-	var logic := _filling("medium", 60.0)
-	_run(logic, 40.0, 60.0)
+	# 15% of FTP: a medium stalls where 0.08 + 0.18 f³ = 0.15, f ≈ 0.73.
+	var logic := _filling("medium", 30.0)
+	_run(logic, 60.0, 30.0)
 	assert_int(logic.phase).is_equal(PumpLogic.Phase.FILL)
-	assert_float(logic.fill).is_between(0.68, 0.76)
+	assert_float(logic.fill).is_between(0.65, 0.75)
 	# Turning it up to the line and past it finishes the balloon.
 	var events := _run(logic, 20.0, 100.0, func(): return logic.phase != PumpLogic.Phase.FILL)
 	assert_bool(_find(events, "filled").is_empty()).is_false()
@@ -108,12 +108,13 @@ func test_below_the_line_the_balloon_leaks_slowly_and_never_pops() -> void:
 	_run(logic, 6.0, 120.0)
 	var before := logic.fill
 	assert_float(before).is_greater(0.4)
+	assert_float(before).is_less(0.9)
 	# Once the smoothing has dropped below the line (about 1.4 s), 2.5% of a balloon a second.
-	var events := _run(logic, 2.0, 20.0)
+	var events := _run(logic, 2.0, 10.0)
 	assert_bool(logic.leaking).is_true()
 	var mid := logic.fill
 	assert_float(mid).is_greater(before - 0.02)
-	events.append_array(_run(logic, 2.0, 20.0))
+	events.append_array(_run(logic, 2.0, 10.0))
 	assert_float(mid - logic.fill).is_equal_approx(2.0 * PumpLogic.LEAK, 0.003)
 	events.append_array(_run(logic, 120.0, 0.0))
 	assert_float(logic.fill).is_equal(0.0)
@@ -267,8 +268,8 @@ func test_sensor_loss_holds_the_balloon() -> void:
 
 func test_recovery_has_a_gentle_line_a_cap_and_a_faster_flow() -> void:
 	var logic := _filling("medium", 0.0, PARAMS.merged({"power_cap_watts": 120.0}), true)
-	assert_float(logic.line_at(0.0)).is_equal_approx(30.0, 0.01)
-	assert_float(logic.line_at(1.0)).is_equal_approx(60.0, 0.01)
+	assert_float(logic.line_at(0.0)).is_equal_approx(10.0, 0.01)
+	assert_float(logic.line_at(1.0)).is_equal_approx(40.0, 0.01)
 	# 80 W fills a medium in 1.5 / (0.25 × 1.4 × 0.4) ≈ 10.7 s; 200 W counts only the 120 W cap.
 	var times := []
 	for watts in [80.0, 200.0, 120.0]:
@@ -348,6 +349,25 @@ func test_stars_need_about_one_point_three_times_effort() -> void:
 			# The same ride at 1.3× (about 48% resistance) earns 3.
 			assert_int(_stars(perfect * 1.3, difficulty, variant)).override_failure_message(
 				"%s %s 1.3x %.0f" % [difficulty, variant, perfect * 1.3]).is_equal(3)
+
+
+## The 2026-11 retune's core goal: a rider at 30% of FTP finishes every kind of balloon without
+## digging in, and fills a standard Race heat's five in time.
+func test_a_rider_at_thirty_percent_of_ftp_finishes_balloons_and_a_race_heat() -> void:
+	for kind in ["small", "medium", "large", "gold"]:
+		var logic := _filling(kind, 0.30 * FTP)
+		var events := _run(logic, 60.0, 0.30 * FTP, func(): return logic.phase != PumpLogic.Phase.FILL)
+		assert_bool(_find(events, "filled").is_empty()).override_failure_message(kind).is_false()
+	var race := PumpLogic.new(1, PARAMS.merged({"race_balloons": 5}), "race", true)
+	var won := false
+	var t := 0.0
+	while t < 130.0 and not won:
+		for e in race.step(DT, 0.30 * FTP, 85.0):
+			if e.type == "heat_end":
+				won = e.won
+				t = 1.0e9
+		t += DT
+	assert_bool(won).is_true()
 
 
 func test_an_easy_ride_earns_a_star_and_more_work_more_points() -> void:

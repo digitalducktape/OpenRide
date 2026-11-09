@@ -37,13 +37,15 @@ class KeepyUppyCatalogTest {
 
     @Test
     fun `the balloon weighs 30, 40 and 50 percent of FTP and the weather scales with FTP`() {
-        assertEquals(60, params(Difficulty.EASY).int("weight_watts"))
-        assertEquals(80, params(Difficulty.STANDARD).int("weight_watts"))
-        assertEquals(100, params(Difficulty.HARD).int("weight_watts"))
+        // The 2026-11 retune: a light hover weight and the watts a full height asks.
+        assertEquals(12, params(Difficulty.EASY).int("weight_watts"))
+        assertEquals(16, params(Difficulty.STANDARD).int("weight_watts"))
+        assertEquals(20, params(Difficulty.HARD).int("weight_watts"))
+        assertEquals(listOf(130, 150, 170), Difficulty.entries.map { params(it).int("height_watts") })
         for (d in Difficulty.entries) {
-            assertEquals(20, params(d).int("rain_watts"))
-            assertEquals(10, params(d).int("bird_watts"))
-            assertEquals(40, params(d).int("downdraft_watts"))
+            assertEquals(8, params(d).int("rain_watts"))
+            assertEquals(4, params(d).int("bird_watts"))
+            assertEquals(16, params(d).int("downdraft_watts"))
             assertEquals(200, params(d).int("ftp_watts"))
         }
     }

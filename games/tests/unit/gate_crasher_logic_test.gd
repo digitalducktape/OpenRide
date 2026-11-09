@@ -259,10 +259,25 @@ func test_a_lost_sensor_freezes_the_ride() -> void:
 
 func test_params_set_the_pace_and_window_and_levels_fill_in() -> void:
 	var l := GateLogic.new({"ftp_watts": 300.0}, "hard")
-	assert_float(l.pace_watts).is_equal_approx(195.0, 0.01)
+	assert_float(l.pace_watts).is_equal_approx(126.0, 0.01)
 	assert_float(l.window_sec).is_equal(1.2)
 	assert_float(GateLogic.new({"pace_watts": 123.0, "window_sec": 1.3}).pace_watts).is_equal(123.0)
 	assert_float(GateLogic.new({"window_sec": 1.3}).window_sec).is_equal(1.3)
+
+
+## The 2026-11 retune's core goal: light pedalling keeps the horse going, and a rider at 30% of
+## FTP canters near pace (standard asks 32%) and jumps a clean round.
+func test_a_rider_at_thirty_percent_of_ftp_canters_a_clear_round() -> void:
+	logic = GateLogic.new({"ftp_watts": 200.0}, "standard")
+	for i in roundi(10.0 / DT):
+		_step(0.15 * 200.0)
+	assert_float(logic.speed).is_greater(GateLogic.V_WALK)
+	logic = GateLogic.new({"ftp_watts": 200.0}, "standard")
+	events = []
+	_ride_with(Rider.new(), 0.30 * 200.0, GateLogic.FENCES)
+	assert_float(logic.speed).is_greater(GateLogic.V_PACE * 0.9)
+	assert_int(logic.clears).is_equal(GateLogic.FENCES)
+	assert_int(logic.faults).is_equal(0)
 
 
 ## Points a minute over two rounds of a perfect ride at `watts_share` of pace, with `multiplier`

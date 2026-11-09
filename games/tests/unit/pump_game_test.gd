@@ -81,15 +81,15 @@ func test_a_rounds_ride_ends_after_its_heats() -> void:
 
 func test_the_intro_copy_comes_from_the_segments_params() -> void:
 	_set_mode("race")
-	_make({"params": {"ftp_watts": 200.0, "push_lo_watts": 40, "push_hi_watts": 90, "race_balloons": 7, "race_sec": 90}})
-	# The biggest balloon's top line: 40 + 50 × 1.12.
-	assert_str(game.target_text(game.segment)).is_equal("Get above 96 W to finish each balloon")
+	_make({"params": {"ftp_watts": 200.0, "push_lo_watts": 16, "push_hi_watts": 52, "race_balloons": 7, "race_sec": 90}})
+	# The biggest balloon's top line: 16 + 36 × 1.12.
+	assert_str(game.target_text(game.segment)).is_equal("Get above 56 W to finish each balloon")
 	assert_str(game.race_line(game.segment)).is_equal("Race: fill 7 balloons in 1:30")
 	assert_str(game.how_to_text(game.segment).replace("\n", " ")).is_equal(
 		"Pedal to pump up balloons. Each one gets harder to fill near the end")
 	# FTP alone sets the line when the params leave it out, by role.
 	var fallback := {"role": "recovery", "params": {"ftp_watts": 300.0}}
-	assert_str(game.target_text(fallback)).is_equal("Get above 95 W to finish each balloon")
+	assert_str(game.target_text(fallback)).is_equal("Get above 65 W to finish each balloon")
 	# Circuits play Max: no race line.
 	assert_str(game.race_line({"role": "work", "params": {}})).is_equal("")
 

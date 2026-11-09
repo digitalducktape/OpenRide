@@ -17,7 +17,7 @@ func _make(steer := "off", seg_extra := {}) -> Node:
 	add_child(g.hud)
 	add_child(g)
 	var seg := {"game_id": "keepy_uppy", "role": "free", "difficulty": "standard", "duration_sec": -1,
-		"end_mode": "game", "seed": 7, "params": {"ftp_watts": 200.0, "weight_watts": 80.0}}
+		"end_mode": "game", "seed": 7, "params": {"ftp_watts": 200.0}}
 	seg.merge(seg_extra, true)
 	g.prepare(seg)
 	return g
@@ -56,11 +56,13 @@ func test_the_declarations_match_the_issue() -> void:
 
 
 func test_the_target_line_is_computed_from_the_segment() -> void:
-	# The middle of the mid band against the balloon's weight: 80 / (1 - 0.45 × 0.5) ≈ 103 W → 105.
-	assert_str(game.target_text({"params": {"ftp_watts": 200.0, "weight_watts": 80.0}})).is_equal("About 105 W holds it in the middle")
-	# Without weight_watts, from FTP and difficulty: hard is 50% of 300 W = 150 → 194 W → 195.
-	assert_str(game.target_text({"difficulty": "hard", "params": {"ftp_watts": 300.0}})).is_equal("About 195 W holds it in the middle")
-	assert_str(game.target_text({"difficulty": "easy", "params": {"ftp_watts": 100.0}})).is_equal("About 40 W holds it in the middle")
+	# Just inside the mid band (30% of a full height): 16 + 0.3 × 150 = 61 W → 60.
+	assert_str(game.target_text({"params": {"ftp_watts": 200.0, "weight_watts": 16.0, "height_watts": 150.0}})) \
+		.is_equal("About 60 W holds it in the middle band")
+	# From FTP and difficulty: hard is 10% + 0.3 × 85% of 300 W = 106.5 → 105.
+	assert_str(game.target_text({"difficulty": "hard", "params": {"ftp_watts": 300.0}})).is_equal("About 105 W holds it in the middle band")
+	# The rider's bike (FTP 140, standard): 11.2 + 0.3 × 105 = 42.7 → 45, the comfortable effort.
+	assert_str(game.target_text({"params": {"ftp_watts": 140.0}})).is_equal("About 45 W holds it in the middle band")
 
 
 func test_a_pop_takes_fifty_points_off_through_the_framework() -> void:
@@ -223,11 +225,12 @@ func test_callouts_sit_in_their_lane_clear_of_the_balloon_and_the_hud() -> void:
 
 
 func test_the_rain_warning_says_what_the_rain_costs() -> void:
-	# Weight 80 W, rain 200 × share more: the callout's figure is the watts in the rain.
+	# The callout's figure is the watts that hold the mid band in the rain.
 	var w: float = game.logic.weight() + game.logic.rain_watts
+	var span: float = game.logic.height_watts
 	game._handle({"type": "telegraph", "force": "rain"})
-	assert_str(game.banner.label.text).is_equal("Rain: %d W holds it up" % game._holds_watts(w))
-	assert_int(game._holds_watts(w)).is_greater(game._holds_watts(game.logic.weight()))
+	assert_str(game.banner.label.text).is_equal("Rain: %d W holds it up" % game._holds_watts(w, span))
+	assert_int(game._holds_watts(w, span)).is_greater(game._holds_watts(game.logic.weight(), span))
 
 
 func test_the_rooftop_has_no_grass() -> void:

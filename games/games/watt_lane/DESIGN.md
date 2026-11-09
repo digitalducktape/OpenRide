@@ -1,5 +1,9 @@
 # Watt Lane: design record
 
+> **Retuned 2026-11** (rider feedback: the watts asked were too high). The thresholds below are
+> the original design; the current ones, and a before/after table, are in `docs/GAMES.md` under
+> this game. The rules' constants and Kotlin's `GameCatalog` params are the source of truth.
+
 Watt Lane (#78, epic #74) is a work game, and a low-profile warm-up: **a chevron cursor following
 an illuminated horizontal lane.** Your smoothed power is the chevron's height (more watts, higher);
 the lane comes in from the right and steps up or down as the target wattage changes. Hold the
