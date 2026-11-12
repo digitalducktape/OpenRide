@@ -10,7 +10,8 @@ package dev.digitalducktape.openride.ui.classes
  *   pause/resume playback when the *ride* pauses — whether from the Pause button or the
  *   freewheel auto-pause.
  * - `openrideSetMuted(true|false)` silences or restores the class's own audio (#72), so a rider
- *   can listen to their own music instead. Muting rebuilds the player at the same second with
+ *   can listen to their own music instead. This is the fallback for a WebView that can't be
+ *   muted as a whole; where it can, VideoRideScreen does that and never calls this. Muting rebuilds the player at the same second with
  *   `mute: 1`, rather than calling `mute()`: Android gives the sound to one app at a time, and
  *   the WebView only stays out of that when its video has been silent from its first frame. A
  *   video muted part-way keeps its claim, so the rider's music app starting would pause the
@@ -43,7 +44,11 @@ object YouTubeEmbed {
      *  rather than escaped, since a non-matching id can only be a bug or an injection. */
     private val VIDEO_ID = Regex("^[A-Za-z0-9_-]{5,20}$")
 
-    fun html(videoId: String): String {
+    /**
+     * @param startMuted build the player silent from its first frame (a class started over the
+     *   rider's music, on a WebView that can't be muted as a whole).
+     */
+    fun html(videoId: String, startMuted: Boolean = false): String {
         require(VIDEO_ID.matches(videoId)) { "Not a YouTube video id: $videoId" }
         return """
             <!doctype html>
@@ -63,7 +68,7 @@ object YouTubeEmbed {
               // latest requested state and apply it in onReady.
               var wantPaused = false;
               // Likewise the rider's mute choice (#72).
-              var wantMuted = false;
+              var wantMuted = $startMuted;
 
               // Whether the player on screen was built silent, the only kind of silence
               // that lets the rider's music play alongside.

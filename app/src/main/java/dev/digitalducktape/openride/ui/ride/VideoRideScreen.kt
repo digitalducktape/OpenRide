@@ -1,6 +1,8 @@
 package dev.digitalducktape.openride.ui.ride
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.media.AudioManager
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -21,7 +23,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,8 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -49,7 +49,6 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.music.MiniPlayer
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -59,9 +58,8 @@ import kotlinx.coroutines.launch
  *
  * The overlay is dismissible (tap the video) so YouTube's native player controls are always
  * reachable and never permanently covered — part of the app's deliberate YouTube ToS stance.
- * It comes back by itself [OverlayReturnMs] after the rider's last touch, or at once from the
- * "Ride controls" pill, so the ride's own controls are never more than a moment away (rider,
- * 2026-11-11: a tap on the video used to leave only the pill).
+ * The "Ride controls" pill brings it back, and nothing else does: it stays away until the rider
+ * asks for it (rider, 2026-11-12).
  *
  * Ride state comes from the same [InRideViewModel] as the plain in-ride screen, and the
  * video tracks it: pausing the ride (Pause button or freewheel auto-pause) pauses the video
@@ -69,9 +67,16 @@ import kotlinx.coroutines.launch
  * workout automatically.
  *
  * The rider can mute the class's own audio (#72) to ride to their music instead, which matters
- * most for scenic rides. It's a choice for this ride: every class starts with its sound on, so a
- * coached class is never silent by surprise. While the class is muted the top strip carries the
- * music player, since the rider's music app may have paused itself when the class first spoke.
+ * most for scenic rides. It's a choice for this ride, not a setting: a class starts with its
+ * sound on, so a coached class is never silent by surprise, unless the rider's music is already
+ * playing as it opens, when it starts muted and the music carries on. While the class is muted
+ * the top strip carries the music player.
+ *
+ * The mute is the WebView's own (`WebViewCompat.setAudioMuted`) where it has one: the video
+ * plays on untouched, and the WebView lets go of the sound, which Android gives to one app at a
+ * time, so the music app can play without the class pausing. Unmuting takes the sound back, as
+ * starting any class does. An older WebView falls back to the page's `openrideSetMuted`
+ * ([YouTubeEmbed]), which has to restart the video where it was (a few seconds of black).
  */
 @Composable
 fun VideoRideScreen(
@@ -84,18 +89,10 @@ fun VideoRideScreen(
     val scope = rememberCoroutineScope()
     var overlayVisible by remember { mutableStateOf(true) }
     var showEndConfirmation by remember { mutableStateOf(false) }
-    // Survives a configuration change, as the WebView's page (and its sound) doesn't restart for one.
-    var classMuted by rememberSaveable { mutableStateOf(false) }
-
-    // Every touch on the screen, YouTube's controls included, counted so the tucked-away
-    // overlay waits until the rider has finished with them before it returns.
-    var touches by remember { mutableIntStateOf(0) }
-    LaunchedEffect(overlayVisible, touches) {
-        if (!overlayVisible) {
-            delay(OverlayReturnMs)
-            overlayVisible = true
-        }
-    }
+    // A class started over the rider's own music starts muted: they chose the music first
+    // (rider, 2026-11-12). Asked once, as the screen opens, before the class makes any sound.
+    val context = LocalContext.current
+    var classMuted by rememberSaveable { mutableStateOf(riderMusicPlaying(context)) }
 
     // Shared by the End Ride dialog and the video-completion auto-end. endRide() returns
     // null if the ride is already over, so the two paths can't double-fire navigation.
@@ -106,20 +103,7 @@ fun VideoRideScreen(
         }
     }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            // Watches without consuming: the touch still reaches the player or the overlay.
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                        touches++
-                    }
-                }
-            },
-    ) {
+    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         ClassPlayer(
             videoId = videoId,
             paused = uiState.isPaused,
@@ -184,7 +168,8 @@ fun VideoRideScreen(
 /**
  * The WebView hosting YouTube's embedded player. Created once per [videoId]. [paused]
  * mirrors the *ride's* paused state into the player (see [YouTubeEmbed] for the page-side
- * functions), [muted] silences the class's own audio the same way (#72), and [onVideoEnded] fires — already on the UI thread — when playback completes.
+ * functions), [muted] silences the class's own audio (#72), and [onVideoEnded] fires — already
+ * on the UI thread — when playback completes.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -228,9 +213,13 @@ private fun ClassPlayer(
                         YouTubeEmbed.PLAYER_ORIGINS,
                     )
                 }
+                // Silent before the first frame when the class starts muted, so it never
+                // takes the sound from the rider's music.
+                val webViewMute = WebViewFeature.isFeatureSupported(WebViewFeature.MUTE_AUDIO)
+                if (webViewMute) WebViewCompat.setAudioMuted(this, muted)
                 loadDataWithBaseURL(
                     YouTubeEmbed.BASE_URL,
-                    YouTubeEmbed.html(videoId),
+                    YouTubeEmbed.html(videoId, startMuted = muted && !webViewMute),
                     "text/html",
                     "utf-8",
                     null,
@@ -245,7 +234,12 @@ private fun ClassPlayer(
     }
 
     LaunchedEffect(webView, muted) {
-        webView?.evaluateJavascript(YouTubeEmbed.muteScript(muted), null)
+        val view = webView ?: return@LaunchedEffect
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.MUTE_AUDIO)) {
+            WebViewCompat.setAudioMuted(view, muted)
+        } else {
+            view.evaluateJavascript(YouTubeEmbed.muteScript(muted), null)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -259,6 +253,10 @@ private fun ClassPlayer(
         }
     }
 }
+
+/** Whether something is already playing music as the class opens: the rider's own app. */
+private fun riderMusicPlaying(context: Context): Boolean =
+    (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
 
 /** Page → app callback surface injected as `window.OpenRideBridge` (see [YouTubeEmbed]). */
 private class VideoEndBridge(private val onEnded: () -> Unit) {
@@ -354,22 +352,13 @@ private fun TopStripContent(
 }
 
 /**
- * How long after the rider's last touch the tucked-away overlay returns: long enough to use
- * YouTube's own controls, which hide themselves after about three seconds.
- */
-private const val OverlayReturnMs = 6_000L
-
-/**
  * The strip over video holds [VideoScrimTop] down past the ELAPSED label before it fades, so the
  * label stays readable over bright cloud (bike test, 2026-10-27).
  */
 private val VideoScrimTop = Color(0xCC000000)
 private const val VideoScrimHoldEnd = 0.8f
 
-/**
- * Brings the overlay back at once while it's tucked away (it also returns by itself, see
- * [OverlayReturnMs]). Raised fill: it sits on video.
- */
+/** Brings the overlay back once it's been tucked away. Raised fill: it sits on video. */
 @Composable
 private fun RideControlsPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OrSecondaryButton(

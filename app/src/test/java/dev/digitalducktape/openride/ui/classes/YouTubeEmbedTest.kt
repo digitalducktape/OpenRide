@@ -114,4 +114,10 @@ class YouTubeEmbedTest {
     fun `the preference runs on the player's own origin`() {
         assertTrue(YouTubeEmbed.BASE_URL in YouTubeEmbed.PLAYER_ORIGINS)
     }
+
+    @Test
+    fun `a class can be built silent from its first frame`() {
+        assertTrue(YouTubeEmbed.html("dQw4w9WgXcQ", startMuted = true).contains("var wantMuted = true;"))
+        assertTrue(YouTubeEmbed.html("dQw4w9WgXcQ", startMuted = false).contains("var wantMuted = false;"))
+    }
 }
