@@ -11,8 +11,9 @@ import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
 
 /**
- * A yes/no confirmation in the design system's look (End ride?): a Cancel and a confirm button
- * of the ordinary sizes, the confirm one red when [destructive].
+ * A yes/no confirmation in the design system's look (End ride?): a dismiss button ([dismissText],
+ * "Cancel" by default) and a confirm button of the ordinary sizes, the confirm one red when
+ * [destructive].
  */
 @Composable
 fun OrConfirmDialog(
@@ -22,6 +23,7 @@ fun OrConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = true,
+    dismissText: String = "Cancel",
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -31,7 +33,7 @@ fun OrConfirmDialog(
         text = { Text(text = text, style = OrType.Body, color = OrColors.OnSurfaceMuted) },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {
-                OrSecondaryButton(text = "Cancel", onClick = onDismiss)
+                OrSecondaryButton(text = dismissText, onClick = onDismiss)
                 if (destructive) {
                     OrDangerButton(text = confirmText, onClick = onConfirm)
                 } else {

@@ -33,6 +33,13 @@ interface RideDao {
     @Query("SELECT * FROM ride_samples WHERE rideId = :rideId ORDER BY tSec ASC")
     suspend fun getSamples(rideId: Long): List<RideSample>
 
+    /**
+     * Deletes one ride. Its [RideSample]s and [GameResult]s go with it through their
+     * `ON DELETE CASCADE` foreign keys. Returns the number of rides deleted (0 or 1).
+     */
+    @Query("DELETE FROM rides WHERE id = :rideId")
+    suspend fun deleteById(rideId: Long): Int
+
     /** Total ride count across all profiles — a cheap "did ride data change?" signal for
      *  [dev.digitalducktape.openride.core.backup.AutoBackupManager] (samples only ever change
      *  together with their ride, so ride count covers both). */

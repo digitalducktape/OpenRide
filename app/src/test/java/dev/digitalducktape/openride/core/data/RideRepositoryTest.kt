@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -101,6 +102,29 @@ class RideRepositoryTest {
         assertEquals(edNewestRideId, edHistory.first().id)
         assertEquals(listOf(3_000L, 2_000L, 1_000L), edHistory.map { it.startEpochMs })
         assertTrue(edHistory.all { it.profileId == edId })
+    }
+
+    @Test
+    fun `deleteRide removes only that ride, with its samples and game results`() = runTest {
+        val profileId = createProfile("Ed")
+        val keptId = rideRepository.saveRide(rideFor(profileId, startEpochMs = 1_000L), samplesFor(5))
+        val deletedId = rideRepository.saveRide(rideFor(profileId, startEpochMs = 2_000L), samplesFor(5))
+        db.gameResultDao().insertAll(
+            listOf(GameResult(deletedId, 0, "demo", "free", "standard", 0, 60, 10.0, 1, null, false, "{}", "")),
+        )
+
+        assertTrue(rideRepository.deleteRide(deletedId))
+
+        assertNull(rideRepository.getRide(deletedId))
+        assertTrue(rideRepository.getSamples(deletedId).isEmpty())
+        assertTrue(db.gameResultDao().getForRide(deletedId).isEmpty())
+        assertEquals(listOf(keptId), rideRepository.observeHistory(profileId).first().map { it.id })
+        assertEquals(5, rideRepository.getSamples(keptId).size)
+    }
+
+    @Test
+    fun `deleteRide returns false for an unknown id`() = runTest {
+        assertFalse(rideRepository.deleteRide(rideId = 999L))
     }
 
     @Test

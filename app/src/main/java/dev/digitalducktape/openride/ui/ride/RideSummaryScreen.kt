@@ -29,11 +29,14 @@ import dev.digitalducktape.openride.ui.common.ExportShare
 import dev.digitalducktape.openride.ui.common.GameBadge
 import dev.digitalducktape.openride.ui.designsystem.BikePreview
 import dev.digitalducktape.openride.ui.designsystem.OrColors
+import dev.digitalducktape.openride.ui.designsystem.OrIcons
 import dev.digitalducktape.openride.ui.designsystem.OrShapes
 import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
 import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrChip
+import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
+import dev.digitalducktape.openride.ui.designsystem.component.OrIconButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrEmptyState
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrLabel
@@ -79,6 +82,12 @@ fun RideSummaryRoute(
             viewModel.sampleCsvContent()?.let { csv -> ExportShare.share(context, "ride_$id.csv", csv, "text/csv") }
         },
         onApplyFtp = { scope.launch { viewModel.applySuggestedFtp() } },
+        onDelete = {
+            scope.launch {
+                viewModel.deleteRide()
+                onDismiss()
+            }
+        },
         onDone = {
             viewModel.dismiss()
             onDismiss()
@@ -93,6 +102,7 @@ fun RideSummaryRoute(
  * chips, the selected metric's TOTAL / AVG / MAX band and its graph on the left and, when there
  * is any, the games and the FTP suggestion on the right. Only a very long circuit's game list
  * scrolls, inside its column. The same screen serves a ride just stopped and one from History.
+ * The trash icon in the header asks "Are you sure…?" before [onDelete] removes the ride.
  */
 @Composable
 fun RideSummaryScreen(
@@ -100,10 +110,12 @@ fun RideSummaryScreen(
     onExportTcx: () -> Unit,
     onExportCsv: () -> Unit,
     onApplyFtp: () -> Unit,
+    onDelete: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedMetric by remember { mutableStateOf(RideMetric.Output) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val current = uiState.ride
     if (current == null) {
         OrEmptyState(message = "Loading…", modifier = modifier.background(OrColors.Background))
@@ -126,6 +138,12 @@ fun RideSummaryScreen(
                 OrLabel(text = RideSummaryUiState.subtitle(current), style = OrType.Body, color = OrColors.OnSurfaceMuted)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                OrIconButton(
+                    icon = OrIcons.Delete,
+                    contentDescription = "Delete ride",
+                    onClick = { confirmDelete = true },
+                    tint = OrColors.OnSurfaceMuted,
+                )
                 OrSecondaryButton(text = "Export TCX", onClick = onExportTcx)
                 OrSecondaryButton(text = "Export CSV", onClick = onExportCsv)
                 OrPrimaryButton(text = "Done", onClick = onDone)
@@ -165,6 +183,20 @@ fun RideSummaryScreen(
                 }
             }
         }
+    }
+
+    if (confirmDelete) {
+        OrConfirmDialog(
+            title = "Delete ride?",
+            text = "Are you sure you want to delete this ride?",
+            confirmText = "Yes",
+            dismissText = "No",
+            onDismiss = { confirmDelete = false },
+            onConfirm = {
+                confirmDelete = false
+                onDelete()
+            },
+        )
     }
 }
 
@@ -249,6 +281,7 @@ private fun RideSummaryScreenPreview() {
             onExportTcx = {},
             onExportCsv = {},
             onApplyFtp = {},
+            onDelete = {},
             onDone = {},
         )
     }

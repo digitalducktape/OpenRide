@@ -154,6 +154,23 @@ class RideSummaryViewModelTest {
         assertEquals(RideSessionState.Idle, manager.state.value)
     }
 
+    @Test
+    fun `deleteRide removes the ride and resets a just-finished session`() = runTest {
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        manager.start(profileId)
+        advanceTimeBy(2_000)
+        runCurrent()
+        val ride = manager.stop()
+        requireNotNull(ride)
+
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, ride.id)
+        viewModel.deleteRide()
+
+        assertNull(rideRepository.getRide(ride.id))
+        assertTrue(rideRepository.getSamples(ride.id).isEmpty())
+        assertEquals(RideSessionState.Idle, manager.state.value)
+    }
+
     // --- FTP suggestion (T13/#13) ------------------------------------------------------------
 
     private fun longRideOf(power: Int): Ride = Ride(

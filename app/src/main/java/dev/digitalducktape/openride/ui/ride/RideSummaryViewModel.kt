@@ -85,6 +85,15 @@ class RideSummaryViewModel(
     fun sampleCsvContent(): String? = _ride.value?.let { CsvExporter.exportRideSamples(_samples.value) }
 
     /**
+     * Deletes this ride from history (with its samples and game results), then resets a
+     * just-finished session the same way [dismiss] does, since the screen leaves right after.
+     */
+    suspend fun deleteRide() {
+        rideRepository.deleteRide(rideId)
+        rideSessionManager.reset()
+    }
+
+    /**
      * Returns to [dev.digitalducktape.openride.core.ride.RideSessionState.Idle] if it was
      * sitting in [dev.digitalducktape.openride.core.ride.RideSessionState.Finished] (the
      * just-stopped-this-ride path) — a no-op otherwise (e.g. viewing an older ride from

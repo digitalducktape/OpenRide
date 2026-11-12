@@ -43,6 +43,12 @@ class RideRepository(
 
     suspend fun getSamples(rideId: Long): List<RideSample> = rideDao.getSamples(rideId)
 
+    /**
+     * Removes one ride from history, with its samples and game results (cascaded by the
+     * database). Returns `true` if a ride was deleted, `false` for an unknown id.
+     */
+    suspend fun deleteRide(rideId: Long): Boolean = rideDao.deleteById(rideId) > 0
+
     /** A game session's per-segment results, in plan order; empty for any other ride. */
     suspend fun getGameResults(rideId: Long): List<GameResult> = gameResultDao?.getForRide(rideId).orEmpty()
 }
