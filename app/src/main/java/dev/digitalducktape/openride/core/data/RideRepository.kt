@@ -2,7 +2,11 @@ package dev.digitalducktape.openride.core.data
 
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
+import dev.digitalducktape.openride.core.importer.ImportedWorkout
 import kotlinx.coroutines.flow.Flow
+
+/** What [RideRepository.importRides] did: rides added, and rides the profile already had. */
+data class ImportOutcome(val imported: Int, val alreadyThere: Int)
 
 /**
  * Persists finished rides and serves per-profile history.
@@ -49,6 +53,19 @@ class RideRepository(
      * the tables this removes from, so they follow without being told.
      */
     suspend fun deleteRide(rideId: Long) = rideDao.deleteRide(rideId)
+
+    /**
+     * Adds rides read from another service's workout history (#83) to [profileId]'s history, in
+     * one transaction. A ride starting at the same moment as one the profile already has is
+     * left out, so importing the same file twice adds nothing the second time.
+     */
+    suspend fun importRides(profileId: Long, workouts: List<ImportedWorkout>): ImportOutcome =
+        database.withTransaction {
+            val seen = rideDao.getStartTimes(profileId).toMutableSet()
+            val fresh = workouts.filter { seen.add(it.startEpochMs) }
+            if (fresh.isNotEmpty()) rideDao.insertRides(fresh.map { it.toRide(profileId) })
+            ImportOutcome(imported = fresh.size, alreadyThere = workouts.size - fresh.size)
+        }
 
     /** A game session's per-segment results, in plan order; empty for any other ride. */
     suspend fun getGameResults(rideId: Long): List<GameResult> = gameResultDao?.getForRide(rideId).orEmpty()

@@ -48,17 +48,19 @@ object RideMetricStats {
      * Headline stats for [metric]. Output/cadence/resistance come from the ride's persisted
      * aggregates (exactly what the summary always showed); heart-rate stats are derived from
      * the samples since the ride row doesn't aggregate HR. Resistance has no max aggregate —
-     * it shows avg only, same honesty rule as the in-ride bar.
+     * it shows avg only, same honesty rule as the in-ride bar. A ride imported from another
+     * service's history (#83) has no maximums either: its row holds 0, and a maximum below its
+     * average can't have been measured, so that stat is left out rather than shown as 0.
      */
     fun stats(metric: RideMetric, ride: Ride, samples: List<RideSample>): List<MetricStat> = when (metric) {
-        RideMetric.Output -> listOf(
+        RideMetric.Output -> listOfNotNull(
             MetricStat("TOTAL OUTPUT", "%.0f".format(ride.outputKj), "KJ"),
             MetricStat("AVG OUTPUT", "${ride.avgPower}", "WATTS"),
-            MetricStat("MAX OUTPUT", "${ride.maxPower}", "WATTS"),
+            MetricStat("MAX OUTPUT", "${ride.maxPower}", "WATTS").takeIf { ride.maxPower >= ride.avgPower },
         )
-        RideMetric.Cadence -> listOf(
+        RideMetric.Cadence -> listOfNotNull(
             MetricStat("AVG CADENCE", "${ride.avgCadence}", "RPM"),
-            MetricStat("MAX CADENCE", "${ride.maxCadence}", "RPM"),
+            MetricStat("MAX CADENCE", "${ride.maxCadence}", "RPM").takeIf { ride.maxCadence >= ride.avgCadence },
         )
         RideMetric.Resistance -> listOf(
             MetricStat("AVG RESISTANCE", "${ride.avgResistance}", "PERCENT"),

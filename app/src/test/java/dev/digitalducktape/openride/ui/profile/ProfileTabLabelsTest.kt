@@ -51,4 +51,18 @@ class ProfileTabLabelsTest {
         assertEquals("On. Shows what's playing, with controls", ProfileTabLabels.musicControls(true))
         assertEquals("Off. Needs Notification access; reads only what's playing", ProfileTabLabels.musicControls(false))
     }
+
+    @Test
+    fun `the import summary names only what happened`() {
+        assertEquals("Imported 336 rides", ProfileTabLabels.importSummary(WorkoutImportSummary(336, 0, 0, 0)))
+        assertEquals(
+            "Imported 1 ride  •  2 other workouts skipped",
+            ProfileTabLabels.importSummary(WorkoutImportSummary(1, 0, 2, 0)),
+        )
+        assertEquals(
+            "No new rides  •  336 already here  •  1 other workout skipped  •  3 unreadable",
+            ProfileTabLabels.importSummary(WorkoutImportSummary(0, 336, 1, 3)),
+        )
+        assertEquals("No new rides", ProfileTabLabels.importSummary(WorkoutImportSummary(0, 0, 0, 0)))
+    }
 }

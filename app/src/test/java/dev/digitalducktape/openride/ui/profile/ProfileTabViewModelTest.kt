@@ -7,6 +7,9 @@ import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
+import dev.digitalducktape.openride.core.data.RideRepository
+import java.time.Instant
+import java.time.ZoneOffset
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -25,6 +28,7 @@ class ProfileTabViewModelTest {
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
     private lateinit var backupRepository: BackupRepository
+    private lateinit var rideRepository: RideRepository
     private lateinit var viewModel: ProfileTabViewModel
 
     @Before
@@ -34,7 +38,8 @@ class ProfileTabViewModelTest {
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao())
-        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository)
+        rideRepository = RideRepository(db, db.rideDao())
+        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository) { ZoneOffset.UTC }
     }
 
     @After
@@ -123,5 +128,64 @@ class ProfileTabViewModelTest {
         assertTrue(result.isFailure)
         assertEquals(id, activeProfileHolder.activeProfileId.value)
         assertEquals(1, profileRepository.observeProfiles().first().size)
+    }
+
+    private val historyCsv = listOf(
+        "Workout Timestamp,Live/On-Demand,Instructor Name,Length (minutes),Fitness Discipline,Type,Title,Class Timestamp," +
+            "Total Output,Avg. Watts,Avg. Resistance,Avg. Cadence (RPM),Avg. Speed (mph),Distance (mi),Calories Burned," +
+            "Avg. Heartrate,Avg. Incline,Avg. Pace (min/mi)",
+        "2021-02-07 21:10 (PST),On Demand,Sam Example,20,Cycling,Beginner,20 min Beginner Ride,2019-03-21 23:11 (PST),122,101,40%,75,15.88,5.29,165,,,",
+        "2021-03-02 19:52 (-08),On Demand,Alex Example,5,Stretching,Stretch,5 min Stretch,2021-02-26 06:00 (-08),,,,,,,13,,,",
+        "2021-03-04 07:00 (-08),On Demand,Sam Example,45,Cycling,Climb,45 min Climb Ride,2021-02-26 06:00 (-08),410,152,48%,71,17.2,12.9,520,,,",
+    ).joinToString("\n")
+
+    private suspend fun activeRider(name: String = "Ed"): Long {
+        val id = profileRepository.createProfile(
+            Profile(name = name, avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(id)
+        return id
+    }
+
+    @Test
+    fun `importing a workout history adds its rides to the active rider only`() = runTest {
+        val otherId = activeRider("Alex")
+        val edId = activeRider("Ed")
+
+        val summary = viewModel.importWorkoutHistory(historyCsv).getOrThrow()
+
+        assertEquals(WorkoutImportSummary(imported = 2, alreadyThere = 0, otherWorkouts = 1, unreadableRows = 0), summary)
+        val rides = rideRepository.observeHistory(edId).first()
+        assertEquals(listOf(410.0, 122.0), rides.map { it.outputKj })
+        assertEquals(Instant.parse("2021-02-08T05:10:00Z").toEpochMilli(), rides.last().startEpochMs)
+        assertEquals(1200, rides.last().durationSec)
+        assertEquals(165, rides.last().calories)
+        assertTrue(rideRepository.observeHistory(otherId).first().isEmpty())
+    }
+
+    @Test
+    fun `importing the same file again adds nothing`() = runTest {
+        val edId = activeRider()
+        viewModel.importWorkoutHistory(historyCsv).getOrThrow()
+
+        val again = viewModel.importWorkoutHistory(historyCsv).getOrThrow()
+
+        assertEquals(WorkoutImportSummary(imported = 0, alreadyThere = 2, otherWorkouts = 1, unreadableRows = 0), again)
+        assertEquals(2, rideRepository.observeHistory(edId).first().size)
+    }
+
+    @Test
+    fun `a file that isn't a workout history fails and changes nothing`() = runTest {
+        val edId = activeRider()
+
+        assertTrue(viewModel.importWorkoutHistory("date,duration_sec").isFailure)
+        assertTrue(rideRepository.observeHistory(edId).first().isEmpty())
+    }
+
+    @Test
+    fun `importing with no rider selected fails`() = runTest {
+        activeProfileHolder.clear()
+
+        assertTrue(viewModel.importWorkoutHistory(historyCsv).isFailure)
     }
 }

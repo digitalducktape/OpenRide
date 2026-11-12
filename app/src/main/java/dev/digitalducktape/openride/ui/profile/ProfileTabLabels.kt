@@ -32,4 +32,26 @@ object ProfileTabLabels {
      */
     fun musicControls(on: Boolean): String =
         if (on) "On. Shows what's playing, with controls" else "Off. Needs Notification access; reads only what's playing"
+
+    /** The Import row's value before anything is imported. */
+    const val IMPORT_HINT = "Past rides, from a workout-history CSV"
+
+    /** The Import row's value when the picked file isn't the export. */
+    const val IMPORT_FAILED = "That isn't a Peloton workout-history CSV"
+
+    /**
+     * The Import row's value after an import: "Imported 336 rides  •  2 other workouts skipped",
+     * with only the parts that happened. A file that added nothing says why.
+     */
+    fun importSummary(summary: WorkoutImportSummary): String {
+        val skipped = buildList {
+            if (summary.alreadyThere > 0) add("${summary.alreadyThere} already here")
+            if (summary.otherWorkouts > 0) add("${count(summary.otherWorkouts, "other workout")} skipped")
+            if (summary.unreadableRows > 0) add("${summary.unreadableRows} unreadable")
+        }
+        val head = if (summary.imported > 0) "Imported ${count(summary.imported, "ride")}" else "No new rides"
+        return (listOf(head) + skipped).joinToString("  •  ")
+    }
+
+    private fun count(n: Int, noun: String): String = if (n == 1) "1 $noun" else "$n ${noun}s"
 }
