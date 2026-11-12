@@ -59,11 +59,16 @@ class YouTubeEmbedTest {
         val html = YouTubeEmbed.html("dQw4w9WgXcQ")
 
         assertTrue(html.contains("function openrideSetMuted(muted)"))
+        // Muting rebuilds the player silent from its first frame, where it left off, so the
+        // rider's music app can play without the class pausing.
+        assertTrue(html.contains("if (muted) { rebuildPlayer(); } else { player.unMute(); }"))
+        assertTrue(html.contains("\"mute\": wantMuted ? 1 : 0, \"start\": Math.floor(startSec)"))
+        assertTrue(html.contains("var at = player.getCurrentTime ? player.getCurrentTime() : 0;"))
         // A mute asked for while the player was still loading is applied once it's ready.
-        assertTrue(html.contains("if (wantMuted) { e.target.mute(); }"))
-        assertTrue(html.contains("player.unMute()"))
-        // The class starts with its sound on.
+        assertTrue(html.contains("if (wantMuted && !builtMuted) { rebuildPlayer(); return; }"))
+        // The class starts with its sound on, from the beginning.
         assertTrue(html.contains("var wantMuted = false;"))
+        assertTrue(html.contains("function onYouTubeIframeAPIReady() { buildPlayer(0); }"))
     }
 
     @Test

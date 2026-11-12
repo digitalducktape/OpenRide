@@ -21,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -46,6 +49,7 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.music.MiniPlayer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -53,9 +57,11 @@ import kotlinx.coroutines.launch
  * WebView streaming the class through YouTube's own embedded player, with live ride metrics
  * overlaid — timer and ride controls along the top scrim, [RideMetricsBar] along the bottom.
  *
- * The overlay is dismissible (tap the video, or bring it back via the "Metrics" pill) so
- * YouTube's native player controls are always reachable and never permanently covered —
- * part of the app's deliberate YouTube ToS stance.
+ * The overlay is dismissible (tap the video) so YouTube's native player controls are always
+ * reachable and never permanently covered — part of the app's deliberate YouTube ToS stance.
+ * It comes back by itself [OverlayReturnMs] after the rider's last touch, or at once from the
+ * "Ride controls" pill, so the ride's own controls are never more than a moment away (rider,
+ * 2026-11-11: a tap on the video used to leave only the pill).
  *
  * Ride state comes from the same [InRideViewModel] as the plain in-ride screen, and the
  * video tracks it: pausing the ride (Pause button or freewheel auto-pause) pauses the video
@@ -81,6 +87,16 @@ fun VideoRideScreen(
     // Survives a configuration change, as the WebView's page (and its sound) doesn't restart for one.
     var classMuted by rememberSaveable { mutableStateOf(false) }
 
+    // Every touch on the screen, YouTube's controls included, counted so the tucked-away
+    // overlay waits until the rider has finished with them before it returns.
+    var touches by remember { mutableIntStateOf(0) }
+    LaunchedEffect(overlayVisible, touches) {
+        if (!overlayVisible) {
+            delay(OverlayReturnMs)
+            overlayVisible = true
+        }
+    }
+
     // Shared by the End Ride dialog and the video-completion auto-end. endRide() returns
     // null if the ride is already over, so the two paths can't double-fire navigation.
     val endRideAndShowSummary: () -> Unit = {
@@ -90,7 +106,20 @@ fun VideoRideScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            // Watches without consuming: the touch still reaches the player or the overlay.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        touches++
+                    }
+                }
+            },
+    ) {
         ClassPlayer(
             videoId = videoId,
             paused = uiState.isPaused,
@@ -127,7 +156,7 @@ fun VideoRideScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         } else {
-            MetricsPill(
+            RideControlsPill(
                 onClick = { overlayVisible = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -325,17 +354,26 @@ private fun TopStripContent(
 }
 
 /**
+ * How long after the rider's last touch the tucked-away overlay returns: long enough to use
+ * YouTube's own controls, which hide themselves after about three seconds.
+ */
+private const val OverlayReturnMs = 6_000L
+
+/**
  * The strip over video holds [VideoScrimTop] down past the ELAPSED label before it fades, so the
  * label stays readable over bright cloud (bike test, 2026-10-27).
  */
 private val VideoScrimTop = Color(0xCC000000)
 private const val VideoScrimHoldEnd = 0.8f
 
-/** Brings the overlay back once it's been tucked away. Raised fill: it sits on video. */
+/**
+ * Brings the overlay back at once while it's tucked away (it also returns by itself, see
+ * [OverlayReturnMs]). Raised fill: it sits on video.
+ */
 @Composable
-private fun MetricsPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun RideControlsPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OrSecondaryButton(
-        text = "Metrics",
+        text = "Ride controls",
         onClick = onClick,
         modifier = modifier.background(OrColors.SurfaceRaised, OrShapes.Small),
     )

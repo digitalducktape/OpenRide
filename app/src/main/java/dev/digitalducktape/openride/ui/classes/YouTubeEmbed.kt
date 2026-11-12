@@ -9,9 +9,13 @@ package dev.digitalducktape.openride.ui.classes
  * - `openridePause()` / `openrideResume()` (called from the WebView via `evaluateJavascript`)
  *   pause/resume playback when the *ride* pauses — whether from the Pause button or the
  *   freewheel auto-pause.
- * - `openrideSetMuted(true|false)` silences or restores the class's own audio (#72) through the
- *   player's `mute()` / `unMute()`, so a rider can listen to their own music instead. The
- *   picture, the ride's pause/resume and the end-of-class finish are untouched.
+ * - `openrideSetMuted(true|false)` silences or restores the class's own audio (#72), so a rider
+ *   can listen to their own music instead. Muting rebuilds the player at the same second with
+ *   `mute: 1`, rather than calling `mute()`: Android gives the sound to one app at a time, and
+ *   the WebView only stays out of that when its video has been silent from its first frame. A
+ *   video muted part-way keeps its claim, so the rider's music app starting would pause the
+ *   class (bike test, 2026-11-11). Unmuting is `unMute()`, which takes the sound back from the
+ *   music app, as starting any class does.
  * - When the player reaches ENDED, the page notifies the app through the injected
  *   `OpenRideBridge` JavaScript interface so the workout can finish automatically.
  *
@@ -61,14 +65,23 @@ object YouTubeEmbed {
               // Likewise the rider's mute choice (#72).
               var wantMuted = false;
 
-              function onYouTubeIframeAPIReady() {
+              // Whether the player on screen was built silent, the only kind of silence
+              // that lets the rider's music play alongside.
+              var builtMuted = false;
+
+              function buildPlayer(startSec) {
+                builtMuted = wantMuted;
                 player = new YT.Player('player', {
                   host: '$BASE_URL',
                   videoId: '$videoId',
-                  playerVars: { "autoplay": 1, "playsinline": 1, "controls": 1, "rel": 0, "modestbranding": 1 },
+                  playerVars: {
+                    "autoplay": 1, "playsinline": 1, "controls": 1, "rel": 0, "modestbranding": 1,
+                    "mute": wantMuted ? 1 : 0, "start": Math.floor(startSec)
+                  },
                   events: {
                     onReady: function (e) {
-                      if (wantMuted) { e.target.mute(); }
+                      // Muted while this player was still loading: start over, silent.
+                      if (wantMuted && !builtMuted) { rebuildPlayer(); return; }
                       if (wantPaused) { e.target.pauseVideo(); } else { e.target.playVideo(); }
                     },
                     onStateChange: function (e) {
@@ -80,14 +93,25 @@ object YouTubeEmbed {
                 });
               }
 
+              function rebuildPlayer() {
+                var at = player.getCurrentTime ? player.getCurrentTime() : 0;
+                player.destroy();
+                buildPlayer(at);
+              }
+
+              function onYouTubeIframeAPIReady() { buildPlayer(0); }
+
               function openridePause() {
                 wantPaused = true;
                 if (player && player.pauseVideo) { player.pauseVideo(); }
               }
 
               function openrideSetMuted(muted) {
+                if (muted === wantMuted) { return; }
                 wantMuted = muted;
-                if (player && player.mute) { if (muted) { player.mute(); } else { player.unMute(); } }
+                // A player still loading picks the choice up in onReady.
+                if (!player || !player.getCurrentTime) { return; }
+                if (muted) { rebuildPlayer(); } else { player.unMute(); }
               }
 
               function openrideResume() {
