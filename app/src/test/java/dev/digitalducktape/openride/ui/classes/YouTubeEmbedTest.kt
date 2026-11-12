@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.ui.classes
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -51,5 +52,25 @@ class YouTubeEmbedTest {
         val html = YouTubeEmbed.html("a-b_c-D_e12")
 
         assertTrue(html.contains("videoId: 'a-b_c-D_e12'"))
+    }
+
+    @Test
+    fun `html can mute the class audio, before or after the player is ready`() {
+        val html = YouTubeEmbed.html("dQw4w9WgXcQ")
+
+        assertTrue(html.contains("function openrideSetMuted(muted)"))
+        // A mute asked for while the player was still loading is applied once it's ready.
+        assertTrue(html.contains("if (wantMuted) { e.target.mute(); }"))
+        assertTrue(html.contains("player.unMute()"))
+        // The class starts with its sound on.
+        assertTrue(html.contains("var wantMuted = false;"))
+    }
+
+    @Test
+    fun `the mute script and label follow the mute state`() {
+        assertEquals("openrideSetMuted(true)", YouTubeEmbed.muteScript(true))
+        assertEquals("openrideSetMuted(false)", YouTubeEmbed.muteScript(false))
+        assertEquals("Mute class", YouTubeEmbed.muteLabel(muted = false))
+        assertEquals("Unmute class", YouTubeEmbed.muteLabel(muted = true))
     }
 }

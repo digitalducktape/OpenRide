@@ -72,7 +72,8 @@ val LocalNowPlaying = compositionLocalOf<NowPlayingMonitor?> { null }
  * don't let another app browse their libraries (bike test, 2026-10-27).
  *
  * With nothing playing it is a button that opens the rider's music app (Profile → Music). Just
- * Ride has the larger [NowPlayingPanel]; a class video has neither, since its own sound is the point.
+ * Ride has the larger [NowPlayingPanel]; a class video has this one
+ * only while the rider has muted the class (#72), since otherwise its own sound is the point.
  */
 @Composable
 fun MiniPlayer(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? = LocalNowPlaying.current) {

@@ -9,6 +9,9 @@ package dev.digitalducktape.openride.ui.classes
  * - `openridePause()` / `openrideResume()` (called from the WebView via `evaluateJavascript`)
  *   pause/resume playback when the *ride* pauses — whether from the Pause button or the
  *   freewheel auto-pause.
+ * - `openrideSetMuted(true|false)` silences or restores the class's own audio (#72) through the
+ *   player's `mute()` / `unMute()`, so a rider can listen to their own music instead. The
+ *   picture, the ride's pause/resume and the end-of-class finish are untouched.
  * - When the player reaches ENDED, the page notifies the app through the injected
  *   `OpenRideBridge` JavaScript interface so the workout can finish automatically.
  *
@@ -50,6 +53,8 @@ object YouTubeEmbed {
               // The ride can pause before the player finishes bootstrapping; remember the
               // latest requested state and apply it in onReady.
               var wantPaused = false;
+              // Likewise the rider's mute choice (#72).
+              var wantMuted = false;
 
               function onYouTubeIframeAPIReady() {
                 player = new YT.Player('player', {
@@ -58,6 +63,7 @@ object YouTubeEmbed {
                   playerVars: { "autoplay": 1, "playsinline": 1, "controls": 1, "rel": 0, "modestbranding": 1 },
                   events: {
                     onReady: function (e) {
+                      if (wantMuted) { e.target.mute(); }
                       if (wantPaused) { e.target.pauseVideo(); } else { e.target.playVideo(); }
                     },
                     onStateChange: function (e) {
@@ -74,6 +80,11 @@ object YouTubeEmbed {
                 if (player && player.pauseVideo) { player.pauseVideo(); }
               }
 
+              function openrideSetMuted(muted) {
+                wantMuted = muted;
+                if (player && player.mute) { if (muted) { player.mute(); } else { player.unMute(); } }
+              }
+
               function openrideResume() {
                 wantPaused = false;
                 if (player && player.playVideo) { player.playVideo(); }
@@ -87,4 +98,10 @@ object YouTubeEmbed {
             </html>
         """.trimIndent()
     }
+
+    /** The call that mutes or unmutes the class's audio (#72), for `WebView.evaluateJavascript`. */
+    fun muteScript(muted: Boolean): String = "openrideSetMuted($muted)"
+
+    /** The mute button's label: what a tap does next. */
+    fun muteLabel(muted: Boolean): String = if (muted) "Unmute class" else "Mute class"
 }
