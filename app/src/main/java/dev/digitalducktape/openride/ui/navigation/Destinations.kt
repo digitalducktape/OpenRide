@@ -20,6 +20,12 @@ object Destinations {
     /** BLE heart-rate strap pairing screen (PRD P1-4, T17), reachable from the Profile tab. */
     const val HrPairing = "hr_pairing"
 
+    /** OpenBikeControl controllers (#68), reachable from the Profile tab. */
+    const val Controllers = "controllers"
+
+    /** Where the bike's numbers come from: the built-in source or a smart trainer (#68). */
+    const val BikeSource = "bike_source"
+
     /** Opt-in self-updater screen (PRD #22/T22), reachable from the Profile tab. */
     const val AppUpdate = "app_update"
 

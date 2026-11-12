@@ -9,6 +9,8 @@ extends Node
 ## Games read the fields below and never touch the bridge themselves.
 
 signal frame_updated
+## A controller's Use item was pressed (frame field 15 went up). Kart Race fires its item.
+signal controller_item
 
 const BRIDGE := "OpenRideBridge"
 
@@ -27,6 +29,10 @@ const I_TRACKER_STATE := 9
 const I_SEGMENT_TIME_LEFT := 10
 const I_SENSORS_OK := 11
 const I_RIDER_MUSIC := 12  ## added after v1; read only when the frame has it
+## OpenBikeControl controllers (#68), added after v1 too; read only when the frame has them.
+const I_CONTROLLER_STEER := 13
+const I_CONTROLLER_STEERING := 14
+const I_CONTROLLER_ITEM_PRESSES := 15
 const FRAME_SIZE := 12  ## the fields every v1 frame has
 
 ## tracker_state values.
@@ -51,10 +57,15 @@ var sensors_ok := false
 ## The rider's own music app has a track (the app's mini player): AudioDirector keeps game
 ## music off meanwhile. M toggles it in the keyboard simulator.
 var rider_music := false
+## A connected controller steers (#68): games that steer by lean take [member controller_steer]
+## instead while this is true, so a shifter-only controller never takes the steering.
+var controller_steering := false
+var controller_steer := 0.0  ## -1 (left) .. +1 (right)
 ## The latest raw frame, for debugging.
 var frame := PackedFloat64Array()
 
 var _bridge: Object = null
+var _item_presses := -1  ## the last frame's count; -1 until the first frame has one
 var _warned_bad_frame := false
 
 # Keyboard simulator state (desktop only).
@@ -104,7 +115,29 @@ func _process(delta: float) -> void:
 	segment_time_left = f[I_SEGMENT_TIME_LEFT]
 	sensors_ok = f[I_SENSORS_OK] > 0.5
 	rider_music = f.size() > I_RIDER_MUSIC and f[I_RIDER_MUSIC] > 0.5
+	_read_controller(f)
 	frame_updated.emit()
+
+
+## Frame fields 13-15. The item count goes up by one per press; the first frame only sets the
+## baseline, so presses from before this session (the count is the app's) aren't replayed.
+func _read_controller(f: PackedFloat64Array) -> void:
+	if f.size() <= I_CONTROLLER_ITEM_PRESSES:
+		controller_steering = false
+		controller_steer = 0.0
+		return
+	controller_steering = f[I_CONTROLLER_STEERING] > 0.5
+	controller_steer = clampf(f[I_CONTROLLER_STEER], -1.0, 1.0) if controller_steering else 0.0
+	var presses := int(f[I_CONTROLLER_ITEM_PRESSES])
+	if _item_presses >= 0 and presses > _item_presses:
+		controller_item.emit()
+	_item_presses = presses
+
+
+## Lean for games that steer by it: a steering controller's level while one steers, else the
+## head tracker's lean_x.
+func steer_x() -> float:
+	return controller_steer if controller_steering else lean_x
 
 
 func _input(event: InputEvent) -> void:
@@ -132,7 +165,7 @@ func _simulate(delta: float) -> PackedFloat64Array:
 		0.0, 100.0)
 	var watts := sim_power(_sim_cadence, _sim_resistance)
 	var f := PackedFloat64Array()
-	f.resize(I_RIDER_MUSIC + 1)
+	f.resize(I_CONTROLLER_ITEM_PRESSES + 1)
 	f[I_VERSION] = VERSION
 	f[I_CADENCE] = roundf(_sim_cadence)
 	f[I_POWER] = roundf(watts)
@@ -146,6 +179,9 @@ func _simulate(delta: float) -> PackedFloat64Array:
 	f[I_SEGMENT_TIME_LEFT] = Session.local_time_left()
 	f[I_SENSORS_OK] = 1.0
 	f[I_RIDER_MUSIC] = 1.0 if _sim_rider_music else 0.0
+	f[I_CONTROLLER_STEER] = 0.0
+	f[I_CONTROLLER_STEERING] = 0.0
+	f[I_CONTROLLER_ITEM_PRESSES] = maxf(_item_presses, 0.0)
 	return f
 
 

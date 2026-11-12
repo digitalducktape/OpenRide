@@ -20,7 +20,7 @@ class InputFrameTest {
         )
 
         assertArrayEquals(
-            doubleArrayOf(1.0, 92.0, 187.0, 41.0, 17.5, 143.0, -0.5, 0.25, 1.0, 3.0, 42.0, 1.0, 0.0),
+            doubleArrayOf(1.0, 92.0, 187.0, 41.0, 17.5, 143.0, -0.5, 0.25, 1.0, 3.0, 42.0, 1.0, 0.0, 0.0, 0.0, 0.0),
             frame,
             0.0,
         )
@@ -41,7 +41,10 @@ class InputFrameTest {
         assertEquals(10, InputFrame.SEGMENT_TIME_LEFT)
         assertEquals(11, InputFrame.SENSORS_OK)
         assertEquals(12, InputFrame.RIDER_MUSIC)
-        assertEquals(13, InputFrame.SIZE)
+        assertEquals(13, InputFrame.CONTROLLER_STEER)
+        assertEquals(14, InputFrame.CONTROLLER_STEERING)
+        assertEquals(15, InputFrame.CONTROLLER_ITEM_PRESSES)
+        assertEquals(16, InputFrame.SIZE)
         assertEquals(1, InputFrame.VERSION)
     }
 
@@ -49,6 +52,23 @@ class InputFrameTest {
     fun `rider_music is 1 while the rider's own music app has a track`() {
         assertEquals(1.0, InputFrame.pack(metrics, true, null, TrackerReading.OFF, 0.0, riderMusic = true)[InputFrame.RIDER_MUSIC], 0.0)
         assertEquals(0.0, InputFrame.pack(metrics, true, null, TrackerReading.OFF, 0.0)[InputFrame.RIDER_MUSIC], 0.0)
+    }
+
+    @Test
+    fun `a steering controller fills fields 13-15, clamped`() {
+        val frame = InputFrame.pack(metrics, true, null, TrackerReading.OFF, 0.0, controller = ControllerReading(steer = 1.4, itemPresses = 3))
+
+        assertEquals(1.0, frame[InputFrame.CONTROLLER_STEER], 0.0)
+        assertEquals(1.0, frame[InputFrame.CONTROLLER_STEERING], 0.0)
+        assertEquals(3.0, frame[InputFrame.CONTROLLER_ITEM_PRESSES], 0.0)
+    }
+
+    @Test
+    fun `no steering controller reads steering 0, centred`() {
+        val frame = InputFrame.pack(metrics, true, null, TrackerReading.OFF, 0.0, controller = ControllerReading(steer = null, itemPresses = 0))
+
+        assertEquals(0.0, frame[InputFrame.CONTROLLER_STEER], 0.0)
+        assertEquals(0.0, frame[InputFrame.CONTROLLER_STEERING], 0.0)
     }
 
     @Test

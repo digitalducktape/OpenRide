@@ -16,6 +16,7 @@ import dev.digitalducktape.openride.core.route.RoutePosition
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
 import dev.digitalducktape.openride.core.sensor.BikeMetrics
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.core.sensor.ResistanceControl
 import dev.digitalducktape.openride.core.sensor.offlineFor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -54,6 +55,8 @@ data class InRideUiState(
     val heartRatePaired: Boolean = false,
     val heartRateConnectionState: ConnectionState = ConnectionState.Unavailable,
     val autoPaused: Boolean = false,
+    /** The source's resistance is OpenRide's to set (a smart trainer, #68): the tile gets − and +. */
+    val resistanceAdjustable: Boolean = false,
     val route: Route? = null,
     val routePosition: RoutePosition? = null,
 ) {
@@ -107,6 +110,8 @@ class InRideViewModel(
     routeHolder: RouteHolder? = null,
     /** The app's one "sensors offline" rule ([dev.digitalducktape.openride.AppContainer.sensorsOffline]); `null` = not known yet. */
     sensorsOffline: Flow<Boolean?> = bikeDataSource.connectionState.offlineFor(),
+    /** A trainer's virtual resistance (#68); the source itself when it is one. */
+    private val resistanceControl: ResistanceControl? = bikeDataSource as? ResistanceControl,
 ) : ViewModel() {
     // profileRepository.observeProfiles() is backed by a Room @Query Flow, which (unlike the
     // rest of this view model's plain in-memory StateFlows) doesn't necessarily emit its first
@@ -153,8 +158,9 @@ class InRideViewModel(
         heartRateFlow,
         rideSessionManager.autoPaused,
         routeFlow,
-    ) { hr, autoPaused, route ->
-        SecondaryFlow(hr, autoPaused, route)
+        resistanceControl?.adjustable ?: flowOf(false),
+    ) { hr, autoPaused, route, adjustable ->
+        SecondaryFlow(hr, autoPaused, route, adjustable)
     }
 
     val uiState: Flow<InRideUiState> = combine(
@@ -175,6 +181,7 @@ class InRideViewModel(
             heartRatePaired = secondary.hr.paired,
             heartRateConnectionState = secondary.hr.state,
             autoPaused = secondary.autoPaused,
+            resistanceAdjustable = secondary.resistanceAdjustable,
             route = secondary.route,
         )
     }.scan(InRideUiState()) { previous, next ->
@@ -198,6 +205,11 @@ class InRideViewModel(
     fun pause() = rideSessionManager.pause()
 
     fun resume() = rideSessionManager.resume()
+
+    /** The tile's − and + (#68): a step of the trainer's resistance. */
+    fun stepResistance(steps: Int) {
+        resistanceControl?.stepResistance(steps)
+    }
 
     /**
      * Stops the ride and persists it. Deliberately does *not* call
@@ -225,6 +237,7 @@ class InRideViewModel(
         val hr: HeartRateSnapshot,
         val autoPaused: Boolean,
         val route: Route?,
+        val resistanceAdjustable: Boolean,
     )
 
     private companion object {

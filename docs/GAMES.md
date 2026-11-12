@@ -59,6 +59,9 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 | 10 | `segment_time_left` | seconds, from Kotlin's clock |
 | 11 | `sensors_ok` | 0 / 1: 0 once the app's one "sensors offline" rule says so (`AppContainer.sensorsOffline`: not Connected, or no frames, for 10 s; issue #56), the same moment as the top bar's notice |
 | 12 | `rider_music` | 0 / 1: the rider's own music app has a track, so game music stays off. Added after v1 at the end, so the version stays `1`; `InputBus` reads it only when the frame has it |
+| 13 | `controller_steer` | -1 (left) .. +1 (right): an OpenBikeControl controller's steering (#68); `0` while none steers |
+| 14 | `controller_steering` | 0 / 1: a connected controller steers. Games that steer by lean use `InputBus.steer_x()`, which is field 13 while this is 1 and `lean_x` otherwise, so a shifter-only controller never takes the steering |
+| 15 | `controller_item_presses` | how many times a controller's Use item (Power-up 1-3) has been pressed since the app started. A count, so no press between two polls is lost; `InputBus` emits `controller_item` when it goes up, and takes the first frame's value as its baseline. Fields 13-15 were added after v1 like field 12; `InputBus` reads them only when the frame has them |
 
 **Kotlin → Godot signals:**
 
@@ -141,6 +144,18 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 - `request_end()`: the rider ends the session (early, or an open-ended Just Ride). Kotlin stops and saves
   the ride, then sends `session_finished`.
 - `request_exit()`: after the summary; the host finishes back to the app.
+
+**Controllers (#68):** OpenBikeControl controllers (shifters, buttons, BikeControl on a phone)
+reach the games through fields 13-15 above and through Kotlin. Pause and Resume call the
+session's pause and resume as `request_pause()` / `request_resume()` would
+(`ControllerRouter`), so games need nothing for them. Kart Race steers with `InputBus.steer_x()`
+and fires its item on `InputBus.controller_item`.
+
+**Smart trainers (#68):** with an FTMS trainer as the bike source, `resistance` is OpenRide's
+virtual resistance (`SwitchableBikeDataSource`), which the rider steps and Kotlin sends to the
+trainer. The game host draws its **+** and **−** as native views at the right edge, over the
+engine, while the trainer takes targets, so games need nothing for it; keep that edge's middle
+clear of game controls.
 
 **Sensor loss:** while `sensors_ok` is 0, games freeze scoring and show the "sensors not detected"
 banner. The ride keeps recording exactly as it does today.

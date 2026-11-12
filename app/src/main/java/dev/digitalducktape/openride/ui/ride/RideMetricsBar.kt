@@ -26,6 +26,7 @@ import dev.digitalducktape.openride.ui.designsystem.OrSize
 import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
+import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.designsystem.zoneColor
 
 /**
@@ -48,6 +49,8 @@ fun RideMetricsBar(
     uiState: InRideUiState,
     translucent: Boolean,
     modifier: Modifier = Modifier,
+    /** A step of a trainer's resistance (#68), from the − and + beside the reading. */
+    onStepResistance: (Int) -> Unit = {},
 ) {
     val background = if (translucent) {
         Modifier.background(
@@ -67,7 +70,7 @@ fun RideMetricsBar(
             .then(background)
             .padding(top = if (translucent) OrSpacing.xl else OrSpacing.md, bottom = OrSpacing.md),
     ) {
-        PrimaryRow(uiState)
+        PrimaryRow(uiState, onStepResistance)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -89,7 +92,7 @@ private val VideoScrimLabels = Color(0xCC000000)
 private val VideoScrimBottom = Color(0xE6000000)
 
 @Composable
-private fun PrimaryRow(uiState: InRideUiState, modifier: Modifier = Modifier) {
+private fun PrimaryRow(uiState: InRideUiState, onStepResistance: (Int) -> Unit, modifier: Modifier = Modifier) {
     val dash = "--"
     val live = uiState.sensorsAvailable
 
@@ -123,6 +126,12 @@ private fun PrimaryRow(uiState: InRideUiState, modifier: Modifier = Modifier) {
             avgTrend = trend(live, uiState.metrics.resistancePercent, uiState.aggregates.avgResistance),
             best = null,
             modifier = Modifier.weight(1f),
+            // A trainer has no knob: its resistance is stepped here, where BEST would be.
+            trailing = if (uiState.resistanceAdjustable) {
+                { ResistanceStepper(onStep = onStepResistance) }
+            } else {
+                null
+            },
         )
     }
 }
@@ -142,6 +151,7 @@ private fun PrimaryMetric(
     best: String?,
     modifier: Modifier = Modifier,
     currentColor: Color? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier,
@@ -162,12 +172,23 @@ private fun PrimaryMetric(
             )
             OrEyebrow(unit)
         }
-        if (best != null) {
+        if (trailing != null) {
+            trailing()
+        } else if (best != null) {
             Flank(label = "BEST", value = best, trend = null)
         } else {
             // Keep the big value optically centered when there's no BEST readout.
             Box(modifier = Modifier.width(FlankWidth))
         }
+    }
+}
+
+/** + over −, a flank wide: steps a trainer's resistance (#68). */
+@Composable
+private fun ResistanceStepper(onStep: (Int) -> Unit) {
+    Column(modifier = Modifier.width(FlankWidth), verticalArrangement = Arrangement.spacedBy(OrSpacing.xs)) {
+        OrSecondaryButton(text = "+", onClick = { onStep(1) }, modifier = Modifier.fillMaxWidth())
+        OrSecondaryButton(text = "−", onClick = { onStep(-1) }, modifier = Modifier.fillMaxWidth())
     }
 }
 

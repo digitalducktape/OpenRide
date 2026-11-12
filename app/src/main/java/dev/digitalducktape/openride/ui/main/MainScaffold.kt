@@ -123,6 +123,8 @@ fun MainScaffold(
     val sensorsOffline by appContainer.sensorsOffline.collectAsState()
     val heartRateState by appContainer.heartRateManager.connectionState.collectAsState()
     val heartRateBpm by appContainer.heartRateManager.bpm.collectAsState()
+    val controllerStatuses by appContainer.controllerManager.statuses.collectAsState()
+    val bikeSource by appContainer.bikeSourceStore.source.collectAsState()
     val availableUpdate by appContainer.updateAvailability.collectAsState()
     val updateBannerDismissed by appContainer.updateBannerDismissed.collectAsState()
     val currentTab = TopLevelDestination.fromRoute(currentRoute) ?: TopLevelDestination.Start
@@ -243,6 +245,10 @@ fun MainScaffold(
                         // "switch rider": pairing is a full-screen flow, not a fifth tab.
                         outerNavController.navigate(Destinations.HrPairing)
                     },
+                    onManageControllers = { outerNavController.navigate(Destinations.Controllers) },
+                    bikeSource = bikeSource,
+                    onManageBikeSource = { outerNavController.navigate(Destinations.BikeSource) },
+                    controllers = controllerStatuses,
                     onManageAppUpdates = { outerNavController.navigate(Destinations.AppUpdate) },
                     onShowAbout = { outerNavController.navigate(Destinations.About) },
                     onManageContentSources = {

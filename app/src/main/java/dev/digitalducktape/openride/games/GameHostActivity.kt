@@ -16,7 +16,13 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import dev.digitalducktape.openride.R
@@ -51,6 +57,7 @@ import org.godotengine.godot.plugin.GodotPlugin
  */
 class GameHostActivity : GodotActivity(), GameLoadingHost {
     private var loadingView: View? = null
+    private var resistanceButtons: View? = null
 
     private val bridge: GameBridge
         get() = appContainer.gameBridge
@@ -76,6 +83,7 @@ class GameHostActivity : GodotActivity(), GameLoadingHost {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
         }
         hideSystemBars()
+        addResistanceButtons()
         showLoadingView(R.string.games_loading)
         Log.i(TAG, "game host created")
     }
@@ -113,6 +121,47 @@ class GameHostActivity : GodotActivity(), GameLoadingHost {
         loadingView = overlay
     }
 
+    /**
+     * A smart trainer's resistance (#68) has no knob, and the games read resistance as they read a
+     * Peloton's: so while the bike source takes targets, + and − sit at the right edge, halfway
+     * down, over the engine. A controller's shifters step it too. Native views rather than Godot
+     * UI, so every game gets them without knowing about trainers.
+     */
+    private fun addResistanceButtons() {
+        val dp = { v: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, resources.displayMetrics).toInt() }
+        val bike = appContainer.bikeDataSource
+        fun button(label: String, steps: Int) = TextView(this).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12f).toFloat()
+                setColor(RESISTANCE_BUTTON_FILL)
+            }
+            contentDescription = if (steps > 0) "Resistance up" else "Resistance down"
+            setOnClickListener { bike.stepResistance(steps) }
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            val size = dp(64f)
+            addView(button("+", 1), LinearLayout.LayoutParams(size, size))
+            addView(button("−", -1), LinearLayout.LayoutParams(size, size).apply { topMargin = dp(12f) })
+        }
+        addContentView(
+            column,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END or Gravity.CENTER_VERTICAL)
+                .apply { marginEnd = dp(24f) },
+        )
+        resistanceButtons = column
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                bike.adjustable.collect { column.visibility = if (it) View.VISIBLE else View.GONE }
+            }
+        }
+    }
+
     /** Called on the render thread once the main scene is loaded, just before its first frame. */
     override fun onGodotMainLoopStarted() {
         Log.i(TAG, "engine main loop started")
@@ -127,6 +176,8 @@ class GameHostActivity : GodotActivity(), GameLoadingHost {
     private fun hideLoadingView() {
         loadingView?.let { (it.parent as? ViewGroup)?.removeView(it) }
         loadingView = null
+        // The loading view was added over them; they stay on top of the engine.
+        resistanceButtons?.bringToFront()
     }
 
     /** Entering games again: the engine is already running, so only the session is new. */
@@ -209,6 +260,9 @@ class GameHostActivity : GodotActivity(), GameLoadingHost {
         const val EXTRA_AUTOSTART = "dev.digitalducktape.openride.games.AUTOSTART"
 
         private const val REQUEST_CAMERA = 0x0CA4
+
+        /** The resistance buttons' fill: dark and see-through, readable over any game. */
+        private const val RESISTANCE_BUTTON_FILL = 0x99000000.toInt()
 
         /** Opens the Games hub: a new visit, or the live one (`launchGames`, the app's one way in). */
         fun intent(context: Context): Intent = Intent(context, GameHostActivity::class.java)

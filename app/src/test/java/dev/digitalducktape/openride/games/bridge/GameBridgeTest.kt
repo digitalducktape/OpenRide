@@ -62,10 +62,21 @@ class GameBridgeTest {
         val frame = bridge.inputFrame()
 
         assertArrayEquals(
-            doubleArrayOf(1.0, 85.0, 160.0, 35.0, 16.0, 128.0, 0.0, 0.0, 0.0, 0.0, 33.0, 1.0, 0.0),
+            doubleArrayOf(1.0, 85.0, 160.0, 35.0, 16.0, 128.0, 0.0, 0.0, 0.0, 0.0, 33.0, 1.0, 0.0, 0.0, 0.0, 0.0),
             frame,
             0.0,
         )
+    }
+
+    @Test
+    fun `the input frame carries the controllers' steering and item presses`() {
+        val withController = GameBridge(bike, sensorsOffline, heartRate, controllerReading = { ControllerReading(steer = -0.5, itemPresses = 2) })
+
+        val frame = withController.inputFrame()
+
+        assertEquals(-0.5, frame[InputFrame.CONTROLLER_STEER], 0.0)
+        assertEquals(1.0, frame[InputFrame.CONTROLLER_STEERING], 0.0)
+        assertEquals(2.0, frame[InputFrame.CONTROLLER_ITEM_PRESSES], 0.0)
     }
 
     @Test
