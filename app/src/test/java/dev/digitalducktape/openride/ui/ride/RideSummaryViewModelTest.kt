@@ -269,4 +269,23 @@ class RideSummaryViewModelTest {
         assertEquals(null, profileRepository.getProfile(profileId)?.ftp)
         assertEquals(false, viewModel.ftpApplied.value)
     }
+
+    @Test
+    fun `deleteRide removes the ride from history and clears a finished session`() = runTest {
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        manager.start(profileId)
+        advanceTimeBy(2_000)
+        runCurrent()
+        val ride = requireNotNull(manager.stop())
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, ride.id)
+        viewModel.load()
+
+        viewModel.deleteRide()
+
+        assertNull(rideRepository.getRide(ride.id))
+        assertTrue(rideRepository.getSamples(ride.id).isEmpty())
+        assertNull(viewModel.ride.value)
+        assertNull(viewModel.tcxContent())
+        assertEquals(RideSessionState.Idle, manager.state.value)
+    }
 }

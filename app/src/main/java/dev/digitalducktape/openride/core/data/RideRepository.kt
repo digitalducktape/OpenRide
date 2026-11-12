@@ -43,6 +43,13 @@ class RideRepository(
 
     suspend fun getSamples(rideId: Long): List<RideSample> = rideDao.getSamples(rideId)
 
+    /**
+     * Deletes a ride for good (#84), with its per-second samples and any game results. History,
+     * its totals and personal records, the Classes "taken" badges and the games' bests all read
+     * the tables this removes from, so they follow without being told.
+     */
+    suspend fun deleteRide(rideId: Long) = rideDao.deleteRide(rideId)
+
     /** A game session's per-segment results, in plan order; empty for any other ride. */
     suspend fun getGameResults(rideId: Long): List<GameResult> = gameResultDao?.getForRide(rideId).orEmpty()
 }

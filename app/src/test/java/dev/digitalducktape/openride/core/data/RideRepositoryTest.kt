@@ -107,4 +107,39 @@ class RideRepositoryTest {
     fun `getRide returns null for an unknown id`() = runTest {
         assertNull(rideRepository.getRide(rideId = 999L))
     }
+
+    @Test
+    fun `deleteRide removes the ride with its samples and game results, and nothing else`() = runTest {
+        val gameRides = RideRepository(db, db.rideDao(), db.gameResultDao())
+        val profileId = createProfile("Ed")
+        val keptId = gameRides.saveRide(rideFor(profileId, startEpochMs = 1_000L), samplesFor(3))
+        val deletedId = gameRides.saveRide(rideFor(profileId, startEpochMs = 2_000L), samplesFor(5))
+        db.gameResultDao().insertAll(
+            listOf(
+                GameResult(keptId, 0, "demo", "free", "standard", 0, 60, 100.0, 1, null, false, "{}"),
+                GameResult(deletedId, 0, "demo", "free", "standard", 0, 60, 900.0, 3, null, false, "{}"),
+            ),
+        )
+
+        gameRides.deleteRide(deletedId)
+
+        assertNull(gameRides.getRide(deletedId))
+        assertTrue(gameRides.getSamples(deletedId).isEmpty())
+        assertTrue(gameRides.getGameResults(deletedId).isEmpty())
+        assertEquals(listOf(keptId), gameRides.observeHistory(profileId).first().map { it.id })
+        assertEquals(3, gameRides.getSamples(keptId).size)
+        assertEquals(1, gameRides.getGameResults(keptId).size)
+        assertEquals(3, db.rideDao().getAllSamplesOnce().size)
+    }
+
+    @Test
+    fun `deleteRide of an unknown id changes nothing`() = runTest {
+        val profileId = createProfile("Ed")
+        val rideId = rideRepository.saveRide(rideFor(profileId, startEpochMs = 1_000L), samplesFor(2))
+
+        rideRepository.deleteRide(rideId + 100)
+
+        assertEquals(1, rideRepository.observeHistory(profileId).first().size)
+        assertEquals(2, rideRepository.getSamples(rideId).size)
+    }
 }

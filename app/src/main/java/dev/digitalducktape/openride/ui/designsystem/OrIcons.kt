@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
@@ -35,6 +36,8 @@ object OrIcons {
     val Add: ImageVector = Icons.Filled.Add
     val Info: ImageVector = Icons.Filled.Info
     val Warning: ImageVector = Icons.Filled.Warning
+    /** The bin: deleting a ride from its detail screen. */
+    val Delete: ImageVector = Icons.Filled.Delete
     val Chevron: ImageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight
 
     // Music transport (the mini player). Core has only Play, so the other three are Material's
