@@ -157,3 +157,13 @@ func test_bouncing_balls_squash_on_landing_and_their_shadows_tighten() -> void:
 	assert_float(DodgeWorld.squash_for(0.0)).is_equal_approx(0.14, 0.001)
 	assert_float(DodgeWorld.squash_for(0.2)).is_equal(0.0)
 	assert_float(DodgeWorld.shadow_scale(0.0)).is_less(DodgeWorld.shadow_scale(DodgeWorld.BOUNCE_HEIGHT))
+
+
+func test_points_lost_float_up_in_the_bad_red() -> void:
+	# A style name ("danger") once went where a Color belongs, so the popup lost its red.
+	var world := _world()
+	var label: Label3D = world._popups[world._next_popup]
+	world.penalty_fx(0.0, 5.0)
+	assert_str(label.text).is_equal("−5")
+	var rgb := Color(label.modulate, 1.0)
+	assert_bool(rgb.is_equal_approx(Color(GameTheme.BAD, 1.0))).override_failure_message("popup is %s" % label.modulate).is_true()
