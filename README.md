@@ -14,6 +14,27 @@ It's installed using a free tool called [OpenPelo](https://github.com/doudar/Ope
   <img src="docs/screenshots/classes.png" width="32%" alt="Classes catalog" />
 </p>
 
+## New in 1.2
+
+Seven new mini-games, circuits that change every ride, and a round of fixes for classes and your ride history.
+
+- **Seven new games** — Watt Lane, Balloon Pump, Keepy Uppy, Power Grid, Ready for Launch, The Pull and Gate Crasher. See [The games](#the-games).
+- **Fresh circuits every ride** — each slot in a circuit now draws from a pool of games that suit it, so the same 30-minute circuit plays differently each time.
+- **Gentler targets** — the new games ask for about a third of your FTP to reach their main goal, so they're fun at a comfortable effort. Push harder for more stars.
+- **Ride to your own music** — **Mute class** in the class player turns the class's sound off and lets your music app play. A class you open while music is playing starts muted.
+- **Sharper class video** — classes now ask YouTube for a format the bike plays smoothly, so the picture holds its resolution instead of dropping to 480p.
+- **Delete a ride** — the bin button on a ride's details removes it from your history.
+- **Import your Peloton history** — **Profile → Backup & restore → Import Peloton history** adds the cycling rides from Peloton's workout-history CSV export to your history. Thanks to coyotemojo and Drewmiller1 for asking for these two.
+- **About & support** — **Profile → About & support** shows what's new in your version, where to send feedback, and how to help fund the app.
+
+## Support OpenRide
+
+OpenRide is free and always will be. If it's made your rides better and you'd like to help keep it going, you can buy the developer a coffee:
+
+<a href="https://buymeacoffee.com/digitalducktape"><img src="https://img.buymeacoffee.com/button-api/?text=Support%20OpenRide%20Development&emoji=&slug=digitalducktape&button_colour=5F7FFF&font_colour=ffffff&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" alt="Support OpenRide Development on Buy Me a Coffee" /></a>
+
+On the bike, **Profile → About & support** shows a QR code for the same page, so you can scan it with your phone.
+
 ## New in 1.1
 
 Your music now has a place in the app, the bike's home screen is a setting you can switch on, and the heart-rate strap and the ride screens got a round of fixes.
@@ -98,6 +119,21 @@ Workouts that play like games. Tap **Enter Games** (the **Games** tab, or the *G
   <img src="docs/screenshots/game_kart_race.png" width="49%" alt="Kart Race: racing along a harbour at sunset, fourth of eight" />
   <img src="docs/screenshots/game_kart_race_options.png" width="49%" alt="Kart Race in the hub: pick your kart and starting track" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/game_watt_lane.png" width="49%" alt="Watt Lane: a glowing lane to follow, with a jump coming up" />
+  <img src="docs/screenshots/game_balloon_pump.png" width="49%" alt="Balloon Pump: a brass pump filling a gold balloon on a pier at night" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/game_keepy_uppy.png" width="49%" alt="Keepy Uppy: a red balloon over a fan in a meadow, with a rain cloud and a bird" />
+  <img src="docs/screenshots/game_power_grid.png" width="49%" alt="Power Grid: a generator shed lighting up a valley town at night" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/game_ready_for_launch.png" width="49%" alt="Ready for Launch: a rocket in orbit above the Earth, the Moon ahead" />
+  <img src="docs/screenshots/game_the_pull.png" width="49%" alt="The Pull: hauling a sled down a dirt track past a cheering crowd" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/game_gate_crasher.png" width="49%" alt="Gate Crasher: cantering toward a fence, seen between the horse's ears" />
+</p>
 
 | Game | How it plays |
 | --- | --- |
@@ -106,18 +142,25 @@ Workouts that play like games. Tap **Enter Games** (the **Games** tab, or the *G
 | **Safe Cracker** | A vault dial that you turn with the **resistance knob**. Hit each number and hold it to crack the safe, then move to the next — but keep your power under the cap or the alarm trips. |
 | **Cadence Karaoke** | A neon tunnel with a target rpm set to the beat. Pedal at the target to keep the ball in the box; the **−** and **+** buttons set the pace you're comfortable with. |
 | **Kart Race** | A Grand Prix of 3-lap races against seven rivals on four tracks. Pedal to drive, **lean your head** to steer, add resistance to drift and charge a boost, and tap to use the items you pick up. Pick your kart and starting track in the hub. Uses the camera. |
+| **Watt Lane** | A glowing lane across the screen, and your watts set the arrow's height. Stay in the lane as it rises and falls, and catch the jumps it announces. A gentle warm-up. |
+| **Balloon Pump** | Your pedalling drives an air pump. Push past the line to fill each balloon, which gets harder to fill near the end, then tie it off. Race to fill a set number, or fill as many as you can. |
+| **Keepy Uppy** | Keep a balloon in the air over a fan your pedalling drives, while gusts, rain and birds push it down. Turn on *Steer* to **lean** and slide the fan under it. |
+| **Power Grid** | Your bike turns a valley town's generator. Keep up with the evening's demand to light the houses, the street lamps, the funfair and the stadium, and push through storm repairs. |
+| **Ready for Launch** | Fill the rocket's tank, then push hard at liftoff to climb through the clouds to orbit and on toward the Moon. One launch a round. |
+| **The Pull** | A sled pull at a county fair. The sled gets heavier the further you drag it, so see how far you can get. Just Ride only. |
+| **Gate Crasher** | Show jumping, seen from the saddle. Pedal to canter round the course and **stand up** on the bike at each fence's take-off line to clear it. Uses the camera. |
 
 Each game can be played on its own as a **Just Ride** — for a set time, open-ended, or (for Dodge Ball, Tug of War and Safe Cracker) a set number of rounds — at Easy, Standard or Hard.
 
 ### Circuits
 
-A circuit strings the games into a structured interval workout — warm-up, work and recovery segments, each with its own game — in **20, 30 or 45 minutes**, or one you build yourself (up to 12 games and 90 minutes, saved as *My circuit 1-3*). A progress strip shows where you are, and the summary at the end lists every game and its result.
+A circuit strings the games into a structured interval workout — warm-up, work and recovery segments, each with its own game — in **20, 30 or 45 minutes**, with a fresh mix of games every ride, or one you build yourself (up to 12 games and 90 minutes, saved as *My circuit 1-3*). A progress strip shows where you are, and the summary at the end lists every game and its result.
 
 ### Good to know
 
 - **Resistance scores more.** In the effort games (Dodge Ball and Tug of War), points get a multiplier from 1.0× at light resistance (30% or less) up to 1.5× at 60% and above — but only while you're pedaling at 60 rpm or more, so grinding at a standstill doesn't count.
 - **Targets follow your FTP.** Games scale their power targets to your FTP. Set it in **Profile → Edit profile**; until you do, they assume 150 W.
-- **The camera is optional, and private.** Only Dodge Ball and Kart Race need it (and Tug of War's optional *brace lean*), to find where your head is. It looks for a head position, and nothing is recorded or saved. If you don't allow the camera, circuits swap Dodge Ball for a camera-free game. A well-lit room helps.
+- **The camera is optional, and private.** Only Dodge Ball, Kart Race and Gate Crasher need it (and the optional lean modes in Tug of War and Keepy Uppy), to find where your head is or whether you're standing. It looks for a head position, and nothing is recorded or saved. If you don't allow the camera, circuits leave out the games that need it. A well-lit room helps.
 - **Music and sound effects are generated on the device.** Game music turns itself off while you're playing your own music (you can set it to always on or off, and set volumes, in the hub's settings).
 - **Stars and personal bests.** Each game awards up to three stars and remembers your best.
 
@@ -161,14 +204,6 @@ To make OpenRide the screen that greets you when the bike turns on, open **Profi
 ### Staying up to date
 
 Once it's installed, OpenRide checks this repo's [Releases](https://github.com/digitalducktape/openride/releases) on its own each time it launches, and shows a notice at the top of the screen when a newer build is available. Tap it (or go to **Profile → App updates**) to download and install; no computer needed. Reinstalling from OpenPelo's catalog also gets you the latest release. See [docs/INSTALL.md](docs/INSTALL.md#in-app-updates-t22--22) for details.
-
-## Support OpenRide
-
-OpenRide is free and always will be. If it's made your rides better and you'd like to help keep it going, you can buy the developer a coffee:
-
-<a href="https://buymeacoffee.com/digitalducktape"><img src="https://img.buymeacoffee.com/button-api/?text=Support%20OpenRide%20Development&emoji=&slug=digitalducktape&button_colour=5F7FFF&font_colour=ffffff&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" alt="Support OpenRide Development on Buy Me a Coffee" /></a>
-
-On the bike, **Profile → About & support** shows a QR code for the same page, so you can scan it with your phone.
 
 ## For developers
 

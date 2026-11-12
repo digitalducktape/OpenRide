@@ -1,16 +1,11 @@
-OpenRide 1.1: a music player, a home screen setting, and fixes, on top of everything new in 1.0.
+OpenRide 1.2: Seven new mini-games, Import Peloton workout history, Delete a ride, Improvements to video playback, Bug fixes
 
-New in 1.1:
+New in 1.2:
 
-Music player: see what's playing in your music app, with cover, song, artist and previous, play/pause and next, in the top bar and on the Just Ride screen. Tried with Spotify, Apple Music, Pandora, SiriusXM and Plexamp. Turn it on in Profile, Music. In the games, game music steps aside while yours plays, and a note button opens the player.
+Seven new games: Watt Lane, Balloon Pump, Keepy Uppy, Power Grid, Ready for Launch, The Pull and Gate Crasher.
 
-Home screen setting: Profile, Device, Home screen, Turn on. No more adb commands (fixes #47, and the home-screen part of #63 on the newer tablet; Peloton's own overlay on newer software is covered in docs/INSTALL.md). Pressing Home no longer opens a second copy of the app.
+Fresh circuits: Each part of a circuit now picks from a pool of games that suit it, so the same circuit plays differently every ride. The new games ask for about a third of your FTP to reach their goal; the harder you push the more stars you earn.
 
-Heart-rate strap: connects reliably, reconnects when the link drops, and shows your bpm on the ride screens and in the games.
+Mute Classes: Classes now let you ride to your own music, and a class opened while music is playing starts muted. Classes also ask YouTube for a format the bike plays smoothly, so the picture stays sharp and does not stutter.
 
-Fixes: bigger readings on the ride screens, form labels that no longer overlap, games that fill the whole screen with no side bars, and one sensor warning everywhere, including when the bike's sensor board goes quiet.
-
-Still new from 1.0: the Games hub (BETA), the Kart Race, better game graphics and sound, a new look for the whole app with tabs along the bottom, and installing from OpenPelo's app catalog.
-
-The camera only looks for where your head is; nothing is recorded.
-
+History Import: You can now delete a ride from its details screen, and import your past rides from Peloton's workout-history CSV in Profile. Thanks to coyotemojo and Drewmiller1 for the PR.
