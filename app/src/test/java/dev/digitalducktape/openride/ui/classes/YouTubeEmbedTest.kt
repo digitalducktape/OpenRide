@@ -73,4 +73,40 @@ class YouTubeEmbedTest {
         assertEquals("Mute class", YouTubeEmbed.muteLabel(muted = false))
         assertEquals("Unmute class", YouTubeEmbed.muteLabel(muted = true))
     }
+
+    @Test
+    fun `the H264 preference turns away VP8, VP9 and AV1 through every capability check`() {
+        val script = YouTubeEmbed.H264_PREFERENCE_SCRIPT
+
+        assertTrue(script.contains("/vp0?9|vp8|av01/i"))
+        assertTrue(script.contains("ms.isTypeSupported = "))
+        assertTrue(script.contains("HTMLMediaElement.prototype.canPlayType = "))
+        assertTrue(script.contains("mc.decodingInfo = "))
+        // Anything else is still answered by the browser itself.
+        assertTrue(script.contains("isTypeSupported(type)"))
+        assertTrue(script.contains("canPlayType.call(this, type)"))
+        assertTrue(script.contains("return decodingInfo(config)"))
+    }
+
+    @Test
+    fun `the codec pattern matches the types YouTube asks about, and leaves H264 and audio alone`() {
+        val avoid = Regex("vp0?9|vp8|av01", RegexOption.IGNORE_CASE)
+
+        listOf(
+            "video/webm; codecs=\"vp9\"",
+            "video/webm; codecs=\"vp09.00.51.08.01.01.01.01.00\"",
+            "video/webm; codecs=\"vp8\"",
+            "video/mp4; codecs=\"av01.0.08M.08\"",
+        ).forEach { assertTrue(it, avoid.containsMatchIn(it)) }
+        listOf(
+            "video/mp4; codecs=\"avc1.64002A\"",
+            "audio/webm; codecs=\"opus\"",
+            "audio/mp4; codecs=\"mp4a.40.2\"",
+        ).forEach { assertTrue(it, !avoid.containsMatchIn(it)) }
+    }
+
+    @Test
+    fun `the preference runs on the player's own origin`() {
+        assertTrue(YouTubeEmbed.BASE_URL in YouTubeEmbed.PLAYER_ORIGINS)
+    }
 }

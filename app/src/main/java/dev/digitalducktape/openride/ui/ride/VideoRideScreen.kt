@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import dev.digitalducktape.openride.ui.classes.YouTubeEmbed
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -187,6 +189,16 @@ private fun ClassPlayer(
                     VideoEndBridge { post { currentOnVideoEnded() } },
                     YouTubeEmbed.BRIDGE_NAME,
                 )
+                // H.264 for the class (#73), set before the page loads so it is in place when
+                // the player first asks what the tablet can decode. A WebView too old for
+                // document-start scripts plays as before.
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(
+                        this,
+                        YouTubeEmbed.H264_PREFERENCE_SCRIPT,
+                        YouTubeEmbed.PLAYER_ORIGINS,
+                    )
+                }
                 loadDataWithBaseURL(
                     YouTubeEmbed.BASE_URL,
                     YouTubeEmbed.html(videoId),

@@ -255,6 +255,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
     implementation(libs.androidx.exifinterface)
+    // The class player's document-start script (#73).
+    implementation(libs.androidx.webkit)
 
     // Mini-games (#32): the Godot engine as an Android library; GameHostActivity embeds it.
     // Must match the editor version that exports games/ (checked by exportGamesPack).

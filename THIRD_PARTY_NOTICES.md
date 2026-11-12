@@ -49,7 +49,7 @@ OpenRide's own source beyond attribution. Authoritative versions live in
 
 | Dependency | Group | License |
 |---|---|---|
-| AndroidX (core-ktx, lifecycle, activity, fragment, navigation, exifinterface) | `androidx.*` | Apache-2.0 |
+| AndroidX (core-ktx, lifecycle, activity, fragment, navigation, exifinterface, webkit) | `androidx.*` | Apache-2.0 |
 | Jetpack Compose (UI, Material 3, tooling) | `androidx.compose.*` | Apache-2.0 |
 | Room (runtime, ktx, compiler) | `androidx.room` | Apache-2.0 |
 | Kotlin stdlib & Coroutines | `org.jetbrains.kotlin*`, `org.jetbrains.kotlinx` | Apache-2.0 |

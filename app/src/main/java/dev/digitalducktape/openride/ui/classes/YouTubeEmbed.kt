@@ -15,6 +15,11 @@ package dev.digitalducktape.openride.ui.classes
  * - When the player reaches ENDED, the page notifies the app through the injected
  *   `OpenRideBridge` JavaScript interface so the workout can finish automatically.
  *
+ * The bike tablet can't keep up with YouTube's default pick (#73), so [H264_PREFERENCE_SCRIPT]
+ * has the page report the codecs it decodes badly as unsupported, the way a browser without
+ * them would. YouTube then chooses the stream itself, as it always does, and its own quality
+ * menu (the player's gear) still works for a rider who wants to pick by hand.
+ *
  * ToS constraints (PRD Non-Goal #5) still shape the parameters: YouTube's own player chrome
  * stays enabled (`"controls": 1`), playback control goes through the official player API
  * only, and nothing is ever downloaded or cached — the WebView streams from YouTube's player
@@ -104,4 +109,49 @@ object YouTubeEmbed {
 
     /** The mute button's label: what a tap does next. */
     fun muteLabel(muted: Boolean): String = if (muted) "Unmute class" else "Mute class"
+
+    /**
+     * Where [H264_PREFERENCE_SCRIPT] runs: the host page and the player's iframe (both on
+     * [BASE_URL]), and `youtube.com` should the player ever be served from there.
+     */
+    val PLAYER_ORIGINS: Set<String> = setOf(BASE_URL, "https://www.youtube.com")
+
+    /**
+     * Makes YouTube send H.264 (#73). Run at document start in the player's frame, before
+     * YouTube's player asks what the device can play, it answers "no" for VP8, VP9 and AV1
+     * through the three ways a page can ask: `MediaSource.isTypeSupported`,
+     * `HTMLMediaElement.canPlayType` and `navigator.mediaCapabilities.decodingInfo`.
+     *
+     * Why: measured on a Gen 2 bike (MT8173, 2026-11-11) with a 1080p60 scenic ride and 30-70
+     * Mbps to spare. Left alone, YouTube picked VP9 1080p60, the tablet dropped about 40% of its
+     * frames, and the player stepped down to 720p and then 480p30 within 45 seconds. With this
+     * script it played H.264 at 720p60 dropping about 2%. The original Bike has no hardware VP9
+     * decoder at all (the issue's report). H.264 tops out at 1080p, which is the screen.
+     */
+    val H264_PREFERENCE_SCRIPT: String = """
+        (function () {
+          if (window.__openrideH264) { return; }
+          window.__openrideH264 = true;
+          var avoid = /vp0?9|vp8|av01/i;
+          var ms = window.MediaSource;
+          if (ms && ms.isTypeSupported) {
+            var isTypeSupported = ms.isTypeSupported.bind(ms);
+            ms.isTypeSupported = function (type) { return !avoid.test(String(type)) && isTypeSupported(type); };
+          }
+          var canPlayType = HTMLMediaElement.prototype.canPlayType;
+          HTMLMediaElement.prototype.canPlayType = function (type) {
+            return avoid.test(String(type)) ? '' : canPlayType.call(this, type);
+          };
+          var mc = navigator.mediaCapabilities;
+          if (mc && mc.decodingInfo) {
+            var decodingInfo = mc.decodingInfo.bind(mc);
+            mc.decodingInfo = function (config) {
+              if (config && config.video && avoid.test(String(config.video.contentType))) {
+                return Promise.resolve({ supported: false, smooth: false, powerEfficient: false });
+              }
+              return decodingInfo(config);
+            };
+          }
+        })();
+    """.trimIndent()
 }
