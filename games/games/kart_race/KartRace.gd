@@ -135,7 +135,6 @@ var _draw: Array[KartState] = []
 var _item_key := false
 var _item_edge := false
 var _countdown_shown := -1
-var _message_left := 0.0
 var _lineup_dirty := false
 ## The adaptive quality for this session (KartQualityGovernor); null when tuning turns it off.
 var quality: KartQualityGovernor
@@ -1023,10 +1022,6 @@ func _update_hud(delta: float) -> void:
 	if lights != _lights:
 		_lights = lights
 		world.set_start_lights(lights)
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 
 
 ## The item button was tapped: the rider's next KartInput carries `use_item` (an edge that the
@@ -1036,5 +1031,4 @@ func _on_item_pressed() -> void:
 
 
 func _show_message(text: String, seconds: float) -> void:
-	hud.show_message(text)
-	_message_left = seconds
+	hud.show_message(text, HudTheme.INK, seconds)

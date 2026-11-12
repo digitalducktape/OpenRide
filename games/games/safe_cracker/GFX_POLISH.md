@@ -42,7 +42,7 @@ full-screen blended layers; the CPU cost is redrawing big `_draw()` lists.
    **Done** (2026-10-20), further than asked: `SafeDoor` holds the static door; `SafeDial` keeps
    only the bands, ring, lights and the target's number; the reading's number is its own
    text-only layer; the numerals are a static layer; the needle is a static drawing turned by
-   `rotation`, so a needle step redraws nothing. Every shape is batched by `SafeMesh`.
+   `rotation`, so a needle step redraws nothing. Every shape is batched by `MeshBatch2D`.
 2. **Steel, bevels and hardware** (`SafeBody._draw`, the new `SafeDoor._draw`). Flat fills read as
    a gauge panel. Draw:
    - a top-lit value gradient on the body and the door (a vertical `draw_polygon` with per-vertex
@@ -68,7 +68,7 @@ full-screen blended layers; the CPU cost is redrawing big `_draw()` lists.
    layer: measure. Verify: no banding; each room has a light direction that the safe's shading
    agrees with.
    **Done, differently:** the pool is a many-ring vertex-colour glow in the room's own batch
-   (`SafeMesh.glow`), not a TextureRect: no extra draw call, no texture, and it fills only the
+   (`MeshBatch2D.glow`), not a TextureRect: no extra draw call, no texture, and it fills only the
    light's area, not the screen. The vignette stays (its curve smoothed, no visible edge).
 4. **The door swings open** (`SafeDial._draw`'s squash transform, `SafeBody._draw`'s vault). Today
    the door squashes horizontally. Draw it as a perspective swing about the hinge: the far edge
@@ -168,7 +168,7 @@ bike shows the canvas at 1792x1008, 0.87 of that.
 | 1. The room and the vignette baked into one texture per place (`SafeBackdrop.bake`, a SubViewport at the on-screen size, shown as one opaque sprite); the backing ColorRect gone | 6.9-7.7 → 3.7-3.8 screens (−3.1 to −4.0) | −5 to −6 ms a frame: the biggest win | Nothing visible: the ambient life (rain, sea, lantern, flasks, dust) now draws over the vignette, which is under 6% where they sit. 7 MB of VRAM; a window resize re-bakes |
 | 2. The body and the door's seam are frames round the door's hole; the cast shadow keeps a 90 px rim; the vault is `SafeDial`'s `Vault` layer, drawn only while the door is open | 3.7-3.8 → 2.3 (−1.45) | −2 ms | Nothing: the shut door covered all of it. The open door adds the vault back (0.72) for the 2.6 s of a crack |
 | 3. A hole in the door's slab under the dial's face; the bezel's shadow only where it shows | 2.3 → 2.2 (−0.15) | −0.2 ms | Nothing |
-| 4. Each place's room and body built once (`SafeMesh.built`), and the next place's while a cracked door stands open (`SafeCracker._next_place`) | (CPU) a place change's longest desktop frame 13-21 ms → 11.5-12.7 | −25 to −50 ms off the frame the next safe slides in | Nothing; about 3 MB of RAM for all six places |
+| 4. Each place's room and body built once (`MeshBatch2D.built`), and the next place's while a cracked door stands open (`SafeCracker._next_place`) | (CPU) a place change's longest desktop frame 13-21 ms → 11.5-12.7 | −25 to −50 ms off the frame the next safe slides in | Nothing; about 3 MB of RAM for all six places |
 
 **After:** play 2.1-2.2 screens in every place (was 6.9-7.7), 2.7 with the alarm's wash, 3.6 with
 the door open (the vault and the warm spill) and 3.5-3.6 under the intro card (was 8.2). That

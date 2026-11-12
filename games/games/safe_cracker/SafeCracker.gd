@@ -6,7 +6,7 @@ extends Game
 ##
 ## Rules: `SafeLogic` (tested headless). Drawing (ART_BIBLE.md): `SafeBackdrop` (the room and
 ## its ambient life), `SafeBody` and `SafeDial` (the door's layers, `SafeDoor` the static door),
-## all shapes drawn in code and batched by `SafeMesh`. Audio: `SafeAudio`. This scene wires them to the framework:
+## all shapes drawn in code and batched by `MeshBatch2D`. Audio: `SafeAudio`. This scene wires them to the framework:
 ## declarations, the HUD widget and the game's banner (`SafeBanner`), scoring through award(), music and effects through
 ## AudioDirector, and the rider's options (place, hints, sound) through `GameOptions`.
 
@@ -51,6 +51,8 @@ var _door_tween: Tween
 var _slide_tween: Tween
 var _light_tween: Tween
 var _alarm_tween: Tween
+var _hints_hidden := false
+var _ticks_on := true
 var _wash: Node2D
 
 
@@ -125,10 +127,10 @@ func _ready() -> void:
 ## A red additive wash from the room's left, as if an alarm light came on: drawn once, shown and
 ## breathed by `_set_alarm` (+1 draw call while the alarm holds).
 static func _alarm_wash() -> Node2D:
-	var wash := SafeDial.Layer.new()
+	var wash := PaintLayer.new()
 	wash.name = "AlarmWash"
 	wash.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.glow(Vector2(-120, 520), Vector2(1100, 760), Color(1.0, 0.12, 0.08, 0.5), 14)
 		m.flush(ci)
 	var add := CanvasItemMaterial.new()
@@ -152,20 +154,35 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = SafeStatus.new(look)
 	hud.add_widget(_status)
+	_banner.follow(hud, _status)
 	hud.metrics.set_cadence_band(logic.cadence_min)
+	hud.metrics.set_power_source(smoothed_power)
+	_read_options()
 	AudioDirector.play_music(MUSIC_STYLE, SafeMusic.BPM)
 	AudioDirector.set_intensity(0.5)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, SafeAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, SafeAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(SafeAudioScript.music_effects(), SafeAudioScript.sfx_effects())
 	_update_status()
 
 
 func _on_option_changed(key: String, _value: String) -> void:
+	_read_options()
 	if key == "scene":
 		_next_place = -1
 		_place = _pick_place(-1)
 		_show_place()
+
+
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smoothed_power if logic and logic.smoothed_power >= 0.0 else InputBus.power
+
+
+## The rider's Hints and Sound options, read on prepare and on change (not from the file every
+## frame).
+func _read_options() -> void:
+	_hints_hidden = option("hints") == "hide"
+	_ticks_on = option("sound") == "on"
 
 
 func _pick_place(not_index: int) -> int:
@@ -189,8 +206,8 @@ func _on_frame(delta: float) -> void:
 	_apply_dial()
 	_update_status()
 	_set_alarm(logic.alarm_left > 0.0)
-	var hidden := logic.hidden or option("hints") == "hide"
-	if hidden and not logic.is_open() and logic.powered and option("sound") == "on":
+	var hidden := logic.hidden or _hints_hidden
+	if hidden and not logic.is_open() and logic.powered and _ticks_on:
 		_tick_left -= delta
 		var closeness := logic.closeness()
 		if closeness > 0.15 and _tick_left <= 0.0:
@@ -207,7 +224,7 @@ func _on_frame(delta: float) -> void:
 
 
 func _apply_dial() -> void:
-	var hidden := logic.hidden or option("hints") == "hide"
+	var hidden := logic.hidden or _hints_hidden
 	_dial.reading = logic.reading
 	_dial.target = logic.target()
 	_dial.tolerance = logic.tolerance
@@ -222,9 +239,9 @@ func _apply_dial() -> void:
 
 
 func _update_status() -> void:
-	var hidden := logic.hidden or option("hints") == "hide"
+	var hidden := logic.hidden or _hints_hidden
 	var cap := logic.power_cap
-	_status.set_state(logic.vault, logic.cracked, cap, cap > 0.0 and InputBus.power > cap,
+	_status.set_state(logic.vault, logic.cracked, cap, cap > 0.0 and smoothed_power() > cap,
 		"Follow the ticks" if hidden else "")
 
 

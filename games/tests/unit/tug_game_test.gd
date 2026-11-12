@@ -43,7 +43,7 @@ func test_the_lost_round_flash_tints_the_view_and_fades() -> void:
 func test_the_quality_step_shrinks_the_view() -> void:
 	var view: SubViewport = game.get_node("View3D")
 	var full := view.size
-	game.governor.tier = 1
-	game._set_render_scale(game.governor.render_scale(game.RENDER_SCALE))
+	game.view.governor.tier = 1
+	game.view.set_render_scale(game.view.governor.render_scale(game.RENDER_SCALE))
 	assert_int(view.size.x).is_less(full.x)
 	assert_int(view.size.x).is_equal(roundi(HudTheme.W * RenderScaleStep.LOW_SCALE))

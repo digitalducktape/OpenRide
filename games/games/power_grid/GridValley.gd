@@ -1,0 +1,908 @@
+class_name GridValley
+extends RefCounted
+## The valley town at dusk (#81; ART_BIBLE.md): one illustrated scene, drawn in code into a
+## `MeshBatch2D` batch (Safe Cracker's batcher, read only). `paint` draws everything that doesn't
+## move, twice: once in the dusk palette and once in the night palette, and `GridStage` bakes both
+## and blends them in one shader as the evening goes on. Every window, lamp and bulb sits dark in
+## the bake; `lights` lists the same layout for the additive light mesh (`GridLights`), so a
+## district coming on is one uniform, not a redraw.
+##
+## Depth, back to front: sky, far mountains, forested hills, the valley floor and the river, the
+## stadium, the funfair, the houses, the road and its lamps, the pylons, the near hillside. The
+## generator shed on the hillside is `GridShed`'s. Names are plain descriptions: nothing here
+## refers to any real town, fair, stadium or maker.
+
+const SIZE := Vector2(1920, 1080)
+## The scene is painted this far past each side of the stage (#57: the bike shows 68 px more each
+## side). Props stay on the 1920 stage.
+const BLEED := 160.0
+const WIDE := Vector2(SIZE.x + 2.0 * BLEED, SIZE.y)
+const LEFT := -BLEED
+const RIGHT := SIZE.x + BLEED
+
+const FLOOR_Y := 556.0  ## where the valley floor meets the hills
+const SUN := Vector2(1210, 470)  ## the sun's glow, behind the mountains
+## The far ridge's highest point: nothing tall stands under the HUD's side panels.
+const RIDGE_TOP := 352.0
+
+## The road, left to right: the southern edge of the town (cars and lamps are never hidden).
+const ROAD := [Vector2(-160, 960), Vector2(420, 950), Vector2(690, 912), Vector2(860, 884), Vector2(1060, 866), Vector2(1280, 860),
+	Vector2(1500, 868), Vector2(1760, 892), Vector2(2080, 932)]
+## The river's centre line and half width, from the far hills to the near bank.
+const RIVER := [[Vector2(1262, 556), 5.0], [Vector2(1306, 612), 9.0], [Vector2(1290, 680), 14.0], [Vector2(1344, 760), 21.0],
+	[Vector2(1332, 858), 32.0], [Vector2(1404, 930), 50.0], [Vector2(1490, 1010), 78.0], [Vector2(1570, 1100), 118.0]]
+const BRIDGE_AT := Vector2(1333, 860)
+
+## The pylons, near to far: [foot, height]. The first stands by the shed; they march down the
+## valley behind the town, smaller as they go.
+const PYLONS := [[Vector2(716, 880), 300.0], [Vector2(934, 690), 172.0], [Vector2(1268, 640), 124.0], [Vector2(1470, 620), 100.0],
+	[Vector2(1668, 604), 84.0]]
+const SHED_FEED := Vector2(624, 560)  ## where the line leaves the shed's gable
+## Each district's feeder: which pylon it leaves, and where it lands in the district.
+const FEEDERS := [[1, Vector2(836, 690)], [1, Vector2(1040, 856)], [2, Vector2(1160, 640)], [4, Vector2(1664, 690)]]
+
+const WHEEL_AT := Vector2(1150, 652)  ## the funfair's big wheel
+const WHEEL_R := 106.0
+const WHEEL_SPOKES := 12
+const STADIUM_AT := Vector2(1646, 772)
+const STADIUM_R := Vector2(226, 76)
+const MASTS := [Vector2(1442, 760), Vector2(1546, 714), Vector2(1746, 714), Vector2(1850, 760)]
+const MAST_H := 128.0
+const CAROUSEL_AT := Vector2(1062, 822)
+const TENTS := [[Vector2(1250, 800), 54.0, 0], [Vector2(1000, 742), 44.0, 1]]
+const CHURCH_AT := Vector2(806, 776)
+
+## [dusk, night] for every colour in the scene.
+const PALETTE := {
+	"sky_top": [Color("23306a"), Color("050a1e")],
+	"sky_mid": [Color("6a4f8f"), Color("0c1536")],
+	"sky_low": [Color("e07f72"), Color("1a2452")],
+	"horizon": [Color("ffc677"), Color("2f3a72")],
+	"sun": [Color(1.0, 0.86, 0.55, 0.85), Color(0.4, 0.5, 0.8, 0.0)],
+	"cloud": [Color("8a5f8c"), Color("131c40")],
+	"cloud_rim": [Color(1.0, 0.72, 0.5, 0.75), Color(0.4, 0.5, 0.75, 0.16)],
+	"far": [Color("8d6c9e"), Color("1a2148")],
+	"far_low": [Color("c98f8c"), Color("232c58")],
+	"snow": [Color("ffd9c0"), Color("56649a")],
+	"mid": [Color("5a4a7e"), Color("121838")],
+	"mid_low": [Color("80607f"), Color("182046")],
+	"hill": [Color("394560"), Color("0d1330")],
+	"hill_low": [Color("4c5868"), Color("111a38")],
+	"tree": [Color("2c3a4e"), Color("0a1028")],
+	"tree_hi": [Color("4a5f60"), Color("121a38")],
+	"floor": [Color("5e6c5c"), Color("141e34")],
+	"floor_low": [Color("46584e"), Color("0f182c")],
+	"field_a": [Color(0.62, 0.62, 0.38, 0.5), Color(0.12, 0.16, 0.26, 0.5)],
+	"field_b": [Color(0.32, 0.44, 0.34, 0.5), Color(0.06, 0.11, 0.2, 0.5)],
+	"hedge": [Color("2e4040"), Color("0b1226")],
+	"road": [Color("6d6068"), Color("20233a")],
+	"road_edge": [Color("8a7b78"), Color("2b2f4a")],
+	"river_far": [Color("ffc98e"), Color("2c3770")],
+	"river_near": [Color("8a6a96"), Color("111a40")],
+	"river_bank": [Color("3d4a48"), Color("0c1428")],
+	"wall_a": [Color("c9a78e"), Color("2c2f4c")],
+	"wall_b": [Color("b58f84"), Color("272a46")],
+	"wall_c": [Color("a8a39a"), Color("2a2f4a")],
+	"wall_shade": [Color("6d5868"), Color("171a32")],
+	"roof_a": [Color("7a4150"), Color("1c1a33")],
+	"roof_b": [Color("54506e"), Color("15172e")],
+	"roof_c": [Color("8a5a48"), Color("201c33")],
+	"roof_hi": [Color(1.0, 0.76, 0.55, 0.5), Color(0.5, 0.58, 0.8, 0.14)],
+	"glass": [Color("3a3a58"), Color("0c0e20")],
+	"stone": [Color("9a8a88"), Color("262a44")],
+	"stone_dark": [Color("665866"), Color("171a30")],
+	"steel": [Color("3a3648"), Color("0b0e20")],
+	"steel_hi": [Color("7a6a78"), Color("232a48")],
+	"wire": [Color(0.12, 0.1, 0.16, 0.85), Color(0.03, 0.04, 0.09, 0.9)],
+	"stand": [Color("6a5f70"), Color("181c34")],
+	"stand_lo": [Color("4a4358"), Color("11142a")],
+	"pitch": [Color("5e8058"), Color("14283a")],
+	"pitch_alt": [Color("6b8d60"), Color("183040")],
+	"line": [Color(0.95, 0.92, 0.85, 0.6), Color(0.5, 0.56, 0.7, 0.3)],
+	"tent_a": [Color("c0525c"), Color("2c1c38")],
+	"tent_b": [Color("e8d4b4"), Color("383a56")],
+	"tent_c": [Color("4d6d9a"), Color("1a2444")],
+	"yard": [Color("7c6a60"), Color("1a1c30")],
+	"near": [Color("35463f"), Color("0c1424")],
+	"near_low": [Color("212f30"), Color("070c18")],
+	"near_hi": [Color("6e7a50"), Color("182638")],
+	"grass": [Color("4e6248"), Color("101c2c")],
+	"grass_hi": [Color("8a8f58"), Color("1c2c3c")],
+	"fence": [Color("4a3c3c"), Color("0e101e")],
+	"vignette": [Color(0.09, 0.05, 0.14, 0.62), Color(0.01, 0.01, 0.05, 0.72)],
+}
+
+const NIGHT_LIFT := Color("3a4c86")
+
+static var _layout_cache := {}
+
+
+## The palette for a bake: `night` 0 is dusk, 1 is night.
+static func palette(night: int) -> Dictionary:
+	var out := {}
+	for key in PALETTE:
+		var col: Color = PALETTE[key][night]
+		# Moonlight lifts the whole night a little, so the land still reads under the lights.
+		out[key] = Color(col.lerp(NIGHT_LIFT, 0.13), col.a) if night == 1 else col
+	return out
+
+
+## The road's y at `x`, and points along it (shared by the lamps, the cars and the bake).
+static func road_y(x: float) -> float:
+	for k in ROAD.size() - 1:
+		var a: Vector2 = ROAD[k]
+		var b: Vector2 = ROAD[k + 1]
+		if x <= b.x:
+			return lerpf(a.y, b.y, smoothstep(a.x, b.x, x) * 0.5 + inverse_lerp(a.x, b.x, x) * 0.5)
+	return (ROAD[ROAD.size() - 1] as Vector2).y
+
+
+## Width of the road at `y`: it's nearer, so wider, toward the bottom of the frame.
+static func road_w(y: float) -> float:
+	return lerpf(16.0, 40.0, clampf((y - 860.0) / 100.0, 0.0, 1.0))
+
+
+## A pylon's top (the arm's centre).
+static func pylon_top(i: int) -> Vector2:
+	var p: Array = PYLONS[i]
+	return (p[0] as Vector2) - Vector2(0, float(p[1]))
+
+
+## The points of a wire from `a` to `b` sagging by `sag` px at the middle.
+static func catenary(a: Vector2, b: Vector2, sag: float, segs := 14) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for k in segs + 1:
+		var t := float(k) / segs
+		out.append(a.lerp(b, t) + Vector2(0, sag * 4.0 * t * (1.0 - t)))
+	return out
+
+
+## Every wire: {points, channel}: channel 0 is the trunk, 1-4 are the feeders of districts 0-3.
+static func wires() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var prev := SHED_FEED
+	for i in PYLONS.size():
+		var top := pylon_top(i)
+		var span := prev.distance_to(top)
+		for side in [-1.0, 1.0]:
+			var w: float = float(PYLONS[i][1]) * 0.15 * side
+			var from := prev + (Vector2(0, 0) if i == 0 else Vector2(float(PYLONS[i - 1][1]) * 0.15 * side, 0))
+			out.append({"points": catenary(from, top + Vector2(w, 0), span * 0.05), "channel": 0})
+		prev = top
+	for d in FEEDERS.size():
+		var from := pylon_top(int(FEEDERS[d][0])) + Vector2(0, 6)
+		var to: Vector2 = FEEDERS[d][1]
+		out.append({"points": catenary(from, to, from.distance_to(to) * 0.05, 10), "channel": d + 1})
+	return out
+
+
+## The houses, back row first: {at (foot centre), w, h, roof, wall, kind, windows: [Rect2]}.
+static func houses() -> Array:
+	if _layout_cache.has("houses"):
+		return _layout_cache.houses
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 81
+	var out := []
+	# Rows from the back of the town to the road, each a little larger and wider.
+	var rows := [[636.0, 790.0, 1020.0, 32.0], [664.0, 762.0, 1020.0, 38.0], [698.0, 738.0, 960.0, 46.0], [738.0, 716.0, 950.0, 54.0],
+		[784.0, 700.0, 960.0, 62.0], [836.0, 690.0, 980.0, 72.0]]
+	for row in rows:
+		var y: float = row[0]
+		var x: float = row[1] + rng.randf_range(0.0, 14.0)
+		var w0: float = row[3]
+		while x < row[2]:
+			var w := w0 * rng.randf_range(0.85, 1.2)
+			var front := rng.randf() < 0.55
+			var at := Vector2(x + w * 0.5, y + rng.randf_range(-3.0, 3.0))
+			x += w * rng.randf_range(1.1, 1.42)
+			if absf(at.x - CHURCH_AT.x - 8.0) < 86.0 and at.y > CHURCH_AT.y - 62.0 and at.y < CHURCH_AT.y + 8.0:
+				continue
+			var h := w * rng.randf_range(0.62, 0.82)
+			out.append({"at": at, "w": w, "h": h, "roof": w * rng.randf_range(0.42, 0.56), "front": front,
+				"wall": ["wall_a", "wall_b", "wall_c"][rng.randi_range(0, 2)],
+				"tile": ["roof_a", "roof_b", "roof_c"][rng.randi_range(0, 2)],
+				"windows": _windows(rng, at, w, h, front), "chimney": rng.randf() < 0.6, "flip": rng.randf() < 0.5})
+	_layout_cache.houses = out
+	return out
+
+
+static func _windows(rng: RandomNumberGenerator, at: Vector2, w: float, h: float, front: bool) -> Array:
+	var out := []
+	var ww := clampf(w * 0.17, 5.0, 12.0)
+	var wh := ww * 1.3
+	var floors := 2 if h > 30.0 else 1
+	var across := 2 if front else 3
+	for f in floors:
+		for k in across:
+			if f == 0 and k == across / 2 and h > 30.0:
+				continue  # the door
+			var cx := at.x + (float(k) + 0.5 - across * 0.5) * (w / across)
+			var cy := at.y - h * (0.28 + 0.44 * f)
+			out.append(Rect2(cx - ww * 0.5, cy - wh * 0.5, ww, wh))
+	return out
+
+
+## The farm on the near bank, right of the river: its windows light with the houses.
+static func cottages() -> Array:
+	if _layout_cache.has("cottages"):
+		return _layout_cache.cottages
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var out := []
+	for c in [[Vector2(1742, 1010), 118.0, 76.0, "wall_a", "roof_a", false], [Vector2(1860, 998), 84.0, 58.0, "wall_c", "roof_b", true]]:
+		var at: Vector2 = c[0]
+		out.append({"at": at, "w": c[1], "h": c[2], "roof": float(c[1]) * 0.44, "front": c[5], "wall": c[3], "tile": c[4],
+			"windows": _windows(rng, at, c[1], c[2], c[5]), "chimney": true, "flip": true})
+	_layout_cache.cottages = out
+	return out
+
+
+## The street lamps along the road, left to right.
+static func lamps() -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var x := 800.0
+	while x < 1880.0:
+		if absf(x - BRIDGE_AT.x) > 50.0:
+			out.append(Vector2(x, road_y(x)))
+		x += 84.0
+	return out
+
+
+## Everything that doesn't move, in the palette `night` (0 dusk, 1 night), stage coordinates.
+static func paint(m: MeshBatch2D, night: int) -> void:
+	var p := palette(night)
+	_sky(m, p)
+	_mountains(m, p)
+	_hills(m, p)
+	_floor(m, p)
+	_river(m, p)
+	_stadium(m, p)
+	_funfair(m, p)
+	_town(m, p)
+	_road(m, p)
+	_pylons(m, p)
+	_near(m, p)
+	_river(m, p, 884.0)  # the lower river runs over the near land's edge
+
+
+## The corners pulled in toward the town. Painted last, over the shed too.
+static func vignette(m: MeshBatch2D, night: int) -> void:
+	var col: Color = PALETTE.vignette[night]
+	var c := Vector2(1040, 640)
+	var inner := MeshBatch2D._ellipse(c, Vector2(1050, 500), 48)
+	var outer := MeshBatch2D._ellipse(c, Vector2(1900, 1160), 48)
+	m.band(inner, outer, Color(col, 0.0), col)
+
+
+# --- The sky ---
+
+static func _sky(m: MeshBatch2D, p: Dictionary) -> void:
+	m.rect_v(Rect2(LEFT, 0, WIDE.x, 230), p.sky_top, p.sky_mid)
+	m.rect_v(Rect2(LEFT, 230, WIDE.x, 170), p.sky_mid, p.sky_low)
+	m.rect_v(Rect2(LEFT, 400, WIDE.x, 190), p.sky_low, p.horizon)
+	var sun: Color = p.sun
+	m.glow(SUN, Vector2(980, 300), Color(sun, sun.a * 0.55), 16)
+	m.glow(SUN, Vector2(360, 170), sun, 14, 0.12)
+	# Long evening clouds, lit from below on the sun's side.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 12
+	for i in 9:
+		var at := Vector2(rng.randf_range(-100, 2000), rng.randf_range(250, 420))
+		var w := rng.randf_range(160, 420)
+		var h := rng.randf_range(7, 15)
+		_streak(m, at, w, h, p.cloud, p.cloud_rim)
+
+
+static func _streak(m: MeshBatch2D, at: Vector2, w: float, h: float, col: Color, rim: Color) -> void:
+	m.glow(at, Vector2(w, h * 1.5), Color(col, 0.7), 8, 0.35)
+	m.glow(at + Vector2(w * 0.15, h * 0.7), Vector2(w * 0.72, h * 0.6), rim, 6, 0.3)
+
+
+# --- The land ---
+
+## A ridge from sum-of-sines, top to `bottom`, shading from `top` to `low` down its face.
+static func _ridge(m: MeshBatch2D, crest: PackedVector2Array, bottom: float, top: Color, low: Color) -> void:
+	for k in crest.size() - 1:
+		var a := crest[k]
+		var b := crest[k + 1]
+		m.quad4(a, b, Vector2(b.x, bottom), Vector2(a.x, bottom), top, top, low, low)
+
+
+static func _mountains(m: MeshBatch2D, p: Dictionary) -> void:
+	# The far range: a few real peaks, lit on the sun's side, with snow on the tallest.
+	var peaks := [Vector2(LEFT, 470), Vector2(40, 430), Vector2(230, 470), Vector2(470, 400), Vector2(690, 462), Vector2(900, 372), Vector2(1040, 436),
+		Vector2(1160, 480), Vector2(1370, 402), Vector2(1560, 464), Vector2(1770, RIDGE_TOP + 22.0), Vector2(1950, 448), Vector2(RIGHT, 420)]
+	var crest := PackedVector2Array()
+	for k in peaks.size() - 1:
+		var a: Vector2 = peaks[k]
+		var b: Vector2 = peaks[k + 1]
+		for s in 8:
+			var t := s / 8.0
+			var y := lerpf(a.y, b.y, t) + sin(t * 9.0 + k * 2.0) * 7.0 * sin(t * PI) + sin(t * 23.0 + k) * 2.5 * sin(t * PI)
+			crest.append(Vector2(lerpf(a.x, b.x, t), y))
+	crest.append(peaks[peaks.size() - 1])
+	_ridge(m, crest, 590.0, p.far, p.far_low)
+	for peak in [peaks[3], peaks[5], peaks[8], peaks[10]]:
+		_snowcap(m, peak, p.snow, 46.0)
+		# The peak's shaded flank, away from the sun.
+		var side := -1.0 if peak.x < SUN.x else 1.0
+		m.quad4(peak, peak + Vector2(side * 130.0, 118.0), peak + Vector2(side * 40.0, 150.0), peak + Vector2(side * 6.0, 40.0),
+			Color(p.mid, 0.0), Color(p.mid, 0.0), Color(p.mid, 0.34), Color(p.mid, 0.3))
+	# The nearer range, in haze.
+	var near := PackedVector2Array()
+	var x := LEFT
+	while x <= RIGHT + 20.0:
+		near.append(Vector2(x, 508.0 - 30.0 * sin(x * 0.0031 + 1.0) - 16.0 * sin(x * 0.0087) - 6.0 * sin(x * 0.023)))
+		x += 20.0
+	_ridge(m, near, 600.0, p.mid, p.mid_low)
+
+
+static func _snowcap(m: MeshBatch2D, peak: Vector2, col: Color, size: float) -> void:
+	var s := PackedVector2Array([peak, peak + Vector2(size * 0.72, size * 0.74), peak + Vector2(size * 0.34, size * 0.52), peak + Vector2(size * 0.12, size * 0.8),
+		peak + Vector2(-size * 0.2, size * 0.5), peak + Vector2(-size * 0.42, size * 0.76), peak + Vector2(-size * 0.74, size * 0.72)])
+	# Convex pieces: a fan from the peak.
+	for k in range(1, s.size() - 1):
+		m.fill(PackedVector2Array([s[0], s[k], s[k + 1]]), Color(col, 0.82), false)
+
+
+## The forested hills behind the town: a crest of tree tops, two depths.
+static func _hills(m: MeshBatch2D, p: Dictionary) -> void:
+	var crest := PackedVector2Array()
+	var x := LEFT
+	while x <= RIGHT + 16.0:
+		crest.append(Vector2(x, _hill_y(x)))
+		x += 16.0
+	_ridge(m, crest, FLOOR_Y + 40.0, p.hill, p.hill_low)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 33
+	# Trees along the crest and down the face, darker at the crest.
+	for i in 520:
+		var tx := rng.randf_range(LEFT, RIGHT)
+		var top := _hill_y(tx)
+		var ty := lerpf(top + 2.0, FLOOR_Y + 8.0, pow(rng.randf(), 1.6))
+		var r := lerpf(7.0, 12.0, clampf((ty - top) / 50.0, 0.0, 1.0)) * rng.randf_range(0.8, 1.25)
+		m.circle(Vector2(tx, ty), r, p.tree, false)
+		m.circle(Vector2(tx + r * 0.3, ty - r * 0.3), r * 0.55, Color(p.tree_hi, 0.5), false)
+
+
+static func _hill_y(x: float) -> float:
+	return 524.0 - 22.0 * sin(x * 0.0042 + 2.2) - 10.0 * sin(x * 0.011 + 0.4)
+
+
+static func _floor(m: MeshBatch2D, p: Dictionary) -> void:
+	m.rect_v(Rect2(LEFT, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), p.floor, p.floor_low)
+	# Fields in perspective: strips of two tints running across the valley, hedged.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var y := FLOOR_Y + 2.0
+	while y < 880.0:
+		var h := lerpf(8.0, 52.0, (y - FLOOR_Y) / 320.0)
+		var xx := LEFT - rng.randf_range(0, 200)
+		while xx < RIGHT:
+			var w := rng.randf_range(160, 420) * lerpf(0.7, 1.6, (y - FLOOR_Y) / 320.0)
+			var tint: Color = p.field_a if rng.randf() < 0.45 else p.field_b
+			var lean := rng.randf_range(-24.0, 24.0)
+			m.quad(Vector2(xx + lean, y), Vector2(xx + w + lean, y), Vector2(xx + w, y + h), Vector2(xx, y + h), Color(tint, tint.a * rng.randf_range(0.2, 0.8)))
+			if rng.randf() < 0.6:
+				m.line(Vector2(xx + w + lean, y), Vector2(xx + w, y + h), 2.0, Color(p.hedge, 0.45))
+			xx += w
+		y += h
+	# Hedgerow trees dotted along the field lines, right of the river especially.
+	for copse in 11:
+		var c := Vector2(rng.randf_range(1370, RIGHT), rng.randf_range(FLOOR_Y + 10.0, 660.0))
+		for i in 6:
+			var at := c + Vector2(rng.randf_range(-34, 34), rng.randf_range(-7, 7))
+			var r := lerpf(5.0, 11.0, (at.y - FLOOR_Y) / 110.0) * rng.randf_range(0.8, 1.2)
+			m.circle(at, r, Color(p.tree, 0.9), false)
+			m.circle(at + Vector2(r * 0.3, -r * 0.3), r * 0.5, Color(p.tree_hi, 0.4), false)
+
+
+## The river's two banks at `k`, for the bake and the shimmer mesh.
+static func river_edges() -> Array[PackedVector2Array]:
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for k in RIVER.size() - 1:
+		var a: Array = RIVER[k]
+		var b: Array = RIVER[k + 1]
+		for s in 6:
+			var t := s / 6.0
+			var e := t * t * (3.0 - 2.0 * t)
+			var c := (a[0] as Vector2).lerp(b[0], e)
+			var w: float = lerpf(a[1], b[1], t)
+			left.append(c - Vector2(w, 0))
+			right.append(c + Vector2(w, 0))
+	var last: Array = RIVER[RIVER.size() - 1]
+	left.append((last[0] as Vector2) - Vector2(last[1], 0))
+	right.append((last[0] as Vector2) + Vector2(last[1], 0))
+	return [left, right]
+
+
+static func _river(m: MeshBatch2D, p: Dictionary, from_y := 0.0) -> void:
+	var edges := river_edges()
+	var left: PackedVector2Array = edges[0]
+	var right: PackedVector2Array = edges[1]
+	var y0 := left[0].y
+	var y1 := left[left.size() - 1].y
+	for k in left.size() - 1:
+		if left[k].y < from_y:
+			continue
+		var ca: Color = (p.river_far as Color).lerp(p.river_near, pow(inverse_lerp(y0, y1, left[k].y), 0.6))
+		var cb: Color = (p.river_far as Color).lerp(p.river_near, pow(inverse_lerp(y0, y1, left[k + 1].y), 0.6))
+		var bank := Vector2(lerpf(1.5, 7.0, inverse_lerp(y0, y1, left[k].y)), 0)
+		m.quad4(left[k] - bank, right[k] + bank, right[k + 1] + bank, left[k + 1] - bank, p.river_bank, p.river_bank, p.river_bank, p.river_bank)
+		m.quad4(left[k], right[k], right[k + 1], left[k + 1], ca, ca, cb, cb)
+
+
+static func _stadium(m: MeshBatch2D, p: Dictionary) -> void:
+	var c := STADIUM_AT
+	var r := STADIUM_R
+	m.glow(c + Vector2(0, r.y + 6.0), Vector2(r.x * 1.1, 16.0), Color(0, 0, 0, 0.32), 6)
+	# The outer wall, the stands stepping down, the pitch.
+	var wall := MeshBatch2D._ellipse(c + Vector2(0, 12), r, 56)
+	m.fill(wall, p.stand_lo)
+	m.fill(MeshBatch2D._ellipse(c, r, 56), p.stand)
+	# Tiers: rings of slightly different value, with aisles.
+	for k in 5:
+		var t := float(k) / 5.0
+		var ring := r * lerpf(1.0, 0.68, t)
+		var inner := r * lerpf(1.0, 0.68, t + 0.2)
+		m.band(MeshBatch2D._ellipse(c, inner, 56), MeshBatch2D._ellipse(c, ring, 56), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15))
+	for k in 20:
+		var a := TAU * k / 20.0
+		m.line(c + Vector2(cos(a), sin(a)) * r * 0.68, c + Vector2(cos(a), sin(a)) * r * 0.98, 1.5, Color(p.stand_lo, 0.6))
+	var pitch := r * 0.66
+	m.fill(MeshBatch2D._ellipse(c, pitch, 48), p.pitch)
+	for k in 8:
+		if k % 2 == 0:
+			var x0 := c.x - pitch.x * 0.8 + k * pitch.x * 0.2
+			var hh := pitch.y * 0.82
+			m.quad(Vector2(x0 + 4, c.y - hh), Vector2(x0 + pitch.x * 0.2 + 4, c.y - hh), Vector2(x0 + pitch.x * 0.2 - 4, c.y + hh), Vector2(x0 - 4, c.y + hh), Color(p.pitch_alt, 0.8))
+	var field := Vector2(pitch.x * 0.76, pitch.y * 0.72)
+	m.line(c + Vector2(-field.x, -field.y), c + Vector2(field.x, -field.y), 1.5, p.line)
+	m.line(c + Vector2(-field.x - 6, field.y), c + Vector2(field.x + 6, field.y), 1.5, p.line)
+	m.line(c + Vector2(-field.x, -field.y), c + Vector2(-field.x - 6, field.y), 1.5, p.line)
+	m.line(c + Vector2(field.x, -field.y), c + Vector2(field.x + 6, field.y), 1.5, p.line)
+	m.line(c + Vector2(0, -field.y), c + Vector2(0, field.y), 1.5, p.line)
+	m.ring(c, 12.0, 13.5, p.line)
+	# The floodlight masts, each with its bank of lamps.
+	for at in MASTS:
+		var top: Vector2 = at + Vector2(0, -MAST_H)
+		m.line(at, top, 4.0, p.steel)
+		m.line(at + Vector2(-5, 0), top + Vector2(0, 30), 2.0, p.steel)
+		m.line(at + Vector2(5, 0), top + Vector2(0, 30), 2.0, p.steel)
+		m.round_rect(Rect2(top + Vector2(-17, -11), Vector2(34, 18)), 2.0, p.steel_hi, p.steel)
+
+
+static func _funfair(m: MeshBatch2D, p: Dictionary) -> void:
+	# The yard, then the wheel's stand (the wheel itself turns in its own layer).
+	var yard := PackedVector2Array([Vector2(976, 740), Vector2(1296, 740), Vector2(1300, 850), Vector2(960, 852)])
+	m.fill(yard, Color(p.yard, 0.75))
+	var hub := WHEEL_AT
+	var foot_y := hub.y + WHEEL_R + 22.0
+	for side in [-1.0, 1.0]:
+		m.line(hub, Vector2(hub.x + side * 70.0, foot_y), 8.0, p.steel)
+		m.line(hub + Vector2(side * 36.0, 70.0), hub + Vector2(-side * 36.0, 70.0), 3.0, p.steel)
+	m.round_rect(Rect2(hub.x - 88, foot_y - 3, 176, 10), 3.0, p.steel_hi, p.steel)
+	for t in TENTS:
+		_tent(m, t[0], t[1], p, int(t[2]))
+	_carousel(m, p)
+	# Stalls along the road side of the yard: striped awnings.
+	for k in 4:
+		var at := stall_at(k)
+		m.rect(Rect2(at + Vector2(-20, -18), Vector2(40, 20)), p.stone_dark)
+		for s in 4:
+			m.quad(at + Vector2(-24 + s * 12, -32), at + Vector2(-12 + s * 12, -32), at + Vector2(-11 + s * 12, -17), at + Vector2(-25 + s * 12, -17),
+				p.tent_a if s % 2 == 0 else p.tent_b)
+
+
+## A stall's foot.
+static func stall_at(k: int) -> Vector2:
+	return Vector2(1140 + k * 52.0, 846.0)
+
+
+## A striped tent: a pointed roof over a short drum.
+static func _tent(m: MeshBatch2D, foot: Vector2, w: float, p: Dictionary, style: int) -> void:
+	var h := w * 0.6
+	var roof := w * 0.86
+	var a: Color = p.tent_a if style == 0 else p.tent_c
+	var b: Color = p.tent_b
+	m.rect_v(Rect2(foot.x - w, foot.y - h, 2.0 * w, h), (b as Color).darkened(0.12), (b as Color).darkened(0.34))
+	var apex := foot + Vector2(0, -h - roof)
+	for k in 6:
+		var x0 := foot.x - w - 4.0 + k * ((2.0 * w + 8.0) / 6.0)
+		var x1 := x0 + (2.0 * w + 8.0) / 6.0
+		m.fill(PackedVector2Array([apex, Vector2(x1, foot.y - h), Vector2(x0, foot.y - h)]), a if k % 2 == 0 else b, false)
+	m.fill(PackedVector2Array([apex, Vector2(foot.x + w + 4.0, foot.y - h), foot + Vector2(0, -h - roof * 0.12)]), Color(0, 0, 0, 0.14), false)
+	m.line(apex, apex + Vector2(0, -9), 2.0, p.steel)
+	m.fill(PackedVector2Array([apex + Vector2(0, -9), apex + Vector2(12, -6), apex + Vector2(0, -3)]), a, false)
+	m.round_rect(Rect2(foot.x - w * 0.24, foot.y - h * 0.8, w * 0.48, h * 0.8), 3.0, p.glass)
+
+
+static func _carousel(m: MeshBatch2D, p: Dictionary) -> void:
+	var c := CAROUSEL_AT
+	m.fill(MeshBatch2D._ellipse(c + Vector2(0, 8), Vector2(58, 13), 28), p.stone_dark)
+	m.fill(MeshBatch2D._ellipse(c + Vector2(0, 3), Vector2(55, 12), 28), p.stone)
+	for k in 8:
+		var x := c.x - 49.0 + k * 14.0
+		m.line(Vector2(x, c.y - 42), Vector2(x, c.y + 5), 2.0, p.steel_hi)
+	m.rect_v(Rect2(c.x - 50, c.y - 44, 100, 42), Color(p.glass, 0.7), Color(p.glass, 0.9))
+	var apex := c + Vector2(0, -76)
+	for k in 8:
+		var x0 := c.x - 58.0 + k * 14.5
+		m.fill(PackedVector2Array([apex, Vector2(x0 + 14.5, c.y - 44), Vector2(x0, c.y - 44)]), p.tent_a if k % 2 == 0 else p.tent_b, false)
+	m.rect_v(Rect2(c.x - 60, c.y - 48, 120, 9), p.tent_b, (p.tent_b as Color).darkened(0.3))
+	m.line(apex, apex + Vector2(0, -11), 2.0, p.steel)
+
+
+static func _town(m: MeshBatch2D, p: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	var drawn_church := false
+	for h in houses():
+		if not drawn_church and (h.at as Vector2).y >= CHURCH_AT.y:
+			_church(m, p)
+			drawn_church = true
+		if rng.randf() < 0.32:
+			var tx: float = (h.at as Vector2).x + float(h.w) * 0.72
+			var ty: float = (h.at as Vector2).y - 3.0
+			var r: float = float(h.w) * 0.32
+			m.circle(Vector2(tx, ty - r), r, p.tree, false)
+			m.circle(Vector2(tx + r * 0.3, ty - r * 1.3), r * 0.55, Color(p.tree_hi, 0.55), false)
+		_house(m, h, p)
+
+
+static func _house(m: MeshBatch2D, h: Dictionary, p: Dictionary) -> void:
+	var at: Vector2 = h.at
+	var w: float = h.w
+	var ht: float = h.h
+	var roof: float = h.roof
+	var wall: Color = p[h.wall]
+	var shade: Color = p.wall_shade
+	var tile: Color = p[h.tile]
+	var hi: Color = p.roof_hi
+	m.glow(at + Vector2(w * 0.08, 1), Vector2(w * 0.68, 5.0), Color(0, 0, 0, 0.28), 4)
+	# Sun from the right: the wall is lit toward it.
+	m.quad4(at + Vector2(-w * 0.5, -ht), at + Vector2(w * 0.5, -ht), at + Vector2(w * 0.5, 0), at + Vector2(-w * 0.5, 0),
+		wall.lerp(shade, 0.35), wall, wall.lerp(shade, 0.25), wall.lerp(shade, 0.15))
+	if h.chimney:
+		var cx: float = at.x + w * (0.26 if h.flip else -0.26)
+		m.rect(Rect2(cx - w * 0.05, at.y - ht - roof * 0.92, w * 0.11, roof * 0.7), p.stone_dark)
+		m.rect(Rect2(cx - w * 0.07, at.y - ht - roof * 0.96, w * 0.15, 3.0), p.stone)
+	if h.front:
+		# The gable faces us: a triangle of wall under two roof slopes.
+		var apex := at + Vector2(0, -ht - roof)
+		var el := at + Vector2(-w * 0.5, -ht)
+		var er := at + Vector2(w * 0.5, -ht)
+		m.fill(PackedVector2Array([apex, er, el]), wall.lerp(shade, 0.12), false)
+		var over := w * 0.08
+		var thick := maxf(w * 0.09, 3.0)
+		m.line(apex, el + Vector2(-over, over * 0.8), thick, tile)
+		m.line(apex, er + Vector2(over, over * 0.8), thick, tile.lerp(hi, hi.a))
+	else:
+		# The long side faces us: a roof slope.
+		var a := at + Vector2(-w * 0.56, -ht + 1.0)
+		var b := at + Vector2(w * 0.56, -ht + 1.0)
+		var c := at + Vector2(w * 0.42, -ht - roof * 0.9)
+		var d := at + Vector2(-w * 0.42, -ht - roof * 0.9)
+		m.quad4(d, c, b, a, tile.lerp(hi, hi.a * 0.5), tile.lerp(hi, hi.a), tile.darkened(0.15), tile.darkened(0.1))
+		m.line(d, c, 1.5, Color(hi, hi.a * 0.9))
+	for r: Rect2 in h.windows:
+		m.rect(r, p.glass)
+		m.rect(Rect2(r.position + Vector2(-1, r.size.y), Vector2(r.size.x + 2, 1.5)), Color(p.stone, 0.8))
+	if ht > 30.0:
+		m.rect(Rect2(at.x - w * 0.06, at.y - ht * 0.36, w * 0.12, ht * 0.36), tile.darkened(0.3))
+
+
+static func _church(m: MeshBatch2D, p: Dictionary) -> void:
+	var c := CHURCH_AT
+	var wall: Color = p.stone
+	var shade: Color = p.stone_dark
+	# The nave, then the tower with its pointed spire.
+	m.quad4(c + Vector2(-8, -46), c + Vector2(64, -46), c + Vector2(64, 0), c + Vector2(-8, 0), shade, wall, shade, wall)
+	m.fill(PackedVector2Array([c + Vector2(-12, -44), c + Vector2(4, -74), c + Vector2(68, -74), c + Vector2(72, -44)]), p.roof_b, false)
+	m.line(c + Vector2(4, -74), c + Vector2(68, -74), 1.5, p.roof_hi)
+	m.quad4(c + Vector2(-44, -84), c + Vector2(-8, -84), c + Vector2(-8, 0), c + Vector2(-44, 0), shade, wall, shade, wall.lerp(shade, 0.3))
+	m.fill(PackedVector2Array([c + Vector2(-26, -148), c + Vector2(-4, -84), c + Vector2(-48, -84)]), p.roof_b, false)
+	m.fill(PackedVector2Array([c + Vector2(-26, -148), c + Vector2(-4, -84), c + Vector2(-24, -84)]), Color(p.roof_hi, 0.4), false)
+	m.line(c + Vector2(-26, -148), c + Vector2(-26, -158), 1.5, p.steel_hi)
+	m.line(c + Vector2(-31, -154), c + Vector2(-21, -154), 1.5, p.steel_hi)
+	for r: Rect2 in church_windows():
+		m.round_rect(r, 3.0, p.glass)
+
+
+static func church_windows() -> Array[Rect2]:
+	var c := CHURCH_AT
+	var out: Array[Rect2] = [Rect2(c + Vector2(-33, -72), Vector2(14, 22))]
+	for k in 4:
+		out.append(Rect2(c + Vector2(4 + k * 15, -36), Vector2(8, 20)))
+	return out
+
+
+static func _road(m: MeshBatch2D, p: Dictionary) -> void:
+	var x := LEFT
+	while x < RIGHT:
+		var x2 := x + 12.0
+		var y0 := road_y(x)
+		var y1 := road_y(x2)
+		var w0 := road_w(y0)
+		var w1 := road_w(y1)
+		m.quad(Vector2(x, y0 - w0 * 0.5 - 2.0), Vector2(x2, y1 - w1 * 0.5 - 2.0), Vector2(x2, y1 + w1 * 0.5 + 2.0), Vector2(x, y0 + w0 * 0.5 + 2.0), p.road_edge)
+		m.quad(Vector2(x, y0 - w0 * 0.5), Vector2(x2, y1 - w1 * 0.5), Vector2(x2, y1 + w1 * 0.5), Vector2(x, y0 + w0 * 0.5), p.road)
+		x = x2
+	# Dashes down the middle.
+	x = 700.0
+	while x < 1880.0:
+		var a := Vector2(x, road_y(x))
+		var b := Vector2(x + 14.0, road_y(x + 14.0))
+		m.line(a, b, 1.5, Color(p.line, (p.line as Color).a * 0.6))
+		x += 34.0
+	_bridge(m, p)
+	# Lamp posts on the south verge (their heads light in the light mesh).
+	for at in lamps():
+		var foot: Vector2 = at + Vector2(0, road_w(at.y) * 0.5 + 3.0)
+		var h := lerpf(38.0, 52.0, clampf((at.y - 860.0) / 90.0, 0.0, 1.0))
+		m.line(foot, foot + Vector2(0, -h), 3.0, p.steel)
+		m.line(foot + Vector2(0, -h), foot + Vector2(-8, -h - 2.0), 2.0, p.steel)
+		m.circle(foot + Vector2(-8, -h - 1.0), 2.6, p.steel_hi)
+
+
+static func lamp_head(at: Vector2) -> Vector2:
+	var foot: Vector2 = at + Vector2(0, road_w(at.y) * 0.5 + 3.0)
+	var h := lerpf(38.0, 52.0, clampf((at.y - 860.0) / 90.0, 0.0, 1.0))
+	return foot + Vector2(-8, -h - 1.0)
+
+
+## A stone road bridge over the river: a parapet and three low arches.
+static func _bridge(m: MeshBatch2D, p: Dictionary) -> void:
+	var c := BRIDGE_AT
+	var w := 74.0
+	var water := c.y + 34.0
+	m.rect_v(Rect2(c.x - w, c.y + 6, 2.0 * w, 28), p.stone, p.stone_dark)
+	# Three low arches: half ellipses down to the water, dark under the stone.
+	for k in 3:
+		var ax := c.x + (k - 1) * 46.0
+		var arch := MeshBatch2D.arc_points(Vector2(ax, water), 19.0, PI, TAU, 14)
+		m.fill(arch, Color(p.river_bank, 0.95), false)
+	m.rect(Rect2(c.x - w - 4, c.y + 3, 2.0 * w + 8, 5), p.stone)
+	m.rect(Rect2(c.x - w, c.y - 9, 2.0 * w, 3), Color(p.stone, 0.9))
+	for k in 7:
+		m.rect(Rect2(c.x - w + k * (2.0 * w - 4.0) / 6.0, c.y - 9, 4, 12), Color(p.stone_dark, 0.9))
+
+
+static func _pylons(m: MeshBatch2D, p: Dictionary) -> void:
+	for i in range(PYLONS.size() - 1, -1, -1):
+		_pylon(m, PYLONS[i][0], float(PYLONS[i][1]), p, 1.0 + 1.4 * float(PYLONS[i][1]) / 262.0)
+	for wire in wires():
+		var pts: PackedVector2Array = wire.points
+		for k in pts.size() - 1:
+			m.line(pts[k], pts[k + 1], 2.0, p.wire)
+
+
+## A lattice tower: splayed legs, cross braces, three arms that taper to a point at the top.
+static func _pylon(m: MeshBatch2D, foot: Vector2, h: float, p: Dictionary, w: float) -> void:
+	var steel: Color = p.steel
+	var base := h * 0.17
+	var waist := h * 0.05
+	var top := foot + Vector2(0, -h)
+	var neck := foot + Vector2(0, -h * 0.72)
+	var ll := foot + Vector2(-base, 0)
+	var lr := foot + Vector2(base, 0)
+	var nl := neck + Vector2(-waist, 0)
+	var nr := neck + Vector2(waist, 0)
+	m.line(ll, nl, w * 1.5, steel)
+	m.line(lr, nr, w * 1.5, steel)
+	m.line(nl, top, w * 1.3, steel)
+	m.line(nr, top, w * 1.3, steel)
+	var bays := 5
+	for k in bays:
+		var t0 := float(k) / bays
+		var t1 := float(k + 1) / bays
+		var a := ll.lerp(nl, t0)
+		var b := lr.lerp(nr, t0)
+		var c := ll.lerp(nl, t1)
+		var d := lr.lerp(nr, t1)
+		m.line(a, d, w * 0.7, steel)
+		m.line(b, c, w * 0.7, steel)
+		m.line(c, d, w * 0.8, steel)
+	# The arms: wider at the bottom; insulators hang from their tips.
+	for k in 2:
+		var y := lerpf(0.0, h * 0.13, float(k))
+		var reach := h * (0.15 if k == 0 else 0.19)
+		var at := top + Vector2(0, y + h * 0.03)
+		m.line(at + Vector2(-reach, 0), at + Vector2(reach, 0), w * 1.1, steel)
+		m.line(at + Vector2(-reach, 0), at + Vector2(0, -h * 0.05), w * 0.7, steel)
+		m.line(at + Vector2(reach, 0), at + Vector2(0, -h * 0.05), w * 0.7, steel)
+	m.line(nr + Vector2(0, h * 0.06), nr + Vector2(0, -h * 0.02), w * 0.8, p.steel_hi)
+
+
+## The near land: the hill the shed stands on, the right bank, the foreground.
+static func _near(m: MeshBatch2D, p: Dictionary) -> void:
+	# The right bank: a low swell of meadow under the road's far end.
+	var right_bank := PackedVector2Array()
+	var x := 1380.0
+	while x <= RIGHT + 20.0:
+		right_bank.append(Vector2(x, 926.0 + 16.0 * sin(x * 0.006) + 4.0 * sin(x * 0.02)))
+		x += 20.0
+	_ridge(m, right_bank, SIZE.y, p.near, p.near_low)
+	# The shed's hill, from behind the left edge down to the road, then along the bottom.
+	var crest := PackedVector2Array()
+	x = LEFT
+	while x <= 1520.0:
+		crest.append(Vector2(x, near_y(x)))
+		x += 16.0
+	_ridge(m, crest, SIZE.y, p.near, p.near_low)
+	for k in crest.size() - 1:
+		m.line(crest[k], crest[k + 1], 3.0, Color(p.near_hi, 0.45))
+	# Mown tufts and a rail fence running down the hill.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	for i in 420:
+		var tx := rng.randf_range(LEFT, RIGHT)
+		var top := near_y(tx) if tx <= 1400.0 else 945.0
+		var ty := rng.randf_range(top + 6.0, SIZE.y)
+		if absf(tx - 1400.0 - (ty - 900.0) * 0.8) < 150.0:
+			continue
+		var hh := lerpf(5.0, 18.0, (ty - 860.0) / 220.0)
+		var col: Color = p.grass if i % 3 else p.grass_hi
+		for blade in 3:
+			m.line(Vector2(tx + blade * 3, ty), Vector2(tx + blade * 3 + rng.randf_range(-3, 3), ty - hh * rng.randf_range(0.6, 1.0)), 2.0, Color(col, 0.7))
+	for h in cottages():
+		for t in [Vector2(-0.82, -0.6), Vector2(-0.62, -0.95), Vector2(-0.98, -1.05), Vector2(-0.74, -1.3)]:
+			var c: Vector2 = (h.at as Vector2) + Vector2(t.x * float(h.w), t.y * float(h.h))
+			m.circle(c, float(h.w) * 0.24, p.tree, false)
+			m.circle(c + Vector2(6, -6), float(h.w) * 0.11, Color(p.tree_hi, 0.45), false)
+		_house(m, h, p)
+	# The fence down the hill.
+	var post := 760.0
+	while post < 1240.0:
+		var y := near_y(post)
+		m.line(Vector2(post, y + 16.0), Vector2(post, y - 8.0), 4.0, p.fence)
+		var y2 := near_y(post + 72.0)
+		m.line(Vector2(post, y - 3.0), Vector2(post + 72.0, y2 - 3.0), 2.5, p.fence)
+		m.line(Vector2(post, y + 6.0), Vector2(post + 72.0, y2 + 6.0), 2.5, p.fence)
+		post += 72.0
+
+
+## The near hill's crest: high under the shed, down to the bottom of the frame by the river.
+static func near_y(x: float) -> float:
+	if x < 640.0:
+		return 886.0 + 8.0 * sin(x * 0.012)
+	var t := clampf((x - 640.0) / 860.0, 0.0, 1.0)
+	return lerpf(886.0 + 8.0 * sin(640.0 * 0.012), 1040.0, t * t * (3.0 - 2.0 * t) * 0.3 + t * 0.7) + 5.0 * sin(x * 0.017)
+
+
+## Every light in the town (`m` is a `GridLights`), each on its district's channel.
+static func lights(m: GridLights) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	_house_lights(m, rng)
+	_lamp_lights(m)
+	_fair_lights(m, rng)
+	_stadium_lights(m, rng)
+	# The river catches the lit town, in long soft columns.
+	for at in [[Vector2(1344, 790), 2, Color(1.0, 0.55, 0.4)], [Vector2(1296, 716), 2, Color(1.0, 0.7, 0.4)]]:
+		m.glow(at[0], Vector2(18, 60), Color(at[2], 0.6), at[1], 0.1, 0.3)
+	for at: Vector2 in [Vector2(1366, 920), Vector2(1430, 976)]:
+		m.glow(at, Vector2(36, 64), Color(1.0, 0.86, 0.6, 0.42), 1, 0.4, 0.3)
+	m.glow(Vector2(1500, 1040), Vector2(100, 80), Color(0.82, 0.9, 1.0, 0.34), 3, 0.2, 0.3)
+
+
+static func _house_lights(m: GridLights, rng: RandomNumberGenerator) -> void:
+	var warm := [Color(1.0, 0.82, 0.48), Color(1.0, 0.72, 0.4), Color(1.0, 0.9, 0.66)]
+	for h in houses():
+		for r: Rect2 in h.windows:
+			if rng.randf() < 0.14:
+				continue  # somebody's out
+			var th := rng.randf_range(0.04, 0.96)
+			var col: Color = warm[rng.randi_range(0, 2)]
+			_panes(m, r, col, th, rng.randf())
+			m.glow(r.get_center(), r.size * 3.2, Color(col, 0.34), 0, th, rng.randf())
+	for h in cottages():
+		for r: Rect2 in h.windows:
+			_panes(m, r, warm[0], 0.3, 0.2)
+			m.glow(r.get_center(), r.size * 3.2, Color(warm[0], 0.34), 0, 0.3, 0.2)
+	for r: Rect2 in church_windows():
+		m.rect(r, Color(1.0, 0.7, 0.42, 0.9), 0, 0.5, 0.5)
+		m.glow(r.get_center(), r.size * 2.0, Color(1.0, 0.6, 0.4, 0.24), 0, 0.5, 0.5)
+
+
+## A window: two lit panes with a bar between, once it's big enough to show one.
+static func _panes(m: GridLights, r: Rect2, col: Color, th: float, seed_value: float) -> void:
+	if r.size.x < 8.0:
+		m.rect(r, Color(col, 0.95), 0, th, seed_value)
+		return
+	var half := (r.size.x - 1.5) * 0.5
+	m.rect(Rect2(r.position, Vector2(half, r.size.y)), Color(col, 0.95), 0, th, seed_value)
+	m.rect(Rect2(r.position + Vector2(half + 1.5, 0), Vector2(half, r.size.y)), Color(col, 0.95), 0, th, seed_value)
+
+
+static func _lamp_lights(m: GridLights) -> void:
+	var list := lamps()
+	for i in list.size():
+		var at: Vector2 = list[i]
+		var th := float(i) / list.size() * 0.9 + 0.04  # a wave along the road, left to right
+		var head := lamp_head(at)
+		var col := Color(1.0, 0.8, 0.46)
+		m.glow(head, Vector2(4.5, 4.5), Color(1, 0.96, 0.82, 1.0), 1, th, 0.0)
+		m.glow(head, Vector2(26, 26), Color(col, 0.42), 1, th, 0.0)
+		m.glow(at + Vector2(-8, 3), Vector2(48, 13), Color(col, 0.34), 1, th, 0.0)
+
+
+static func _fair_lights(m: GridLights, rng: RandomNumberGenerator) -> void:
+	# Bulb strings from the wheel's foot out over the yard, the carousel's crown, the tents' doors.
+	var strings := [[Vector2(1000, 680), Vector2(1062, 746)], [Vector2(1062, 746), Vector2(1150, 770)], [Vector2(1150, 770), Vector2(1250, 716)],
+		[Vector2(1250, 716), Vector2(1296, 774)]]
+	var colors := [Color(1.0, 0.42, 0.5), Color(1.0, 0.84, 0.42), Color(0.5, 0.86, 1.0), Color(0.72, 1.0, 0.56)]
+	var n := 0
+	for s in strings:
+		var pts := catenary(s[0], s[1], 14.0, 9)
+		for pt in pts:
+			m.bulb(pt, 4.2, colors[n % 4], 2, rng.randf_range(0.05, 0.95), 2.0 + float(n % 4) * 0.25)
+			n += 1
+	var c := CAROUSEL_AT
+	for k in 13:
+		var x := c.x - 58.0 + k * 9.7
+		m.bulb(Vector2(x, c.y - 44.0), 3.8, colors[k % 4], 2, rng.randf_range(0.05, 0.95), 2.0 + float(k % 4) * 0.25)
+	m.glow(c + Vector2(0, -18), Vector2(96, 60), Color(1.0, 0.7, 0.45, 0.5), 2, 0.3, 0.1)
+	m.glow(Vector2(1120, 800), Vector2(230, 90), Color(1.0, 0.45, 0.5, 0.26), 2, 0.2, 0.1)
+	m.rect(Rect2(c.x - 49, c.y - 40, 98, 36), Color(1.0, 0.72, 0.42, 0.34), 2, 0.3, 0.1)
+	for k in 4:
+		var at := stall_at(k)
+		m.rect(Rect2(at + Vector2(-18, -16), Vector2(36, 16)), Color(1.0, 0.8, 0.5, 0.9), 2, 0.2 + k * 0.2, 0.3)
+		m.glow(at + Vector2(0, -4), Vector2(38, 24), Color(1.0, 0.7, 0.42, 0.3), 2, 0.2 + k * 0.2, 0.3)
+	for t in TENTS:
+		var foot: Vector2 = t[0]
+		var w: float = t[1]
+		var h := w * 0.6
+		m.rect(Rect2(foot.x - w * 0.24, foot.y - h * 0.8, w * 0.48, h * 0.8), Color(1.0, 0.76, 0.46, 0.9), 2, 0.4, 0.4)
+		m.glow(foot + Vector2(0, -h * 0.4), Vector2(w * 0.9, w * 0.6), Color(1.0, 0.66, 0.4, 0.3), 2, 0.4, 0.4)
+
+
+static func _stadium_lights(m: GridLights, rng: RandomNumberGenerator) -> void:
+	var c := STADIUM_AT
+	var white := Color(0.86, 0.93, 1.0)
+	# The pitch under the floods, then each mast's bank and its beam.
+	var pitch := STADIUM_R * 0.66
+	m.glow(c, pitch * 1.5, Color(0.7, 1.0, 0.62, 0.72), 3, 0.3, 0.0)
+	m.glow(c, STADIUM_R * 1.7, Color(white, 0.3), 3, 0.3, 0.0)
+	for i in MASTS.size():
+		var top: Vector2 = (MASTS[i] as Vector2) + Vector2(0, -MAST_H)
+		var th := 0.1 + i * 0.22
+		var to := c + Vector2((top.x - c.x) * 0.2, 0)
+		m.beam(top + Vector2(-14, 2), top + Vector2(14, 2), to + Vector2(70, 0), to + Vector2(-70, 0), Color(white, 0.42), 3, th, 0.0)
+		for r in 2:
+			for k in 4:
+				m.bulb(top + Vector2(-12.0 + k * 8.0, -6.0 + r * 8.0), 3.4, white, 3, th, 0.0)
+		m.glow(top, Vector2(66, 52), Color(white, 0.62), 3, th, 0.0)
+	# The crowd's phones and scarves: a few warm sparks in the stands.
+	for i in 60:
+		var a := rng.randf() * TAU
+		var k := rng.randf_range(0.72, 0.97)
+		m.bulb(c + Vector2(cos(a), sin(a)) * STADIUM_R * k, 1.5, Color(1.0, 0.9, 0.7), 3, rng.randf_range(0.2, 0.95), rng.randf())
+
+
+## The wheel's lamps, on the rim, for the wheel's own light mesh (origin at the hub).
+static func wheel_lights(m: GridLights) -> void:
+	var colors := [Color(1.0, 0.42, 0.5), Color(1.0, 0.84, 0.42), Color(0.5, 0.86, 1.0)]
+	for k in WHEEL_SPOKES * 2:
+		var a := TAU * k / (WHEEL_SPOKES * 2.0)
+		m.bulb(Vector2(cos(a), sin(a)) * WHEEL_R, 5.0, colors[k % 3], 2, float(k) / (WHEEL_SPOKES * 2.0) * 0.9 + 0.05, 2.0 + float(k % 4) * 0.25)
+	for k in WHEEL_SPOKES:
+		var a := TAU * k / float(WHEEL_SPOKES)
+		m.bulb(Vector2(cos(a), sin(a)) * WHEEL_R * 0.55, 3.4, Color(1.0, 0.9, 0.7), 2, 0.5, 2.5)
+		m.beam(Vector2.ZERO, Vector2.ZERO, Vector2(cos(a + 0.02), sin(a + 0.02)) * WHEEL_R, Vector2(cos(a - 0.02), sin(a - 0.02)) * WHEEL_R, Color(1.0, 0.7, 0.5, 0.5), 2, 0.4, 0.2)
+	m.glow(Vector2.ZERO, Vector2.ONE * WHEEL_R * 1.5, Color(1.0, 0.55, 0.5, 0.26), 2, 0.3, 0.2)
+
+
+## The wheel's frame (it turns in its own layer), for either palette: `shade` is its colour.
+static func paint_wheel(m: MeshBatch2D, ink: Color) -> void:
+	var r := WHEEL_R
+	m.ring(Vector2.ZERO, r - 4.0, r + 1.0, ink)
+	m.ring(Vector2.ZERO, r * 0.55 - 2.0, r * 0.55 + 1.0, ink)
+	for k in WHEEL_SPOKES:
+		var a := TAU * k / float(WHEEL_SPOKES)
+		var at := Vector2(cos(a), sin(a))
+		m.line(Vector2.ZERO, at * r, 3.0, ink)
+		var b := Vector2(cos(a + TAU / WHEEL_SPOKES), sin(a + TAU / WHEEL_SPOKES))
+		m.line(at * r, b * r * 0.55, 1.5, Color(ink, 0.8))
+	m.circle(Vector2.ZERO, 9.0, ink)

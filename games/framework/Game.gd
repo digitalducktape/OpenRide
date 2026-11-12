@@ -282,7 +282,7 @@ func finish() -> Dictionary:
 	result_stats["played_sec"] = roundi(played_sec)
 	return {
 		"game_id": game_id,
-		"score": roundi(total),
+		"score": Effort.whole_points(total),
 		"stars": Stars.for_score(total, declared(), difficulty, played_sec, variant),
 		"won": won,
 		"skipped": false,

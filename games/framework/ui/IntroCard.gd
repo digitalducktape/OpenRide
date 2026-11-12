@@ -10,7 +10,9 @@ extends CanvasLayer
 signal skip_requested
 
 const LAYER := 20
-const CARD_SIZE := Vector2(1320, 760)
+## Tall enough for the busiest card (a picture, a two-line how-to, the target, the previous
+## result) with the countdown's HUGE digits reserved from the start (intro_card_layout_test).
+const CARD_SIZE := Vector2(1320, 984)
 const SHADE := Color(0, 0, 0, 0.55)
 const SHADE_CORNER := 32.0  ## the card's corner radius
 
@@ -56,7 +58,7 @@ func _init() -> void:
 	add_child(card)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 14)
+	box.add_theme_constant_override("separation", 8)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(box)
 
@@ -68,7 +70,10 @@ func _init() -> void:
 	_how_to = _centred(box, HudTheme.BODY)
 	_how_to.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_target = _centred(box, HudTheme.BODY, HudTheme.GOOD)
+	_target.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_count = _centred(box, HudTheme.HUGE, HudTheme.WARN)
+	_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_reserve_count_height()
 	var previous_row := HBoxContainer.new()
 	previous_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	previous_row.add_theme_constant_override("separation", 24)
@@ -78,9 +83,17 @@ func _init() -> void:
 	previous_row.add_child(_previous)
 	_previous_stars = StarRow.new(0, 40.0)
 	previous_row.add_child(_previous_stars)
+	# The skip button shares the previous result's row, so the stack stays short enough.
 	skip_button = HudTheme.button("Skip this game", _on_skip_pressed, Color(0.3, 0.3, 0.36))
-	skip_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(skip_button)
+	skip_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	previous_row.add_child(skip_button)
+
+
+## The countdown's slot always holds the HUGE 3-2-1, so the card's stack never grows when the
+## count reaches it (rider feedback 2026-11: Balloon Pump's tall card clipped at 3-2-1).
+func _reserve_count_height() -> void:
+	var font := _count.get_theme_font("font")
+	_count.custom_minimum_size.y = ceilf(font.get_height(HudTheme.HUGE)) if font else HudTheme.HUGE * 1.4
 
 
 ## Styles the card in a game's look (`Game.ui_theme()`): the card, the display face, the title
@@ -110,6 +123,7 @@ func apply_theme(new_theme: GameTheme) -> void:
 		HudTheme.style_button(skip_button, Color(0.3, 0.3, 0.36))
 	_count.scale = Vector2.ONE
 	_count.modulate.a = 1.0
+	_reserve_count_height()
 
 
 ## Shows the card for a segment. `previous` is the last result (or empty), with its title.
@@ -138,9 +152,9 @@ func show_segment(info: GameInfo, segment: Dictionary, target: String, previous:
 	_previous_stars.visible = has_previous and not previous.get("skipped", false)
 	if has_previous:
 		if previous.get("skipped", false):
-			_previous.text = "Last: %s (skipped)" % previous_title
+			_previous.text = "Previous game: %s (skipped)" % previous_title
 		else:
-			_previous.text = "Last: %s  %d points" % [previous_title, int(previous.get("score", 0))]
+			_previous.text = "Previous game: %s · %d points" % [previous_title, int(previous.get("score", 0))]
 			_previous_stars.stars = int(previous.get("stars", 0))
 	can_skip = skippable
 	skip_button.visible = skippable

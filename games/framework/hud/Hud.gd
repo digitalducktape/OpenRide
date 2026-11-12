@@ -14,7 +14,8 @@ extends CanvasLayer
 ##     │  │                  game's floor or band), watts and resistance
 ##     │  ├ Centre:          the game's own status widgets (`add_widget`), compact
 ##     │  └ Right (expand):  time left over the score in one panel, [Music |] Pause | End under it
-##     │                     (Music while the rider's own music app has a track: opens the panel)
+##     │                     (Music while the rider's own music app has a track: opens the panel;
+##     │                     it hangs left of the column, which keeps its width: `_ButtonRow`)
 ##     ├ Middle (expand):    a brief centred message (`show_message`), translucent
 ##     ├ status slot:        the camera strip ("Camera steering is off", …), when showing
 ##     └ BottomBar (HBox):   Recalibrate on the right (camera games)
@@ -29,12 +30,18 @@ signal end_pressed
 signal recalibrate_pressed
 ## The Music button: SessionDirector opens the music panel (it doesn't pause).
 signal music_pressed
+## The status widgets or the button row moved on screen: a game keeping its callouts clear of them
+## looks again.
+signal top_bar_moved
 
 const LAYER := 10
 const GAP := 16
 const SIDE_BUTTON_WIDTH := 160.0
 const MUSIC_BUTTON_WIDTH := 110.0
 const MESSAGE_ALPHA := 0.85
+## About what the clock panel gives back at `HudTheme.MEDIUM`: the top bar has to have this spare
+## before the clock grows again.
+const CLOCK_SQUEEZE_PX := 60.0
 
 var timer: SegmentTimer
 var score: BigNumber
@@ -59,6 +66,9 @@ var circuit_strip: CircuitStrip
 var _widgets: HBoxContainer
 var _message: Label
 var _score_text := ""
+var _clock_squeezed := false  ## `_fit_clock`: the time and score at `HudTheme.MEDIUM`
+var _message_left := 0.0  ## seconds until a timed message hides (`show_message`); 0: it stays
+var _paused := false
 var _message_pop := false  ## a skin's `message_font`: the message pops in
 ## What `set_skin` overrode, to put back: [Control, kind, name, had_override, old value].
 var _skin_saved: Array = []
@@ -96,7 +106,8 @@ func _init() -> void:
 	centre.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	circuit_strip = CircuitStrip.new()
 	centre.add_child(circuit_strip)
-	_widgets = _box(HBoxContainer.new(), centre, "Widgets")
+	_widgets = _box(_WidgetRow.new(), centre, "Widgets")
+	(_widgets as _WidgetRow).moved.connect(func(): top_bar_moved.emit())
 	_widgets.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var right := _box(VBoxContainer.new(), top, "Right")
@@ -109,10 +120,16 @@ func _init() -> void:
 	timer = SegmentTimer.new(true)
 	clock.add_child(timer)
 	score = BigNumber.new("score", "0", HudTheme.INK, true)
+	score.tight_from = 5
 	clock.add_child(score)
-	var buttons := _box(HBoxContainer.new(), right, "Buttons")
+	var buttons := _ButtonRow.new()
+	buttons.name = "Buttons"
+	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_END
-	# A drawn note rather than the word: three text buttons are wider than the right column.
+	right.add_child(buttons)
+	buttons.moved.connect(func(): top_bar_moved.emit())
+	# A drawn note rather than the word: three text buttons are wider than the right column, so
+	# it hangs off the row's left end (`_ButtonRow`), under the status widget's end.
 	music_button = HudTheme.button("", func(): music_pressed.emit())
 	music_button.name = "Music"
 	music_button.tooltip_text = "Music"
@@ -144,6 +161,8 @@ func _init() -> void:
 
 	status_slot = _box(HBoxContainer.new(), rows, "StatusSlot")
 	status_slot.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	top.minimum_size_changed.connect(_fit_clock)
 
 	var bottom := _box(HBoxContainer.new(), rows, "BottomBar")
 	bottom_bar = bottom
@@ -207,6 +226,7 @@ func clear_widgets() -> void:
 ## `message_outline_color` (Color). `GameTheme.hud_skin()` sets both.
 func set_skin(skin: Dictionary) -> void:
 	clear_skin()
+	_squeeze_clock(false)
 	if skin.has("message_font"):
 		_skin_set(_message, "font", "font", skin.message_font)
 		_message_pop = true
@@ -277,6 +297,7 @@ func set_status_area(width: float, reserve_bottom: float) -> void:
 
 
 func clear_skin() -> void:
+	_squeeze_clock(false)
 	_message_pop = false
 	for i in range(_skin_saved.size() - 1, -1, -1):
 		var entry: Array = _skin_saved[i]
@@ -320,6 +341,27 @@ func clear_skin() -> void:
 	_skin_saved.clear()
 
 
+## The top bar too wide for the screen (a heart strap's column, the widest status widget and a long
+## clock together) would push End off it: the time and score drop to `HudTheme.MEDIUM` until there's
+## room again. Every other state keeps the big clock.
+func _fit_clock() -> void:
+	var spare := HudTheme.W - 2.0 * HudTheme.MARGIN - top_bar.get_combined_minimum_size().x
+	if spare < 0.0:
+		_squeeze_clock(true)
+	elif spare >= CLOCK_SQUEEZE_PX:
+		_squeeze_clock(false)
+
+
+func _squeeze_clock(on: bool) -> void:
+	if on == _clock_squeezed:
+		return
+	_clock_squeezed = on
+	# The panel keeps its height, so the buttons under it stay put.
+	clock_panel.custom_minimum_size.y = clock_panel.size.y if on else 0.0
+	timer.set_value_size(HudTheme.MEDIUM if on else 0)
+	score.set_value_size(HudTheme.MEDIUM if on else 0)
+
+
 func _skin_set(c: Control, kind: String, key: StringName, value: Variant) -> void:
 	match kind:
 		"property":
@@ -343,7 +385,10 @@ func _skin_set(c: Control, kind: String, key: StringName, value: Variant) -> voi
 
 
 ## A short centred message over the middle of the screen ("Game over! Next run in 5").
-func show_message(text: String, color := HudTheme.INK) -> void:
+## Shows `text` in the middle of the screen. With `seconds` it hides by itself after that long
+## (the countdown stops while the game is paused); without, it stays until `hide_message`.
+func show_message(text: String, color := HudTheme.INK, seconds := 0.0) -> void:
+	_message_left = maxf(seconds, 0.0)
 	var fresh := text != _message.text or not _message.visible
 	_message.text = text
 	_message.add_theme_color_override("font_color", color)
@@ -354,6 +399,7 @@ func show_message(text: String, color := HudTheme.INK) -> void:
 
 func hide_message() -> void:
 	_message.visible = false
+	_message_left = 0.0
 
 
 func is_showing_message() -> bool:
@@ -361,11 +407,16 @@ func is_showing_message() -> bool:
 
 
 func set_paused(paused: bool) -> void:
+	_paused = paused
 	pause_button.text = "Resume" if paused else "Pause"
 
 
-func _process(_delta: float) -> void:
-	var shown := str(floori(Effort.score))
+func _process(delta: float) -> void:
+	if _message_left > 0.0 and not _paused:
+		_message_left -= delta
+		if _message_left <= 0.0:
+			hide_message()
+	var shown := str(Effort.whole_points(Effort.score))
 	if shown != _score_text:
 		_score_text = shown
 		score.set_value(shown)
@@ -386,6 +437,66 @@ func _box(box: BoxContainer, parent: Control, node_name: String) -> BoxContainer
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(box)
 	return box
+
+
+## The status widgets' row, saying when it moves (a circuit's strip pushes it down).
+class _WidgetRow extends HBoxContainer:
+	signal moved
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			moved.emit()
+
+
+## [Music |] Pause | End, packed against the right. The Music button first in the row doesn't count
+## towards the row's width: it hangs off the left end, so a track showing leaves the top bar's
+## columns as they were (with it counted, the widest status widget and ride panel pushed End off
+## the screen). Kart Race's row starts with Recalibrate and has room saved for all of it, so there
+## every button counts.
+class _ButtonRow extends Container:
+	signal moved
+
+	func _init() -> void:
+		set_notify_transform(true)
+
+	func _shown() -> Array[Control]:
+		var out: Array[Control] = []
+		for child in get_children():
+			if child is Control and (child as Control).visible:
+				out.append(child)
+		return out
+
+	func _hangs(c: Control) -> bool:
+		return c.name == &"Music" and c.get_index() == 0
+
+	func _get_minimum_size() -> Vector2:
+		var total := Vector2.ZERO
+		var counted := 0
+		for c in _shown():
+			var m := c.get_combined_minimum_size()
+			total.y = maxf(total.y, m.y)
+			if not _hangs(c):
+				total.x += m.x
+				counted += 1
+		total.x += GAP * maxi(counted - 1, 0)
+		return total
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_TRANSFORM_CHANGED:
+			moved.emit()
+		if what != NOTIFICATION_SORT_CHILDREN:
+			return
+		var x := size.x
+		var shown := _shown()
+		shown.reverse()
+		for c in shown:
+			var w := c.get_combined_minimum_size().x
+			x -= w
+			fit_child_in_rect(c, Rect2(x, 0.0, w, size.y))
+			x -= GAP
 
 
 ## The Music button's note, drawn (the faces have no ♪); it follows the button's text colour.

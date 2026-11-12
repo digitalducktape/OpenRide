@@ -134,6 +134,7 @@ class Song:
         self.bus = {b: np.zeros((2, self.n)) for b in BUSES}
         self.rng = np.random.default_rng(seed)
         self.kicks = []
+        self.level = 1.0  ## a section's dynamic level, on everything put (render_song's `dynamics`)
         self._cache = {}
 
     def at(self, beat):
@@ -145,7 +146,7 @@ class Song:
         at = self.at(beat) + (int(self.rng.normal(0, human * SR)) if human else 0)
         if x.ndim == 1:
             x = dsp.pan(x, pan)
-        dsp.add(self.bus[bus], x, at)
+        dsp.add(self.bus[bus], x * self.level, at)
 
     def hit(self, kind, beat, vel, bus, pan=0.0, **kw):
         """A drum hit from a small cache of variants (round robin), scaled by velocity."""

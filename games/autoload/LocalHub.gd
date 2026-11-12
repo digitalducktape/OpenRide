@@ -17,20 +17,24 @@ const MIN_SAVED_SEC := 60.0  ## a visit with less gameplay is discarded (v1's ru
 ## As HubStateBuilder.MINUTE_STEPS.
 const MINUTE_STEPS := [5, 10, 15, 20, 30, 45, 60]
 ## GameCatalog's roundSec, which GameInfo doesn't declare (60 when not listed).
-const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75}
+const ROUND_SEC := {"dodge_ball": 90, "tug_of_war": 120, "safe_cracker": 75, "the_pull": 300, "balloon_pump": 125,
+	"keepy_uppy": 60, "ready_for_launch": 90, "gate_crasher": 65}
 ## GameCatalog's usesCamera where it differs from the game's tracker mode (Tug of War's camera
 ## is an option, decided per segment).
 const USES_CAMERA := {"tug_of_war": false}
-## The display order (GameCatalog's, without the demo).
-const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"]
-## CircuitPresets: warm-up, N blocks, cool-down.
-const WARMUP := {"game_id": "cadence_karaoke", "role": "warmup", "duration_sec": 180}
-const COOLDOWN := {"game_id": "cadence_karaoke", "role": "cooldown", "duration_sec": 180}
+## The display order of the first games (GameCatalog's, without the demo); every other
+## registered game follows, by id (`order()`).
+const ORDER := ["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull",
+	"balloon_pump", "keepy_uppy", "power_grid", "ready_for_launch", "gate_crasher"]
+## CircuitPresets: warm-up, N blocks, cool-down. Shapes only: each slot's game is drawn from its
+## role's pool (`draw_slots`, as Kotlin's CircuitDraw).
+const WARMUP := {"role": "warmup", "duration_sec": 180}
+const COOLDOWN := {"role": "cooldown", "duration_sec": 180}
 const BLOCK := [
-	{"game_id": "tug_of_war", "role": "work", "duration_sec": 60},
-	{"game_id": "safe_cracker", "role": "recovery", "duration_sec": 90},
-	{"game_id": "dodge_ball", "role": "work", "duration_sec": 90},
-	{"game_id": "cadence_karaoke", "role": "recovery", "duration_sec": 90},
+	{"role": "work", "duration_sec": 60},
+	{"role": "recovery", "duration_sec": 90},
+	{"role": "work", "duration_sec": 90},
+	{"role": "recovery", "duration_sec": 90},
 ]
 const PRESETS := {"circuit-20": 2, "circuit-30": 4, "circuit-45": 6}
 const INTRO_SEC := 10
@@ -49,6 +53,8 @@ var rider := {"id": 1, "name": RIDER_NAME, "avatar_png": null, "avatar_color": "
 ## This visit's finished plans: [{plan_id, difficulty, score, stars, game_ids}].
 var plans: Array = []
 var plan_index := 0
+## Seeds this visit's circuit draws: plan n draws with circuit_seed + n (GameVisitManager's).
+var circuit_seed := 0
 var ride_sec := 0.0
 var gameplay_sec := 0.0
 ## Bests kept for the process (the desktop's "DB"): key "plan_id|difficulty" → {score, stars}.
@@ -80,6 +86,7 @@ func begin_visit() -> void:
 	phase = "hub"
 	plans = []
 	plan_index = 0
+	circuit_seed = randi()
 	ride_sec = 0.0
 	gameplay_sec = 0.0
 	calibrated = ""
@@ -124,12 +131,19 @@ func camera_available() -> bool:
 ## GameCatalog as HubStateBuilder sends it, from each game's GameInfo.
 func catalog() -> Array:
 	var out: Array = []
-	for id in ORDER:
+	for id in order():
 		var info := GameRegistry.info(id)
 		if info == null:
 			continue
 		out.append(entry(info))
 	return out
+
+
+## ORDER, then every other registered game but the demo, by id.
+static func order() -> Array:
+	var rest: Array = GameRegistry.ids().filter(func(id): return id != "demo" and id not in ORDER)
+	rest.sort()
+	return ORDER + rest
 
 
 static func entry(info: GameInfo) -> Dictionary:
@@ -164,26 +178,99 @@ func circuits() -> Array:
 	return out
 
 
+## The preset's lineup for the next plan (the hub shows the one that plays).
 func _preset_slots(id: String) -> Array:
-	var slots: Array = [WARMUP.duplicate()]
+	var shape: Array = [WARMUP]
 	for i in PRESETS[id]:
-		for slot in BLOCK:
-			slots.append(slot.duplicate())
-	slots.append(COOLDOWN.duplicate())
-	if not camera_available():
-		for i in slots.size():
-			var info := GameRegistry.info(slots[i].game_id)
-			if info and USES_CAMERA.get(info.id, info.uses_camera()):
-				slots[i].game_id = _camera_free_stand_in(slots[i].role)
-	return slots
+		shape.append_array(BLOCK)
+	shape.append(COOLDOWN)
+	return draw_slots(shape, catalog(), camera_available(), circuit_seed + plan_index)
 
 
-func _camera_free_stand_in(role: String) -> String:
-	for id in ORDER:
-		var info := GameRegistry.info(id)
-		if info and not USES_CAMERA.get(id, info.uses_camera()) and role in info.roles:
-			return id
-	return "tug_of_war"
+## GameCatalog.circuitPool: the catalog entries of `role`, without camera games when off.
+static func circuit_pool(entries: Array, role: String, camera: bool) -> Array:
+	return entries.filter(func(e): return role in e.roles and (camera or not bool(e.uses_camera)))
+
+
+static func _fits(e: Dictionary, sec: int) -> bool:
+	return sec >= int(e.min_sec) and sec <= int(e.max_sec)
+
+
+## Kotlin's CircuitDraw: each slot of `shape` ({role, duration_sec}) gets a game from its role's
+## pool that fits its length, from a shuffled bag per role (no repeat in a role until every game
+## that fits has played), preferring games that fit fewer of the role's lengths, and never the
+## slot before's game when another fits; "demo" when nothing fits. Same seed, same lineup (the
+## shuffle isn't Kotlin's, so the desktop's mix differs from the bike's for a seed).
+static func draw_slots(shape: Array, entries: Array, camera: bool, seed_value: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var lengths := {}  # role → {sec: true}
+	for slot in shape:
+		var per_role: Dictionary = lengths.get_or_add(slot.role, {})
+		per_role[int(slot.duration_sec)] = true
+	var bags := {}  # role → Array of entries not yet played this pass
+	var last_of_role := {}
+	var previous := ""
+	var out: Array = []
+	for slot in shape:
+		var role: String = slot.role
+		var sec := int(slot.duration_sec)
+		var pool := circuit_pool(entries, role, camera)
+		var picked := "demo"
+		if pool.any(func(e): return _fits(e, sec)):
+			var bag: Array = bags.get_or_add(role, [])
+			if not bag.any(func(e): return _fits(e, sec)):
+				bag.clear()
+				bag.append_array(_shuffled(pool, rng))
+				for i in bag.size():
+					if bag[i].id == last_of_role.get(role, ""):
+						bag.append(bag.pop_at(i))
+						break
+			var role_lengths: Array = (lengths[role] as Dictionary).keys()
+			var ranked := _ranked(bag, sec, role_lengths)
+			# Not twice running wins over the bag's round (SessionPlans' CircuitDraw): when the only
+			# game left is the one that played the slot before (a game in two pools), the role's
+			# next round starts early, that game first in it.
+			if ranked.all(func(r): return r[2].id == previous) and pool.any(func(e): return _fits(e, sec) and e.id != previous):
+				bag.clear()
+				bag.append_array(_shuffled(pool, rng))
+				for i in bag.size():
+					if bag[i].id == previous:
+						bag.push_front(bag.pop_at(i))
+						break
+				ranked = _ranked(bag, sec, role_lengths)
+			var pick: Dictionary = ranked[0][2]
+			for r in ranked:
+				if r[2].id != previous:
+					pick = r[2]
+					break
+			bag.erase(pick)
+			picked = pick.id
+			last_of_role[role] = picked
+		out.append({"game_id": picked, "role": role, "duration_sec": sec})
+		previous = picked if picked != "demo" else ""
+	return out
+
+
+## The bag's games that fit `sec`, as [reach, bag index, entry], sorted by reach (how many of the
+## role's lengths the game fits), the bag's order breaking ties.
+static func _ranked(bag: Array, sec: int, role_lengths: Array) -> Array:
+	var ranked: Array = []
+	for i in bag.size():
+		if _fits(bag[i], sec):
+			ranked.append([role_lengths.filter(func(l): return _fits(bag[i], l)).size(), i, bag[i]])
+	ranked.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return ranked
+
+
+static func _shuffled(items: Array, rng: RandomNumberGenerator) -> Array:
+	var out := items.duplicate()
+	for i in range(out.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var t = out[i]
+		out[i] = out[j]
+		out[j] = t
+	return out
 
 
 # --- The hub's calls ---
@@ -229,7 +316,7 @@ func build_plan(request: Dictionary) -> Dictionary:
 
 func _just_ride(request: Dictionary, difficulty: String) -> Dictionary:
 	var id := str(request.get("game_id", ""))
-	if id not in ORDER or GameRegistry.info(id) == null:
+	if id not in order() or GameRegistry.info(id) == null:
 		return {"reason": "unknown_game"}
 	var e := entry(GameRegistry.info(id))
 	if e.uses_camera and not camera_available():
@@ -265,7 +352,7 @@ func _custom(request: Dictionary, difficulty: String) -> Dictionary:
 	var parts: Array = []
 	for i in slots.size():
 		var id := str(slots[i].get("game_id", ""))
-		var info := GameRegistry.info(id) if id in ORDER else null
+		var info := GameRegistry.info(id) if id in order() else null
 		if info == null:
 			return {"reason": "unknown_game"}
 		var e := entry(info)
@@ -276,11 +363,12 @@ func _custom(request: Dictionary, difficulty: String) -> Dictionary:
 		elif i == slots.size() - 1 and slots.size() > 1 and "cooldown" in e.roles:
 			role = "cooldown"
 		# Camera off: the first camera-free game of the same circuit role plays it (the id keeps
-		# the requested game), as SessionPlans.customGame; none (Kart Race) rejects it.
+		# the requested game), as SessionPlans.customGame; none, or a free slot (Kart Race),
+		# rejects it.
 		var plays := id
 		if e.uses_camera and not camera_available():
 			plays = ""
-			for other_id in ORDER:
+			for other_id in (order() if e.circuit_role != "free" else []):
 				var other := entry(GameRegistry.info(other_id))
 				if not other.uses_camera and other.circuit_role == e.circuit_role:
 					plays = other_id

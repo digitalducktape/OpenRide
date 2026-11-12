@@ -19,18 +19,10 @@ const SOUNDS := {
 	"ball_bounce": "res://games/dodge_ball/sounds/impactSoft_heavy_000.ogg",
 }
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
 	SfxSynth.add_preset_dir(SFX_DIR)
-	for sound in DodgeMusic.SOUNDS:
-		var rendered := load(DodgeMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(DodgeMusic.SOUNDS)
 	for sound in SOUNDS:
 		var stream := load(SOUNDS[sound]) as AudioStream
 		if stream:

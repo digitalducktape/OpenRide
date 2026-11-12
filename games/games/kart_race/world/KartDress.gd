@@ -157,49 +157,49 @@ func scatter_far(woods: Array, meshes: Array, count: int, r0: float, r1: float, 
 static func tree_meshes(leaf := Color(0.30, 0.56, 0.18), snow := false) -> Array:
 	var trunk := Color(0.42, 0.28, 0.17, 0.0)
 	var white := Color(0.95, 0.97, 1.0)
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 1.0
 	kit.ao_y1 = 5.5
 	kit.ao_min = 0.5
-	kit.add(KartMeshKit.cylinder(0.18, 0.3, 2.4, 5), KartMeshKit.xf(Vector3(0, 1.2, 0)), trunk)
+	kit.add(MeshKit3D.cylinder(0.18, 0.3, 2.4, 5), MeshKit3D.xf(Vector3(0, 1.2, 0)), trunk)
 	for b in [[Vector3(0, 3.6, 0), 1.95], [Vector3(1.1, 3.0, 0.3), 1.35], [Vector3(-1.0, 3.1, -0.4), 1.4],
 			[Vector3(0.1, 4.6, -0.1), 1.3]]:
 		var c := leaf.lerp(Color(0.45, 0.68, 0.22), clampf((b[0].y - 3.0) / 1.7, 0.0, 1.0))
 		if snow:
 			c = c.lerp(white, 0.5 if b[0].y > 4.0 else 0.15)
 		c.a = clampf(b[0].y / 5.0, 0.0, 1.0)
-		kit.add(KartMeshKit.sphere(b[1], 7, 3), KartMeshKit.xf(b[0]), c)
+		kit.add(MeshKit3D.sphere(b[1], 7, 3), MeshKit3D.xf(b[0]), c)
 	var broad := kit.commit()
 	if snow:
 		broad = snow_cap(broad, 0.3)
-	kit = KartMeshKit.new()
+	kit = MeshKit3D.new()
 	kit.ao_y0 = 0.5
 	kit.ao_y1 = 7.0
 	kit.ao_min = 0.45
-	kit.add(KartMeshKit.cylinder(0.15, 0.25, 1.6, 5), KartMeshKit.xf(Vector3(0, 0.8, 0)), trunk)
+	kit.add(MeshKit3D.cylinder(0.15, 0.25, 1.6, 5), MeshKit3D.xf(Vector3(0, 0.8, 0)), trunk)
 	for k in 3:
 		var y := 1.4 + k * 1.7
 		var c := Color(0.16, 0.40, 0.22, clampf(y / 6.0, 0.0, 1.0)).lerp(Color(0.24, 0.5, 0.26, 1.0), k / 3.0)
-		kit.add(KartMeshKit.cylinder(0.0, 2.1 - k * 0.55, 2.6, 7), KartMeshKit.xf(Vector3(0, y + 1.3, 0)), c)
+		kit.add(MeshKit3D.cylinder(0.0, 2.1 - k * 0.55, 2.6, 7), MeshKit3D.xf(Vector3(0, y + 1.3, 0)), c)
 	var pine := kit.commit()
 	if snow:
 		pine = snow_cap(pine, 0.45)
-	kit = KartMeshKit.new()
+	kit = MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 1.4
 	kit.ao_min = 0.5
 	for b in [[Vector3(0, 0.6, 0), 0.9], [Vector3(0.7, 0.45, 0.2), 0.65]]:
 		var c := Color(0.34, 0.58, 0.2, 0.5) if not snow else Color(0.88, 0.92, 0.98, 0.3)
-		kit.add(KartMeshKit.sphere(b[1], 6, 3), KartMeshKit.xf(b[0]), c)
+		kit.add(MeshKit3D.sphere(b[1], 6, 3), MeshKit3D.xf(b[0]), c)
 	var bush := kit.commit()
 	if snow:
 		bush = snow_cap(bush, 0.2)
-	kit = KartMeshKit.new()
+	kit = MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 6.0
 	kit.ao_min = 0.5
-	kit.add(KartMeshKit.cylinder(0.0, 2.0, 3.6, 5), KartMeshKit.xf(Vector3(0, 2.6, 0)), Color(0.18, 0.42, 0.22, 0.6))
-	kit.add(KartMeshKit.cylinder(0.0, 1.4, 2.8, 5), KartMeshKit.xf(Vector3(0, 4.6, 0)),
+	kit.add(MeshKit3D.cylinder(0.0, 2.0, 3.6, 5), MeshKit3D.xf(Vector3(0, 2.6, 0)), Color(0.18, 0.42, 0.22, 0.6))
+	kit.add(MeshKit3D.cylinder(0.0, 1.4, 2.8, 5), MeshKit3D.xf(Vector3(0, 4.6, 0)),
 		Color(0.24, 0.5, 0.26, 1.0) if not snow else Color(0.92, 0.95, 1.0, 1.0))
 	var far := kit.commit()
 	return [broad, pine, bush, far]
@@ -227,7 +227,7 @@ static func snow_cap(mesh: ArrayMesh, from: float, snow := Color(0.95, 0.97, 1.0
 static func rock_mesh(color: Color, seed_value: int, squash := 0.7) -> ArrayMesh:
 	var r := RandomNumberGenerator.new()
 	r.seed = seed_value
-	var base := KartMeshKit.sphere(1.0, 7, 4).get_mesh_arrays()
+	var base := MeshKit3D.sphere(1.0, 7, 4).get_mesh_arrays()
 	var verts: PackedVector3Array = base[Mesh.ARRAY_VERTEX]
 	var idx: PackedInt32Array = base[Mesh.ARRAY_INDEX]
 	# Jitter each distinct position once, so the facets stay closed.

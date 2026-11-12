@@ -27,10 +27,10 @@ func _angle(b: Basis, axis: Vector3) -> float:
 
 func test_every_racer_fits_the_triangle_budget() -> void:
 	for r in KartRoster.RACERS:
-		var tris := KartMeshKit.tri_count(KartView.model_mesh(r))
+		var tris := MeshKit3D.tri_count(KartView.model_mesh(r))
 		assert_int(tris).override_failure_message("%s: %d triangles" % [r.id, tris]).is_less_equal(MAX_TRIS)
 		assert_int(tris).is_greater(1500)
-		assert_int(KartMeshKit.tri_count(KartView.head_mesh(r))).is_greater(300)
+		assert_int(MeshKit3D.tri_count(KartView.head_mesh(r))).is_greater(300)
 
 
 func test_every_vertex_carries_a_bone_and_its_shader_flags() -> void:

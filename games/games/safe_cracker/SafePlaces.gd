@@ -1,7 +1,7 @@
 class_name SafePlaces
 extends RefCounted
 ## The places Safe Cracker's safes are found in (#41). Each is a palette, one key light and a few
-## shapes drawn in code into one `SafeMesh` batch (one draw call), so there are no assets and the
+## shapes drawn in code into one `MeshBatch2D` batch (one draw call), so there are no assets and the
 ## picture redraws only when the safe changes. The slow ambient life (rain, the sea, the lantern,
 ## the flasks, dust in the light) is `SafeBackdrop`'s, in shaders and tweens. Names are plain
 ## descriptions; nothing here refers to any existing game or film. ART_BIBLE.md §3 and §6.
@@ -38,7 +38,6 @@ const PLACES := [
 		"light": {"at": Vector2(1520, 690), "color": Color(1.0, 0.74, 0.4), "radius": Vector2(600, 520), "strength": 0.32}},
 ]
 
-static var _dot: Texture2D
 
 
 static func count() -> int:
@@ -76,7 +75,7 @@ static func to_light(index: int) -> Vector2:
 
 
 ## Steel lit from above and from the key light's side: an affine relight (exact on fans and
-## bands), for `SafeMesh.shade`. `half` is the shape's half size, centred on the origin.
+## bands), for `MeshBatch2D.shade`. `half` is the shape's half size, centred on the origin.
 static func steel_shade(dir: Vector2, half: Vector2, light_col: Color) -> Callable:
 	return func(p: Vector2, c: Color) -> Color:
 		var n := Vector2(p.x / half.x, p.y / half.y)
@@ -87,35 +86,9 @@ static func steel_shade(dir: Vector2, half: Vector2, light_col: Color) -> Callab
 		return Color(c.r + f + light_col.r * warm, c.g + f + light_col.g * warm, c.b + f + light_col.b * warm, c.a)
 
 
-## A domed rivet: a dark ring, the dome, a highlight toward the light.
-static func rivet(m: SafeMesh, at: Vector2, r: float, colour: Color, dir: Vector2) -> void:
-	m.circle(at + Vector2(1.5, 2.5), r, Color(0, 0, 0, 0.35))
-	m.circle(at, r, colour.darkened(0.45))
-	m.circle(at, r * 0.72, colour.lightened(0.12))
-	m.circle(at + dir * r * 0.3, r * 0.3, colour.lightened(0.6))
-
-
-## A soft white dot (32 px, radial), shared by the dust and the sparkles.
-static func soft_dot() -> Texture2D:
-	if _dot == null:
-		var g := Gradient.new()
-		g.set_color(0, Color(1, 1, 1, 1))
-		g.set_color(1, Color(1, 1, 1, 0))
-		g.add_point(0.35, Color(1, 1, 1, 0.75))
-		var t := GradientTexture2D.new()
-		t.gradient = g
-		t.fill = GradientTexture2D.FILL_RADIAL
-		t.fill_from = Vector2(0.5, 0.5)
-		t.fill_to = Vector2(1.0, 0.5)
-		t.width = 32
-		t.height = 32
-		_dot = t
-	return _dot
-
-
 ## Adds the room to `m`: the wall, the key light's pool, the props, the floor in perspective.
 ## The safe covers the middle (x 470-1450), so the props sit to either side and behind it.
-static func build_room(m: SafeMesh, index: int) -> void:
+static func build_room(m: MeshBatch2D, index: int) -> void:
 	var p := place(index)
 	var wall: Color = p.wall
 	var wall2: Color = p.wall2
@@ -157,7 +130,7 @@ static func floor_x(x: float, y: float) -> float:
 
 
 ## Boards running toward the safe, `step` wide at the back edge, in tones of `base`.
-static func _boards(m: SafeMesh, base: Color, step: float, vary: float, seed: int) -> void:
+static func _boards(m: MeshBatch2D, base: Color, step: float, vary: float, seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	var x := -BLEED - step
@@ -173,7 +146,7 @@ static func _boards(m: SafeMesh, base: Color, step: float, vary: float, seed: in
 
 
 ## Checker tiles toward the safe: rows deeper in perspective, `step` wide at the back edge.
-static func _tiles(m: SafeMesh, a_col: Color, b_col: Color, step: float) -> void:
+static func _tiles(m: MeshBatch2D, a_col: Color, b_col: Color, step: float) -> void:
 	var rows := [FLOOR_Y]
 	var k := 1
 	while rows[-1] < SIZE.y:
@@ -194,14 +167,14 @@ static func _tiles(m: SafeMesh, a_col: Color, b_col: Color, step: float) -> void
 
 
 ## A picture frame: a moulding with a lit top and left, a dark inner lip.
-static func _frame(m: SafeMesh, r: Rect2, wood: Color, w: float) -> void:
+static func _frame(m: MeshBatch2D, r: Rect2, wood: Color, w: float) -> void:
 	m.soft_shadow(Rect2(r.position + Vector2(10, 14), r.size), 4.0, 18.0, Color(0, 0, 0, 0.35))
 	m.rect(r, wood)
 	m.bevel(r, 2.0, w * 0.45, Vector2(-0.4, -0.9).normalized(), wood.lightened(0.4), wood.darkened(0.5))
 	m.rect(r.grow(-w), wood.darkened(0.6))
 
 
-static func _office(m: SafeMesh, p: Dictionary) -> void:
+static func _office(m: MeshBatch2D, p: Dictionary) -> void:
 	m.rect_v(Rect2(-BLEED, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), (p.floor as Color).lightened(0.05), (p.floor as Color).darkened(0.3))
 	_boards(m, p.floor, 70.0, 0.12, 3)
 	# Moonlight through the blinds: soft slanted stripes from the window across the wall.
@@ -224,14 +197,14 @@ static func _office(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## The desk and its lamp, in front of the light's pool.
-static func _office_front(m: SafeMesh, p: Dictionary) -> void:
+static func _office_front(m: MeshBatch2D, p: Dictionary) -> void:
 	var wood := Color(0.24, 0.15, 0.1)
 	m.quad4(Vector2(1490, 768), Vector2(SIZE.x + BLEED, 768), Vector2(SIZE.x + BLEED, 802), Vector2(1460, 802), wood.lightened(0.35), wood.lightened(0.2), wood.lightened(0.05), wood.lightened(0.1))
 	m.rect_v(Rect2(1460, 802, 460 + BLEED, 103), wood, wood.darkened(0.45))
 	m.rect(Rect2(1500, 830, 380, 2), Color(0, 0, 0, 0.4))
 	m.circle(Vector2(1690, 852), 7.0, p.accent)
 	var metal := Color(0.16, 0.16, 0.18)
-	m.fill(SafeMesh._ellipse(Vector2(1640, 770), Vector2(46, 11), 24), metal.lightened(0.15))
+	m.fill(MeshBatch2D._ellipse(Vector2(1640, 770), Vector2(46, 11), 24), metal.lightened(0.15))
 	m.line(Vector2(1640, 765), Vector2(1600, 668), 8.0, metal)
 	m.line(Vector2(1600, 668), Vector2(1652, 618), 8.0, metal)
 	m.circle(Vector2(1600, 668), 7.0, metal.lightened(0.2))
@@ -241,7 +214,7 @@ static func _office_front(m: SafeMesh, p: Dictionary) -> void:
 	m.glow(Vector2(1662, 655), Vector2(70, 26), Color(1.0, 0.95, 0.75, 0.9), 8, 0.3)
 
 
-static func _bank(m: SafeMesh, p: Dictionary) -> void:
+static func _bank(m: MeshBatch2D, p: Dictionary) -> void:
 	var wall: Color = p.wall
 	m.rect_v(Rect2(-BLEED, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), (p.floor as Color).lightened(0.08), (p.floor as Color).darkened(0.25))
 	_tiles(m, (p.floor as Color).lightened(0.1), (p.floor as Color).darkened(0.1), 150.0)
@@ -256,15 +229,15 @@ static func _bank(m: SafeMesh, p: Dictionary) -> void:
 		for y in [70.0, 380.0, 520.0, 830.0]:
 			for dx in [14.0, -14.0]:
 				if x + dx > -BLEED and x + dx < SIZE.x + BLEED:
-					rivet(m, Vector2(x + dx, y), 6.0, wall.lightened(0.15), dir)
+					MeshBatch2D.rivet(m, Vector2(x + dx, y), 6.0, wall.lightened(0.15), dir)
 	# The round vault door's rim on the wall behind the safe.
 	var c := Vector2(960, 560)
 	m.glow(c, Vector2(600, 600), Color(0, 0, 0, 0.3), 10, 0.75)
-	SafeDoor.lit_ring(m, c, 470.0, 530.0, wall.lightened(0.3), wall.darkened(0.5), dir)
-	SafeDoor.lit_ring(m, c, 455.0, 470.0, wall.darkened(0.6), wall.lightened(0.1), dir)
+	MeshBatch2D.lit_ring(m, c, 470.0, 530.0, wall.lightened(0.3), wall.darkened(0.5), dir)
+	MeshBatch2D.lit_ring(m, c, 455.0, 470.0, wall.darkened(0.6), wall.lightened(0.1), dir)
 	for k in 20:
 		var a := TAU * k / 20.0
-		rivet(m, c + Vector2(cos(a), sin(a)) * 500.0, 9.0, wall.lightened(0.1), dir)
+		MeshBatch2D.rivet(m, c + Vector2(cos(a), sin(a)) * 500.0, 9.0, wall.lightened(0.1), dir)
 	# Brass bars on the left: lit cylinders between two rails.
 	var acc: Color = p.accent
 	for i in 7:
@@ -286,7 +259,7 @@ static func _bank(m: SafeMesh, p: Dictionary) -> void:
 	m.rect_v(Rect2(740, 34, 440, 8), Color(0.95, 0.98, 1.0), Color(0.8, 0.88, 1.0))
 
 
-static func _museum(m: SafeMesh, p: Dictionary) -> void:
+static func _museum(m: MeshBatch2D, p: Dictionary) -> void:
 	var wall2: Color = p.wall2
 	m.rect_v(Rect2(-BLEED, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), (p.floor as Color).lightened(0.05), (p.floor as Color).darkened(0.3))
 	_boards(m, p.floor, 48.0, 0.1, 17)
@@ -315,15 +288,15 @@ static func _museum(m: SafeMesh, p: Dictionary) -> void:
 	# A vase on a marble pedestal, behind the right rope.
 	m.rect_h(Rect2(1600, 770, 140, 135), Color(0.86, 0.84, 0.8), Color(0.62, 0.6, 0.56))
 	m.rect_v(Rect2(1588, 758, 164, 16), Color(0.92, 0.9, 0.86), Color(0.7, 0.68, 0.64))
-	m.fill(SafeMesh._ellipse(Vector2(1670, 706), Vector2(42, 52), 28), Color(0.5, 0.27, 0.18))
+	m.fill(MeshBatch2D._ellipse(Vector2(1670, 706), Vector2(42, 52), 28), Color(0.5, 0.27, 0.18))
 	m.rect_h(Rect2(1652, 638, 36, 22), Color(0.45, 0.24, 0.16), Color(0.6, 0.34, 0.22))
-	m.fill(SafeMesh._ellipse(Vector2(1656, 690), Vector2(12, 26), 16), Color(1, 0.85, 0.7, 0.25))
+	m.fill(MeshBatch2D._ellipse(Vector2(1656, 690), Vector2(12, 26), 16), Color(1, 0.85, 0.7, 0.25))
 	# Rope barriers on brass posts.
 	_rope(m, Vector2(110, 790), Vector2(430, 790), p.accent)
 	_rope(m, Vector2(1490, 790), Vector2(1830, 790), p.accent)
 
 
-static func _landscape(m: SafeMesh, r: Rect2) -> void:
+static func _landscape(m: MeshBatch2D, r: Rect2) -> void:
 	m.rect_v(r, Color(0.55, 0.62, 0.7), Color(0.85, 0.72, 0.55))
 	m.circle(Vector2(r.position.x + 200, r.position.y + 120), 34.0, Color(1.0, 0.88, 0.6))
 	m.fill(PackedVector2Array([Vector2(r.position.x, r.position.y + 250), Vector2(r.position.x + 120, r.position.y + 190),
@@ -331,7 +304,7 @@ static func _landscape(m: SafeMesh, r: Rect2) -> void:
 	m.fill(PackedVector2Array([Vector2(r.position.x, r.position.y + 300), Vector2(r.end.x, r.position.y + 280), r.end, Vector2(r.position.x, r.end.y)]), Color(0.24, 0.3, 0.22), false)
 
 
-static func _abstract(m: SafeMesh, r: Rect2) -> void:
+static func _abstract(m: MeshBatch2D, r: Rect2) -> void:
 	m.rect_v(r, Color(0.2, 0.3, 0.42), Color(0.12, 0.18, 0.28))
 	m.circle(Vector2(r.position.x + 110, r.position.y + 140), 70.0, Color(0.85, 0.55, 0.3))
 	m.rect(Rect2(r.position.x + 150, r.position.y + 180, 110, 150), Color(0.9, 0.85, 0.7))
@@ -339,7 +312,7 @@ static func _abstract(m: SafeMesh, r: Rect2) -> void:
 
 
 ## Two brass posts and a sagging red rope between them.
-static func _rope(m: SafeMesh, a: Vector2, b: Vector2, brass: Color) -> void:
+static func _rope(m: MeshBatch2D, a: Vector2, b: Vector2, brass: Color) -> void:
 	var red := Color(0.55, 0.1, 0.12)
 	var prev := a
 	for k in range(1, 13):
@@ -351,12 +324,12 @@ static func _rope(m: SafeMesh, a: Vector2, b: Vector2, brass: Color) -> void:
 	for x in [a.x, b.x]:
 		m.glow(Vector2(x, FLOOR_Y + 8), Vector2(40, 9), Color(0, 0, 0, 0.5), 6)
 		m.rect_h(Rect2(x - 6, a.y, 12, FLOOR_Y - a.y), brass.darkened(0.4), brass.lightened(0.2))
-		m.fill(SafeMesh._ellipse(Vector2(x, FLOOR_Y - 2), Vector2(24, 7), 18), brass.darkened(0.3))
+		m.fill(MeshBatch2D._ellipse(Vector2(x, FLOOR_Y - 2), Vector2(24, 7), 18), brass.darkened(0.3))
 		m.circle(Vector2(x, a.y - 4), 12.0, brass)
 		m.circle(Vector2(x - 3, a.y - 7), 4.0, brass.lightened(0.5))
 
 
-static func _cabin(m: SafeMesh, p: Dictionary) -> void:
+static func _cabin(m: MeshBatch2D, p: Dictionary) -> void:
 	var wall: Color = p.wall
 	m.rect_v(Rect2(-BLEED, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), (p.floor as Color).lightened(0.06), (p.floor as Color).darkened(0.3))
 	_boards(m, p.floor, 90.0, 0.1, 29)
@@ -380,17 +353,17 @@ static func _cabin(m: SafeMesh, p: Dictionary) -> void:
 	var acc: Color = p.accent
 	m.glow(c, Vector2(260, 260), Color(0.45, 0.65, 0.85, 0.12), 10)
 	m.circle(c + Vector2(8, 12), 152.0, Color(0, 0, 0, 0.35))
-	SafeDoor.lit_ring(m, c, 122.0, 152.0, acc.lightened(0.2), acc.darkened(0.55), Vector2(-0.5, -0.85))
+	MeshBatch2D.lit_ring(m, c, 122.0, 152.0, acc.lightened(0.2), acc.darkened(0.55), Vector2(-0.5, -0.85))
 	for k in 10:
 		var a := TAU * k / 10.0 + 0.3
-		rivet(m, c + Vector2(cos(a), sin(a)) * 138.0, 6.0, acc.darkened(0.2), Vector2(-0.5, -0.85))
+		MeshBatch2D.rivet(m, c + Vector2(cos(a), sin(a)) * 138.0, 6.0, acc.darkened(0.2), Vector2(-0.5, -0.85))
 	# The lantern's wall bracket (the lantern swings, SafeBackdrop).
 	var iron := Color(0.12, 0.1, 0.08)
 	m.rect_v(Rect2(1688, 92, 24, 50), iron.lightened(0.15), iron)
 	m.line(Vector2(1700, 120), Vector2(1700, 92), 6.0, iron)
 
 
-static func _lab(m: SafeMesh, p: Dictionary) -> void:
+static func _lab(m: MeshBatch2D, p: Dictionary) -> void:
 	var wall: Color = p.wall
 	var wall2: Color = p.wall2
 	_tiles(m, Color(0.82, 0.86, 0.84), Color(0.3, 0.36, 0.36), 110.0)
@@ -431,7 +404,7 @@ static func _lab(m: SafeMesh, p: Dictionary) -> void:
 	m.rect(Rect2(720, 36, 480, 7), Color(0.95, 1.0, 0.98))
 
 
-static func _library(m: SafeMesh, p: Dictionary) -> void:
+static func _library(m: MeshBatch2D, p: Dictionary) -> void:
 	var fl: Color = p.floor
 	m.rect_v(Rect2(-BLEED, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), fl.lightened(0.06), fl.darkened(0.3))
 	_boards(m, fl, 60.0, 0.12, 41)
@@ -478,7 +451,7 @@ static func _library(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## The reading lamp's table and the lamp, in front of the light's pool.
-static func _library_front(m: SafeMesh, p: Dictionary) -> void:
+static func _library_front(m: MeshBatch2D, p: Dictionary) -> void:
 	var wood := Color(0.3, 0.18, 0.1)
 	m.glow(Vector2(1520, FLOOR_Y + 6), Vector2(120, 14), Color(0, 0, 0, 0.5), 6)
 	m.quad4(Vector2(1440, 780), Vector2(1600, 780), Vector2(1612, 800), Vector2(1428, 800), wood.lightened(0.4), wood.lightened(0.3), wood.lightened(0.1), wood.lightened(0.15))
@@ -486,10 +459,10 @@ static func _library_front(m: SafeMesh, p: Dictionary) -> void:
 	for x in [1440.0, 1590.0]:
 		m.rect_h(Rect2(x, 814, 12, FLOOR_Y - 814), wood.darkened(0.2), wood.darkened(0.5))
 	var brass: Color = p.accent
-	m.fill(SafeMesh._ellipse(Vector2(1520, 778), Vector2(34, 8), 20), brass.darkened(0.3))
+	m.fill(MeshBatch2D._ellipse(Vector2(1520, 778), Vector2(34, 8), 20), brass.darkened(0.3))
 	m.rect_h(Rect2(1516, 696, 8, 82), brass.darkened(0.2), brass.lightened(0.2))
 	# The shade (the room's brass prop): a dome with its warm mouth.
-	var dome := SafeMesh.arc_points(Vector2(1520, 700), 60.0, PI, TAU, 16)
+	var dome := MeshBatch2D.arc_points(Vector2(1520, 700), 60.0, PI, TAU, 16)
 	dome.append(Vector2(1580, 700))
 	m.fill(_squash(dome, Vector2(1520, 700), 0.6), brass, false)
 	m.glow(Vector2(1520, 702), Vector2(62, 14), Color(1.0, 0.92, 0.7, 0.95), 8, 0.4)

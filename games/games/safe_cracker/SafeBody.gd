@@ -31,16 +31,16 @@ func _draw() -> void:
 	mesh_for(place_index).draw_on(self)
 
 
-## The body's batch for a place, built once (`SafeMesh.built`).
-static func mesh_for(index: int) -> SafeMesh:
-	return SafeMesh.built("body:%d" % index, build_place.bind(index))
+## The body's batch for a place, built once (`MeshBatch2D.built`).
+static func mesh_for(index: int) -> MeshBatch2D:
+	return MeshBatch2D.built("body:%d" % index, build_place.bind(index))
 
 
-func build(m: SafeMesh) -> void:
+func build(m: MeshBatch2D) -> void:
 	build_place(m, place_index)
 
 
-static func build_place(m: SafeMesh, place_index: int) -> void:
+static func build_place(m: MeshBatch2D, place_index: int) -> void:
 	var p := SafePlaces.place(place_index)
 	var colour: Color = p.safe
 	var to_light := SafePlaces.to_light(place_index)
@@ -72,7 +72,7 @@ static func build_place(m: SafeMesh, place_index: int) -> void:
 
 
 ## The vault behind the door, filling the door's opening (drawn by `SafeDial`'s `Vault` layer).
-static func build_vault(m: SafeMesh, colour: Color) -> void:
+static func build_vault(m: MeshBatch2D, colour: Color) -> void:
 	var steel := colour.darkened(0.55).lerp(Color(0.25, 0.18, 0.1), 0.25)
 	var warm := Color(1.0, 0.78, 0.45)
 	var d := DOOR
@@ -107,7 +107,7 @@ static func build_vault(m: SafeMesh, colour: Color) -> void:
 		m.rect_h(r, GOLD.darkened(0.25), GOLD.lightened(0.15))
 		for k in int(h / 6.0):
 			m.rect(Rect2(r.position.x, r.end.y - 6.0 * (k + 1), r.size.x, 1.2), Color(0.45, 0.3, 0.05, 0.6))
-		m.fill(SafeMesh._ellipse(Vector2(x, r.position.y), Vector2(22, 7), 18), GOLD.lightened(0.35))
+		m.fill(MeshBatch2D._ellipse(Vector2(x, r.position.y), Vector2(22, 7), 18), GOLD.lightened(0.35))
 	# The stack of bars on the floor: four, three, two, one; each a lit top face and a front face.
 	m.glow(Vector2(120, 210), Vector2(460, 170), Color(1.0, 0.8, 0.35, 0.22), 10)
 	for row in 4:
@@ -118,7 +118,7 @@ static func build_vault(m: SafeMesh, colour: Color) -> void:
 
 
 ## A gold bar: front face (120 x 34) at `front` (its top-left), the top face going back.
-static func _bar(m: SafeMesh, front: Vector2, row: int) -> void:
+static func _bar(m: MeshBatch2D, front: Vector2, row: int) -> void:
 	var w := 120.0
 	var h := 34.0
 	var back := Vector2(10.0, -14.0)

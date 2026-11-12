@@ -10,18 +10,10 @@ extends RefCounted
 const SFX_DIR := "res://games/tug_of_war/sfx"
 const TugMusic := preload("res://games/tug_of_war/TugMusic.gd")
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
 	SfxSynth.add_preset_dir(SFX_DIR)
-	for sound in TugMusic.SOUNDS:
-		var rendered := load(TugMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(TugMusic.SOUNDS)
 
 
 static func music_effects() -> Array[AudioEffect]:

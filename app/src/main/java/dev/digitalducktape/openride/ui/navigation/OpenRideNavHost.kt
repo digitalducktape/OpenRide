@@ -20,6 +20,7 @@ import dev.digitalducktape.openride.ui.creator.CreatorRoute
 import dev.digitalducktape.openride.ui.creator.CreatorViewModel
 import dev.digitalducktape.openride.ui.sources.ContentSourcesRoute
 import dev.digitalducktape.openride.ui.sources.ContentSourcesViewModel
+import dev.digitalducktape.openride.ui.about.AboutRoute
 import dev.digitalducktape.openride.ui.update.UpdateRoute
 import dev.digitalducktape.openride.ui.update.UpdateViewModel
 import dev.digitalducktape.openride.ui.main.MainScaffold
@@ -154,6 +155,13 @@ fun OpenRideNavHost(appContainer: AppContainer) {
             )
             UpdateRoute(
                 viewModel = viewModel,
+                onDone = { navController.popBackStack() },
+            )
+        }
+
+        composable(Destinations.About) {
+            AboutRoute(
+                versionName = BuildConfig.VERSION_NAME,
                 onDone = { navController.popBackStack() },
             )
         }

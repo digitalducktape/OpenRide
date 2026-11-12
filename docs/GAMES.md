@@ -254,6 +254,11 @@ starts).
   art, playing, can_previous, can_next}` (`art` a PNG path in the app's cache, or ""), or `{}`
   with nothing. Sent when it changes, and again on the first input-frame poll after a session
   attaches (the engine drops signals sent before it runs). Guarded with `has_signal`.
+  In a game the HUD's Music button hangs off the left end of Pause | End and doesn't count towards
+  the top bar's width (`Hud._ButtonRow`), so a track moves nothing. `game_music_ui_test` plays each
+  wave 2 game with a track: the button's place, the panel and `rider_music`. A new game adds one
+  row to its table.
+  A game with its own callout lane keeps it under the status widget and short of the button.
 - `visit_ended(result_json)`: `{visit_id, ride_id (or null), saved, discarded_reason: "" |
   too_short | no_pedalling | not_recording, next: app | edit_profile | hub, reason: exit | idle |
   app_resumed | replaced}`. Sent after the ride is saved or discarded. Godot calls nothing after
@@ -663,6 +668,7 @@ game is also playable on the desktop: run its scene with F6, or play the project
 | `star_thresholds` | `{easy: [1★, 2★, 3★], standard: […], hard: […]}`: the minimum score for each star |
 | `stars_per_minute` | When true, the thresholds are points per minute of gameplay, so one set fits a 90 s slot and a 30-minute ride |
 | `variant_star_thresholds` | Star thresholds for the game's variants, by variant (e.g. `{"catch": {…}}`); others use `star_thresholds` |
+| `summary_stats` | A one-game summary's extra tiles from the result's `stats`: `[{key, label, suffix, of}]` (`of`: a second stat, shown "3/4"); at most three. Watt Lane shows in-lane %, best streak and steps caught. |
 | `options` | The game's own settings, shown on its hub screen and in the pause screen's **Game options** card: `[{key, label, choices, labels, default}]`, values as strings, plus the optional `where`, `kind`, `cards`, `columns`, `group` and `rider_badge`. See "Game options". |
 
 For work games, set the thresholds so that 3 stars needs about 1.3× effort. A perfect run at
@@ -762,6 +768,9 @@ The `Effort` autoload applies the epic's multiplier (maths in `EffortMeter`):
 `sensors_ok` is 0 and after the end. That is how "sensor loss freezes scoring" is enforced.
 `stats.effort_avg` is the multiplier's average, weighted by time, over the time scoring
 counted.
+
+`Effort.whole_points(points)` is the one rounding of a score: floored, for the HUD and for the
+result's `score` alike, so the summary never differs from the HUD by a point.
 
 ### HUD kit
 
@@ -881,6 +890,23 @@ text, panel, badge and card styles, buttons, a HUD skin, and `pop` / `slam` / `f
   `tests/capture_framework_screens.gd` does the same for the framework's own screens: every
   calibration step and strip, and the summary in its shapes (one game, a new best, no stars, a
   circuit, one ended early, a long one, Kart Race's house look).
+
+### Shared game kits
+
+What more than one game needs lives in the framework, not in the first game that needed it. A new
+game uses these; it never reaches into another game's folder.
+
+| Kit | For |
+|---|---|
+| `GameAudio` (`games/audio/`) | `register(sounds, loops)` in the game's `_ready` (every time: two games may use the same sound name, and the game on screen owns it), `loop_player(name, path)` for a loop the game fades itself, `apply_mix(music_fx, sfx_fx)` for its bus effects |
+| `Hud.show_message(text, color, seconds)` | a timed centre message; the HUD hides it (no timer in the game) |
+| `CalloutBanner` (`framework/ui/`) | callouts in a lane under the status widget, for a game whose hero is mid-screen. `follow(hud, status)` keeps the lane clear of the ride panel and the Music button |
+| `RideMetrics.set_power_source(method)` | the ride panel shows the watts the rules use (a smoothed reading). Pass a bound method of the game |
+| `GaugeBar` (`framework/hud/`) | the status widget's bar: fill, target line, ticks, a best flag, a chequered end, a red alert track |
+| `MeshBatch2D`, `PaintLayer`, `MeshLayer` (`framework/draw/`) | code-drawn 2D: shapes batched into one draw call per layer |
+| `BakedBackdrop` (`framework/draw/`) | a painted 2D backdrop rendered once into a texture at the screen's size, baked again when the window changes |
+| `MeshKit3D`, `StageView3D` (`framework/draw/`) | 3D: merged vertex-coloured meshes, and the low-resolution view with its image, wide-stage fit and quality step |
+| `TimeOfDay` (`framework/`, presets in `framework/tod/`) and `MeshKit3D.model_mesh` (`games/assets/models/`) | an outdoor 3D world's lighting presets, and the shared trees, bushes and rocks |
 
 ### World look (3D)
 
@@ -1057,6 +1083,13 @@ song module per game in `songs/`. See that folder's README. A game's rendered fi
 | Tug of War | Heave Together | 132 bpm, D minor | Stomp-clap sea shanty: strums, accordion, tin whistle, brass | harmony with the rope tight, lead in a surge |
 | Safe Cracker | Night Shift | 120 bpm swung, C minor | Spy jazz: ride and brushes, walking bass, vibes, muted trumpet, sax, spy guitar | harmony and lead while steady; the bed alone while the alarm rings |
 | Cadence Karaoke | Neon Lines | the cadence (70-130 bpm), A major | Synth-funk: slap bass, Rhodes, plucks, supersaw hook | the tempo is the target cadence; the lead only in the band |
+| Watt Lane | Live Wire | 112 bpm, Eb major | Dream-pop electronica: glockenspiel hook over flute, eighth-note piano, plucked arp, sleigh bells, octave bass, supersaw chorus with brass stabs | harmony near the lane, lead only in it |
+| The Pull | Heavy Haul | 116 bpm, E mixolydian | County-fair boogie: chugs, strum, barrelhouse piano, twang guitar, brass and sax | harmony while pulling, lead with the sled rolling or near the best flag or the line |
+| Balloon Pump | Midnight Carousel | 126 bpm swung, D minor | Band-organ carousel, turning to F major in the chorus | harmony while the balloon takes air, lead with the rider over the push line |
+| Keepy Uppy | Updraft | 118 bpm, B-flat major | Summer indie-pop: glockenspiel hook, eighth-note piano, soft strings, bouncy octave bass | harmony from the mid band, lead in the high band |
+| Power Grid | Evening Current | 132 bpm, A-flat major | Bossa nova: nylon guitar, upright bass, cross-stick clave, flugelhorn hook, flute, wordless voices and strings | harmony while meeting demand, lead with the whole town lit |
+| Ready for Launch | Moon Shot | 156 bpm, A minor to C major, final chorus up a tone | Space-age surf: floor-tom gallop, gallop bass, reverb twang riff and tremolo picking, combo organ, gliding theremin hook, horns | harmony (the riff) with fuel flowing and from the count on, lead on the push |
+| Gate Crasher | Clear Round | 138 bpm, G major | Show-ring galop: a gallop-figure hook on brass answered by tin whistle, conga clip-clop, flute verses, a key lift for the last chorus | harmony always, lead at a canter, out for 6 s after a rail |
 | Demo | Warm Up | 122 bpm, F major | Easy house: sub bass, off-beat piano, pluck and supersaw | harmony and lead as cadence nears the target |
 
 **Music that follows a tempo (`SongSequencer`).** Cadence Karaoke's music must play at the rider's
@@ -1604,7 +1637,7 @@ pier into the river; losing pulls the camera in. It follows the tablet recipe (a
 `shaders/tug_look.gdshaderinc`): every surface is unshaded and lit by hand from one table
 (`TugWorld.look_for(preset)`), with no engine lights, fog or post passes.
 
-- `TugMeshes` bakes the statics into one vertex-coloured mesh with painted AO (`KartMeshKit`
+- `TugMeshes` bakes the statics into one vertex-coloured mesh with painted AO (`MeshKit3D`
   shapes): sloped earth banks, reeds, shore rocks, hills, the nature-kit trees, pier frames,
   pilings, torch posts, masts, bunting, string lights, a striped tent and hay bales.
   `scenery.gdshader` reads `COLOR.a` as 1 − sway, `UV.x` as ground grain and `UV.y` as a bulb's
@@ -1623,7 +1656,7 @@ pier into the river; losing pulls the camera in. It follows the tablet recipe (a
   and 35 in play with the tracker on). The sky shader runs only in its cubemap pass (256 a face,
   rebuilt when the time of day changes; the sky is set as the reflection source so the cubemap
   stays up to date) and the background samples it. The vignette is painted into the vertex
-  colours of the grid that draws the view on screen (`TugMeshes.view_image`, a `MeshInstance2D`),
+  colours of the grid that draws the view on screen (`StageView3D.view_image`, a `MeshInstance2D`),
   not in each shader. The water, deck, riverside and crowd haze per vertex
   (`haze_amount`/`hazed` in `tug_look.gdshaderinc`), and the water's flat light is per vertex.
   `prewarm` draws the steam, ripple and droplets behind the intro card so their shaders compile
@@ -1673,7 +1706,7 @@ never in the HUD's centre message, which would cover the dial. `safe_scene_test`
 layout (no overlaps, the needle's sweep, the status budget) and the events.
 
 **Graphics** (`games/safe_cracker/ART_BIBLE.md`, punch list `GFX_POLISH.md`): one heavy steel
-safe in a pool of light. Every shape goes through `SafeMesh`, which batches a node's shapes into
+safe in a pool of light. Every shape goes through `MeshBatch2D`, which batches a node's shapes into
 one `canvas_item_add_triangle_array` with per-vertex colours and a 1.2 px feather for
 antialiasing. In Compatibility each `draw_circle`, `draw_colored_polygon` or `draw_arc` is a draw
 call of its own (the bank's rivets alone were 168), so a whole room, body or door is one call.
@@ -1681,7 +1714,7 @@ Each place has one key light (`SafePlaces.PLACES[i].light`): a smooth pool drawn
 batch, with the safe's steel (`SafePlaces.steel_shade`), bevels and cast shadow agreeing with it.
 The room's batch and the vignette are baked once per place into one texture at the on-screen size
 (`SafeBackdrop.bake`, a SubViewport), shown as one opaque sprite. Each place's room and body are
-built once (`SafeMesh.built`), the next place's while a cracked door stands open.
+built once (`MeshBatch2D.built`), the next place's while a cracked door stands open.
 The door's layers (`SafeDial` docs) redraw only on a change: the needle is a static drawing turned
 by `rotation`; the reading's number has its own text-only layer; the door swing is a perspective
 turn about the hinge in `safe_door.gdshader` (a uniform; the door's thickness comes from UV
@@ -1696,7 +1729,7 @@ with the HUD (86 before the graphics pass; the bank was 258, the lab 125).
 **Tablet cost** (`GFX_POLISH.md`, "Tablet performance"). The tablet is fill-bound and 2D is all
 blended, so what counts is the pixels shaded a frame, seen or not. `tests/measure_safe.gd`
 (needs a window) prints each layer's pixels per place, the batches rebuilt a frame and the build
-times. Shapes under opaque ones have holes (`SafeMesh.round_frame`, `holed_round_rect`, the
+times. Shapes under opaque ones have holes (`MeshBatch2D.round_frame`, `holed_round_rect`, the
 `hollow` of `glow` and `soft_shadow`), and the vault draws only while the door is open. Play
 shades 2.1-2.2 screens a frame (6.9-7.7 before the tablet pass, which read 50 fps on the bike,
 31 in the intro), 3.6 at worst (a crack, or under the intro card).
@@ -1803,6 +1836,58 @@ and a pool and trail on the floor. In the bonus band, sparks fly off the line as
 grade is the shared world look's (`cadence_look.gdshaderinc` sets Cadence's defines); additive
 layers take only its linear parts. `CadenceWorld.ring_z` places the rings for the MultiMesh and
 for the floor's reflections alike (`cadence_world_test`).
+
+## Watt Lane (#78)
+
+Retuned 2026-11 after a real ride on the tablet's bike (FTP 140 W), where easy spinning (100 rpm at
+15%) makes only 26-29 W. In every wave 2 game, light pedalling (about 15% of FTP) keeps the game
+going, the core goal takes about 30-35% of FTP, and the top tier 55-70%. Each game has a test that
+a rider at 30% of FTP reaches its core goal.
+
+A work game (and a low-profile warm-up): **a chevron cursor following an illuminated horizontal
+lane.** Your smoothed power is the chevron's height (more watts, higher); the lane comes in from
+the right and steps up or down. 2D and abstract (rider, 2026-11-02: a lane moving sideways on a
+road read as "lean", and a note-head marker failed the silhouette check). Rules and tuning are in
+`games/watt_lane/DESIGN.md`, the look in `ART_BIBLE.md` (with its silhouette check), the polish in
+`GFX_POLISH.md`, `UI_POLISH.md` and `AUDIO_POLISH.md`. `WattLaneLogic` and `WattLaneCourse` hold
+the rules (`watt_lane_logic_test`), `WattLaneTrack` the lane and the chevron, `WattLaneBackdrop`
+the field, `WattLaneStatus` the HUD widget and `WattLaneAudio` the sounds (`watt_lane_scene_test`).
+
+- **One power number.** The smoothed power (a 3 s window, rounded) is the chevron's height, the
+  lane check and the ride panel's W: the game calls `hud.metrics.set_power_source`, so the panel
+  shows that value, and `set_power_band(lo, hi)` with the rules' band turns it gold exactly when
+  the rules say "in" (`RideMetrics.power_color`; a band with a top is amber above it). The lane's
+  bounds are whole watts on a 5 W grid and the hero shows them as they are.
+- **The lane.** 20% of FTP wide, at least 30 W (easy 25% / 40 W, hard 15% / 30 W); its centre
+  follows a seeded course of slow drifts and steps of over half a lane, at least 20 s apart,
+  within `lane_min_watts`..`lane_max_watts` (Kotlin: work 20-35 / 22-40 / 32-55% of FTP, warm-up
+  18-32%). A range too narrow for those steps widens, never under 15% of FTP. On screen, a faint guide every 12.5% of FTP; time ahead is distance to the right at
+  150 px a second (about 9 s visible).
+- **Steps** are announced 5 s ahead: a chime, a countdown chip ("▲ 175–215 in 5", the arrow
+  drawn), and on the lane a riser of light, whole amber chevrons before the bend and the new watts
+  (56 px, just inside the new lane). Off the lane, the widget says how far: "PUSH 14 W". From 1.5 s before a step to 3.5 s after,
+  either lane counts.
+- **Scoring.** 10 points a second in the lane times a streak (×1 to ×3 over 20 s; it survives
+  1 s outside), through `Effort.award`; a warm-up's points count 1.25×. Stars, points a minute:
+  250, 1200, 2000 (a perfect 1.0× run earns 1550-1800, 2 stars; 1.3× reaches 3).
+- **Look and cost.** Full-canvas 2D, 60 fps on the tablet (31 before the pass in `GFX_POLISH.md`).
+  The field's static layers are baked once and its dots, bokeh and the lane's streaks into a 512 px
+  tile; per frame `wl_field.gdshader` is two reads and the beat lines. The lane is a strip mesh over
+  only the lane and its glow (`wl_lane.gdshader`, its light per vertex from 64-column arrays); the
+  path is a thin strip, and the beam, riser, step chevrons and cursor are small drawings. `tests/capture_watt_lane.gd` takes the review shots.
+- **Thresholds** (2026-11 retune; FTP shares):
+
+  | | Before | After |
+  |---|---|---|
+  | Lane centre, work (easy / standard / hard) | 40-60 / 45-70 / 50-75% | 20-35 / 22-40 / 32-55% |
+  | Lane centre, warm-up | 35-55% | 18-32% |
+  | Lane width floor (easy / standard / hard) | 50 / 40 / 30 W | 40 / 30 / 30 W |
+  | Widened range floor | 30% | 15% |
+  | Stars (points a minute) | 250 / 1200 / 2000 | unchanged |
+
+- **Music.** "Live Wire", dream-pop electronica at 112 bpm in Eb major (`songs/watt_lane.py`): a
+  glockenspiel hook over a flute, eighth-note piano, a plucked arpeggio, a supersaw chorus; the
+  harmony near the lane, the lead only in it, and a hum loop that brightens in the lane.
 
 ## Kart Race (#43)
 
@@ -2094,22 +2179,281 @@ every frame. `capture_kart_hud.gd` prints the same split per viewport on the des
 - the climb crawl floor (2.5 m/s);
 - `SPEED_SCALE` (2.4), which sets how fast the karts feel.
 
+## The Pull (#79)
+
+A sled pull at a county fair at dusk, in first person from the bike. A chain runs back to a steel
+sled whose weight box slides forward as it goes, so every metre needs more watts. Pull until you
+max out: distance is the score. The rules, the tuning and every call are in
+`games/games/the_pull/DESIGN.md`, and the look is in its `ART_BIBLE.md`. `PullLogic` holds the
+rules (headless-tested by `the_pull_logic_test`), `PullWorld` and `PullMeshes` the 3D view,
+`PullStatus` the HUD widget, `PullAudio` the sounds and `PullBests` the rider's best distance
+per difficulty (for the flag on the track). `ThePull.gd` wires them to the framework.
+
+- **Drag:** `FTP × (0.10 + 0.55 × d / d_ref_m)`. Kotlin sends `d_ref_m` (easy 360, standard
+  300, hard 250), so a steady pull at 65% of FTP lasts about 4.5, 3.8 and 3.2 minutes. It also
+  sends `full_factor` (1.12), the Full Pull line as a multiple of `d_ref_m` (72% of FTP there).
+- **Speed** follows the square root of the gap between power smoothed over 1.5 s and the drag
+  (2.5 m/s for a gap of 55% of FTP), eased at 0.6 / 0.5 m/s², never backwards. **Stall:** 5 s in a row
+  below 0.2 m/s, once the sled has rolled 1 m (or 15 s after the horn). "Dig in!" shows 3.5 s
+  before. Sensor loss and pause freeze the sled.
+- **Modes:** `timed_end_mode: game`. Rounds play N pulls with a 60 s rest. A timed ride starts
+  pulls (with a 30 s rest) while at least 10 s would be left after the rest, and lets the last
+  finish. Open plays pulls until the rider ends. An overtime guard ends a pull still going at
+  1.3 × the length,
+  before Kotlin's hard stop. No circuit roles: a custom circuit plays it as a `free` slot, like
+  Kart Race.
+- **Scoring:** 10 points a metre and +500 for a Full Pull, through `award()`. Stars come from
+  the **best single pull's** points, against thresholds of 0.2 / 0.667 / 1.2 × `d_ref_m` × 10
+  (the game sets the result's `stars` itself). 65% of FTP at 1.0× earns 2 stars, and 1.3× earns
+  3; 30% of FTP pulls about a third of `d_ref_m`, 1 star.
+  **Stats:** `distance_m`, `best_distance_m`, `peak_power` (the raw reading, what the ride
+  metrics showed), `pull_sec`, `pulls`, `full_pulls`.
+- **HUD agreement:** the widget never shows the rider's watts. The sled's need appears in the
+  widget's chip and as the ride metrics' power band tick, both from `PullLogic.shown_need()`.
+  Metres come from `PullLogic.shown_m()` everywhere (`the_pull_scene_test`).
+- **Look:** a floodlit clay track, hand-lit like every 3D game here (pools from a `mod`, no
+  loop). One baked scenery mesh, a billboard crowd MultiMesh, the sled with its sliding box and
+  an 18-link chain, a handlebar mirror (a 400×248 SubViewport, every other frame) and a look back
+  over the shoulder at each pull's start. Stands with bunting and bulbs, a cheering crowd,
+  floodlight halos, dust motes, a turning wheel (`GFX_POLISH.md`, `UI_POLISH.md`,
+  `AUDIO_POLISH.md`). 71-74 draw calls in play on the desktop with the HUD.
+- **Thresholds** (2026-11 retune; FTP shares):
+
+  | | Before | After |
+  |---|---|---|
+  | Sled's need at the start | 30% | 10% |
+  | Need at `d_ref_m` | 100% | 65% |
+  | Full Pull line (1.12 × `d_ref_m`) | 108% | 72% |
+  | Gap for 2.5 m/s (`G_FULL`) | 70% | 55% |
+  | Stars (0.2 / 0.667 / 1.2 × `d_ref_m` × 10) | 2 at FTP, 3 with 1.3× | 2 at 65%, 3 with 1.3× |
+
+- **Intro copy:** "Reach the Full Pull line at N m" (from the segment's `d_ref_m` and
+  `full_factor`), or "Your best: N m" once the rider has one. No number is hard-coded.
+- **Captures:** `tests/capture_pull.gd` (review shots; `--play=SECONDS` for a recording) and
+  `tests/render_game_audio.gd --game=the_pull`.
+
+**Camera-off stand-ins (#79).** The Pull is the second camera-free game with no circuit role,
+so "the first camera-free game of the same circuit role" would have swapped a Kart Race slot for
+The Pull. A `free` slot now has no stand-in on all three sides (`SessionPlans.customGame`,
+`CircuitBuilder.stand_in`, `LocalHub`), and Kart Race is still refused without the camera.
+
+## Balloon Pump (#76)
+
+The bike drives a brass air pump; the rider's watts, smoothed over about 2 s, fill a balloon on
+its nozzle. Each balloon pushes back harder as it fills (a push line from 8% to 26% of FTP in
+standard work, 6-22% easy, 10-32% hard, 5-20% in recovery, steepest at the end), so the last part
+asks a little more; below the line it leaks back slowly. A full balloon ties off and floats into the bunch. **Race** fills
+X balloons (4 / 5 / 7) in 2:00 with a time bonus; **Max** fills as many as it can; circuits play
+Max. Points are 100 × the balloon's air (gold ×3) through `award`, so more work is more points.
+`PumpLogic` holds the rules (`pump_logic_test`); `games/balloon_pump/DESIGN.md` is the design
+record.
+
+Thresholds (2026-11 retune; FTP shares, empty to full for a medium balloon, a large ×1.12):
+
+| | Before | After |
+|---|---|---|
+| Push line, work (easy / standard / hard) | 20-45% (all) | 6-22 / 8-26 / 10-32% |
+| Push line, recovery | 15-30% | 5-20% |
+| What 15% of FTP does | nothing (it leaks) | fills a medium about 70% |
+| Stars (points a minute) | 60% at 1.0× is 2, 1.3× is 3 | unchanged |
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the pump and its balloon in a
+warm key light at the fair after dark, in three places (a fair at dusk with a Ferris wheel,
+backstage in a big top, a pier at night), changing after each Race heat or every 6 balloons in
+Max. `PumpPlaces` and `PumpArt` draw the room and the pump into one `MeshBatch2D` batch, baked once
+per place; `PumpStage` adds the live layers (the plunger moving with the cadence, the gauge's
+needle and push wedge, the balloon and the bunch shaded per pixel by `pump_balloon.gdshader`,
+twinkling bulbs, confetti). `pump_layout_test` keeps every element inside the stage and clear of
+the HUD at its extremes. **Music:** "Midnight Carousel" (`AUDIO_POLISH.md`).
+
+## Keepy Uppy (#77)
+
+Keep a balloon in the air over a fan the bike drives, while the weather tries to push it down. The
+rider's watts, smoothed over about 2 s, hold it at height h (0-1) when they reach
+`weight_watts + height_watts × h`. `KeepyLogic` holds the rules (`keepy_logic_test`,
+`keepy_scene_test`), and `games/keepy_uppy/DESIGN.md` is the design record. A work game; Kotlin
+sends `weight_watts` (6 / 8 / 10% of FTP), `height_watts` (65 / 75 / 85%), `rain_watts` (4%),
+`bird_watts` (2%) and `downdraft_watts` (8%). Below its need the balloon sinks at most 0.06 a
+second (0.10 in a downdraft), and "Sinking!" shows below 15% height, seconds before the grille.
+
+Thresholds (2026-11 retune; FTP shares, standard):
+
+| | Before | After |
+|---|---|---|
+| Model | lift = power × (1 − 0.45 h) against 40% | need = 8% + 75% × h |
+| Floats low, just off the grille | about 41% | about 10-15% |
+| Mid band (from h 0.35, now 0.25) | 47% | 27% (intro target: about 30%) |
+| High band (from h 0.65) | 57% | 57% |
+| Rain / bird / downdraft | 10 / 5 / 20% | 4 / 2 / 8% |
+| Fastest sink (in a downdraft) | 0.15 (0.25) a second | 0.06 (0.10) a second |
+| Stars (points a minute) | 500 / 1100 / 2000 | unchanged (bands, not watts) |
+
+- **Scoring:** the low, mid and high bands score 1×, 2× and 3× of 10 points a second through
+  `award`, and only with the power to lift the balloon off the grille. Hitting the ground pops it:
+  -50 points through `penalize`, then a new balloon 3 s later. No lives. Stars are points a minute
+  (500 / 1100 / 2000). **Stats:** `pops`, `seconds_high`, `birds_shaken`, `avg_power`,
+  `downdrafts`, `downdrafts_beaten`, `best_air`.
+- **Weather:** one force at a time, each announced at least 2 s ahead: a rain cloud, birds (up to
+  three; hold the high band 3 s to shake them off) or a downdraft.
+- **Modes:** minutes and circuits end on the timer, open when the rider ends it. A round is 60 s
+  of air time.
+- **Steer** (a rider option, off by default): wind drifts the balloon and the rider leans to keep
+  the fan under it. Tracker `off` otherwise, so `usesCamera` stays false (Tug of War's precedent).
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the balloon near the centre of
+the screen above an illustrated pedal fan, in four lit outdoor places (the **Place** option, or a
+new one every 3 minutes on random). **Music:** "Updraft" (`AUDIO_POLISH.md`).
+
+## Power Grid (#81)
+
+The bike turns the generator for a valley town at dusk. Demand follows an evening curve; the rider's
+watts, averaged over about 5 s, meet it at 90% of it, and only while pedalling (30 rpm). `GridLogic`
+holds the rules (`grid_logic_test`), and `games/power_grid/DESIGN.md` is the design record. It plays
+all four circuit roles and Just Rides (minutes, open). Kotlin sends `demand_lo_watts`,
+`demand_hi_watts` (12-27 / 15-33 / 20-45% of FTP in work, 12-27% in a warm-up or cool-down, 12-22% in
+a recovery) and `storm_watts` (15%).
+
+Thresholds (2026-11 retune; FTP shares of demand, met at 90% of it):
+
+| | Before | After |
+|---|---|---|
+| Work (easy / standard / hard) | 40-60 / 45-70 / 50-75% | 12-27 / 15-33 / 20-45% |
+| Warm-up, cool-down | 30-50% | 12-27% |
+| Recovery | 30-42% | 12-22% |
+| Storm repair | demand + 15% | unchanged |
+| Stars (points a minute) | 200 / 600 / 1000 | unchanged (districts, not watts) |
+
+- **Districts:** houses, street lamps, the funfair and the stadium come online as demand rises,
+  each announced 4 s ahead. Falling short dims the newest, then turns it off; catching up relights
+  it. Nothing is ever lost. A cool-down runs the curve backwards: the town goes to bed.
+- **Evenings:** a work ride over 5 minutes is several evenings, each winding down into the next.
+- **Storms (work only):** lightning warns 3 s ahead, then a line goes down; 10 s at demand plus 15% of
+  FTP restores it for 100 points, or the crew fixes it after 30 s for none.
+- **Scoring:** 5 points a second per district lit while meeting demand, through `award`. Stars are
+  points a minute (200 / 600 / 1000). Easy roles have no multiplier, so a 1.4 gain stands in for it.
+  **Stats:** `lit_pct`, `districts_max`, `districts_total`, `storms`, `storms_restored`, `avg_power`,
+  `evenings`.
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`, `UI_POLISH.md`): one illustrated
+scene, the valley and the generator shed, baked in a dusk and a night palette and blended in one opaque
+shader as the evening goes on. Every light in the town is one mesh (`GridLights`) read against four
+uniform levels, so a district comes on window by window with no redraw. `grid_layout_test` keeps
+every prop inside the stage and clear of the HUD. **Music:** "Evening Current" (`AUDIO_POLISH.md`).
+
+## Ready for Launch (#82)
+
+Each round is one rocket launch of about 90 s: fuel it with a steady effort (45 s), keep spinning
+through the count (10 s), push all out at liftoff (18 s), then coast (15 s). The climb is power × a
+fuel multiplier of 0.5 to 1.5, past the clouds, the edge of space, orbit and the Moon. `LaunchLogic`
+holds the rules (`launch_logic_test`, `launch_scene_test`); `games/ready_for_launch/DESIGN.md` is the
+design record. A work game; Kotlin sends `fuel_line_watts` (8 / 10 / 15% of FTP),
+`fuel_full_watts` (28 / 30 / 35%) and `push_watts` (50 / 60 / 70%), the push's target; the plan's
+`target_watts` (105% of FTP) is no longer used. The clamps let go at 20% of the push's target.
+
+Thresholds (2026-11 retune; FTP shares, easy / standard / hard):
+
+| | Before | After |
+|---|---|---|
+| Fuel line | 45 / 50 / 55% | 8 / 10 / 15% |
+| Full tank held | 55 / 60 / 65% | 28 / 30 / 35% |
+| Push target | the plan's 90 / 105 / 120% | 50 / 60 / 70% |
+| Lift-off | 25% of the target | 20% of the target |
+| Stars (points a minute) | 300 / 950 / 2000 | unchanged (the Moon at 1.3× is 3) |
+
+- **Scoring:** 40 points a climb unit plus 100 / 200 / 300 / 500 at the milestones, through `award`,
+  only from climb while pedalling; the Moon caps a launch at 2460. Stars are points a minute (300 /
+  950 / 2000). **Stats:** `launches`, `best_altitude`, `fuel_pct_avg`, `peak_power`, `moons`.
+- **Slots:** launches share a slot evenly (`floor(sec / 90)`), the spare time going to fuelling and
+  the coast and scaling the points. `min_sec` is 90, so a 1:30 slot plays one launch.
+- **Watts** show only in the ride panel, the rules' smoothed figure (`set_power_source`).
+
+**Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): a stepped, finned rocket on a pad
+at three lit places; the climb scrolls the ground away by hand (no `Camera2D`, which would fight
+`Stage`) to the sky, the Earth (`rfl_earth.gdshader` over `earth_map.png`, generated by
+`tools/art/make_earth_map.py`) and the Moon. **Music:** "Moon Shot" (`AUDIO_POLISH.md`).
+
+## Gate Crasher (#80)
+
+Show jumping in first person from the saddle: pedal to canter round a course of fences, and stand
+up on the bike at each take-off line. `games/games/gate_crasher/DESIGN.md` has the rules, the tuning
+and every call, and its `ART_BIBLE.md` the look. `GateLogic` holds the rules
+(`gate_crasher_logic_test`), `GateCourse` the loop, `GateWorld` and `GateMeshes` the 3D view,
+`GateStatus` the HUD widget, and `GateCrasher.gd` wires them (`gate_crasher_scene_test`, with the
+bounds checks).
+
+- **Camera only:** `tracker_mode` `lean_stand` and `usesCamera`, so a camera-off circuit skips it.
+- **The window includes the detector's lag.** Kotlin sends `window_sec` (1.4 easy, else 1.2) and
+  `stand_lag_sec` (0.5, `standEnterMs`). A stand within half a window of the line counts; it reads
+  0.5 s later, so `GateLogic` opens the window at `window_sec / 2 - lag` before the line. Only a
+  stand that starts in the window counts. Fences are at least 5 s apart at the 10 m/s cap.
+- **Pace:** Kotlin sends `pace_watts`, the ride panel's band. The horse walks from 10% of pace,
+  canters at pace and tops out at 1.3×. Under 30 rpm the horse stops, and nothing scores.
+
+  | 2026-11 retune (FTP shares) | Before | After |
+  |---|---|---|
+  | Pace (easy / standard / hard) | 45 / 55 / 65% | 25 / 32 / 42% |
+  | Top speed (1.3 × pace, standard) | 72% | 42% |
+  | Stars (points a minute) | 220-300 / 500-600 / 860-900 | unchanged (clears, not watts) |
+- **Scoring:** 50 a clear, 0.25 a metre, 100 a clear round; a rail is 4 faults and -30. Stars are
+  points a minute.
+- **Lost camera** (any `tracker_state` but tracking): the horse circles, judging nothing, and comes
+  out with a whole countdown ahead.
+- **Captures:** `tests/capture_gate.gd` (`--play=SECONDS`, `--silhouette`) and
+  `tests/render_game_audio.gd --game=gate_crasher`.
+
 ## Circuits and the Games hub (#37, #38)
 
-**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min Cadence Karaoke
-warm-up, N blocks of Tug of War 1:00, Safe Cracker 1:30, Dodge Ball 1:30 and Cadence Karaoke
-1:30, and a 3 min cool-down, each after a 10 s intro card (20 min = 2 blocks, 18:40; 30 min = 4,
-31:00; 45 min = 6, 43:20). It is one `SessionPlan`, recorded as one ride.
+**Circuits.** A circuit is a preset of slots (`CircuitPresets`): a 3 min warm-up, N blocks of
+work 1:00, recovery 1:30, work 1:30 and recovery 1:30, and a 3 min cool-down, each after a 10 s
+intro card (20 min = 2 blocks, 18:40; 30 min = 4, 31:00; 45 min = 6, 43:20). It is one
+`SessionPlan`, recorded as one ride. A preset is only the shape (roles and lengths): the games are
+drawn per ride.
+
+**The circuit pool (#75).** `SessionPlans.circuit` fills each slot with `CircuitDraw`, in
+circuit order:
+
+- **Pools come from the catalog.** A role's pool is `GameCatalog.circuitPool(role, cameraGames)`:
+  every game that declares the role in its `GameDeclaration.roles`, without the demo. A new game
+  joins circuits by declaring roles there and nowhere else. A game with no roles (Kart Race, The
+  Pull) only plays a custom circuit's `free` slot.
+- **It fits.** A game fills a slot only if the slot's length is within its `minSec`..`maxSec`
+  (a 90 s game takes the 1:30 work slot, never the 1:00 one).
+- **No repeats until the pool is used up.** Each role keeps a shuffled bag; a slot takes the first
+  game in the bag that fits, so a game repeats in a role only once every game that fits that slot
+  has played. Then the bag refills, with the game just played at its end. A slot prefers a game
+  that fits fewer of the role's lengths, so the long slots use up the games only they can play.
+  It never repeats the slot before's game when another fits (Cadence Karaoke's recovery then its
+  cool-down, say). That wins over the bag's round: when the only game left in a role's bag is the
+  one that played the slot before (a game in two pools, like Balloon Pump's work and recovery),
+  the role's next round starts early, with that game first in it (#76).
+- **A fresh mix every ride (rider decision).** The draw is seeded: same seed, same lineup.
+  `GameVisitManager` takes a random seed per visit and draws plan *n* of the visit with
+  `seed + n`; `hub_state.circuits` shows the lineup that seed draws, so the hub shows what plays.
+- **No camera.** With `cameraGames = false` (the rider turned camera games off, or refused the
+  permission) the pools leave out every game that declares `usesCamera` (today Dodge Ball and Kart
+  Race; Tug of War's camera is an option, so it stays). The shape and the circuit's id don't
+  change.
+- **Bests stay per circuit length** (`circuit-20`, ...), whichever games played (`planBest`).
+- A slot no game fits plays the stand-in (the demo).
+- `SessionPlansTest` pins it with today's catalog and an eleven-game fake one: deterministic per
+  seed, every slot of its role and fitting, no repeats before the pool is used up, a 45 min
+  circuit covering the work and recovery pools, and the camera-off pools.
+- **On a desktop** `LocalHub.draw_slots` does the same from the `hub_state` catalog (its own
+  shuffle, so a seed's mix differs from the bike's), and lists every registered game (`ORDER`
+  first, then the rest by id). `local_hub_test` pins it with an eleven-game catalog.
 
 - **Progress strip.** From `session_started`, `Hud.circuit_strip` (`CircuitStrip`) shows a pill
   per segment above the game's widgets: as wide as the segment is long, in the role's colour (work
   warm, recovery cool); done pills are dimmed, the current one is outlined and fills as it plays.
   Its line says "3 of 10 · 14:02 left" (the rest of the segment plus every later segment and its
   10 s card). A Just Ride hides it. `circuit_strip_test` pins the pills, the time and the layout.
-- **No camera.** `SessionRequest.Circuit.cameraGames = false` (the rider turned camera games off,
-  or refused the permission) swaps each camera game's slot for the next game of its role that
-  doesn't use the camera (Dodge Ball becomes Tug of War), keeping the slot's role, length and the
-  circuit's id.
+- **The hub with many games (#75).** Up to five game cards share the home screen's row. More page
+  through four at a time between two 120 px page buttons (`HomeScreen.ROW_MAX`, `PAGE_SIZE`):
+  paging, not a scroll, because a whole card is its tap target and a big button is easy to hit
+  while pedalling. The builder's "Add a game" tiles wrap at six a row (`TILE_COLUMNS_MAX`). A
+  circuit's screen lists its games as chips on one line, the rest as "+3 more". A game whose
+  title is long needs a short name in `LineupStrip.SHORT` for the builder's tiles.
+  `hub_layout_test` lays out an eleven-game catalog (`HubState.test_ids`).
 - **Already there from #34/#35:** the intro card with its Skip button, music across cards, the
   per-segment summary and bests per circuit length (`GameResultDao.planBest`).
 - **The summary.** A circuit lists every planned game: the ones the session never reached say "not played", and the heading reads "Session ended early" instead of "Circuit complete". The best line says "New personal best!" (with the best before it) or "Your best: 5400 points, 2 stars"; Kotlin sends `previous_score` and `previous_stars` alongside the beaten flags. A Just Ride shows its one game.

@@ -6,7 +6,8 @@ extends Button
 ## changes. A disabled one fades its icon (the shape and the fade, never colour alone).
 
 const TOOLTIPS := {"up": "Move up", "down": "Move down", "remove": "Remove", "previous": "Previous",
-	"play": "Play", "pause": "Pause", "next": "Next", "music": "Music"}
+	"play": "Play", "pause": "Pause", "next": "Next", "music": "Music", "left": "More games",
+	"right": "More games"}
 
 var icon_name := ""
 
@@ -41,6 +42,10 @@ func _draw() -> void:
 		"next":
 			b.convex(PackedVector2Array([c + Vector2(-26, -26), c + Vector2(14, 0), c + Vector2(-26, 26)]), ink)
 			b.quad(c + Vector2(16, -26), c + Vector2(26, -26), c + Vector2(26, 26), c + Vector2(16, 26), ink)
+		"left":
+			b.convex(PackedVector2Array([c + Vector2(-26, 0), c + Vector2(20, -30), c + Vector2(20, 30)]), ink)
+		"right":
+			b.convex(PackedVector2Array([c + Vector2(26, 0), c + Vector2(-20, 30), c + Vector2(-20, -30)]), ink)
 		"music":
 			b.note(c, 1.0, ink)
 		"previous":

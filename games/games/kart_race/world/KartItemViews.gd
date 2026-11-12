@@ -601,20 +601,20 @@ func _glow(color: Color, strength := 1.0, pulse := 0.2, hz := 2.0) -> ShaderMate
 
 
 func _build_pod_pools() -> void:
-	var glass := KartMeshKit.capsule(0.52, 1.5, 8, 2)
-	var core := KartMeshKit.sphere(0.27, 4, 2)  # a faceted gem
+	var glass := MeshKit3D.capsule(0.52, 1.5, 8, 2)
+	var core := MeshKit3D.sphere(0.27, 4, 2)  # a faceted gem
 	var halo := PlaneMesh.new()
 	halo.size = Vector2(2.4, 2.4)
-	var glass_node := KartMeshKit.multimesh_node(glass, [], "PodGlass")
+	var glass_node := MeshKit3D.multimesh_node(glass, [], "PodGlass")
 	_pod_glass = _custom_mm(glass_node, glass)
 	glass_node.material_override = _mat("item_glass.gdshader")
 	add_child(glass_node)
-	var band := KartMeshKit.torus(0.5, 0.6, 20, 4)
-	var band_node := KartMeshKit.multimesh_node(band, [], "PodBands")
+	var band := MeshKit3D.torus(0.5, 0.6, 20, 4)
+	var band_node := MeshKit3D.multimesh_node(band, [], "PodBands")
 	_pod_band = _custom_mm(band_node, band)
 	band_node.material_override = _mat("item_glow.gdshader", {"per_instance": true, "pulse": 0.3, "pulse_hz": 1.0})
 	add_child(band_node)
-	var core_node := KartMeshKit.multimesh_node(core, [], "PodCores")
+	var core_node := MeshKit3D.multimesh_node(core, [], "PodCores")
 	_pod_core = _custom_mm(core_node, core)
 	core_node.material_override = _mat("item_glow.gdshader", {"per_instance": true, "pulse": 0.15, "pulse_hz": 1.5})
 	add_child(core_node)
@@ -623,7 +623,7 @@ func _build_pod_pools() -> void:
 	halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	halo_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	halo_mat.vertex_color_use_as_albedo = true
-	halo_mat.albedo_texture = KartMeshKit.soft_disc(64)
+	halo_mat.albedo_texture = MeshKit3D.soft_disc(64)
 	halo_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	halo_mat.disable_fog = true
 	halo.material = halo_mat
@@ -690,8 +690,8 @@ func _billboards(node_name: String, count: int) -> MultiMesh:
 
 
 func _shard_pool(node_name: String, count: int) -> MultiMesh:
-	var mesh := KartMeshKit.prism(Vector3(1.0, 1.2, 0.25))
-	var node := KartMeshKit.multimesh_node(mesh, [], node_name)
+	var mesh := MeshKit3D.prism(Vector3(1.0, 1.2, 0.25))
+	var node := MeshKit3D.multimesh_node(mesh, [], node_name)
 	var mm := _custom_mm(node, mesh)
 	mm.instance_count = count
 	mm.visible_instance_count = 0
@@ -731,16 +731,16 @@ func _make_puck(i: int) -> Dictionary:
 	root.name = "Puck%d" % i
 	root.visible = false
 	add_child(root)
-	var kit := KartMeshKit.new()
-	kit.add(KartMeshKit.cylinder(0.42, 0.45, 0.26, 16), KartMeshKit.xf(Vector3.ZERO), Color(0.14, 0.16, 0.3, 0.9))
-	kit.add(KartMeshKit.cylinder(0.3, 0.36, 0.06, 16), KartMeshKit.xf(Vector3(0, 0.15, 0)), Color(0.95, 0.95, 1.0, 0.9))
-	kit.add(KartMeshKit.cylinder(0.12, 0.12, 0.05, 10), KartMeshKit.xf(Vector3(0, 0.19, 0)), Color(1.0, 0.55, 0.12, 0.9))
+	var kit := MeshKit3D.new()
+	kit.add(MeshKit3D.cylinder(0.42, 0.45, 0.26, 16), MeshKit3D.xf(Vector3.ZERO), Color(0.14, 0.16, 0.3, 0.9))
+	kit.add(MeshKit3D.cylinder(0.3, 0.36, 0.06, 16), MeshKit3D.xf(Vector3(0, 0.15, 0)), Color(0.95, 0.95, 1.0, 0.9))
+	kit.add(MeshKit3D.cylinder(0.12, 0.12, 0.05, 10), MeshKit3D.xf(Vector3(0, 0.19, 0)), Color(1.0, 0.55, 0.12, 0.9))
 	for k in 3:
 		var a := TAU * k / 3.0
-		kit.add(KartMeshKit.box(Vector3(0.08, 0.04, 0.2)), KartMeshKit.xf(Vector3(sin(a) * 0.22, 0.19, cos(a) * 0.22), Vector3(0, rad_to_deg(a), 0)), Color(1.0, 0.55, 0.12, 0.9))
-	var body := KartMeshKit.mesh_node(kit.commit(), KartLook.kart_material(true), "Body")
+		kit.add(MeshKit3D.box(Vector3(0.08, 0.04, 0.2)), MeshKit3D.xf(Vector3(sin(a) * 0.22, 0.19, cos(a) * 0.22), Vector3(0, rad_to_deg(a), 0)), Color(1.0, 0.55, 0.12, 0.9))
+	var body := MeshKit3D.mesh_node(kit.commit(), KartLook.kart_material(true), "Body")
 	root.add_child(body)
-	var rim := KartMeshKit.mesh_node(KartMeshKit.torus(0.4, 0.55, 18, 6), _glow(PUCK_COLOR, 1.1, 0.25, 4.0), "Rim")
+	var rim := MeshKit3D.mesh_node(MeshKit3D.torus(0.4, 0.55, 18, 6), _glow(PUCK_COLOR, 1.1, 0.25, 4.0), "Rim")
 	rim.scale = Vector3(1.0, 0.7, 1.0)
 	root.add_child(rim)
 	var trail := _trail_node("PuckTrail%d" % i)
@@ -753,42 +753,42 @@ func _make_drone(i: int) -> Dictionary:
 	root.name = "Drone%d" % i
 	root.visible = false
 	add_child(root)
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	var hull := Color(0.96, 0.96, 0.98, 0.95)
 	var dark := Color(0.12, 0.13, 0.2, 0.6)
 	var accent := Color(0.2, 0.7, 1.0, 0.95)
-	kit.add(KartMeshKit.sphere(0.3, 12, 6), KartMeshKit.xf(Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.55, 1.25)), hull)
-	kit.add(KartMeshKit.sphere(0.17, 10, 5, true), KartMeshKit.xf(Vector3(0, 0.1, -0.12), Vector3.ZERO, Vector3(1.0, 0.8, 1.2)), dark)
-	kit.add(KartMeshKit.box(Vector3(0.36, 0.06, 0.12)), KartMeshKit.xf(Vector3(0, -0.08, 0.32)), accent)
+	kit.add(MeshKit3D.sphere(0.3, 12, 6), MeshKit3D.xf(Vector3.ZERO, Vector3.ZERO, Vector3(1.0, 0.55, 1.25)), hull)
+	kit.add(MeshKit3D.sphere(0.17, 10, 5, true), MeshKit3D.xf(Vector3(0, 0.1, -0.12), Vector3.ZERO, Vector3(1.0, 0.8, 1.2)), dark)
+	kit.add(MeshKit3D.box(Vector3(0.36, 0.06, 0.12)), MeshKit3D.xf(Vector3(0, -0.08, 0.32)), accent)
 	for k in 4:
 		var x := 0.42 if k % 2 == 0 else -0.42
 		var z := 0.36 if k < 2 else -0.36
-		kit.add(KartMeshKit.box(Vector3(0.05, 0.05, 0.6)), KartMeshKit.xf(Vector3(x * 0.5, 0.0, z * 0.5), Vector3(0, rad_to_deg(atan2(x, z)), 0)), dark)
-		kit.add(KartMeshKit.cylinder(0.07, 0.08, 0.1, 8), KartMeshKit.xf(Vector3(x, 0.03, z)), accent)
-	var body := KartMeshKit.mesh_node(kit.commit(), KartLook.kart_material(true), "Body")
+		kit.add(MeshKit3D.box(Vector3(0.05, 0.05, 0.6)), MeshKit3D.xf(Vector3(x * 0.5, 0.0, z * 0.5), Vector3(0, rad_to_deg(atan2(x, z)), 0)), dark)
+		kit.add(MeshKit3D.cylinder(0.07, 0.08, 0.1, 8), MeshKit3D.xf(Vector3(x, 0.03, z)), accent)
+	var body := MeshKit3D.mesh_node(kit.commit(), KartLook.kart_material(true), "Body")
 	root.add_child(body)
 	# The rotors: blurred discs, the blades swept by their shader.
 	for k in 4:
 		var x := 0.42 if k % 2 == 0 else -0.42
 		var z := 0.36 if k < 2 else -0.36
-		var disc := KartMeshKit.mesh_node(_rotor_mesh(), _rotor_material(), "Rotor%d" % k)
+		var disc := MeshKit3D.mesh_node(_rotor_mesh(), _rotor_material(), "Rotor%d" % k)
 		disc.position = Vector3(x, 0.1, z)
 		disc.rotation.y = float(k) * 0.9
 		root.add_child(disc)
-	var red := KartMeshKit.mesh_node(KartMeshKit.sphere(0.07, 6, 3), _glow(Color(1.0, 0.15, 0.1), 2.0, 0.0), "Red")
+	var red := MeshKit3D.mesh_node(MeshKit3D.sphere(0.07, 6, 3), _glow(Color(1.0, 0.15, 0.1), 2.0, 0.0), "Red")
 	red.position = Vector3(-0.32, 0.0, 0.05)
 	root.add_child(red)
-	var green := KartMeshKit.mesh_node(KartMeshKit.sphere(0.07, 6, 3), _glow(Color(0.2, 1.0, 0.3), 2.0, 0.0), "Green")
+	var green := MeshKit3D.mesh_node(MeshKit3D.sphere(0.07, 6, 3), _glow(Color(0.2, 1.0, 0.3), 2.0, 0.0), "Green")
 	green.position = Vector3(0.32, 0.0, 0.05)
 	root.add_child(green)
-	var strobe := KartMeshKit.mesh_node(KartMeshKit.sphere(0.09, 6, 3), _glow(Color(1, 1, 1), 2.5, 0.0), "Strobe")
+	var strobe := MeshKit3D.mesh_node(MeshKit3D.sphere(0.09, 6, 3), _glow(Color(1, 1, 1), 2.5, 0.0), "Strobe")
 	strobe.position = Vector3(0.0, -0.17, 0.0)
 	root.add_child(strobe)
 	# A cyan eye at the front: the seeker.
-	var eye := KartMeshKit.mesh_node(KartMeshKit.sphere(0.06, 6, 3), _glow(Color(0.3, 0.9, 1.0), 2.0, 0.4, 3.0), "Eye")
+	var eye := MeshKit3D.mesh_node(MeshKit3D.sphere(0.06, 6, 3), _glow(Color(0.3, 0.9, 1.0), 2.0, 0.4, 3.0), "Eye")
 	eye.position = Vector3(0.0, -0.02, -0.37)
 	root.add_child(eye)
-	var lock := KartMeshKit.mesh_node(KartMeshKit.torus(1.15, 1.35, 28, 4), _glow(Color(1.0, 0.18, 0.2), 1.2, 0.4, 5.0), "LockRing%d" % i)
+	var lock := MeshKit3D.mesh_node(MeshKit3D.torus(1.15, 1.35, 28, 4), _glow(Color(1.0, 0.18, 0.2), 1.2, 0.4, 5.0), "LockRing%d" % i)
 	lock.scale = Vector3(1.0, 0.15, 1.0)
 	lock.visible = false
 	add_child(lock)
@@ -848,7 +848,7 @@ void fragment() {
 
 func _trail_node(node_name: String) -> MeshInstance3D:
 	var im := ImmediateMesh.new()
-	var node := KartMeshKit.mesh_node(im, _mat("item_trail.gdshader"), node_name)
+	var node := MeshKit3D.mesh_node(im, _mat("item_trail.gdshader"), node_name)
 	node.custom_aabb = _everywhere()
 	node.visible = false
 	add_child(node)
@@ -857,7 +857,7 @@ func _trail_node(node_name: String) -> MeshInstance3D:
 
 func _make_goo(i: int) -> Dictionary:
 	var mat := _mat("item_goo.gdshader")
-	var node := KartMeshKit.mesh_node(_goo_mesh(i), mat, "Goo%d" % i)
+	var node := MeshKit3D.mesh_node(_goo_mesh(i), mat, "Goo%d" % i)
 	node.visible = false
 	add_child(node)
 	return {"node": node, "mat": mat, "goo": null, "gone": 0.0}
@@ -903,7 +903,7 @@ static func _goo_mesh(variant: int) -> ArrayMesh:
 					st.add_vertex(tri[k])
 	var mesh := st.commit()
 	# Droplets.
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.add_baked(mesh, Transform3D.IDENTITY)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 900 + variant
@@ -911,13 +911,13 @@ static func _goo_mesh(variant: int) -> ArrayMesh:
 		var a := rng.randf() * TAU
 		var r := radius * rng.randf_range(1.12, 1.45)
 		var s := rng.randf_range(0.07, 0.16)
-		kit.add(KartMeshKit.sphere(s, 8, 4, true), KartMeshKit.xf(Vector3(cos(a) * r, 0.0, sin(a) * r), Vector3.ZERO, Vector3(1.0, 0.55, 1.0)), Color(1, 1, 1, 0.3))
+		kit.add(MeshKit3D.sphere(s, 8, 4, true), MeshKit3D.xf(Vector3(cos(a) * r, 0.0, sin(a) * r), Vector3.ZERO, Vector3(1.0, 0.55, 1.0)), Color(1, 1, 1, 0.3))
 	return kit.commit()
 
 
 func _make_shield(i: int) -> Dictionary:
 	var mat := _mat("item_shield.gdshader", {"color": SHIELD_COLOR})
-	var node := KartMeshKit.mesh_node(KartMeshKit.sphere(SHIELD_RADIUS, 20, 10), mat, "Shield%d" % i)
+	var node := MeshKit3D.mesh_node(MeshKit3D.sphere(SHIELD_RADIUS, 20, 10), mat, "Shield%d" % i)
 	node.scale = Vector3(1.0, 0.82, 1.15)
 	node.visible = false
 	add_child(node)
@@ -932,10 +932,10 @@ func _make_magnet(i: int) -> Dictionary:
 	tube.height = 1.0
 	tube.radial_segments = 10
 	tube.rings = 1
-	var beam := KartMeshKit.mesh_node(tube, mat, "MagnetBeam%d" % i)
+	var beam := MeshKit3D.mesh_node(tube, mat, "MagnetBeam%d" % i)
 	beam.visible = false
 	add_child(beam)
-	var grip := KartMeshKit.mesh_node(KartMeshKit.torus(0.55, 0.75, 20, 4), _glow(MAGNET_COLOR, 1.3, 0.4, 6.0), "MagnetGrip%d" % i)
+	var grip := MeshKit3D.mesh_node(MeshKit3D.torus(0.55, 0.75, 20, 4), _glow(MAGNET_COLOR, 1.3, 0.4, 6.0), "MagnetGrip%d" % i)
 	grip.visible = false
 	add_child(grip)
 	return {"beam": beam, "mat": mat, "grip": grip}

@@ -36,6 +36,13 @@ const LOOKS := {
 	"tug_of_war": [Color("ff9f1c"), Color("2a160b")],
 	"safe_cracker": [Color("e8b04a"), Color("14110d")],
 	"cadence_karaoke": [Color(1.0, 0.45, 0.8), Color("12052a")],
+	"watt_lane": [Color("f0875a"), Color("0f1a2e")],
+	"the_pull": [Color("5fd068"), Color("10200f")],
+	"balloon_pump": [Color("ff5fa2"), Color("2b0f2a")],
+	"keepy_uppy": [Color("ff7a59"), Color("12233a")],
+	"power_grid": [Color("8fd8ff"), Color("151336")],
+	"ready_for_launch": [Color("2fd6c8"), Color("0a1a2e")],
+	"gate_crasher": [Color("2fc4b2"), Color("0c2a2e")],
 }
 
 static var _looks := {}

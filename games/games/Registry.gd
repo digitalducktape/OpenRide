@@ -11,6 +11,13 @@ const GAMES := {
 	"safe_cracker": "res://games/safe_cracker/SafeCracker.tscn",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceKaraoke.tscn",
 	"kart_race": "res://games/kart_race/KartRace.tscn",
+	"watt_lane": "res://games/watt_lane/WattLane.tscn",
+	"the_pull": "res://games/the_pull/ThePull.tscn",
+	"balloon_pump": "res://games/balloon_pump/BalloonPump.tscn",
+	"keepy_uppy": "res://games/keepy_uppy/KeepyUppy.tscn",
+	"power_grid": "res://games/power_grid/PowerGrid.tscn",
+	"ready_for_launch": "res://games/ready_for_launch/ReadyForLaunch.tscn",
+	"gate_crasher": "res://games/gate_crasher/GateCrasher.tscn",
 }
 
 static var _infos := {}

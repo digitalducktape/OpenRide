@@ -1,6 +1,7 @@
 """The game music renderer (#43, #55): the instruments. Each takes (midi or a chord, seconds, velocity,
 rng, **options) and returns a mono buffer, except where noted. All synthesised; original code."""
 import numpy as np
+from scipy.signal import lfilter
 from dsp import SR, hz, secs, osc, vibrato, adsr, expdec, fade_out, lp, hp, bp, sweep_lp, drive, ks, peak_eq
 from dsp import lp as dsp_lp
 
@@ -347,6 +348,47 @@ def sax(m, dur, vel, rng):
     return fade_out(y) * vel
 
 
+def theremin(notes, vel, rng):
+    """A whole gliding phrase, [(start sec, seconds, midi), ...], as one continuous voice: pitch
+    slides between notes (the hand moving), a wide vibrato blooms on held notes, and the level
+    closes only at rests. That glide is what per-note synth leads can't do."""
+    last = notes[-1]
+    n = secs(last[0] + last[1] + 0.4)
+    target = np.full(n, float(notes[0][2]))
+    gate = np.zeros(n)
+    since = np.zeros(n)
+    for k, (at, dur, m) in enumerate(notes):
+        a = secs(at)
+        b = secs(notes[k + 1][0]) if k + 1 < len(notes) else n
+        target[a:b] = m
+        gate[a:min(secs(at + dur * 0.97), n)] = 1.0
+        since[a:b] = np.arange(b - a) / SR
+    # Slide: a one-pole glide of the pitch; level: a soft attack and release.
+    pitch = lfilter([1 - np.exp(-1 / (0.05 * SR))], [1, -np.exp(-1 / (0.05 * SR))], target - target[0]) + target[0]
+    level = lfilter([1 - np.exp(-1 / (0.03 * SR))], [1, -np.exp(-1 / (0.03 * SR))], gate)
+    t = np.arange(n) / SR
+    wide = np.clip((since - 0.12) / 0.3, 0, 1) * 0.42 * np.sin(2 * np.pi * (5.9 + 0.3 * np.sin(2 * np.pi * 0.37 * t)) * t)
+    f = 440.0 * 2 ** ((pitch + wide - 69) / 12)
+    ph = np.cumsum(f) / SR
+    x = (np.sin(2 * np.pi * ph) + 0.3 * np.sin(4 * np.pi * ph) + 0.14 * np.sin(6 * np.pi * ph) + 0.05 * np.sin(10 * np.pi * ph))
+    y = drive(x * 0.8, 1.2) * level * (0.92 + 0.08 * np.sin(2 * np.pi * 5.9 * t))
+    return fade_out(y) * vel
+
+
+def combo_organ(chord, dur, vel, rng):
+    """A reedy transistor combo organ (stereo-free): stacked square-ish tones through a nasal
+    peak, with a quick key click."""
+    n = secs(dur + 0.05)
+    out = np.zeros(n)
+    for m in chord:
+        f = hz(m) * vibrato(n, 6.3, 7, 0.0, rng)
+        out += osc("square", f, n) * 0.5 + osc("saw", f * 2, n) * 0.3
+    y = peak_eq(lp(hp(out, 240), 3800), 1500, 6, 0.9)
+    y += bp(rng.uniform(-1, 1, n), 1500, 5000) * np.exp(-np.arange(n) / SR / 0.006) * 0.3
+    y *= adsr(n, a=0.004, d=0.0, s=1.0, r=0.03, gate=secs(dur))
+    return fade_out(y) * vel * 0.3 / max(1, len(chord)) ** 0.7
+
+
 def pad(chord, dur, vel, rng, cutoff=2400):
     """Warm string-synth pad (stereo)."""
     n = secs(dur + 0.55)
@@ -491,3 +533,109 @@ def sub_bass(m, dur, vel, rng):
     x = np.sin(2 * np.pi * f * t) + lp(osc("saw", f, n), 900) * 0.35
     x = drive(x * 1.2, 1.3) * adsr(n, a=0.004, d=0.12, s=0.8, r=0.03, gate=secs(dur))
     return fade_out(x) * vel
+
+
+# --- Added for Power Grid's bossa (#81) ---
+
+def nylon(chord, dur, vel, rng):
+    """A nylon-string guitar, fingered: all the strings of a chord almost at once, soft and woody,
+    a body resonance low down and no steel brightness."""
+    notes = sorted(chord)
+    n = secs(dur + 0.5)
+    out = np.zeros(n)
+    for i, m in enumerate(notes):
+        at = secs(0.006 * i + rng.uniform(0, 0.003))
+        s = ks(hz(m), dur + 0.5, rng, bright=0.55, damp=0.9975, pick=0.32)
+        out[at:] += s[: n - at] * (0.95 ** i)
+    out = hp(out, 85)
+    out = peak_eq(out, 210, 4, 1.2)
+    out = peak_eq(out, 2400, -2, 0.8)
+    out = lp(out, 7000)
+    out *= adsr(n, a=0.001, d=0.05, s=0.92, r=0.16, gate=secs(dur))
+    return fade_out(out) * vel / max(1, len(notes)) ** 0.75 * 1.5
+
+
+def upright(m, dur, vel, rng):
+    """An upright bass: a round sine body under a plucked string, a thump at the finger."""
+    f = hz(m)
+    n = secs(dur + 0.18)
+    t = np.arange(n) / SR
+    string = ks(f, dur + 0.18, rng, bright=0.42, damp=0.9955, pick=0.3)[:n]
+    body = (np.sin(2 * np.pi * f * t) + 0.3 * np.sin(4 * np.pi * f * t)) * np.exp(-t / 0.7)
+    thump = lp(rng.uniform(-1, 1, n), 420) * np.exp(-t / 0.018) * 0.6
+    x = lp(string * 0.8 + body * 0.75 + thump, 1500)
+    x = drive(x * 1.1, 1.2) * adsr(n, a=0.003, d=0.1, s=0.82, r=0.09, gate=secs(dur))
+    return fade_out(x) * vel
+
+
+def flugel(m, dur, vel, rng):
+    """A flugelhorn: additive harmonics whose brightness swells with the breath, a small scoop
+    into the note, a late vibrato. Darker and rounder than the muted trumpet's filtered saw."""
+    f = hz(m)
+    n = secs(dur + 0.12)
+    t = np.arange(n) / SR
+    v = vibrato(n, 5.0, 9, 0.32, rng) * 2.0 ** (-0.35 * np.exp(-t / 0.03) / 12.0)
+    ph = np.cumsum(f * v) / SR
+    swell = np.clip(t / 0.09, 0, 1) * (0.72 + 0.28 * np.minimum(t / max(dur, 0.1), 1.0)) * (0.55 + 0.45 * vel)
+    x = np.zeros(n)
+    for k in range(1, 13):
+        if f * k > SR * 0.42:
+            break
+        x += np.exp(-(k - 1) * (1.5 - 0.95 * swell)) * np.sin(2 * np.pi * k * ph) / k ** 0.3
+    breath = bp(rng.uniform(-1, 1, n), f * 2, min(f * 7, 10000)) * (0.05 + 0.1 * np.exp(-t / 0.05))
+    y = (x + breath) * adsr(n, a=0.028, d=0.12, s=0.84, r=0.09, gate=secs(dur))
+    return fade_out(y * 0.55) * vel
+
+
+def silver_flute(m, dur, vel, rng):
+    """A concert flute: few harmonics, a tongued chiff, breath that follows the partials, a slow
+    tremolo with the vibrato."""
+    f = hz(m)
+    n = secs(dur + 0.1)
+    t = np.arange(n) / SR
+    v = vibrato(n, 5.2, 11, 0.24, rng)
+    ph = np.cumsum(f * v) / SR
+    x = np.sin(2 * np.pi * ph) + 0.28 * np.sin(4 * np.pi * ph) + 0.1 * np.sin(6 * np.pi * ph) + 0.03 * np.sin(8 * np.pi * ph)
+    x *= 1.0 + 0.09 * np.clip((t - 0.24) / 0.25, 0, 1) * np.sin(2 * np.pi * 5.2 * t)
+    chiff = bp(rng.uniform(-1, 1, n), f * 1.5, min(f * 5, 11000)) * np.exp(-t / 0.02) * 0.32
+    breath = bp(rng.uniform(-1, 1, n), f * 0.9, min(f * 2.4, 11000)) * 0.09 + bp(rng.uniform(-1, 1, n), 4000, 9000) * 0.012
+    y = (x + chiff + breath) * adsr(n, a=0.024, d=0.08, s=0.88, r=0.08, gate=secs(dur))
+    return fade_out(y * 0.7) * vel
+
+
+def string_section(m, dur, vel, rng):
+    """A small string section (stereo): six players, each a little out of tune with their own
+    vibrato, through a body resonance; a slow bow. Returns (2, n)."""
+    f = hz(m)
+    n = secs(dur + 0.45)
+    out = np.zeros((2, n))
+    for i in range(6):
+        cents = rng.uniform(-9, 9)
+        v = vibrato(n, rng.uniform(4.6, 5.8), rng.uniform(8, 14), rng.uniform(0.1, 0.35), rng)
+        x = osc("saw", f * 2 ** (cents / 1200) * v, n, rng.uniform(0, 1))
+        p = (i / 5.0) * 2 - 1
+        out[0] += x * np.sqrt((1 - p * 0.8) / 2)
+        out[1] += x * np.sqrt((1 + p * 0.8) / 2)
+    for c in (0, 1):
+        y = hp(lp(out[c], 3600), 170)
+        out[c] = peak_eq(peak_eq(y, 480, 3, 1.1), 1900, 3, 1.3)
+    out *= adsr(n, a=0.16, d=0.1, s=0.9, r=0.38, gate=secs(dur))
+    return out * vel * 0.2
+
+
+def oohs(chord, dur, vel, rng):
+    """Wordless backing voices on an "ooh" (stereo): three singers a note, a glottal saw through
+    the vowel's formants, each with their own drift. Returns (2, n)."""
+    n = secs(dur + 0.4)
+    out = np.zeros((2, n))
+    for m in chord:
+        f = hz(m)
+        for i in range(3):
+            v = vibrato(n, rng.uniform(4.8, 5.6), rng.uniform(10, 17), rng.uniform(0.15, 0.4), rng)
+            x = osc("saw", f * 2 ** (rng.uniform(-7, 7) / 1200) * v, n, rng.uniform(0, 1))
+            y = lp(x, 340) * 1.1 + bp(x, 300, 480) * 1.0 + bp(x, 720, 980) * 0.3 + bp(x, 2300, 2900) * 0.05
+            p = rng.uniform(-0.75, 0.75)
+            out[0] += y * np.sqrt((1 - p) / 2)
+            out[1] += y * np.sqrt((1 + p) / 2)
+    out *= adsr(n, a=0.14, d=0.1, s=0.9, r=0.32, gate=secs(dur))
+    return out * vel * 0.3 / max(1, len(chord)) ** 0.7

@@ -37,6 +37,8 @@ import dev.digitalducktape.openride.ui.common.ProfileAvatar
 import dev.digitalducktape.openride.ui.designsystem.OrColors
 import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
+import dev.digitalducktape.openride.BuildConfig
+import dev.digitalducktape.openride.ui.about.AboutLabels
 import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsDivider
@@ -66,6 +68,7 @@ fun ProfileTabScreen(
     onRestoreComplete: () -> Unit,
     onManageHeartRateStrap: () -> Unit,
     onManageAppUpdates: () -> Unit,
+    onShowAbout: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
     /** The app the music player's button opens, chosen here; null before one is. */
@@ -234,6 +237,13 @@ fun ProfileTabScreen(
                 }
                 OrSettingsDivider()
                 OrSettingsRow(title = "App updates", onClick = onManageAppUpdates)
+                OrSettingsDivider()
+                // #86: version, license and the Buy Me a Coffee QR code, on a page of its own.
+                OrSettingsRow(
+                    title = "About & support",
+                    value = AboutLabels.rowValue(BuildConfig.VERSION_NAME),
+                    onClick = onShowAbout,
+                )
             }
         }
 

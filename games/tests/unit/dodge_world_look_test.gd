@@ -9,7 +9,7 @@ const SCENERY_SHADER := "res://games/dodge_ball/shaders/scenery.gdshader"
 func _world() -> DodgeWorld:
 	var world: DodgeWorld = auto_free(DodgeWorld.new())
 	add_child(world)
-	world.set_time_of_day(DodgeTimeOfDay.load_preset("day"))
+	world.set_time_of_day(TimeOfDay.load_preset("day"))
 	return world
 
 
@@ -44,7 +44,7 @@ func test_tug_of_wars_helpers_keep_their_standard_materials() -> void:
 
 func test_the_look_reaches_every_world_material() -> void:
 	var world := _world()
-	var night := DodgeTimeOfDay.load_preset("night")
+	var night := TimeOfDay.load_preset("night")
 	world.set_time_of_day(night)
 	var sun := WorldLook.sun_dir(night.sun_elevation, night.sun_azimuth)
 	var mats := world.look_materials()
@@ -56,7 +56,7 @@ func test_the_look_reaches_every_world_material() -> void:
 
 
 func test_look_scales_energy_in_linear_light() -> void:
-	var day := DodgeTimeOfDay.load_preset("day")
+	var day := TimeOfDay.load_preset("day")
 	var look := DodgeWorld.look_for(day)
 	var sky: Color = (look.sky_color as Color).srgb_to_linear()
 	var want := day.ambient.srgb_to_linear() * day.ambient_energy
@@ -65,8 +65,8 @@ func test_look_scales_energy_in_linear_light() -> void:
 
 
 func test_only_night_has_stars_and_suns_are_small() -> void:
-	for name in DodgeTimeOfDay.NAMES:
-		var tod := DodgeTimeOfDay.load_preset(name)
+	for name in TimeOfDay.NAMES:
+		var tod := TimeOfDay.load_preset(name)
 		assert_float(tod.sun_size).is_less_equal(0.04)  # radians: a disc under 4.6° across
 		if name != "night":
 			assert_float(tod.stars).is_equal(0.0)

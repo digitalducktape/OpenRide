@@ -164,3 +164,10 @@ func test_progress_frames_dont_restyle_the_hint() -> void:
 	for i in 20:
 		_progress("centre", 0.1 + i * 0.01, 0, 1)
 	assert_int(_restyles).is_equal(0)
+
+
+func test_a_stand_game_never_talks_about_steering() -> void:
+	assert_str(CalibrationOverlay.strip_text("unavailable", "lean_stand")).contains("stand")
+	assert_str(CalibrationOverlay.strip_text("unavailable", "lean_stand")).not_contains("steering")
+	assert_str(CalibrationOverlay.strip_text("unavailable", "lean_x")).contains("steering")
+	assert_str(CalibrationOverlay.strip_text("lost", "lean_stand")).not_contains("steering")

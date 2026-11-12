@@ -52,6 +52,15 @@ class GameCatalog(games: List<GameDeclaration>) {
 
     operator fun get(gameId: String): GameDeclaration? = byId[gameId]
 
+    /**
+     * The games a circuit preset's [role] slots draw from (#75): every game that declares the
+     * role, in catalog order, without the demo, and without the camera games (those that declare
+     * [GameDeclaration.usesCamera]) when [cameraGames] is false. A new game joins circuits by
+     * declaring roles; nothing else lists it.
+     */
+    fun circuitPool(role: SegmentRole, cameraGames: Boolean = true): List<GameDeclaration> =
+        games.filter { role in it.roles && it.id != DEMO.id && (cameraGames || !it.usesCamera) }
+
     companion object {
         /** The framework's reference game (#34), `games/games/demo/`. */
         val DEMO = GameDeclaration(
@@ -234,9 +243,262 @@ class GameCatalog(games: List<GameDeclaration>) {
         )
 
         /**
+         * Watt Lane (#78), `games/games/watt_lane/`: a work game (and a low-profile warm-up). Smoothed
+         * power is the rider's place across a night highway; a lane of watts drifts and jumps, and
+         * every jump is announced 5 s ahead. Params, in watts on a 5 W grid: the lane's width (a
+         * share of FTP with a floor, rounded up to 10 W) and its centre's range (shares of FTP).
+         * Low on purpose (about a third of FTP; the 2026-11 retune, after a ride where easy
+         * spinning made 26-29 W): the forgiving-thresholds lesson. The game widens a range too
+         * narrow for a jump of over half a lane (watt_lane/DESIGN.md).
+         */
+        val WATT_LANE = GameDeclaration(
+            id = "watt_lane",
+            title = "Watt Lane",
+            supports = setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            roles = setOf(SegmentRole.WORK, SegmentRole.WARMUP),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (widthShare, widthFloor) = when (difficulty) {
+                    Difficulty.EASY -> 0.25 to 40
+                    Difficulty.STANDARD -> 0.20 to 30
+                    Difficulty.HARD -> 0.15 to 30
+                }
+                val (low, high) = when {
+                    role == SegmentRole.WARMUP -> 0.18 to 0.32
+                    difficulty == Difficulty.EASY -> 0.20 to 0.35
+                    difficulty == Difficulty.STANDARD -> 0.22 to 0.40
+                    else -> 0.32 to 0.55
+                }
+                val width = maxOf(Math.ceil(ftp.watts * widthShare / 10.0).toInt() * 10, widthFloor)
+                fun grid(share: Double) = (ftp.watts * share / 5.0).roundToInt() * 5
+                mapOf(
+                    "lane_width_watts" to JsonPrimitive(width),
+                    "lane_min_watts" to JsonPrimitive(grid(low)),
+                    "lane_max_watts" to JsonPrimitive(grid(high)),
+                )
+            },
+        )
+
+        /**
+         * The Pull (#79), `games/games/the_pull/`: drag a weighted sled down a track; it needs
+         * more watts every metre (`10% FTP + d / d_ref_m × 55% FTP`, the 2026-11 retune), until the
+         * rider maxes out.
+         * Distance is the score. Just Ride only (no circuit roles; a custom circuit plays it as
+         * a `free` slot, like Kart Race). A timed ride starts pulls until the timer ends and lets
+         * the last one finish ([EndMode.GAME]). `d_ref_m` is where the sled needs 65% of FTP,
+         * tuned so a steady pull there lasts 3-5 minutes; `full_factor` places the Full Pull
+         * line (× d_ref_m, 72% of FTP).
+         */
+        val THE_PULL = GameDeclaration(
+            id = "the_pull",
+            title = "The Pull",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 300,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 5,
+            // A pull (3-5 minutes at FTP) and its 60 s rest.
+            roundSec = 300,
+            effortInJustRide = true,
+            timedEndMode = EndMode.GAME,
+            params = { _, difficulty, _ ->
+                val dRef = when (difficulty) {
+                    Difficulty.EASY -> 360
+                    Difficulty.STANDARD -> 300
+                    Difficulty.HARD -> 250
+                }
+                mapOf(
+                    "d_ref_m" to JsonPrimitive(dRef),
+                    "full_factor" to JsonPrimitive(1.12),
+                )
+            },
+        )
+
+        /**
+         * Balloon Pump (#76), `games/games/balloon_pump/`: the bike drives an air pump. A
+         * balloon takes air only over its push line, which rises as it fills (from 8% to 26% of
+         * FTP in standard work, 6-22% easy, 10-32% hard, 5-20% in recovery; the 2026-11 retune;
+         * `PumpLogic` scales it per balloon size). Race
+         * fills `race_balloons` within `race_sec`; Max fills as many as it can (circuits always).
+         * A round is one Race heat and its break.
+         */
+        val BALLOON_PUMP = GameDeclaration(
+            id = "balloon_pump",
+            title = "Balloon Pump",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 125,
+            roles = setOf(SegmentRole.WORK, SegmentRole.RECOVERY),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (lo, hi) = when {
+                    role == SegmentRole.RECOVERY -> 0.05 to 0.20
+                    difficulty == Difficulty.EASY -> 0.06 to 0.22
+                    difficulty == Difficulty.STANDARD -> 0.08 to 0.26
+                    else -> 0.10 to 0.32
+                }
+                val balloons = when (difficulty) {
+                    Difficulty.EASY -> 4
+                    Difficulty.STANDARD -> 5
+                    Difficulty.HARD -> 7
+                }
+                mapOf(
+                    "push_lo_watts" to JsonPrimitive((ftp.watts * lo).roundToInt()),
+                    "push_hi_watts" to JsonPrimitive((ftp.watts * hi).roundToInt()),
+                    "race_balloons" to JsonPrimitive(balloons),
+                    "race_sec" to JsonPrimitive(120),
+                )
+            },
+        )
+
+        /**
+         * Keepy Uppy (#77), `games/games/keepy_uppy/`: keep a balloon up over a fan driven by
+         * pedalling. A work game. Its lean steering is the rider's "Steer" option (off by
+         * default), which Godot decides per segment, so [GameDeclaration.usesCamera] stays false
+         * (Tug of War's brace-lean precedent). A round is a minute of air time.
+         * The fan holds the balloon at height h (0-1) with `weight_watts + height_watts × h`:
+         * 6 / 8 / 10% and 65 / 75 / 85% of FTP (the 2026-11 retune: light pedalling floats it low,
+         * about 30% of FTP holds the mid band on standard); the weather adds `rain_watts` (4%),
+         * `bird_watts` (2% a bird) and `downdraft_watts` (8%, briefly). See its DESIGN.md.
+         */
+        val KEEPY_UPPY = GameDeclaration(
+            id = "keepy_uppy",
+            title = "Keepy Uppy",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 60,
+            roles = setOf(SegmentRole.WORK),
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val (weight, height) = when (difficulty) {
+                    Difficulty.EASY -> 0.06 to 0.65
+                    Difficulty.STANDARD -> 0.08 to 0.75
+                    Difficulty.HARD -> 0.10 to 0.85
+                }
+                mapOf(
+                    "weight_watts" to JsonPrimitive((ftp.watts * weight).roundToInt()),
+                    "height_watts" to JsonPrimitive((ftp.watts * height).roundToInt()),
+                    "rain_watts" to JsonPrimitive((ftp.watts * 0.04).roundToInt()),
+                    "bird_watts" to JsonPrimitive((ftp.watts * 0.02).roundToInt()),
+                    "downdraft_watts" to JsonPrimitive((ftp.watts * 0.08).roundToInt()),
+                )
+            },
+        )
+
+        /**
+         * Power Grid (#81), `games/games/power_grid/`: the bike turns a valley town's generator.
+         * Demand follows an evening curve between `demand_lo_watts` and `demand_hi_watts`: 12-27 /
+         * 15-33 / 20-45% of FTP in work, 12-27% in a warm-up or cool-down, 12-22% in a recovery
+         * (the 2026-11 retune: met at 90%, so a steady 30% of FTP holds a standard evening)
+         * (difficulty never moves an easy role, and each stays under its power cap). A storm's
+         * repair asks `storm_watts` (15%) over demand. No rounds: an evening is the ride. See its
+         * DESIGN.md.
+         */
+        val POWER_GRID = GameDeclaration(
+            id = "power_grid",
+            title = "Power Grid",
+            supports = setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            roles = setOf(SegmentRole.WARMUP, SegmentRole.WORK, SegmentRole.RECOVERY, SegmentRole.COOLDOWN),
+            effortInJustRide = true,
+            params = { role, difficulty, ftp ->
+                val (lo, hi) = when (role) {
+                    SegmentRole.WARMUP, SegmentRole.COOLDOWN -> 0.12 to 0.27
+                    SegmentRole.RECOVERY -> 0.12 to 0.22
+                    else -> when (difficulty) {
+                        Difficulty.EASY -> 0.12 to 0.27
+                        Difficulty.STANDARD -> 0.15 to 0.33
+                        Difficulty.HARD -> 0.20 to 0.45
+                    }
+                }
+                mapOf(
+                    "demand_lo_watts" to JsonPrimitive((ftp.watts * lo).roundToInt()),
+                    "demand_hi_watts" to JsonPrimitive((ftp.watts * hi).roundToInt()),
+                    "storm_watts" to JsonPrimitive((ftp.watts * 0.15).roundToInt()),
+                )
+            },
+        )
+
+        /**
+         * Ready for Launch (#82), `games/games/ready_for_launch/`: each round is one rocket
+         * launch of about 90 s, so a 1:30 slot plays one. Fuel flows above `fuel_line_watts` (8 /
+         * 10 / 15% of FTP) and `fuel_full_watts` (28 / 30 / 35%) held fills the tank; the push's
+         * target is `push_watts` (50 / 60 / 70%), not the plan's `target_watts` (the 2026-11
+         * retune). See its DESIGN.md.
+         */
+        val READY_FOR_LAUNCH = GameDeclaration(
+            id = "ready_for_launch",
+            title = "Ready for Launch",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 90,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 90,
+            roles = setOf(SegmentRole.WORK),
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val (line, full, push) = when (difficulty) {
+                    Difficulty.EASY -> Triple(0.08, 0.28, 0.50)
+                    Difficulty.STANDARD -> Triple(0.10, 0.30, 0.60)
+                    Difficulty.HARD -> Triple(0.15, 0.35, 0.70)
+                }
+                mapOf(
+                    "fuel_line_watts" to JsonPrimitive((ftp.watts * line).roundToInt()),
+                    "fuel_full_watts" to JsonPrimitive((ftp.watts * full).roundToInt()),
+                    "push_watts" to JsonPrimitive((ftp.watts * push).roundToInt()),
+                )
+            },
+        )
+
+        /**
+         * Gate Crasher (#80), `games/games/gate_crasher/`: show jumping in first person. Pedal to
+         * canter round the course and stand at each take-off line, read by the camera's
+         * StandingDetector, so it needs the camera: a camera-off circuit skips it. `pace_watts`
+         * is the canter's target (25 / 32 / 42% of FTP, the 2026-11 retune), `window_sec` the rider's margin round the
+         * line, and `stand_lag_sec` the detector's enter time (`HeadTrackerConfig.standEnterMs`).
+         * A round is one lap of `fences`.
+         */
+        val GATE_CRASHER = GameDeclaration(
+            id = "gate_crasher",
+            title = "Gate Crasher",
+            supports = setOf(JustRideSupport.ROUNDS, JustRideSupport.MINUTES, JustRideSupport.OPEN),
+            minSec = 60,
+            maxSec = 3600,
+            minRounds = 1,
+            maxRounds = 10,
+            roundSec = 65,
+            roles = setOf(SegmentRole.WORK),
+            usesCamera = true,
+            effortInJustRide = true,
+            params = { _, difficulty, ftp ->
+                val (pace, window) = when (difficulty) {
+                    Difficulty.EASY -> 0.25 to 1.4
+                    Difficulty.STANDARD -> 0.32 to 1.2
+                    Difficulty.HARD -> 0.42 to 1.2
+                }
+                mapOf(
+                    "pace_watts" to JsonPrimitive((ftp.watts * pace).roundToInt()),
+                    "window_sec" to JsonPrimitive(window),
+                    "stand_lag_sec" to JsonPrimitive(0.5),
+                    "fences" to JsonPrimitive(8),
+                )
+            },
+        )
+
+        /**
          * The role a custom-circuit slot of [game] plays (the Games hub, spec §3.4): `work` if
          * the game can work, else its main role (recovery before warm-up and cool-down), else
-         * `free` (Kart Race). [SessionPlans.custom] still plays warm-up in the first slot and
+         * `free` (Kart Race, The Pull). [SessionPlans.custom] still plays warm-up in the first slot and
          * cool-down in the last for a game that has those roles.
          */
         fun circuitRole(game: GameDeclaration): SegmentRole =
@@ -248,6 +510,8 @@ class GameCatalog(games: List<GameDeclaration>) {
         private const val KART_BOTS = 7
 
         /** Every registered game. Each game issue adds its declaration here. */
-        val DEFAULT = GameCatalog(listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE))
+        val DEFAULT = GameCatalog(
+            listOf(DEMO, DODGE_BALL, TUG_OF_WAR, SAFE_CRACKER, CADENCE_KARAOKE, KART_RACE, WATT_LANE, THE_PULL, BALLOON_PUMP, KEEPY_UPPY, POWER_GRID, READY_FOR_LAUNCH, GATE_CRASHER),
+        )
     }
 }

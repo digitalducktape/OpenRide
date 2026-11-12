@@ -22,14 +22,33 @@ const REELS := {
 	"tug_of_war": ["rope_creak", "surge_drumroll", "crowd_swell", "win_sting", "lose_sting", "splash"],
 	"safe_cracker": ["proximity_tick", "tumbler_click", "soft_alarm", "vault_open", "door_creak"],
 	"cadence_karaoke": ["beat_tick", "streak_up", "band_exit", "ease_off_chime"],
+	"watt_lane": ["jump_chime", "count_tick", "lane_shift", "caught", "missed", "off_buzz", "streak_up"],
+	"the_pull": ["pull_horn", "board_pass", "dig_in", "best_pass", "full_pull", "stall_horn", "crowd_swell"],
+	"balloon_pump": ["pump_chuff", "pump_squeak", "pump_tie", "pump_hiss", "pump_gold", "pump_heat_start",
+		"pump_won", "pump_lost", "pump_tick"],
 	"demo": ["dodge", "hit"],
 	"cues": ["countdown", "go", "segment_end", "pause", "resume", "summary"],
+	"ready_for_launch": ["rfl_count", "rfl_count_final", "rfl_count_start", "rfl_ignition", "rfl_liftoff", "rfl_stage",
+		"rfl_milestone", "rfl_moon", "rfl_touchdown", "rfl_tank_full", "rfl_cutoff", "rfl_scrub", "rfl_result"],
+	"keepy_uppy": ["keepy_squeak", "keepy_pop", "keepy_bird_flutter", "keepy_birds_shaken", "keepy_gust",
+		"keepy_downdraft_warn", "keepy_rain_warn", "keepy_new_balloon", "keepy_high_chime"],
+	"power_grid": ["grid_on_0", "grid_on_1", "grid_on_2", "grid_on_3", "grid_crackle", "grid_out", "grid_relit", "grid_thunder",
+		"grid_strike", "grid_restored", "grid_crew_fixed", "grid_full_town", "grid_firework", "grid_bell"],
+	"gate_crasher": ["hoof_canter", "count_tick", "line_chime", "take_chime", "lift_off", "landing", "rail_clatter",
+		"applause", "clear_round", "rein_warn"],
 }
 const GAME_SCRIPTS := {
 	"dodge_ball": "res://games/dodge_ball/DodgeAudio.gd",
 	"tug_of_war": "res://games/tug_of_war/TugAudio.gd",
 	"safe_cracker": "res://games/safe_cracker/SafeAudio.gd",
 	"cadence_karaoke": "res://games/cadence_karaoke/CadenceAudio.gd",
+	"watt_lane": "res://games/watt_lane/WattLaneAudio.gd",
+	"the_pull": "res://games/the_pull/PullAudio.gd",
+	"balloon_pump": "res://games/balloon_pump/PumpAudio.gd",
+	"keepy_uppy": "res://games/keepy_uppy/KeepyAudio.gd",
+	"power_grid": "res://games/power_grid/GridAudio.gd",
+	"ready_for_launch": "res://games/ready_for_launch/LaunchAudio.gd",
+	"gate_crasher": "res://games/gate_crasher/GateAudio.gd",
 }
 
 var out_dir := ""
@@ -118,6 +137,14 @@ func _play(game_id: String, seconds: float) -> void:
 			params = {"power_cap_watts": 160.0}
 		"cadence_karaoke":
 			params = {"ftp_watts": 250.0, "pace": 70}
+		"watt_lane":
+			params = {"ftp_watts": 250.0}
+		"keepy_uppy":
+			params = {"ftp_watts": 200.0, "weight_watts": 80.0}
+		"power_grid":
+			params = {"ftp_watts": 200.0}
+		"ready_for_launch":
+			params = {"ftp_watts": 200.0, "fuel_line_watts": 100.0, "fuel_full_watts": 120.0, "target_watts": 210.0}
 	var session: Node = root.get_node("Session")
 	var director: Node = session.director
 	session._local.start({"kind": "just_ride", "plan_id": "render", "difficulty": "standard", "total_sec": int(seconds),
@@ -153,9 +180,30 @@ func _ride(game_id: String, director: Node) -> void:
 			lean = sin(t * 1.3) * 0.9
 			if director.game and "logic" in director.game and director.game.logic:
 				director.game.logic.target_watts = 200.0  # the power target, for the bonus
+		"balloon_pump":
+			# Spin lightly, then turn the knob up to finish each balloon, and ease off now and
+			# then so a balloon leaks.
+			cad = 85.0
+			res = 15.0 + 35.0 * (0.5 + 0.5 * sin(t * 0.35))
+			if t > 50.0 and t < 56.0:
+				cad = 35.0
+		"gate_crasher":
+			# A steady canter, standing on the line, seated through one fence for the clatter.
+			cad = 85.0
+			res = 34.0
+			var game: Node = director.game
+			if game and "logic" in game and game.logic and director.phase_name() == "PLAYING":
+				var l = game.logic
+				var past: float = l.distance - l.line_s(l.fence)
+				_input._sim_standing = l.speed > 1.0 and past >= l.speed * 0.5 and past < 18.0 and l.fence != 2
 		"tug_of_war":
 			cad = 85.0
 			res = 30.0 + 30.0 * (0.5 + 0.5 * sin(t * 0.25))
+		"the_pull":
+			# A strong pull past the boards (the loops follow the watts and the speed), then a
+			# fade from 50 s into the warning and the stall, and the rest.
+			cad = 88.0 if t < 50.0 else 45.0
+			res = 38.0 if t < 50.0 else 20.0
 		"safe_cracker":
 			# A rider who reads the dial: the knob eases toward each number, overshoots a little
 			# and settles; one hard burst (50-56 s) trips the alarm.
@@ -185,6 +233,48 @@ func _ride(game_id: String, director: Node) -> void:
 					_paced = 2
 			if t > 25.0 and t < 31.0:
 				cad += 12.0
+		"watt_lane":
+			# Follows the lane a moment ahead (the 3 s window lags), off it from 30 to 36 s.
+			var game: Node = director.game
+			res = 35.0
+			if game and "logic" in game and game.logic:
+				var want: float = game.logic.course.visual_centre_at(game.logic.time + 1.2)
+				if t > 30.0 and t < 36.0:
+					want -= 50.0
+				cad = want / (0.3 + res * 0.045)
+		"keepy_uppy":
+			# The mid band (about 105 W), the high band (20-40 s), the low band (40-50 s), a stop
+			# that pops the balloon (50-56 s), then the mid band again. Resistance 30%: the
+			# simulator makes 1.65 W an rpm.
+			res = 30.0
+			cad = 64.0
+			if t > 20.0 and t < 40.0:
+				cad = 82.0
+			elif t > 40.0 and t < 50.0:
+				cad = 57.0
+			elif t > 50.0 and t < 56.0:
+				cad = 20.0
+		"power_grid":
+			# Meets demand and repairs the storms; eases off at 52-62 s for a brown-out. Resistance
+			# 30%: the simulator makes 1.65 W an rpm.
+			res = 30.0
+			var grid: Node = director.game
+			if grid and "logic" in grid and grid.logic:
+				var l: GridLogic = grid.logic
+				cad = maxf(l.need_ahead(4.0), l.repair_need if l.storm != GridLogic.Storm.CALM else 0.0) * 1.12 / 1.65
+				if t > 52.0 and t < 62.0:
+					cad = l.need() * 0.6 / 1.65
+		"ready_for_launch":
+			# Steady in the fuelling (about 125 W), an all-out push from T-0 (55 s), an easy spin
+			# after. Resistance 30%: the simulator makes 1.65 W an rpm.
+			res = 30.0
+			cad = 76.0
+			if t > 52.0 and t < 55.0:
+				cad = 110.0
+			elif t >= 55.0 and t < 73.0:
+				cad = 165.0
+			elif t >= 73.0:
+				cad = 58.0
 		"demo":
 			cad = 80.0 if t < 40.0 or t > 60.0 else 55.0
 			lean = sin(t * 1.1) * 0.8
@@ -271,10 +361,10 @@ func _mix_frame() -> void:
 	sfx.resize(n_out)
 	var master_db := AudioServer.get_bus_volume_db(0)
 	for v in _voices.duplicate():
-		var player: AudioStreamPlayer = v.player
-		if not is_instance_valid(player):
+		if not is_instance_valid(v.player):  # a game's own players go with the game
 			_voices.erase(v)
 			continue
+		var player: AudioStreamPlayer = v.player
 		if player.stream_paused:
 			continue
 		if not player.playing:

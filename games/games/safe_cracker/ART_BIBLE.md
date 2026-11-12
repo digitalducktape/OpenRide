@@ -5,7 +5,7 @@
 > as any change to the places, the safe, the dial's drawing or the effects. **Sources of truth:**
 > `SafePlaces.gd` (rooms, palettes, key lights), `SafeBackdrop.gd` (ambient life), `SafeBody.gd`
 > (the body and the vault), `SafeDoor.gd` (the static door), `SafeDial.gd` (the dial's layers and
-> the swing), `SafeMesh.gd` (the batcher), `SafeBackdrop.vignette`, `SafeCracker.look` (UI).
+> the swing), `MeshBatch2D.gd` (the batcher), `SafeBackdrop.vignette`, `SafeCracker.look` (UI).
 > `GFX_POLISH.md` records the work.
 
 Everything is drawn in code. The six places are plain descriptions; no film, game or brand is
@@ -61,11 +61,11 @@ accent is a brass or, in the lab, a teal that must not read as the reading's "on
 
 ## 4. Light, materials and drawing
 
-- **Everything goes through `SafeMesh`**: one triangle array per node with per-vertex colours
+- **Everything goes through `MeshBatch2D`**: one triangle array per node with per-vertex colours
   (one draw call), every filled edge feathered 1.2 px to transparent (Compatibility has no 2D
   MSAA). Never `draw_circle`, `draw_colored_polygon` or `draw_arc` directly: each is a draw call.
 - **One key light per room** (`PLACES[i].light`), drawn, not computed: a smooth many-ring pool
-  (`SafeMesh.glow`) in the room's batch, a pool on the floor under it, and a soft shadow of the
+  (`MeshBatch2D.glow`) in the room's batch, a pool on the floor under it, and a soft shadow of the
   safe cast away from it. No `Light2D` (each lit item would draw again) and no light texture
   (an extra full-screen layer).
 - **The room is baked.** The room's batch and the vignette render once per place into one
@@ -134,6 +134,6 @@ sliding in and its door. Never shake the view.
 
 The canvas runs at full 1080p and the tablet pays for every blended pixel, seen or not, so the
 rules are: anything static and full-screen goes in the room's bake; a shape under an opaque one
-gets a hole (`SafeMesh.round_frame`, `holed_round_rect`, the `hollow` of `glow` and
+gets a hole (`MeshBatch2D.round_frame`, `holed_round_rect`, the `hollow` of `glow` and
 `soft_shadow`); what's hidden is not drawn (the vault while the door is shut). Check a change with
 `tests/measure_safe.gd`, which prints each layer's pixels per place.

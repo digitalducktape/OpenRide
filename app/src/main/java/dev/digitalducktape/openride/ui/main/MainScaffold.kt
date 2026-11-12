@@ -244,6 +244,7 @@ fun MainScaffold(
                         outerNavController.navigate(Destinations.HrPairing)
                     },
                     onManageAppUpdates = { outerNavController.navigate(Destinations.AppUpdate) },
+                    onShowAbout = { outerNavController.navigate(Destinations.About) },
                     onManageContentSources = {
                         outerNavController.navigate(Destinations.ContentSources)
                     },

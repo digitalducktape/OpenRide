@@ -154,7 +154,10 @@ updates**. (Because the check hits GitHub's public API unauthenticated, the repo
 
 ### Publishing a release
 
-1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`, commit, and tag.
+1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`, write the release notes into
+   `app/src/main/res/raw/release_notes.txt` (starting `OpenRide <major.minor>`), commit, and tag.
+   **Profile → About & support** shows that file as the installed version's notes, offline;
+   `AboutLabelsTest` fails if it names another version.
 2. Build the bike APK: `./gradlew :app:assembleDebugReal`.
 3. Create a GitHub release for the tag and attach the APK **named exactly**
    `openride-real-<versionCode>.apk` — e.g. `openride-real-2.apk`. Put the changelog in the

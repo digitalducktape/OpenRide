@@ -1,7 +1,7 @@
 class_name TugMeshes
 extends RefCounted
 ## Tug of War's procedural meshes (graphics pass, 2026-10-19; ART_BIBLE.md). Everything is built
-## here from primitive shapes merged into vertex-coloured meshes with `KartMeshKit` (read only:
+## here from primitive shapes merged into vertex-coloured meshes with `MeshKit3D` (read only:
 ## Kart owns it), so the whole riverside is one draw call, the bot two and the rider's gloves one.
 ## Colours are the bible's palette (sRGB), turned linear for the vertex colours (`lin`): the
 ## shaders light and grade in linear space like the engine's own materials.
@@ -44,12 +44,12 @@ static func lin(c: Color) -> Color:
 	return Color(l.r, l.g, l.b, c.a)
 
 
-static func _k(kit: KartMeshKit, mesh: Mesh, xf: Transform3D, color: Color) -> void:
+static func _k(kit: MeshKit3D, mesh: Mesh, xf: Transform3D, color: Color) -> void:
 	kit.add(mesh, xf, lin(color))
 
 
-static func _new_kit() -> KartMeshKit:
-	var kit := KartMeshKit.new()
+static func _new_kit() -> MeshKit3D:
+	var kit := MeshKit3D.new()
 	kit.flags = true
 	kit.outline = 0.0
 	kit.glow = 0.0
@@ -145,7 +145,7 @@ static func scenery(models: Dictionary) -> ArrayMesh:
 	return kit.commit()
 
 
-static func _bank(kit: KartMeshKit, edge_z: float, toward_water: float, inland: float) -> void:
+static func _bank(kit: MeshKit3D, edge_z: float, toward_water: float, inland: float) -> void:
 	# A cross-section from far inland to under the water (out = metres past the top edge, toward
 	# the water), revolved along x as a strip of columns with jittered tints.
 	var top := TugWorld.BANK_TOP
@@ -191,15 +191,15 @@ static func _bank(kit: KartMeshKit, edge_z: float, toward_water: float, inland: 
 	kit.outline = 0.0
 
 
-static func _banks(kit: KartMeshKit) -> void:
+static func _banks(kit: MeshKit3D) -> void:
 	# The near bank's water lies toward -z, the far bank's toward +z.
 	_bank(kit, TugWorld.NEAR_BANK_Z, -1.0, 40.0)
 	_bank(kit, TugWorld.FAR_BANK_Z, 1.0, 100.0)
 
 
-static func _hills(kit: KartMeshKit) -> void:
+static func _hills(kit: MeshKit3D) -> void:
 	# Far hills, flattened spheres in two tints, behind everything (the old layout's seed).
-	var hill := KartMeshKit.sphere(1.0, 12, 6)
+	var hill := MeshKit3D.sphere(1.0, 12, 6)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4021
 	for i in 9:
@@ -209,7 +209,7 @@ static func _hills(kit: KartMeshKit) -> void:
 		_k(kit, hill, Transform3D(Basis.from_scale(s), pos), tint)
 
 
-static func _piers(kit: KartMeshKit) -> void:
+static func _piers(kit: MeshKit3D) -> void:
 	var top := TugWorld.DECK_TOP
 	# Painted AO: the timber darkens toward the water.
 	kit.ao_y0 = -0.3
@@ -222,38 +222,38 @@ static func _piers(kit: KartMeshKit) -> void:
 		var mid := (z0 + z1) * 0.5
 		var length := z1 - z0
 		for x: float in [-2.47, 2.47]:  # the side beams frame the deck
-			_k(kit, KartMeshKit.box(Vector3(0.1, 0.3, length)), KartMeshKit.xf(Vector3(x, top - 0.13, mid)), beam)
+			_k(kit, MeshKit3D.box(Vector3(0.1, 0.3, length)), MeshKit3D.xf(Vector3(x, top - 0.13, mid)), beam)
 		# The end beam over the water, and the pilings under it.
 		var end_z: float = z0 if z0 == TugWorld.NEAR_EDGE_Z else z1
 		var out := -1.0 if end_z == TugWorld.NEAR_EDGE_Z else 1.0
-		_k(kit, KartMeshKit.box(Vector3(5.04, 0.3, 0.1)), KartMeshKit.xf(Vector3(0.0, top - 0.13, end_z + out * 0.03)), beam)
+		_k(kit, MeshKit3D.box(Vector3(5.04, 0.3, 0.1)), MeshKit3D.xf(Vector3(0.0, top - 0.13, end_z + out * 0.03)), beam)
 		for x: float in [-2.3, -0.8, 0.8, 2.3]:
 			var r := 0.12 if absf(x) > 2.0 else 0.09
 			var h := top + 1.0
-			_k(kit, KartMeshKit.cylinder(r, r * 1.08, h, 8), KartMeshKit.xf(Vector3(x, top - h * 0.5 - 0.03, end_z - out * 0.16)), PILING)
+			_k(kit, MeshKit3D.cylinder(r, r * 1.08, h, 8), MeshKit3D.xf(Vector3(x, top - h * 0.5 - 0.03, end_z - out * 0.16)), PILING)
 	kit.ao_min = 1.0
 	# The far pier's torch posts: a post, a bracket and an iron cup for the flame card.
 	var post_z := TugWorld.FAR_EDGE_Z - 0.15
 	for x: float in [-2.35, 2.35]:
-		_k(kit, KartMeshKit.box(Vector3(0.16, 1.28, 0.16)), KartMeshKit.xf(Vector3(x, top + 0.64, post_z)), PILING)
-		_k(kit, KartMeshKit.box(Vector3(0.24, 0.06, 0.24)), KartMeshKit.xf(Vector3(x, top + 1.27, post_z)), IRON)
-		var cup := KartMeshKit.lathe(PackedVector2Array([Vector2(0.05, 0.0), Vector2(0.13, 0.12), Vector2(0.15, 0.2),
+		_k(kit, MeshKit3D.box(Vector3(0.16, 1.28, 0.16)), MeshKit3D.xf(Vector3(x, top + 0.64, post_z)), PILING)
+		_k(kit, MeshKit3D.box(Vector3(0.24, 0.06, 0.24)), MeshKit3D.xf(Vector3(x, top + 1.27, post_z)), IRON)
+		var cup := MeshKit3D.lathe(PackedVector2Array([Vector2(0.05, 0.0), Vector2(0.13, 0.12), Vector2(0.15, 0.2),
 			Vector2(0.11, 0.2), Vector2(0.0, 0.12)]), 8)
-		_k(kit, cup, KartMeshKit.xf(Vector3(x, top + 1.3, post_z)), IRON)
+		_k(kit, cup, MeshKit3D.xf(Vector3(x, top + 1.3, post_z)), IRON)
 
 
-static func _mast(kit: KartMeshKit, x: float, z: float, height: float) -> Vector3:
+static func _mast(kit: MeshKit3D, x: float, z: float, height: float) -> Vector3:
 	var on_deck := absf(x) < 2.5 and (z > TugWorld.NEAR_EDGE_Z or z < TugWorld.FAR_EDGE_Z)
 	var base := TugWorld.DECK_TOP if on_deck else TugWorld.BANK_TOP
-	_k(kit, KartMeshKit.cylinder(0.05, 0.07, height, 6), KartMeshKit.xf(Vector3(x, base + height * 0.5, z)), PILING.lightened(0.2))
-	_k(kit, KartMeshKit.sphere(0.08, 6, 3), KartMeshKit.xf(Vector3(x, base + height, z)), BRASS)
+	_k(kit, MeshKit3D.cylinder(0.05, 0.07, height, 6), MeshKit3D.xf(Vector3(x, base + height * 0.5, z)), PILING.lightened(0.2))
+	_k(kit, MeshKit3D.sphere(0.08, 6, 3), MeshKit3D.xf(Vector3(x, base + height, z)), BRASS)
 	return Vector3(x, base + height - 0.05, z)
 
 
 ## The bunting and the string lights hang from masts beside the far torches: the bunting back to
 ## masts on the near bank (wide of the camera), the lights out over the far bank. Both stay wide
 ## of the rope's line from the fists to the bot.
-static func _masts_and_strings(kit: KartMeshKit) -> void:
+static func _masts_and_strings(kit: MeshKit3D) -> void:
 	var wire := Color(0.25, 0.2, 0.16)
 	for side: float in [-1.0, 1.0]:
 		var far := _mast(kit, side * 2.4, TugWorld.FAR_EDGE_Z - 0.45, 2.7)
@@ -261,7 +261,7 @@ static func _masts_and_strings(kit: KartMeshKit) -> void:
 		var out := _mast(kit, side * 9.6, TugWorld.FAR_BANK_Z - 0.6, 2.9)
 		# Bunting: triangles under a sagging line, alternating colours, fluttering at the tips.
 		var line := catenary(far, near, 0.7, 26)
-		_k(kit, KartMeshKit.tube(line, PackedFloat32Array([0.016]), 4), Transform3D.IDENTITY, wire)
+		_k(kit, MeshKit3D.tube(line, PackedFloat32Array([0.016]), 4), Transform3D.IDENTITY, wire)
 		var flags := Tris.new()
 		for i in line.size() - 1:
 			var a := line[i]
@@ -275,12 +275,12 @@ static func _masts_and_strings(kit: KartMeshKit) -> void:
 		kit.add(flags.mesh(), Transform3D.IDENTITY, Color.WHITE)
 		# String lights: bulbs along a sagging wire; they glow with the lamps (UV.y).
 		var lights := catenary(far + Vector3(0.0, -0.15, 0.0), out, 0.45, 14)
-		_k(kit, KartMeshKit.tube(lights, PackedFloat32Array([0.014]), 4), Transform3D.IDENTITY, wire)
-		var bulb := KartMeshKit.sphere(0.065, 6, 3)
+		_k(kit, MeshKit3D.tube(lights, PackedFloat32Array([0.014]), 4), Transform3D.IDENTITY, wire)
+		var bulb := MeshKit3D.sphere(0.065, 6, 3)
 		kit.glow = 1.0
 		for i in range(1, lights.size() - 1):
 			var c := Color(1.0, 0.86, 0.55) if i % 2 == 0 else Color(1.0, 0.62, 0.32)
-			_k(kit, bulb, KartMeshKit.xf(lights[i] + Vector3(0.0, -0.07, 0.0)), c)
+			_k(kit, bulb, MeshKit3D.xf(lights[i] + Vector3(0.0, -0.07, 0.0)), c)
 		kit.glow = 0.0
 
 
@@ -308,7 +308,7 @@ static func _reed_clump(t: Tris, base: Vector3, rng: RandomNumberGenerator) -> v
 		t.card(mid - side * 0.6, mid + side * 0.6, tip, n, middle, middle, top)
 
 
-static func _reeds_and_shore(kit: KartMeshKit, rock: Mesh) -> void:
+static func _reeds_and_shore(kit: MeshKit3D, rock: Mesh) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 6113
 	var reeds := Tris.new()
@@ -334,7 +334,7 @@ static func _reeds_and_shore(kit: KartMeshKit, rock: Mesh) -> void:
 
 
 ## The trees, bushes and rocks (the old layout's seed and counts, kept off the water).
-static func _plants(kit: KartMeshKit, models: Dictionary) -> void:
+static func _plants(kit: MeshKit3D, models: Dictionary) -> void:
 	var trees: Array = models.get("trees", [])
 	var bush: Mesh = models.get("bush")
 	var rock: Mesh = models.get("rock")
@@ -370,7 +370,7 @@ static func _plants(kit: KartMeshKit, models: Dictionary) -> void:
 
 
 ## Behind the far crowd: a striped tent (mustard and cream, a blue pennant) and hay bales.
-static func _fairground(kit: KartMeshKit) -> void:
+static func _fairground(kit: MeshKit3D) -> void:
 	var y := TugWorld.BANK_TOP - 0.02
 	var tent_at := Vector3(-11.5, y, TugWorld.FAR_BANK_Z - 9.0)
 	var stripes := Callable(func(p: Vector3, _n: Vector3, c: Color) -> Color:
@@ -379,24 +379,24 @@ static func _fairground(kit: KartMeshKit) -> void:
 		var col := lin(Color(0.95, 0.92, 0.82)) if cream else lin(Color(0.93, 0.7, 0.2))
 		return Color(col.r * c.r, col.g * c.g, col.b * c.b, 1.0))
 	kit.paint = stripes
-	var walls := KartMeshKit.lathe(PackedVector2Array([Vector2(2.3, 0.0), Vector2(2.3, 1.5), Vector2(2.45, 1.6),
+	var walls := MeshKit3D.lathe(PackedVector2Array([Vector2(2.3, 0.0), Vector2(2.3, 1.5), Vector2(2.45, 1.6),
 		Vector2(1.2, 2.5), Vector2(0.15, 3.35), Vector2(0.0, 3.4)]), 12)
-	kit.add(walls, KartMeshKit.xf(tent_at), Color.WHITE)
+	kit.add(walls, MeshKit3D.xf(tent_at), Color.WHITE)
 	kit.paint = Callable()
-	_k(kit, KartMeshKit.box(Vector3(1.0, 1.3, 0.05)), KartMeshKit.xf(tent_at + Vector3(0.4, 0.65, 2.29)), Color(0.12, 0.08, 0.06))
-	_k(kit, KartMeshKit.cylinder(0.03, 0.03, 0.8, 4), KartMeshKit.xf(tent_at + Vector3(0.0, 3.7, 0.0)), PILING)
+	_k(kit, MeshKit3D.box(Vector3(1.0, 1.3, 0.05)), MeshKit3D.xf(tent_at + Vector3(0.4, 0.65, 2.29)), Color(0.12, 0.08, 0.06))
+	_k(kit, MeshKit3D.cylinder(0.03, 0.03, 0.8, 4), MeshKit3D.xf(tent_at + Vector3(0.0, 3.7, 0.0)), PILING)
 	var pennant := Tris.new()
 	var blue := lin(Color(0.3, 0.6, 0.9))
 	pennant.card(tent_at + Vector3(0.0, 4.05, 0.0), tent_at + Vector3(0.0, 3.8, 0.0), tent_at + Vector3(0.55, 3.93, 0.0),
 		Vector3.BACK, Color(blue, 1.0), Color(blue, 1.0), Color(blue, 0.0))
 	kit.add(pennant.mesh(), Transform3D.IDENTITY, Color.WHITE)
-	var bale := KartMeshKit.blob(Vector3(0.55, 0.32, 0.38), 0.3, 0.3, 8, 6)
+	var bale := MeshKit3D.blob(Vector3(0.55, 0.32, 0.38), 0.3, 0.3, 8, 6)
 	kit.ao_y0 = y
 	kit.ao_y1 = y + 0.7
 	kit.ao_min = 0.7
 	for b in [[Vector3(7.6, 0.3, -7.8), 8.0], [Vector3(8.8, 0.3, -7.4), -14.0], [Vector3(8.2, 0.92, -7.6), 3.0],
 			[Vector3(-7.4, 0.3, -6.6), 30.0]]:
-		_k(kit, bale, KartMeshKit.xf(Vector3(0.0, y, TugWorld.FAR_BANK_Z) + b[0], Vector3(0.0, b[1], 0.0)), Color(0.85, 0.7, 0.36))
+		_k(kit, bale, MeshKit3D.xf(Vector3(0.0, y, TugWorld.FAR_BANK_Z) + b[0], Vector3(0.0, b[1], 0.0)), Color(0.85, 0.7, 0.36))
 	kit.ao_min = 1.0
 
 
@@ -429,35 +429,35 @@ static func bot_body() -> ArrayMesh:
 	var dark := IRON
 	# Feet and legs.
 	for x: float in [-0.24, 0.24]:
-		_k(kit, KartMeshKit.blob(Vector3(0.19, 0.12, 0.28), 0.5, 0.5, 8, 5), KartMeshKit.xf(Vector3(x, 0.12, 0.06)), dark)
+		_k(kit, MeshKit3D.blob(Vector3(0.19, 0.12, 0.28), 0.5, 0.5, 8, 5), MeshKit3D.xf(Vector3(x, 0.12, 0.06)), dark)
 		var leg := PackedVector3Array()
 		var cols := PackedColorArray()
 		for i in 5:
 			leg.append(Vector3(x * 0.92, 0.2 + i * 0.09, 0.0))
 			cols.append(lin(Color(0.55, 0.55, 0.58) if i % 2 == 0 else Color(0.3, 0.3, 0.33)))
-		kit.add(KartMeshKit.tube(leg, PackedFloat32Array([0.085]), 6, cols), Transform3D.IDENTITY, Color.WHITE)
-	_k(kit, KartMeshKit.lathe(PackedVector2Array([Vector2(0.3, 0.52), Vector2(0.42, 0.56), Vector2(0.42, 0.62),
+		kit.add(MeshKit3D.tube(leg, PackedFloat32Array([0.085]), 6, cols), Transform3D.IDENTITY, Color.WHITE)
+	_k(kit, MeshKit3D.lathe(PackedVector2Array([Vector2(0.3, 0.52), Vector2(0.42, 0.56), Vector2(0.42, 0.62),
 		Vector2(0.3, 0.64)]), 12), Transform3D.IDENTITY, dark)
 	# The barrel body, in the body colour with darker hoops.
 	kit.outline = 1.0
 	var shade := Color(0.62, 0.62, 0.62)
 	var paint := Color(1.0, 1.0, 1.0)
-	var body := KartMeshKit.lathe(PackedVector2Array([Vector2(0.34, 0.58), Vector2(0.44, 0.62), Vector2(0.46, 0.68),
+	var body := MeshKit3D.lathe(PackedVector2Array([Vector2(0.34, 0.58), Vector2(0.44, 0.62), Vector2(0.46, 0.68),
 		Vector2(0.52, 0.78), Vector2(0.55, 1.05), Vector2(0.53, 1.32), Vector2(0.47, 1.46), Vector2(0.45, 1.52),
 		Vector2(0.36, 1.6), Vector2(0.0, 1.62)]), 14,
 		PackedColorArray([shade, shade, paint, paint, paint, paint, paint, shade, shade, shade]))
 	kit.add(body, Transform3D.IDENTITY, Color.WHITE)
 	# The head: a short drum and a dome.
-	var head := KartMeshKit.lathe(PackedVector2Array([Vector2(0.0, 1.7), Vector2(0.3, 1.7), Vector2(0.39, 1.75),
+	var head := MeshKit3D.lathe(PackedVector2Array([Vector2(0.0, 1.7), Vector2(0.3, 1.7), Vector2(0.39, 1.75),
 		Vector2(0.41, 1.9), Vector2(0.41, 2.16), Vector2(0.37, 2.3), Vector2(0.27, 2.42), Vector2(0.13, 2.49),
 		Vector2(0.0, 2.51)]), 14, PackedColorArray([shade, shade, paint, paint, paint, paint, paint, paint, paint]))
 	kit.add(head, Transform3D.IDENTITY, Color.WHITE)
 	# Shoulders and mitten hands on the rope (the rope meets them at (0, 1.3, 0.97)).
 	for x: float in [-0.56, 0.56]:
-		kit.add(KartMeshKit.sphere(0.14, 8, 4), KartMeshKit.xf(Vector3(x, 1.38, 0.0)), Color(0.92, 0.92, 0.92))
+		kit.add(MeshKit3D.sphere(0.14, 8, 4), MeshKit3D.xf(Vector3(x, 1.38, 0.0)), Color(0.92, 0.92, 0.92))
 	for x: float in [-0.12, 0.12]:
-		kit.add(KartMeshKit.blob(Vector3(0.1, 0.11, 0.13), 0.7, 0.7, 8, 5), KartMeshKit.xf(Vector3(x, 1.3, 0.9)), Color.WHITE)
-		kit.add(KartMeshKit.blob(Vector3(0.04, 0.05, 0.06), 0.8, 0.8, 6, 4), KartMeshKit.xf(Vector3(x * 0.55, 1.4, 0.93), Vector3(0.0, 0.0, 0.0)), Color(0.9, 0.9, 0.9))
+		kit.add(MeshKit3D.blob(Vector3(0.1, 0.11, 0.13), 0.7, 0.7, 8, 5), MeshKit3D.xf(Vector3(x, 1.3, 0.9)), Color.WHITE)
+		kit.add(MeshKit3D.blob(Vector3(0.04, 0.05, 0.06), 0.8, 0.8, 6, 4), MeshKit3D.xf(Vector3(x * 0.55, 1.4, 0.93), Vector3(0.0, 0.0, 0.0)), Color(0.9, 0.9, 0.9))
 	kit.outline = 0.0
 	# The arms: springy hoses from the shoulders to the mittens.
 	for side: float in [-1.0, 1.0]:
@@ -470,17 +470,17 @@ static func bot_body() -> ArrayMesh:
 			var t := i / 8.0
 			arm.append(a.lerp(b, t).lerp(b.lerp(c, t), t))
 			cols.append(lin(Color(0.6, 0.6, 0.62) if i % 2 == 0 else Color(0.32, 0.32, 0.35)))
-		kit.add(KartMeshKit.tube(arm, PackedFloat32Array([0.07]), 6, cols), Transform3D.IDENTITY, Color.WHITE)
+		kit.add(MeshKit3D.tube(arm, PackedFloat32Array([0.07]), 6, cols), Transform3D.IDENTITY, Color.WHITE)
 	# The visor slot (the eyes glow inside it) and the mouth grille.
-	_k(kit, KartMeshKit.blob(Vector3(0.3, 0.085, 0.08), 0.25, 0.25, 10, 5), KartMeshKit.xf(Vector3(0.0, 2.05, 0.345)), Color(0.06, 0.06, 0.08))
+	_k(kit, MeshKit3D.blob(Vector3(0.3, 0.085, 0.08), 0.25, 0.25, 10, 5), MeshKit3D.xf(Vector3(0.0, 2.05, 0.345)), Color(0.06, 0.06, 0.08))
 	for i in 3:
-		_k(kit, KartMeshKit.box(Vector3(0.24, 0.025, 0.04)), KartMeshKit.xf(Vector3(0.0, 1.82 + i * 0.045, 0.395)), Color(0.08, 0.08, 0.1))
+		_k(kit, MeshKit3D.box(Vector3(0.24, 0.025, 0.04)), MeshKit3D.xf(Vector3(0.0, 1.82 + i * 0.045, 0.395)), Color(0.08, 0.08, 0.1))
 	# The chest gauge: a brass rim, a cream face and a needle.
-	_k(kit, KartMeshKit.cylinder(0.17, 0.17, 0.05, 14), KartMeshKit.xf(Vector3(0.0, 1.12, 0.53), Vector3(90.0, 0.0, 0.0)), BRASS)
-	_k(kit, KartMeshKit.cylinder(0.135, 0.135, 0.02, 14), KartMeshKit.xf(Vector3(0.0, 1.12, 0.56), Vector3(90.0, 0.0, 0.0)), Color(0.95, 0.92, 0.8))
-	_k(kit, KartMeshKit.box(Vector3(0.018, 0.11, 0.012)), KartMeshKit.xf(Vector3(0.03, 1.15, 0.575), Vector3(0.0, 0.0, -35.0)), Color(0.12, 0.1, 0.1))
+	_k(kit, MeshKit3D.cylinder(0.17, 0.17, 0.05, 14), MeshKit3D.xf(Vector3(0.0, 1.12, 0.53), Vector3(90.0, 0.0, 0.0)), BRASS)
+	_k(kit, MeshKit3D.cylinder(0.135, 0.135, 0.02, 14), MeshKit3D.xf(Vector3(0.0, 1.12, 0.56), Vector3(90.0, 0.0, 0.0)), Color(0.95, 0.92, 0.8))
+	_k(kit, MeshKit3D.box(Vector3(0.018, 0.11, 0.012)), MeshKit3D.xf(Vector3(0.03, 1.15, 0.575), Vector3(0.0, 0.0, -35.0)), Color(0.12, 0.1, 0.1))
 	# Rivets in rings around the body and head.
-	var rivet := KartMeshKit.sphere(0.024, 4, 2, true)
+	var rivet := MeshKit3D.sphere(0.024, 4, 2, true)
 	for ring in [[0.79, 0.52], [1.3, 0.535], [1.76, 0.39]]:
 		for i in 8:
 			var a: float = TAU * (i + 0.5) / 8.0
@@ -488,15 +488,15 @@ static func bot_body() -> ArrayMesh:
 			var xf := Transform3D(Basis(n.cross(Vector3.UP), n, Vector3.UP), n * ring[1] + Vector3.UP * ring[0])
 			_k(kit, rivet, xf, Color(0.8, 0.8, 0.76))
 	# The chimney (it puffs steam in a surge).
-	_k(kit, KartMeshKit.cylinder(0.075, 0.09, 0.3, 10), KartMeshKit.xf(Vector3(0.14, 2.56, -0.1)), dark)
-	_k(kit, KartMeshKit.cylinder(0.11, 0.11, 0.05, 10), KartMeshKit.xf(Vector3(0.14, 2.71, -0.1)), Color(0.32, 0.32, 0.35))
+	_k(kit, MeshKit3D.cylinder(0.075, 0.09, 0.3, 10), MeshKit3D.xf(Vector3(0.14, 2.56, -0.1)), dark)
+	_k(kit, MeshKit3D.cylinder(0.11, 0.11, 0.05, 10), MeshKit3D.xf(Vector3(0.14, 2.71, -0.1)), Color(0.32, 0.32, 0.35))
 	# The wind-up key on its back: a shaft and a two-lobed bow; it spins about z (UV.y = 1).
 	kit.glow = 1.0
 	var p := Vector3(BOT_KEY_PIVOT.x, BOT_KEY_PIVOT.y, 0.0)
-	_k(kit, KartMeshKit.cylinder(0.04, 0.04, 0.32, 8), KartMeshKit.xf(p + Vector3(0.0, 0.0, -0.66), Vector3(90.0, 0.0, 0.0)), BRASS)
-	_k(kit, KartMeshKit.sphere(0.07, 8, 4), KartMeshKit.xf(p + Vector3(0.0, 0.0, -0.83)), BRASS)
+	_k(kit, MeshKit3D.cylinder(0.04, 0.04, 0.32, 8), MeshKit3D.xf(p + Vector3(0.0, 0.0, -0.66), Vector3(90.0, 0.0, 0.0)), BRASS)
+	_k(kit, MeshKit3D.sphere(0.07, 8, 4), MeshKit3D.xf(p + Vector3(0.0, 0.0, -0.83)), BRASS)
 	for side: float in [-1.0, 1.0]:
-		_k(kit, KartMeshKit.blob(Vector3(0.17, 0.11, 0.035), 0.9, 0.9, 8, 4), KartMeshKit.xf(p + Vector3(side * 0.17, 0.0, -0.83)), BRASS)
+		_k(kit, MeshKit3D.blob(Vector3(0.17, 0.11, 0.035), 0.9, 0.9, 8, 4), MeshKit3D.xf(p + Vector3(side * 0.17, 0.0, -0.83)), BRASS)
 	kit.glow = 0.0
 	return kit.commit()
 
@@ -506,8 +506,8 @@ static func bot_ears() -> ArrayMesh:
 	var kit := _new_kit()
 	kit.outline = 1.0
 	for side: float in [-1.0, 1.0]:
-		kit.add(KartMeshKit.cylinder(0.14, 0.14, 0.08, 12), KartMeshKit.xf(Vector3(side * 0.43, 2.12, 0.0), Vector3(0.0, 0.0, 90.0)), Color(0.72, 0.72, 0.72))
-		kit.add(KartMeshKit.cylinder(0.08, 0.08, 0.04, 10), KartMeshKit.xf(Vector3(side * 0.48, 2.12, 0.0), Vector3(0.0, 0.0, 90.0)), Color(0.45, 0.45, 0.45))
+		kit.add(MeshKit3D.cylinder(0.14, 0.14, 0.08, 12), MeshKit3D.xf(Vector3(side * 0.43, 2.12, 0.0), Vector3(0.0, 0.0, 90.0)), Color(0.72, 0.72, 0.72))
+		kit.add(MeshKit3D.cylinder(0.08, 0.08, 0.04, 10), MeshKit3D.xf(Vector3(side * 0.48, 2.12, 0.0), Vector3(0.0, 0.0, 90.0)), Color(0.45, 0.45, 0.45))
 	return kit.commit()
 
 
@@ -515,7 +515,7 @@ static func bot_ears() -> ArrayMesh:
 static func bot_horns() -> ArrayMesh:
 	var kit := _new_kit()
 	for side: float in [-1.0, 1.0]:
-		_k(kit, KartMeshKit.cylinder(0.0, 0.075, 0.42, 8), KartMeshKit.xf(Vector3(side * 0.3, 2.52, 0.0), Vector3(0.0, 0.0, -32.0 * side)), Color(0.9, 0.86, 0.74))
+		_k(kit, MeshKit3D.cylinder(0.0, 0.075, 0.42, 8), MeshKit3D.xf(Vector3(side * 0.3, 2.52, 0.0), Vector3(0.0, 0.0, -32.0 * side)), Color(0.9, 0.86, 0.74))
 	return kit.commit()
 
 
@@ -523,7 +523,7 @@ static func bot_horns() -> ArrayMesh:
 static func bot_eyes() -> ArrayMesh:
 	var kit := _new_kit()
 	for p in BOT_EYES:
-		kit.add(KartMeshKit.blob(Vector3(0.07, 0.05, 0.03), 1.0, 1.0, 10, 5), KartMeshKit.xf(p), Color.WHITE)
+		kit.add(MeshKit3D.blob(Vector3(0.07, 0.05, 0.03), 1.0, 1.0, 10, 5), MeshKit3D.xf(p), Color.WHITE)
 	return kit.commit()
 
 
@@ -539,27 +539,27 @@ static func gloves() -> ArrayMesh:
 	for side: float in [-1.0, 1.0]:
 		var c := Vector3(side * 0.064, 0.0, 0.0)
 		# The palm and back of the hand, a pillowy block around the rope.
-		_k(kit, KartMeshKit.blob(Vector3(0.05, 0.047, 0.062), 0.55, 0.6, 12, 8), KartMeshKit.xf(c + Vector3(0.0, 0.004, 0.006)), glove)
+		_k(kit, MeshKit3D.blob(Vector3(0.05, 0.047, 0.062), 0.55, 0.6, 12, 8), MeshKit3D.xf(c + Vector3(0.0, 0.004, 0.006)), glove)
 		# Curled fingers: four rolls across the top front, knuckles readable from above.
 		for f in 4:
 			var at := Vector3(c.x - 0.033 + f * 0.022, 0.03 - absf(f - 1.5) * 0.004, -0.028)
-			_k(kit, KartMeshKit.blob(Vector3(0.0125, 0.02, 0.026), 0.8, 0.8, 8, 5), KartMeshKit.xf(at, Vector3(20.0, 0.0, 0.0)), glove.lightened(0.06))
-			_k(kit, KartMeshKit.blob(Vector3(0.012, 0.012, 0.012), 1.0, 1.0, 6, 4), KartMeshKit.xf(at + Vector3(0.0, 0.016, 0.012)), glove.lightened(0.14))
+			_k(kit, MeshKit3D.blob(Vector3(0.0125, 0.02, 0.026), 0.8, 0.8, 8, 5), MeshKit3D.xf(at, Vector3(20.0, 0.0, 0.0)), glove.lightened(0.06))
+			_k(kit, MeshKit3D.blob(Vector3(0.012, 0.012, 0.012), 1.0, 1.0, 6, 4), MeshKit3D.xf(at + Vector3(0.0, 0.016, 0.012)), glove.lightened(0.14))
 		# The seam across the back, and the thumb wrapping the rope on the inside.
-		_k(kit, KartMeshKit.box(Vector3(0.07, 0.004, 0.006)), KartMeshKit.xf(c + Vector3(0.0, 0.048, 0.012)), seam)
-		_k(kit, KartMeshKit.blob(Vector3(0.016, 0.018, 0.034), 0.8, 0.8, 8, 5), KartMeshKit.xf(Vector3(side * 0.03, 0.012, -0.03), Vector3(0.0, side * 25.0, 0.0)), glove)
+		_k(kit, MeshKit3D.box(Vector3(0.07, 0.004, 0.006)), MeshKit3D.xf(c + Vector3(0.0, 0.048, 0.012)), seam)
+		_k(kit, MeshKit3D.blob(Vector3(0.016, 0.018, 0.034), 0.8, 0.8, 8, 5), MeshKit3D.xf(Vector3(side * 0.03, 0.012, -0.03), Vector3(0.0, side * 25.0, 0.0)), glove)
 		# The cuff and the sleeve going back and down under the camera.
-		_k(kit, KartMeshKit.lathe(PackedVector2Array([Vector2(0.044, 0.0), Vector2(0.058, 0.005), Vector2(0.06, 0.04),
-			Vector2(0.056, 0.05), Vector2(0.0, 0.052)]), 10), KartMeshKit.xf(c + Vector3(side * 0.006, -0.012, 0.05), Vector3(-80.0, 0.0, 0.0)),
+		_k(kit, MeshKit3D.lathe(PackedVector2Array([Vector2(0.044, 0.0), Vector2(0.058, 0.005), Vector2(0.06, 0.04),
+			Vector2(0.056, 0.05), Vector2(0.0, 0.052)]), 10), MeshKit3D.xf(c + Vector3(side * 0.006, -0.012, 0.05), Vector3(-80.0, 0.0, 0.0)),
 			Color(0.92, 0.88, 0.78))
 		var sleeve := PackedVector3Array([c + Vector3(side * 0.008, -0.018, 0.09), c + Vector3(side * 0.016, -0.04, 0.15)])
-		_k(kit, KartMeshKit.tube(sleeve, PackedFloat32Array([0.044, 0.047]), 10), Transform3D.IDENTITY, GLOVE.darkened(0.45))
+		_k(kit, MeshKit3D.tube(sleeve, PackedFloat32Array([0.044, 0.047]), 10), Transform3D.IDENTITY, GLOVE.darkened(0.45))
 	# The rope through the fists, its end showing just behind them.
 	var tail := PackedVector3Array([Vector3(0.0, 0.0, -0.03), Vector3(0.0, -0.002, 0.03), Vector3(0.006, -0.012, 0.06)])
 	var tc := PackedColorArray()
 	for i in tail.size():
 		tc.append(lin(ROPE_LIGHT if i % 2 == 0 else ROPE_DARK))
-	kit.add(KartMeshKit.tube(tail, PackedFloat32Array([0.026, 0.026, 0.024]), 8, tc), Transform3D.IDENTITY, Color.WHITE)
+	kit.add(MeshKit3D.tube(tail, PackedFloat32Array([0.026, 0.026, 0.024]), 8, tc), Transform3D.IDENTITY, Color.WHITE)
 	return kit.commit()
 
 
@@ -570,8 +570,8 @@ static func gloves() -> ArrayMesh:
 ## flutter weight along the cloth.
 static func flag() -> ArrayMesh:
 	var kit := _new_kit()
-	_k(kit, KartMeshKit.cylinder(0.022, 0.022, 0.95, 6), KartMeshKit.xf(Vector3(0.0, 0.475, 0.0)), Color(0.92, 0.92, 0.88))
-	_k(kit, KartMeshKit.sphere(0.04, 6, 3), KartMeshKit.xf(Vector3(0.0, 0.97, 0.0)), BRASS)
+	_k(kit, MeshKit3D.cylinder(0.022, 0.022, 0.95, 6), MeshKit3D.xf(Vector3(0.0, 0.475, 0.0)), Color(0.92, 0.92, 0.88))
+	_k(kit, MeshKit3D.sphere(0.04, 6, 3), MeshKit3D.xf(Vector3(0.0, 0.97, 0.0)), BRASS)
 	var t := Tris.new()
 	var red := lin(FLAG)
 	var cols := 6
@@ -622,7 +622,7 @@ static func lily_pad(flower: bool) -> ArrayMesh:
 	var kit := _new_kit()
 	kit.add(t.mesh(), Transform3D.IDENTITY, Color.WHITE)
 	if flower:
-		_k(kit, KartMeshKit.blob(Vector3(0.14, 0.12, 0.14), 1.0, 1.0, 6, 4, PI * 0.55), KartMeshKit.xf(Vector3(0.25, 0.02, 0.1)), Color(0.98, 0.85, 0.9))
+		_k(kit, MeshKit3D.blob(Vector3(0.14, 0.12, 0.14), 1.0, 1.0, 6, 4, PI * 0.55), MeshKit3D.xf(Vector3(0.25, 0.02, 0.1)), Color(0.98, 0.85, 0.9))
 	return kit.commit()
 
 
@@ -732,51 +732,7 @@ static func crowd_sprite() -> ImageTexture:
 
 
 ## Tug's vignette (ART_BIBLE §4: 0.3 toward a warm tint), painted into the vertex colours of the
-## grid that draws the 3D view scaled up on screen (`view_image`), so it costs nothing a pixel.
+## grid that draws the 3D view scaled up on screen (`StageView3D.view_image`), so it costs nothing a pixel.
 ## It was LOOK_VIGNETTE in every world shader: about 20 ALU on every pixel of the view.
 const VIGNETTE := 0.3
 const VIGNETTE_TINT := Color(1.0, 0.9, 0.8)
-const VIEW_COLS := 16
-const VIEW_ROWS := 9
-
-
-## The darkening (as a colour multiplier) at a screen position `suv` (0-1 each way): the shared
-## include's formula (world_look.gdshaderinc, `grade`), in linear light.
-static func vignette_at(suv: Vector2) -> Color:
-	var p := suv * 2.0 - Vector2.ONE
-	p.x *= 1.35
-	var v := smoothstep(0.7, 1.75, p.length())
-	var m := 1.0 - v * VIGNETTE
-	var tint := Color.WHITE.lerp(VIGNETTE_TINT, v * 0.5)
-	return Color(m * tint.r, m * tint.g, m * tint.b)
-
-
-## The grid that draws the 3D view's image at `size` on screen: UVs across the image and the
-## vignette in the vertex colours. The image holds display (sRGB) values, so the linear
-## multiplier goes to the power 1/2.2.
-static func view_image(size: Vector2) -> ArrayMesh:
-	var verts := PackedVector2Array()
-	var uvs := PackedVector2Array()
-	var cols := PackedColorArray()
-	var idx := PackedInt32Array()
-	for j in VIEW_ROWS + 1:
-		for i in VIEW_COLS + 1:
-			var uv := Vector2(float(i) / VIEW_COLS, float(j) / VIEW_ROWS)
-			verts.append(uv * size)
-			uvs.append(uv)
-			var m := vignette_at(uv)
-			cols.append(Color(pow(m.r, 1.0 / 2.2), pow(m.g, 1.0 / 2.2), pow(m.b, 1.0 / 2.2)))
-	for j in VIEW_ROWS:
-		for i in VIEW_COLS:
-			var a := j * (VIEW_COLS + 1) + i
-			var c := a + VIEW_COLS + 1
-			idx.append_array([a, a + 1, c, a + 1, c + 1, c])
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_COLOR] = cols
-	arrays[Mesh.ARRAY_INDEX] = idx
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh

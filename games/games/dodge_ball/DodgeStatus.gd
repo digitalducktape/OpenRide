@@ -20,8 +20,6 @@ extends PanelContainer
 static var look := GameTheme.new(Color("38b6ff"), Color("0e1b3d"), 0.18, true)
 
 const BAR_SIZE := Vector2(320, 30)
-const BAR_EDGE := 3
-const BAR_RADIUS := 9
 const LIFE_RADIUS := 14.0
 const LIFE_GAP := 8.0
 const CAPTIONS := ["SHIELD", "PEDAL UP!", "NO SHIELD"]
@@ -38,7 +36,7 @@ var lives := -1  ## -1: no lives (circuit)
 ## The elements the game pops on its events (DodgeBall._handle).
 var streak_label: Label
 var lives_box: Control
-var bar: Control
+var bar: GaugeBar
 var bonus_badge: PanelContainer
 
 var _mode: Label
@@ -46,7 +44,6 @@ var _caption_box: PanelContainer
 var _caption: Label
 var _bonus_slot: MarginContainer
 var _wave: Label
-var _drawn_shield := -1.0
 var _bonus_on := false
 var _streak_count := -1
 var _wave_number := -1
@@ -54,7 +51,7 @@ var _caption_state := -1
 var _bar_throb: Tween
 var _lost_life := -1  ## the life that's popping down, or -1
 var _lost_scale := 0.0
-## How often the bar and the lives have drawn (tests: no per-frame redraws).
+## How often the lives have drawn (the bar counts its own: `bar.draws`) (tests: no per-frame redraws).
 var draws := 0
 
 
@@ -89,11 +86,7 @@ func _init(floor_value := 85.0, with_lives := false, is_catch := false) -> void:
 	_caption.custom_minimum_size = Vector2(ceilf(widest) + GameTheme.outline_for(HudTheme.SMALL), 0)
 	_caption_box.add_child(_caption)
 	top.add_child(_caption_box)
-	bar = Control.new()
-	bar.custom_minimum_size = BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.draw.connect(_draw_bar)
+	bar = GaugeBar.new(BAR_SIZE, look.ink)
 	top.add_child(bar)
 
 	var bottom := _row(box)
@@ -158,9 +151,7 @@ func set_state(value: float, below_floor: bool, bonus_on: bool, streak: int, liv
 	if wave != _wave_number:
 		_wave_number = wave
 		_wave.text = "WAVE %d" % wave
-	if absf(value - _drawn_shield) > 0.002:
-		_drawn_shield = value
-		bar.queue_redraw()
+	bar.set_fill(value, GameTheme.WARN if below_floor else look.accent)
 
 
 ## The shield emptied (true) or is full again (false): the badge turns red and breathes and the
@@ -176,7 +167,7 @@ func _set_empty(on: bool) -> void:
 		_bar_throb.tween_property(bar, "modulate", Color(0.75, 0.75, 0.75), 0.3).set_trans(Tween.TRANS_SINE)
 	else:
 		GameTheme.pop(bar, 1.12)
-	bar.queue_redraw()
+	bar.set_alert(on)
 
 
 func _refresh_caption() -> void:
@@ -236,31 +227,6 @@ func _row(parent: Container) -> HBoxContainer:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	parent.add_child(row)
 	return row
-
-
-func _draw_bar() -> void:
-	draws += 1
-	var track := StyleBoxFlat.new()
-	track.set_corner_radius_all(BAR_RADIUS)
-	track.anti_aliasing = true
-	track.bg_color = Color(look.ink, 0.92)
-	if empty:
-		track.bg_color = Color(look.ink.lerp(GameTheme.BAD, 0.55), 0.95)
-	track.border_color = Color(GameTheme.BAD, 0.95) if empty else Color(Color.WHITE, 0.7)
-	track.set_border_width_all(BAR_EDGE)
-	bar.draw_style_box(track, Rect2(Vector2.ZERO, BAR_SIZE))
-	var inner := Rect2(Vector2(BAR_EDGE + 1, BAR_EDGE + 1), BAR_SIZE - Vector2(BAR_EDGE + 1, BAR_EDGE + 1) * 2.0)
-	var w := inner.size.x * clampf(shield, 0.0, 1.0)
-	if w < 2.0:
-		return
-	var fill := StyleBoxFlat.new()
-	fill.set_corner_radius_all(int(minf(BAR_RADIUS - BAR_EDGE, w / 2.0)))
-	fill.anti_aliasing = true
-	fill.bg_color = GameTheme.WARN if draining else look.accent
-	bar.draw_style_box(fill, Rect2(inner.position, Vector2(w, inner.size.y)))
-	# A highlight along the top, so the fill reads as a lit tube at a glance.
-	bar.draw_rect(Rect2(inner.position + Vector2(BAR_RADIUS * 0.5, 2), Vector2(maxf(0.0, w - BAR_RADIUS), 4)),
-		Color(1, 1, 1, 0.35))
 
 
 func _draw_lives() -> void:

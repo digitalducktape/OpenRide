@@ -71,6 +71,7 @@ def render_song(spec, seed):
         base = BASE.get(name, name)
         role = spec.get("roles", {}).get(name, base)
         ch = (chords.get(name) or chords[base])[:n]
+        song.level = 10 ** (spec.get("dynamics", {}).get(name, 0.0) / 20)
         drums(song, bar0, n, spec["drums"], role)
         bass(song, bar0, ch, spec["bass"], role, rng)
         for p in spec["parts"].get(name, []):
@@ -82,10 +83,12 @@ def render_song(spec, seed):
                 line(song, bar0, mel[p[1]][:n], p[2], p[3], rng, shift=p[4], vel=p[5], harmony=harm)
             elif kind == "counter":
                 line(song, bar0, counter(ch, *p[4:6]) if len(p) > 4 else counter(ch), p[1], p[2], rng, vel=p[3])
+        if "extra" in spec:  # a song's own parts for this section: extra(song, bar0, bars, name, role, rng)
+            spec["extra"](song, bar0, n, name, role, rng)
         if name in spec.get("risers", ("intro", "bridge")):
             song.put("fx", (bar0 + n - 1) * 4, ins.riser(4 * song.spb, rng), human=0)
         bar0 += n
-    stems = song.mix({**TARGETS, **spec.get("levels", {})}, SENDS, {**SIDECHAIN, **spec.get("sidechain", {})},
+    stems = song.mix({**TARGETS, **spec.get("levels", {})}, {**SENDS, **spec.get("sends", {})}, {**SIDECHAIN, **spec.get("sidechain", {})},
                      MUSIC_LUFS + spec.get("lufs_offset", 0.0), spec.get("verb_sec", 1.7), STEMS)
     head_n = song.at(sum(b for _, b in head) * 4)
     body_n = song.at(sum(b for _, b in body) * 4)
