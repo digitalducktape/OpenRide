@@ -1,6 +1,8 @@
 package dev.digitalducktape.openride.ui.ride
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.media.AudioManager
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -25,13 +27,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import dev.digitalducktape.openride.ui.classes.YouTubeEmbed
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -42,6 +48,7 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
+import dev.digitalducktape.openride.ui.music.MiniPlayer
 import kotlinx.coroutines.launch
 
 /**
@@ -49,14 +56,27 @@ import kotlinx.coroutines.launch
  * WebView streaming the class through YouTube's own embedded player, with live ride metrics
  * overlaid — timer and ride controls along the top scrim, [RideMetricsBar] along the bottom.
  *
- * The overlay is dismissible (tap the video, or bring it back via the "Metrics" pill) so
- * YouTube's native player controls are always reachable and never permanently covered —
- * part of the app's deliberate YouTube ToS stance.
+ * The overlay is dismissible (tap the video) so YouTube's native player controls are always
+ * reachable and never permanently covered — part of the app's deliberate YouTube ToS stance.
+ * The "Ride controls" pill brings it back, and nothing else does: it stays away until the rider
+ * asks for it (rider, 2026-11-12).
  *
  * Ride state comes from the same [InRideViewModel] as the plain in-ride screen, and the
  * video tracks it: pausing the ride (Pause button or freewheel auto-pause) pauses the video
  * through the player API, resuming resumes it, and the video reaching its end finishes the
  * workout automatically.
+ *
+ * The rider can mute the class's own audio (#72) to ride to their music instead, which matters
+ * most for scenic rides. It's a choice for this ride, not a setting: a class starts with its
+ * sound on, so a coached class is never silent by surprise, unless the rider's music is already
+ * playing as it opens, when it starts muted and the music carries on. While the class is muted
+ * the top strip carries the music player.
+ *
+ * The mute is the WebView's own (`WebViewCompat.setAudioMuted`) where it has one: the video
+ * plays on untouched, and the WebView lets go of the sound, which Android gives to one app at a
+ * time, so the music app can play without the class pausing. Unmuting takes the sound back, as
+ * starting any class does. An older WebView falls back to the page's `openrideSetMuted`
+ * ([YouTubeEmbed]), which has to restart the video where it was (a few seconds of black).
  */
 @Composable
 fun VideoRideScreen(
@@ -69,6 +89,10 @@ fun VideoRideScreen(
     val scope = rememberCoroutineScope()
     var overlayVisible by remember { mutableStateOf(true) }
     var showEndConfirmation by remember { mutableStateOf(false) }
+    // A class started over the rider's own music starts muted: they chose the music first
+    // (rider, 2026-11-12). Asked once, as the screen opens, before the class makes any sound.
+    val context = LocalContext.current
+    var classMuted by rememberSaveable { mutableStateOf(riderMusicPlaying(context)) }
 
     // Shared by the End Ride dialog and the video-completion auto-end. endRide() returns
     // null if the ride is already over, so the two paths can't double-fire navigation.
@@ -83,6 +107,7 @@ fun VideoRideScreen(
         ClassPlayer(
             videoId = videoId,
             paused = uiState.isPaused,
+            muted = classMuted,
             onVideoEnded = endRideAndShowSummary,
             modifier = Modifier.fillMaxSize(),
         )
@@ -102,6 +127,8 @@ fun VideoRideScreen(
 
             TopScrimRow(
                 uiState = uiState,
+                classMuted = classMuted,
+                onToggleMute = { classMuted = !classMuted },
                 onPauseResume = { if (uiState.isPaused) viewModel.resume() else viewModel.pause() },
                 onEndRide = { showEndConfirmation = true },
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -113,7 +140,7 @@ fun VideoRideScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         } else {
-            MetricsPill(
+            RideControlsPill(
                 onClick = { overlayVisible = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -141,13 +168,15 @@ fun VideoRideScreen(
 /**
  * The WebView hosting YouTube's embedded player. Created once per [videoId]. [paused]
  * mirrors the *ride's* paused state into the player (see [YouTubeEmbed] for the page-side
- * functions), and [onVideoEnded] fires — already on the UI thread — when playback completes.
+ * functions), [muted] silences the class's own audio (#72), and [onVideoEnded] fires — already
+ * on the UI thread — when playback completes.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun ClassPlayer(
     videoId: String,
     paused: Boolean,
+    muted: Boolean,
     onVideoEnded: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -174,9 +203,23 @@ private fun ClassPlayer(
                     VideoEndBridge { post { currentOnVideoEnded() } },
                     YouTubeEmbed.BRIDGE_NAME,
                 )
+                // H.264 for the class (#73), set before the page loads so it is in place when
+                // the player first asks what the tablet can decode. A WebView too old for
+                // document-start scripts plays as before.
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(
+                        this,
+                        YouTubeEmbed.H264_PREFERENCE_SCRIPT,
+                        YouTubeEmbed.PLAYER_ORIGINS,
+                    )
+                }
+                // Silent before the first frame when the class starts muted, so it never
+                // takes the sound from the rider's music.
+                val webViewMute = WebViewFeature.isFeatureSupported(WebViewFeature.MUTE_AUDIO)
+                if (webViewMute) WebViewCompat.setAudioMuted(this, muted)
                 loadDataWithBaseURL(
                     YouTubeEmbed.BASE_URL,
-                    YouTubeEmbed.html(videoId),
+                    YouTubeEmbed.html(videoId, startMuted = muted && !webViewMute),
                     "text/html",
                     "utf-8",
                     null,
@@ -188,6 +231,15 @@ private fun ClassPlayer(
 
     LaunchedEffect(webView, paused) {
         webView?.evaluateJavascript(if (paused) "openridePause()" else "openrideResume()", null)
+    }
+
+    LaunchedEffect(webView, muted) {
+        val view = webView ?: return@LaunchedEffect
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.MUTE_AUDIO)) {
+            WebViewCompat.setAudioMuted(view, muted)
+        } else {
+            view.evaluateJavascript(YouTubeEmbed.muteScript(muted), null)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -202,6 +254,10 @@ private fun ClassPlayer(
     }
 }
 
+/** Whether something is already playing music as the class opens: the rider's own app. */
+private fun riderMusicPlaying(context: Context): Boolean =
+    (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
+
 /** Page → app callback surface injected as `window.OpenRideBridge` (see [YouTubeEmbed]). */
 private class VideoEndBridge(private val onEnded: () -> Unit) {
     @JavascriptInterface
@@ -211,6 +267,8 @@ private class VideoEndBridge(private val onEnded: () -> Unit) {
 @Composable
 private fun TopScrimRow(
     uiState: InRideUiState,
+    classMuted: Boolean,
+    onToggleMute: () -> Unit,
     onPauseResume: () -> Unit,
     onEndRide: () -> Unit,
     modifier: Modifier = Modifier,
@@ -221,6 +279,8 @@ private fun TopScrimRow(
         uiState.goalProgress?.let { GoalHairline(it) }
         TopStripContent(
             uiState = uiState,
+            classMuted = classMuted,
+            onToggleMute = onToggleMute,
             onPauseResume = onPauseResume,
             onEndRide = onEndRide,
         )
@@ -230,6 +290,8 @@ private fun TopScrimRow(
 @Composable
 private fun TopStripContent(
     uiState: InRideUiState,
+    classMuted: Boolean,
+    onToggleMute: () -> Unit,
     onPauseResume: () -> Unit,
     onEndRide: () -> Unit,
     modifier: Modifier = Modifier,
@@ -266,10 +328,19 @@ private fun TopStripContent(
                 color = if (uiState.sensorsAvailable) OrColors.OnBackground else OrColors.Warning,
                 maxLines = 1,
             )
+        } else if (classMuted) {
+            // The rider's music in the class's place (#72). A status line takes the slot when
+            // there is one: the strip has room for either, not both.
+            MiniPlayer()
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {
-            // Raised fill behind the outlined button: it sits on video.
+            // Raised fill behind the outlined buttons: they sit on video.
+            OrSecondaryButton(
+                text = YouTubeEmbed.muteLabel(classMuted),
+                onClick = onToggleMute,
+                modifier = Modifier.background(OrColors.SurfaceRaised, OrShapes.Small),
+            )
             OrSecondaryButton(
                 text = if (uiState.isPaused) "Resume" else "Pause",
                 onClick = onPauseResume,
@@ -289,9 +360,9 @@ private const val VideoScrimHoldEnd = 0.8f
 
 /** Brings the overlay back once it's been tucked away. Raised fill: it sits on video. */
 @Composable
-private fun MetricsPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun RideControlsPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OrSecondaryButton(
-        text = "Metrics",
+        text = "Ride controls",
         onClick = onClick,
         modifier = modifier.background(OrColors.SurfaceRaised, OrShapes.Small),
     )

@@ -105,7 +105,12 @@ fun MainScaffold(
     )
     val profileViewModel: ProfileTabViewModel = viewModel(
         factory = viewModelFactory {
-            ProfileTabViewModel(appContainer.activeProfileHolder, appContainer.profileRepository, appContainer.backupRepository)
+            ProfileTabViewModel(
+                appContainer.activeProfileHolder,
+                appContainer.profileRepository,
+                appContainer.backupRepository,
+                appContainer.rideRepository,
+            )
         },
     )
     val classRows by classesViewModel.rows.collectAsState()

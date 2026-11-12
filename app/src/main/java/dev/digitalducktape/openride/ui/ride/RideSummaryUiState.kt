@@ -27,6 +27,10 @@ data class RideSummaryUiState(
     val hasSideColumn: Boolean get() = gameResults.isNotEmpty() || suggestedFtp != null
 
     companion object {
+        /** The delete confirmation's body (#84): what goes, and that it can't come back. */
+        const val DELETE_WARNING =
+            "It leaves your history, totals and personal records, along with its graph and any game results. This can't be undone."
+
         /** "45:12 · 380 kcal", or the output in kJ when the bike gave no calories. */
         fun subtitle(ride: Ride): String =
             "${TimeFormat.elapsed(ride.durationSec)} · " + (ride.calories?.let { "$it kcal" } ?: "%.0f kJ".format(ride.outputKj))

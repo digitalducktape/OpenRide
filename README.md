@@ -43,6 +43,7 @@ This update brings a new Kart Race, a games hub for your workouts, better game g
 - **A music player for your own music** — what's playing in Spotify, Apple Music, Pandora, SiriusXM, Plexamp and other music apps, with controls, right on the ride screen. [Details below](#music-player)
 - **Mini-games (BETA)** — five pedal-powered games, including a full Kart Race, plus 20-, 30- and 45-minute game circuits and circuits you build yourself. [Details below](#mini-games-beta)
 - **Ride history and personal bests** — a calendar of every past ride, plus your all-time best output, cadence, and duration
+- **Bring your Peloton history with you** — import the workout-history CSV from your Peloton profile (**Profile → Import Peloton history**) and your past rides join your history, totals and personal bests. The export is a summary per ride, so imported rides have no graph
 - **Export your ride data** — download any ride as a file (TCX or CSV) to keep or use elsewhere, so your data is always yours
 - **Heart-rate strap and Bluetooth headphone support** — pair a heart-rate monitor, see your bpm on the ride screens and in the games, and headphone audio just works once paired
 

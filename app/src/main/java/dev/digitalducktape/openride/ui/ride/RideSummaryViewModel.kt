@@ -85,6 +85,17 @@ class RideSummaryViewModel(
     fun sampleCsvContent(): String? = _ride.value?.let { CsvExporter.exportRideSamples(_samples.value) }
 
     /**
+     * Deletes this ride from history for good (#84), then leaves the session as [dismiss] does,
+     * so a ride deleted straight off the bike doesn't linger as the finished session.
+     */
+    suspend fun deleteRide() {
+        rideRepository.deleteRide(rideId)
+        _ride.value = null
+        _samples.value = emptyList()
+        rideSessionManager.reset()
+    }
+
+    /**
      * Returns to [dev.digitalducktape.openride.core.ride.RideSessionState.Idle] if it was
      * sitting in [dev.digitalducktape.openride.core.ride.RideSessionState.Finished] (the
      * just-stopped-this-ride path) — a no-op otherwise (e.g. viewing an older ride from

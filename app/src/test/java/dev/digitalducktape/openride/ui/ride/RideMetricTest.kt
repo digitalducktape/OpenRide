@@ -80,4 +80,18 @@ class RideMetricTest {
             RideMetricStats.stats(RideMetric.HeartRate, ride, samples),
         )
     }
+
+    @Test
+    fun `a ride without maximums, as an imported one is, shows no max stats`() {
+        val imported = ride.copy(maxPower = 0, maxCadence = 0)
+
+        assertEquals(
+            listOf("TOTAL OUTPUT", "AVG OUTPUT"),
+            RideMetricStats.stats(RideMetric.Output, imported, emptyList()).map { it.label },
+        )
+        assertEquals(
+            listOf("AVG CADENCE"),
+            RideMetricStats.stats(RideMetric.Cadence, imported, emptyList()).map { it.label },
+        )
+    }
 }

@@ -29,13 +29,16 @@ import dev.digitalducktape.openride.ui.common.ExportShare
 import dev.digitalducktape.openride.ui.common.GameBadge
 import dev.digitalducktape.openride.ui.designsystem.BikePreview
 import dev.digitalducktape.openride.ui.designsystem.OrColors
+import dev.digitalducktape.openride.ui.designsystem.OrIcons
 import dev.digitalducktape.openride.ui.designsystem.OrShapes
 import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
 import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrChip
+import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEmptyState
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
+import dev.digitalducktape.openride.ui.designsystem.component.OrIconButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrLabel
 import dev.digitalducktape.openride.ui.designsystem.component.OrPrimaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
@@ -63,6 +66,7 @@ fun RideSummaryRoute(
     val gameResults by viewModel.gameResults.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -79,17 +83,35 @@ fun RideSummaryRoute(
             viewModel.sampleCsvContent()?.let { csv -> ExportShare.share(context, "ride_$id.csv", csv, "text/csv") }
         },
         onApplyFtp = { scope.launch { viewModel.applySuggestedFtp() } },
+        onDelete = { confirmDelete = true },
         onDone = {
             viewModel.dismiss()
             onDismiss()
         },
         modifier = modifier,
     )
+
+    if (confirmDelete) {
+        OrConfirmDialog(
+            title = "Delete this ride?",
+            text = RideSummaryUiState.DELETE_WARNING,
+            confirmText = "Delete ride",
+            destructive = true,
+            onDismiss = { confirmDelete = false },
+            onConfirm = {
+                confirmDelete = false
+                scope.launch {
+                    viewModel.deleteRide()
+                    onDismiss()
+                }
+            },
+        )
+    }
 }
 
 /**
  * Post-ride summary and history detail (PRD P0-5, v2 metrics spec), stateless. One screen, no
- * scrolling (the rider's ask, 2026-10-21): a header with the exports and Done, then the metric
+ * scrolling (the rider's ask, 2026-10-21): a header with delete (#84), the exports and Done, then the metric
  * chips, the selected metric's TOTAL / AVG / MAX band and its graph on the left and, when there
  * is any, the games and the FTP suggestion on the right. Only a very long circuit's game list
  * scrolls, inside its column. The same screen serves a ride just stopped and one from History.
@@ -100,6 +122,7 @@ fun RideSummaryScreen(
     onExportTcx: () -> Unit,
     onExportCsv: () -> Unit,
     onApplyFtp: () -> Unit,
+    onDelete: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -126,6 +149,8 @@ fun RideSummaryScreen(
                 OrLabel(text = RideSummaryUiState.subtitle(current), style = OrType.Body, color = OrColors.OnSurfaceMuted)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                // Apart from Done, at the far end of the row, and behind a confirmation.
+                OrIconButton(icon = OrIcons.Delete, contentDescription = "Delete ride", onClick = onDelete)
                 OrSecondaryButton(text = "Export TCX", onClick = onExportTcx)
                 OrSecondaryButton(text = "Export CSV", onClick = onExportCsv)
                 OrPrimaryButton(text = "Done", onClick = onDone)
@@ -249,6 +274,7 @@ private fun RideSummaryScreenPreview() {
             onExportTcx = {},
             onExportCsv = {},
             onApplyFtp = {},
+            onDelete = {},
             onDone = {},
         )
     }

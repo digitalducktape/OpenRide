@@ -45,7 +45,9 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsDivider
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsGroup
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsRow
 import dev.digitalducktape.openride.ui.music.MusicAppPicker
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Width of the Profile tab's rider column. */
 
@@ -53,8 +55,8 @@ import kotlinx.coroutines.launch
  * Profile nav tab: shows the active rider, offers "Switch rider" (PRD P0-3/P1-6 — tap-to-
  * confirm before clearing the active profile and returning to profile select, so a stray tap
  * mid-session can't silently log the next ride under the wrong rider), quick shortcuts to
- * stock Android Wi-Fi/device settings (PRD P1-5, T12), the home-screen switch (#47), and whole-database backup/restore
- * (PRD P1-8, T15). Laid out as the rider on the left and grouped settings rows on the right
+ * stock Android Wi-Fi/device settings (PRD P1-5, T12), the home-screen switch (#47), whole-database backup/restore
+ * (PRD P1-8, T15), and importing past rides from a Peloton workout-history CSV (#83). Laid out as the rider on the left and grouped settings rows on the right
  * (Ride, Classes, Device, Music, Backup & restore), every row a 72 dp touch target.
  */
 @Composable
@@ -85,6 +87,10 @@ fun ProfileTabScreen(
     var restoreError by remember { mutableStateOf<String?>(null) }
 
     var routeError by remember { mutableStateOf<String?>(null) }
+
+    // Peloton history import (#83): the last import's outcome, or why the file was refused.
+    var importResult by remember { mutableStateOf<String?>(null) }
+    var importFailed by remember { mutableStateOf(false) }
     var pickingMusicApp by remember { mutableStateOf(false) }
 
     // The home-screen alias (#47, #63). Re-read on resume: the default is picked in a system
@@ -108,6 +114,19 @@ fun ProfileTabScreen(
             context.contentResolver.openInputStream(uri)?.use { routeHolder.load(it) }
         }.getOrNull()
         routeError = if (loaded == null) "Couldn't read that file as a GPX route" else null
+    }
+
+    // "*/*" for the same reason as the route: providers disagree on CSV's MIME type.
+    val pickHistoryFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val text = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
+            }
+            val summary = text?.let { viewModel.importWorkoutHistory(it).getOrNull() }
+            importFailed = summary == null
+            importResult = summary?.let(ProfileTabLabels::importSummary) ?: ProfileTabLabels.IMPORT_FAILED
+        }
     }
 
     val pickBackupFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -267,6 +286,18 @@ fun ProfileTabScreen(
                     value = restoreError ?: "Replaces everything on this bike",
                     valueColor = if (restoreError != null) OrColors.Warning else OrColors.OnSurfaceMuted,
                     onClick = { pickBackupFile.launch("application/json") },
+                )
+                OrSettingsDivider()
+                // Adds to the active rider's history; nothing is replaced (#83).
+                OrSettingsRow(
+                    title = "Import Peloton history",
+                    value = importResult ?: ProfileTabLabels.IMPORT_HINT,
+                    valueColor = when {
+                        importResult == null -> OrColors.OnSurfaceMuted
+                        importFailed -> OrColors.Warning
+                        else -> OrColors.Success
+                    },
+                    onClick = { pickHistoryFile.launch("*/*") },
                 )
             }
             Text(

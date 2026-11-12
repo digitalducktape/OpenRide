@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import dev.digitalducktape.openride.core.backup.BackupRepository
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
+import dev.digitalducktape.openride.core.data.RideRepository
+import dev.digitalducktape.openride.core.importer.WorkoutHistoryCsv
+import java.time.ZoneId
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -16,6 +19,8 @@ class ProfileTabViewModel(
     private val activeProfileHolder: ActiveProfileHolder,
     profileRepository: ProfileRepository,
     private val backupRepository: BackupRepository,
+    private val rideRepository: RideRepository,
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : ViewModel() {
     val activeProfile: Flow<Profile?> =
         combine(activeProfileHolder.activeProfileId, profileRepository.observeProfiles()) { id, profiles ->
@@ -43,4 +48,35 @@ class ProfileTabViewModel(
         backupRepository.restore(snapshot)
         activeProfileHolder.clear()
     }
+
+    /**
+     * Reads [content] as a Peloton workout-history CSV and adds its cycling workouts to the
+     * active rider's history (#83). Fails, changing nothing, when the file isn't that export or
+     * no rider is active; the caller shows why.
+     */
+    suspend fun importWorkoutHistory(content: String): Result<WorkoutImportSummary> = runCatching {
+        val profileId = checkNotNull(activeProfileHolder.activeProfileId.value) { "no rider selected" }
+        val history = WorkoutHistoryCsv.parse(content, zone())
+        val outcome = rideRepository.importRides(profileId, history.rides)
+        WorkoutImportSummary(
+            imported = outcome.imported,
+            alreadyThere = outcome.alreadyThere,
+            otherWorkouts = history.otherWorkouts,
+            unreadableRows = history.unreadableRows,
+        )
+    }
 }
+
+/**
+ * What a history import did, for the Profile tab's row.
+ *
+ * @param alreadyThere rides the rider's history already had (the same file imported again).
+ * @param otherWorkouts workouts that aren't rides (strength, stretching), left out.
+ * @param unreadableRows rides without a usable date or length.
+ */
+data class WorkoutImportSummary(
+    val imported: Int,
+    val alreadyThere: Int,
+    val otherWorkouts: Int,
+    val unreadableRows: Int,
+)
