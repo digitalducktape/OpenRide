@@ -43,20 +43,18 @@ static var look := GameTheme.new(Color("ff9f1c"), Color("2a160b"), 0.12)
 var logic: TugLogic
 var world: TugWorld
 
-var _view: SubViewport
+## The 3D view: the world renders in it, and its image draws it over the whole canvas.
+var view: StageView3D
 var _status: TugStatus
-var _shown: MeshInstance2D
-var _view_scale := RENDER_SCALE  ## the scale the 3D view renders at now
 var _flash := 0.0  ## 0-1: the lost-round flash
 var _creak_left := 0.0
-var _message_left := 0.0
 var _mode_name := "match"
 var _endless := false
 var _tension := 0.5
 var _best_rung := 0
 var _results: Array[bool] = []  ## each round's result in order (true: won), for the pips
-## Steps the 3D view down to a lower render scale if the frame rate stays low in a round.
-var governor := RenderScaleStep.new()
+## The rider's Brace option, read on prepare and on change (not from the file every frame).
+var _brace_on := false
 
 
 func info() -> GameInfo:
@@ -116,7 +114,7 @@ func target_text(seg: Dictionary) -> String:
 	var p: Dictionary = seg.get("params", {})
 	var ftp := float(p.get("ftp_watts", p.get("ftp", TugLogic.DEFAULT_FTP)))
 	var bot := float(p.get("bot_watts", ftp * TugLogic.BOT_FACTOR))
-	return "Beat the bot's %d W" % roundi(bot)
+	return "Pull harder than the bot's %d W" % roundi(bot)
 
 
 func ui_theme() -> GameTheme:
@@ -136,24 +134,14 @@ func _ready() -> void:
 	TugAudioScript.register()
 	world = TugWorld.new()
 	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_set_render_scale(RENDER_SCALE)
-	_view.msaa_3d = MSAA
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	# The view scaled up to the screen: a grid with the vignette in its vertex colours
-	# (TugMeshes.view_image), one draw like a TextureRect, and no vignette left per pixel.
-	var shown := MeshInstance2D.new()
-	shown.name = "View3DImage"
-	shown.texture = _view.get_texture()
-	shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(shown)
-	_shown = shown
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	# The view scaled up to the screen: a grid with the vignette in its vertex colours (ART_BIBLE
+	# §4), one draw like a TextureRect, and no vignette left per pixel.
+	view = StageView3D.new(RENDER_SCALE)
+	view.vignette = TugMeshes.VIGNETTE
+	view.vignette_tint = TugMeshes.VIGNETTE_TINT
+	add_child(view)
+	view.add_child(world)
+	add_child(view.image)
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -164,8 +152,7 @@ func _on_prepare(seg: Dictionary) -> void:
 		best_of = maxi(int(params.rounds), 1)
 		best_of += 1 - best_of % 2  # best-of needs an odd count
 	logic = TugLogic.new(rng.seed, params, _mode_name, best_of)
-	governor = RenderScaleStep.new()
-	_set_render_scale(RENDER_SCALE)
+	view.reset_quality()
 	_best_rung = 0
 	_results = []
 	_apply_options()
@@ -176,9 +163,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_update_rounds()
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.5)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, TugAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, TugAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(TugAudioScript.music_effects(), TugAudioScript.sfx_effects())
 	# One frame of the pier at rest behind the intro card, and the effects warmed up.
 	world.update_view(0.0, 0.0, 0.5, "", 0.0)
 	world.prewarm()
@@ -193,17 +178,15 @@ func _on_option_changed(key: String, _value: String) -> void:
 
 
 func _apply_options() -> void:
-	world.set_time_of_day(DodgeTimeOfDay.load_preset(DodgeTimeOfDay.resolve(option("scene"))))
+	_brace_on = option("brace") == "on"
+	world.set_time_of_day(TimeOfDay.load_preset(TimeOfDay.resolve(option("scene"))))
 
 
 func _on_frame(delta: float) -> void:
-	if governor.sample(delta, logic.phase == TugLogic.Phase.ROUND):
-		_set_render_scale(governor.render_scale(RENDER_SCALE))
-		print("OPENRIDE_GAMES tug_of_war quality tier=%d fps=%.1f scale=%.2f" % [
-			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
+	view.sample(delta, logic.phase == TugLogic.Phase.ROUND, "tug_of_war")
 	var power := InputBus.power
 	var cadence := InputBus.cadence
-	var brace := option("brace") == "on" and InputBus.lean_depth > BRACE_LEAN
+	var brace := _brace_on and InputBus.lean_depth > BRACE_LEAN
 	var events := logic.step(delta, power, cadence, brace)
 	if logic.last_margin_points > 0.0:
 		award(logic.last_margin_points)
@@ -228,13 +211,9 @@ func _on_frame(delta: float) -> void:
 	elif resting:
 		intensity = 0.3
 	AudioDirector.set_intensity(intensity)
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	if _flash > 0.0:
 		_flash = move_toward(_flash, 0.0, delta * FLASH_FADE)
-		_shown.modulate = Color.WHITE.lerp(FLASH_TINT, _flash)
+		view.image.modulate = Color.WHITE.lerp(FLASH_TINT, _flash)
 	won = logic.rider_won()
 	variant = "ladder" if _mode_name == "ladder" else ""
 
@@ -288,7 +267,7 @@ func _handle(event: Dictionary) -> void:
 				AudioDirector.play_sfx("lose_sting")
 				GameMix.duck_for_sting(2.0)
 				_flash = 0.9
-				_shown.modulate = Color.WHITE.lerp(FLASH_TINT, _flash)
+				view.image.modulate = Color.WHITE.lerp(FLASH_TINT, _flash)
 				_show_message("Pulled in!", TugLogic.ROUND_END_SEC, GameTheme.BAD)
 			get_tree().create_timer(FALL_SPLASH_DELAY).timeout.connect(func(): AudioDirector.play_sfx("splash"))
 		"recovery_start":
@@ -328,21 +307,5 @@ func _set_bot(rung: int) -> void:
 	_status.set_bot(world.bot_name(), world.bot_color())
 
 
-## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
-## The view over the whole window, past the centred stage (#57), whenever the window changes.
-func _fit_view() -> void:
-	_shown.position = -Stage.pad
-	_shown.mesh = TugMeshes.view_image(Stage.visible_size)
-	_set_render_scale(_view_scale)
-
-
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

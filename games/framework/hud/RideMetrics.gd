@@ -7,7 +7,10 @@ extends PanelContainer
 ##
 ## A game sets its cadence floor or band with `set_cadence_band(low, high)` and its power target
 ## with `set_power_band(low, high)`. The rpm turns green in the band, amber just under it and red
-## well under; the watts turn gold at the target. A slim tick gauge under a number shows where the
+## well under; the watts turn gold at the target (inside the band when it has both ends, amber
+## over its top). A game whose rules read a smoothed power shows that same number here with
+## `set_power_source(callable)` (Watt Lane, #78), so the HUD never shows two different watts.
+## A slim tick gauge under a number shows where the
 ## floor or target sits (filled to the current value, with a white tick at the line to cross):
 ## self-explanatory without words, so no "floor 85" caption. Columns without a band keep the
 ## gauge's space empty, so the units line up. Labels only change with their values: re-laying
@@ -45,6 +48,7 @@ var _rpm_gauge: Control
 var _watts_gauge: Control
 var _cadence := 0.0
 var _power := 0.0
+var _power_source := Callable()  ## () -> float: the watts to show instead of the raw reading
 var _shown := {}
 
 
@@ -81,9 +85,34 @@ func set_power_band(low: float, high := INF) -> void:
 	_shown.clear()
 
 
+## The watts this panel shows come from `source` (`() -> float`), the number the game's rules
+## use, instead of `InputBus.power`. An empty Callable puts the raw reading back.
+func set_power_source(source: Callable) -> void:
+	_power_source = source
+	_shown.clear()
+
+
+## The watts the panel shows now.
+func shown_power() -> float:
+	return float(_power_source.call()) if _power_source.is_valid() else InputBus.power
+
+
+## Clears the game's bands and power source (`Hud.clear_widgets`, when a game leaves).
 func clear_bands() -> void:
 	set_cadence_band(-INF)
 	set_power_band(-INF)
+	_power_source = Callable()
+
+
+## The watts' colour for `power` against the band: gold from the target (to the band's top, when
+## it has one), amber over the top. Compared as shown, in whole watts.
+func power_color(power: float) -> Color:
+	var shown := float(roundi(power))
+	if shown > power_high:
+		return HudTheme.WARN
+	if power_low > -INF and shown >= power_low:
+		return HudTheme.STAR_ON
+	return HudTheme.INK
 
 
 ## The rpm's colour for `cadence` against the band.
@@ -98,17 +127,13 @@ func cadence_color(cadence: float) -> Color:
 
 
 func _process(_delta: float) -> void:
-	refresh(InputBus.cadence, InputBus.power, InputBus.resistance, InputBus.heart_rate)
+	refresh(InputBus.cadence, shown_power(), InputBus.resistance, InputBus.heart_rate)
 
 
 ## `heart_rate` < 0: no strap sending, and the bpm column hides.
 func refresh(cadence: float, power: float, resistance: float, heart_rate := -1.0) -> void:
 	_show(_rpm, "rpm", str(roundi(cadence)), cadence_color(cadence))
-	var watts_color := HudTheme.INK
-	if power_low > -INF and power >= power_low:
-		watts_color = HudTheme.STAR_ON
-	elif power_high < INF and power > power_high:
-		watts_color = HudTheme.WARN
+	var watts_color := power_color(power)
 	_show(_watts, "watts", str(roundi(power)), watts_color)
 	_show(_resistance, "resistance", str(roundi(resistance)), HudTheme.INK)
 	var has_heart := heart_rate >= 0.0
@@ -185,7 +210,17 @@ func _draw_rpm_gauge() -> void:
 func _draw_watts_gauge() -> void:
 	var line := power_low if power_low > -INF else power_high
 	var scale := maxf(line * POWER_SCALE, 1.0)
-	var color := HudTheme.STAR_ON if power_low > -INF and _power >= power_low else HudTheme.MUTED
+	var color := power_color(_power)
+	if color == HudTheme.INK:
+		color = HudTheme.MUTED
+	if power_low > -INF and power_high < INF:
+		# A band: its span marked on the track, the fill up to the current value.
+		scale = maxf(power_high * 1.5, 1.0)
+		var s := _watts_gauge.size
+		_watts_gauge.draw_rect(Rect2(Vector2.ZERO, s), Color(1, 1, 1, 0.15))
+		_watts_gauge.draw_rect(Rect2(s.x * power_low / scale, 0, s.x * (power_high - power_low) / scale, s.y), Color(HudTheme.STAR_ON, 0.35))
+		_watts_gauge.draw_rect(Rect2(0, 0, s.x * clampf(_power / scale, 0.0, 1.0), s.y * 0.5 + 1), color)
+		return
 	_draw_tick_gauge(_watts_gauge, _power / scale, line / scale, color)
 
 

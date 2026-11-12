@@ -25,6 +25,7 @@ const RIGHT_W := HubTheme.W - HubTheme.MARGIN - RIGHT_X
 const TILES_TOP := 150.0
 const BODY_BOTTOM := 1050.0
 const TILE_ASPECT := 0.32
+const TILE_COLUMNS_MAX := 6  ## more games wrap to a second row of tiles (#75: 11 games, 6 + 5)
 const SCROLLBAR_W := 44.0
 const ROW_GAP := 24
 const SUMMARY_SIZE := Vector2(RIGHT_W, 330)
@@ -129,7 +130,8 @@ func _tile_spec() -> Dictionary:
 	var games := HubState.games(state)
 	var choices: Array = []
 	var cards: Array = []
-	var width := OptionCards.slot_size(OptionCards.size_for({"columns": games.size()}, LEFT_WIDTH).x).x - 8
+	var columns := clampi(games.size(), 1, TILE_COLUMNS_MAX)
+	var width := OptionCards.slot_size(OptionCards.size_for({"columns": columns}, LEFT_WIDTH).x).x - 8
 	for e in games:
 		var id := str(e.id)
 		choices.append(id)
@@ -138,7 +140,7 @@ func _tile_spec() -> Dictionary:
 			sub = "Needs camera" if CircuitBuilder.new(state.catalog).stand_in(id).is_empty() else sub
 		cards.append({"value": id, "title": HubTheme.fit_title(id, width), "subtitle": sub,
 			"image": HubArt.card_path(id) if HubArt.has_card(id) else "", "accent": HubTheme.game_look(id).accent})
-	return {"key": "add", "label": "Add a game", "kind": "cards", "columns": maxi(1, games.size()),
+	return {"key": "add", "label": "Add a game", "kind": "cards", "columns": columns,
 		"slot_aspect": TILE_ASPECT, "choices": choices, "cards": cards}
 
 

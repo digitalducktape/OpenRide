@@ -73,30 +73,30 @@ func dress(scenery: Node3D, foliage: Dictionary, props: Dictionary, woods: Array
 
 ## A saguaro: a ribbed trunk and up to two arms, `arms` of them.
 static func _cactus(arms: int) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 4.0
 	kit.ao_min = 0.6
 	var green := Color(0.32, 0.56, 0.3, 0.0)
 	var h := 4.2 if arms > 0 else 2.6
-	kit.add(KartMeshKit.cylinder(0.34, 0.42, h, 8), KartMeshKit.xf(Vector3(0, h * 0.5, 0)), green)
-	kit.add(KartMeshKit.sphere(0.34, 8, 3, true), KartMeshKit.xf(Vector3(0, h, 0)), green.lightened(0.1))
+	kit.add(MeshKit3D.cylinder(0.34, 0.42, h, 8), MeshKit3D.xf(Vector3(0, h * 0.5, 0)), green)
+	kit.add(MeshKit3D.sphere(0.34, 8, 3, true), MeshKit3D.xf(Vector3(0, h, 0)), green.lightened(0.1))
 	for a in arms:
 		var side := 1.0 if a == 0 else -1.0
 		var y := 1.6 + a * 0.6
-		kit.add(KartMeshKit.cylinder(0.22, 0.22, 0.9, 6), KartMeshKit.xf(Vector3(side * 0.6, y, 0), Vector3(0, 0, 90)), green)
-		kit.add(KartMeshKit.cylinder(0.22, 0.24, 1.4, 6), KartMeshKit.xf(Vector3(side * 1.0, y + 0.65, 0)), green)
-		kit.add(KartMeshKit.sphere(0.22, 6, 2, true), KartMeshKit.xf(Vector3(side * 1.0, y + 1.35, 0)), green.lightened(0.1))
+		kit.add(MeshKit3D.cylinder(0.22, 0.22, 0.9, 6), MeshKit3D.xf(Vector3(side * 0.6, y, 0), Vector3(0, 0, 90)), green)
+		kit.add(MeshKit3D.cylinder(0.22, 0.24, 1.4, 6), MeshKit3D.xf(Vector3(side * 1.0, y + 0.65, 0)), green)
+		kit.add(MeshKit3D.sphere(0.22, 6, 2, true), MeshKit3D.xf(Vector3(side * 1.0, y + 1.35, 0)), green.lightened(0.1))
 	# A pink bloom on top.
-	kit.add(KartMeshKit.sphere(0.12, 5, 2), KartMeshKit.xf(Vector3(0.1, h + 0.3, 0)), Color(1.0, 0.45, 0.6, 0.0))
+	kit.add(MeshKit3D.sphere(0.12, 5, 2), MeshKit3D.xf(Vector3(0.1, h + 0.3, 0)), Color(1.0, 0.45, 0.6, 0.0))
 	return kit.commit()
 
 
 ## Dry scrub: olive and straw clumps (they sway a little).
 static func _scrub() -> ArrayMesh:
-	var kit := KartMeshKit.new()
-	kit.add(KartMeshKit.sphere(0.55, 6, 3), KartMeshKit.xf(Vector3(0, 0.35, 0), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)), Color(0.55, 0.55, 0.28, 0.5))
-	kit.add(KartMeshKit.sphere(0.4, 6, 3), KartMeshKit.xf(Vector3(0.5, 0.3, 0.2), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)), Color(0.72, 0.62, 0.36, 0.5))
+	var kit := MeshKit3D.new()
+	kit.add(MeshKit3D.sphere(0.55, 6, 3), MeshKit3D.xf(Vector3(0, 0.35, 0), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)), Color(0.55, 0.55, 0.28, 0.5))
+	kit.add(MeshKit3D.sphere(0.4, 6, 3), MeshKit3D.xf(Vector3(0.5, 0.3, 0.2), Vector3.ZERO, Vector3(1.0, 0.7, 1.0)), Color(0.72, 0.62, 0.36, 0.5))
 	return kit.commit()
 
 
@@ -106,7 +106,7 @@ func _arch(props: Dictionary) -> void:
 	var track := world.track
 	for lm in world.landmarks("arch"):
 		var span := track.half_width(lm.s) + track.verge + 4.0
-		var kit := KartMeshKit.new()
+		var kit := MeshKit3D.new()
 		kit.ao_y0 = 0.0
 		kit.ao_y1 = span + 4.0
 		kit.ao_min = 0.55
@@ -117,11 +117,11 @@ func _arch(props: Dictionary) -> void:
 			var a := PI * (i + 0.5) / segs
 			var p := Vector3(cos(a) * (span + 2.2), sin(a) * (span + 2.2) - 2.0, 0.0)
 			var c: Color = reds[i % 3]
-			kit.add(KartMeshKit.box(Vector3(5.2, PI * (span + 2.2) / segs + 0.6, 5.0)),
+			kit.add(MeshKit3D.box(Vector3(5.2, PI * (span + 2.2) / segs + 0.6, 5.0)),
 				Transform3D(Basis(Vector3.BACK, a), p), c)
 		# Feet: rock piles where the arch meets the ground.
 		for side: float in [-1.0, 1.0]:
-			kit.add(rock_mesh(Color(0.7, 0.32, 0.19), 9), KartMeshKit.xf(Vector3(side * (span + 2.5), -1.0, 0), Vector3.ZERO, Vector3(4.5, 6.0, 4.5)), Color(0.7, 0.32, 0.19, 0.0))
+			kit.add(rock_mesh(Color(0.7, 0.32, 0.19), 9), MeshKit3D.xf(Vector3(side * (span + 2.5), -1.0, 0), Vector3.ZERO, Vector3(4.5, 6.0, 4.5)), Color(0.7, 0.32, 0.19, 0.0))
 		var at := track.position_at(lm.s, 0.0)
 		world.cell(props, at).add_baked(kit.commit(), Transform3D(Basis(Vector3.UP, track.yaw_at(lm.s)), at))
 		if lm.get("hero", false) or hero.is_empty():
@@ -133,7 +133,7 @@ func _spire(props: Dictionary) -> void:
 	var lm := world.landmark("spire")
 	if lm.is_empty() or not world.clear_of_road(lm.p, 6.0):
 		return
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 20.0
 	kit.ao_min = 0.6
@@ -142,10 +142,10 @@ func _spire(props: Dictionary) -> void:
 	var r := 6.5
 	for k in 7:
 		var h := rng.randf_range(2.6, 4.2)
-		kit.add(KartMeshKit.cylinder(r * 0.86, r, h, 7), KartMeshKit.xf(Vector3(rng.randf_range(-0.4, 0.4), y + h * 0.5, rng.randf_range(-0.4, 0.4)), Vector3(0, k * 23.0, 0)), reds[k % 3])
+		kit.add(MeshKit3D.cylinder(r * 0.86, r, h, 7), MeshKit3D.xf(Vector3(rng.randf_range(-0.4, 0.4), y + h * 0.5, rng.randf_range(-0.4, 0.4)), Vector3(0, k * 23.0, 0)), reds[k % 3])
 		y += h
 		r *= 0.8 if k < 4 else 0.9
-	kit.add(rock_mesh(Color(0.86, 0.5, 0.3), 12), KartMeshKit.xf(Vector3(0.0, y - 0.6, 0.0), Vector3.ZERO, Vector3(3.6, 2.4, 3.2)), Color(0.86, 0.5, 0.3, 0.0))
+	kit.add(rock_mesh(Color(0.86, 0.5, 0.3), 12), MeshKit3D.xf(Vector3(0.0, y - 0.6, 0.0), Vector3.ZERO, Vector3(3.6, 2.4, 3.2)), Color(0.86, 0.5, 0.3, 0.0))
 	var at: Vector3 = lm.p
 	world.cell(props, at).add_baked(kit.commit(), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), at))
 
@@ -164,32 +164,32 @@ func _windpump(parent: Node3D) -> void:
 		var face := track.position_at(track.wrap(-30.0), 0.0) - p
 		pump.transform = Transform3D(Basis(Vector3.UP, atan2(-face.x, -face.z)), p)
 		parent.add_child(pump)
-		var kit := KartMeshKit.new()
+		var kit := MeshKit3D.new()
 		var steel := Color(0.62, 0.62, 0.66, 0.0)
 		for corner: Vector2 in [Vector2(-1.4, -1.4), Vector2(1.4, -1.4), Vector2(-1.4, 1.4), Vector2(1.4, 1.4)]:
 			var foot := Vector3(corner.x, 0.0, corner.y)
 			var top := Vector3(corner.x * 0.2, 11.0, corner.y * 0.2)
 			var mid := (foot + top) * 0.5
 			var len := foot.distance_to(top)
-			kit.add(KartMeshKit.box(Vector3(0.14, len, 0.14)), Transform3D(along(top - foot), mid), steel)
+			kit.add(MeshKit3D.box(Vector3(0.14, len, 0.14)), Transform3D(along(top - foot), mid), steel)
 		for y: float in [3.0, 6.0, 9.0]:
 			var w := lerpf(2.8, 0.6, y / 11.0)
-			kit.add(KartMeshKit.box(Vector3(w, 0.1, 0.1)), KartMeshKit.xf(Vector3(0, y, w * 0.5)), steel)
-			kit.add(KartMeshKit.box(Vector3(w, 0.1, 0.1)), KartMeshKit.xf(Vector3(0, y, -w * 0.5)), steel)
-		kit.add(KartMeshKit.box(Vector3(0.5, 0.5, 2.6)), KartMeshKit.xf(Vector3(0, 11.3, 0.6)), Color(0.85, 0.2, 0.15, 0.0))
-		kit.add(KartMeshKit.box(Vector3(0.06, 1.6, 2.0)), KartMeshKit.xf(Vector3(0, 11.6, 2.4)), Color(0.95, 0.95, 0.92, 0.0))
-		kit.add(KartMeshKit.cylinder(1.6, 1.6, 1.4, 10), KartMeshKit.xf(Vector3(3.0, 1.0, 0)), Color(0.55, 0.58, 0.62, 0.0))
-		pump.add_child(KartMeshKit.mesh_node(kit.commit(), world.scenery_mat, "Tower"))
-		var wheel := KartMeshKit.new()
+			kit.add(MeshKit3D.box(Vector3(w, 0.1, 0.1)), MeshKit3D.xf(Vector3(0, y, w * 0.5)), steel)
+			kit.add(MeshKit3D.box(Vector3(w, 0.1, 0.1)), MeshKit3D.xf(Vector3(0, y, -w * 0.5)), steel)
+		kit.add(MeshKit3D.box(Vector3(0.5, 0.5, 2.6)), MeshKit3D.xf(Vector3(0, 11.3, 0.6)), Color(0.85, 0.2, 0.15, 0.0))
+		kit.add(MeshKit3D.box(Vector3(0.06, 1.6, 2.0)), MeshKit3D.xf(Vector3(0, 11.6, 2.4)), Color(0.95, 0.95, 0.92, 0.0))
+		kit.add(MeshKit3D.cylinder(1.6, 1.6, 1.4, 10), MeshKit3D.xf(Vector3(3.0, 1.0, 0)), Color(0.55, 0.58, 0.62, 0.0))
+		pump.add_child(MeshKit3D.mesh_node(kit.commit(), world.scenery_mat, "Tower"))
+		var wheel := MeshKit3D.new()
 		for i in 14:
 			var rot := Basis(Vector3.FORWARD, TAU * i / 14.0)
-			wheel.add(KartMeshKit.box(Vector3(0.5, 1.6, 0.04)), Transform3D(rot * Basis(Vector3.UP, 0.4), rot * Vector3(0, 1.4, 0)), Color(0.92, 0.92, 0.9, 0.0))
-		wheel.add(KartMeshKit.torus(2.1, 2.25, 16, 4), KartMeshKit.xf(Vector3.ZERO, Vector3(90, 0, 0)), Color(0.85, 0.2, 0.15, 0.0))
+			wheel.add(MeshKit3D.box(Vector3(0.5, 1.6, 0.04)), Transform3D(rot * Basis(Vector3.UP, 0.4), rot * Vector3(0, 1.4, 0)), Color(0.92, 0.92, 0.9, 0.0))
+		wheel.add(MeshKit3D.torus(2.1, 2.25, 16, 4), MeshKit3D.xf(Vector3.ZERO, Vector3(90, 0, 0)), Color(0.85, 0.2, 0.15, 0.0))
 		var hub := Node3D.new()
 		hub.name = "Wheel"
 		hub.position = Vector3(0, 11.3, -0.9)
 		pump.add_child(hub)
-		hub.add_child(KartMeshKit.mesh_node(wheel.commit(), world.scenery_mat, "WheelMesh"))
+		hub.add_child(MeshKit3D.mesh_node(wheel.commit(), world.scenery_mat, "WheelMesh"))
 		world.spin(hub, Vector3.FORWARD, 1.6)
 		return
 
@@ -197,7 +197,7 @@ func _windpump(parent: Node3D) -> void:
 ## Tyre walls in the theme's colours on the outside of the corners.
 func _tyres(cells: Dictionary) -> void:
 	var track := world.track
-	var mesh := KartMeshKit.tyre_stack(3, [Color(0.15, 0.15, 0.16, 0.0), Color(1, 1, 1, 0.0), Color(0.15, 0.15, 0.16, 0.0)])
+	var mesh := MeshKit3D.tyre_stack(3, [Color(0.15, 0.15, 0.16, 0.0), Color(1, 1, 1, 0.0), Color(0.15, 0.15, 0.16, 0.0)])
 	var tints := [Color(0.95, 0.45, 0.12), Color(0.98, 0.98, 0.98), Color(0.1, 0.62, 0.66)]
 	var s := 0.0
 	var n := 0

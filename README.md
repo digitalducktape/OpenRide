@@ -161,6 +161,14 @@ To make OpenRide the screen that greets you when the bike turns on, open **Profi
 
 Once it's installed, OpenRide checks this repo's [Releases](https://github.com/digitalducktape/openride/releases) on its own each time it launches, and shows a notice at the top of the screen when a newer build is available. Tap it (or go to **Profile → App updates**) to download and install; no computer needed. Reinstalling from OpenPelo's catalog also gets you the latest release. See [docs/INSTALL.md](docs/INSTALL.md#in-app-updates-t22--22) for details.
 
+## Support OpenRide
+
+OpenRide is free and always will be. If it's made your rides better and you'd like to help keep it going, you can buy the developer a coffee:
+
+<a href="https://buymeacoffee.com/digitalducktape"><img src="https://img.buymeacoffee.com/button-api/?text=Support%20OpenRide%20Development&emoji=&slug=digitalducktape&button_colour=5F7FFF&font_colour=ffffff&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" alt="Support OpenRide Development on Buy Me a Coffee" /></a>
+
+On the bike, **Profile → About & support** shows a QR code for the same page, so you can scan it with your phone.
+
 ## For developers
 
 The rest of this section is technical detail for anyone contributing to the code — feel free to skip it otherwise.

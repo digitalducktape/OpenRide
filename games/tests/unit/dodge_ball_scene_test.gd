@@ -93,6 +93,6 @@ func test_slow_play_steps_the_view_down() -> void:
 	var full := view.size
 	for i in 60 * 5:
 		game._on_frame(1.0 / 40.0)
-	assert_int(game.governor.tier).is_equal(1)
+	assert_int(game.view.governor.tier).is_equal(1)
 	assert_int(view.size.x).is_less(full.x)
 	assert_int(view.size.x).is_equal(roundi(HudTheme.W * RenderScaleStep.LOW_SCALE))

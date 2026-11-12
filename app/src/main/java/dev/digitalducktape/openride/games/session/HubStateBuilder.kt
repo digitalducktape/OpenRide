@@ -64,6 +64,8 @@ data class HubInputs(
     val rideSec: Int,
     val visitResults: List<VisitResult>,
     val visitPlans: List<VisitPlan>,
+    /** The seed the next preset circuit draws its games with (#75): the hub shows that lineup. */
+    val circuitSeed: Long = 0L,
 )
 
 /**
@@ -98,7 +100,7 @@ object HubStateBuilder {
             camera = HubCamera(inputs.permission, cameraAvailable, inputs.calibrated, inputs.sameDayExtremes),
             catalog = inputs.catalog.games.filter { it.id != GameCatalog.DEMO.id }.map(::catalogGame),
             circuits = CircuitPresets.ALL.map { preset ->
-                val plan = SessionPlans.circuit(preset, Difficulty.STANDARD, ftp, inputs.catalog, cameraGames = cameraAvailable)
+                val plan = SessionPlans.circuit(preset, Difficulty.STANDARD, ftp, inputs.catalog, cameraGames = cameraAvailable, seed = inputs.circuitSeed)
                 HubCircuit(
                     id = preset.id,
                     minutes = preset.labelMinutes,

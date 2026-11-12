@@ -149,6 +149,8 @@ func test_without_the_camera() -> void:
 	assert_str(b.start_problem(false)).is_equal("")
 	b.add("kart_race")
 	assert_str(b.stand_in("kart_race")).is_equal("")
+	# The Pull (#79) is free and camera-free too, but no stand-in for a race; it plays itself.
+	assert_str(b.stand_in("the_pull")).is_equal("the_pull")
 	assert_str(b.start_problem(false)).is_equal("camera:kart_race")
 	assert_str(b.start_problem(true)).is_equal("")
 	assert_str(CircuitBuilder.new(catalog).start_problem(true)).is_equal("empty")

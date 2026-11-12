@@ -9,8 +9,8 @@ const WATER_Y := 0.15  ## above the land's floor (world.centre.y)
 const QUAY_HALF := 320.0  ## the quay runs this far either way along the shore
 
 var _shore := {}
-var _barrels := [KartMeshKit.barrel(Color(0.2, 0.4, 0.75, 0.0)), KartMeshKit.barrel(Color(0.8, 0.22, 0.2, 0.0)),
-	KartMeshKit.barrel(Color(0.25, 0.6, 0.4, 0.0))]
+var _barrels := [MeshKit3D.barrel(Color(0.2, 0.4, 0.75, 0.0)), MeshKit3D.barrel(Color(0.8, 0.22, 0.2, 0.0)),
+	MeshKit3D.barrel(Color(0.25, 0.6, 0.4, 0.0))]
 var _bulbs := []  ## halo transforms
 var _bulb_colors := []
 
@@ -70,7 +70,7 @@ func _sea(parent: Node3D) -> void:
 		return
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(2600.0, 1400.0)
-	var node := KartMeshKit.mesh_node(plane, world.water_mat, "Sea")
+	var node := MeshKit3D.mesh_node(plane, world.water_mat, "Sea")
 	var dir: Vector3 = _shore.dir
 	var out: Vector3 = _shore.out
 	var p: Vector3 = _shore.p
@@ -109,15 +109,15 @@ func _quay(props: Dictionary) -> void:
 		kit.quad(ib, ib + Vector3.DOWN * 2.0, ia + Vector3.DOWN * 2.0, ia, face)
 		# A bollard every 20 m, and crates or barrels now and then.
 		var bp := a + dir * 4.0 - out * 0.6
-		kit.add(KartMeshKit.cylinder(0.2, 0.26, 0.6, 8), KartMeshKit.xf(bp + Vector3.UP * 0.3), Color(0.15, 0.16, 0.2, 0.0))
+		kit.add(MeshKit3D.cylinder(0.2, 0.26, 0.6, 8), MeshKit3D.xf(bp + Vector3.UP * 0.3), Color(0.15, 0.16, 0.2, 0.0))
 		if rng.randf() < 0.45:
 			var cp := a + dir * 11.0 - out * rng.randf_range(2.5, 6.0)
 			if rng.randf() < 0.5:
-				kit.add(KartMeshKit.box(Vector3(1.1, 1.0, 1.1)), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), cp + Vector3.UP * 0.5), Color(0.62, 0.42, 0.24, 0.0))
-				kit.add(KartMeshKit.box(Vector3(0.9, 0.8, 0.9)), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), cp + Vector3.UP * 1.4), Color(0.7, 0.5, 0.3, 0.0))
+				kit.add(MeshKit3D.box(Vector3(1.1, 1.0, 1.1)), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), cp + Vector3.UP * 0.5), Color(0.62, 0.42, 0.24, 0.0))
+				kit.add(MeshKit3D.box(Vector3(0.9, 0.8, 0.9)), Transform3D(Basis(Vector3.UP, rng.randf() * TAU), cp + Vector3.UP * 1.4), Color(0.7, 0.5, 0.3, 0.0))
 			else:
 				for k in 3:
-					kit.add(_barrels[k], KartMeshKit.xf(cp + dir * (k * 0.8)), Color.WHITE)
+					kit.add(_barrels[k], MeshKit3D.xf(cp + dir * (k * 0.8)), Color.WHITE)
 		u += step
 
 
@@ -138,13 +138,13 @@ func _piers(props: Dictionary) -> void:
 		var kit := world.cell(props, base + out * 20.0)
 		var mid := base + out * (length * 0.5)
 		mid.y = deck_y
-		kit.add(KartMeshKit.box(Vector3(4.0, 0.3, length)), Transform3D(Basis(dir, Vector3.UP, out), mid), wood)
+		kit.add(MeshKit3D.box(Vector3(4.0, 0.3, length)), Transform3D(Basis(dir, Vector3.UP, out), mid), wood)
 		var v := 3.0
 		while v < length:
 			for side: float in [-1.8, 1.8]:
 				var post := base + out * v + dir * side
 				post.y = (deck_y + water - 2.0) * 0.5
-				kit.add(KartMeshKit.cylinder(0.16, 0.16, deck_y - water + 2.0, 6), KartMeshKit.xf(post), Color(0.35, 0.26, 0.18, 0.0))
+				kit.add(MeshKit3D.cylinder(0.16, 0.16, deck_y - water + 2.0, 6), MeshKit3D.xf(post), Color(0.35, 0.26, 0.18, 0.0))
 			v += 6.0
 		# Boats either side.
 		for k in 2:
@@ -157,15 +157,15 @@ func _piers(props: Dictionary) -> void:
 
 ## A small boat facing -z: a coloured hull with a pointed bow, a white cabin, a mast and sail.
 static func _boat(hull: Color) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	var h := Color(hull.r, hull.g, hull.b, 0.0)
-	kit.add(KartMeshKit.box(Vector3(2.4, 1.1, 5.0)), KartMeshKit.xf(Vector3(0, 0.25, 0.4)), h)
-	kit.add(KartMeshKit.prism(Vector3(2.4, 2.0, 1.1)), KartMeshKit.xf(Vector3(0, 0.25, -2.6), Vector3(90, 0, 0)), h)
-	kit.add(KartMeshKit.box(Vector3(2.5, 0.16, 5.1)), KartMeshKit.xf(Vector3(0, 0.82, 0.4)), Color(0.96, 0.96, 0.94, 0.0))
-	kit.add(KartMeshKit.box(Vector3(1.6, 1.0, 1.8)), KartMeshKit.xf(Vector3(0, 1.35, 1.2)), Color(0.97, 0.97, 0.97, 0.0))
-	kit.add(KartMeshKit.box(Vector3(1.62, 0.3, 1.4)), KartMeshKit.xf(Vector3(0, 1.55, 1.2)), Color(0.3, 0.45, 0.6, 0.25))
-	kit.add(KartMeshKit.cylinder(0.07, 0.09, 6.5, 5), KartMeshKit.xf(Vector3(0, 4.0, -0.4)), Color(0.85, 0.85, 0.85, 0.0))
-	kit.add(KartMeshKit.prism(Vector3(2.4, 5.0, 0.05)), KartMeshKit.xf(Vector3(0, 4.0, 0.6), Vector3(0, 90, 0)), Color(1.0, 0.97, 0.92, 0.15))
+	kit.add(MeshKit3D.box(Vector3(2.4, 1.1, 5.0)), MeshKit3D.xf(Vector3(0, 0.25, 0.4)), h)
+	kit.add(MeshKit3D.prism(Vector3(2.4, 2.0, 1.1)), MeshKit3D.xf(Vector3(0, 0.25, -2.6), Vector3(90, 0, 0)), h)
+	kit.add(MeshKit3D.box(Vector3(2.5, 0.16, 5.1)), MeshKit3D.xf(Vector3(0, 0.82, 0.4)), Color(0.96, 0.96, 0.94, 0.0))
+	kit.add(MeshKit3D.box(Vector3(1.6, 1.0, 1.8)), MeshKit3D.xf(Vector3(0, 1.35, 1.2)), Color(0.97, 0.97, 0.97, 0.0))
+	kit.add(MeshKit3D.box(Vector3(1.62, 0.3, 1.4)), MeshKit3D.xf(Vector3(0, 1.55, 1.2)), Color(0.3, 0.45, 0.6, 0.25))
+	kit.add(MeshKit3D.cylinder(0.07, 0.09, 6.5, 5), MeshKit3D.xf(Vector3(0, 4.0, -0.4)), Color(0.85, 0.85, 0.85, 0.0))
+	kit.add(MeshKit3D.prism(Vector3(2.4, 5.0, 0.05)), MeshKit3D.xf(Vector3(0, 4.0, 0.6), Vector3(0, 90, 0)), Color(1.0, 0.97, 0.92, 0.15))
 	return kit.commit()
 
 
@@ -194,19 +194,19 @@ func _lighthouse(parent: Node3D, props: Dictionary) -> void:
 	var at := base + out * reach
 	at.y = water + 0.6
 	hero = {"p": at + Vector3.UP * 14.0, "size": 28.0}
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 12.0
 	kit.ao_min = 0.7
-	kit.add(KartMeshKit.cylinder(3.4, 3.8, 2.0, 12), KartMeshKit.xf(Vector3(0, 0.0, 0)), Color(0.5, 0.48, 0.5, 0.0))
+	kit.add(MeshKit3D.cylinder(3.4, 3.8, 2.0, 12), MeshKit3D.xf(Vector3(0, 0.0, 0)), Color(0.5, 0.48, 0.5, 0.0))
 	for k in 6:
 		var r0 := lerpf(2.2, 1.5, k / 6.0)
 		var r1 := lerpf(2.2, 1.5, (k + 1) / 6.0)
-		kit.add(KartMeshKit.cylinder(r1, r0, 2.6, 12), KartMeshKit.xf(Vector3(0, 1.3 + k * 2.6, 0)),
+		kit.add(MeshKit3D.cylinder(r1, r0, 2.6, 12), MeshKit3D.xf(Vector3(0, 1.3 + k * 2.6, 0)),
 			Color(0.95, 0.95, 0.95, 0.05) if k % 2 == 0 else Color(0.88, 0.16, 0.16, 0.05))
-	kit.add(KartMeshKit.cylinder(2.0, 2.0, 0.3, 12), KartMeshKit.xf(Vector3(0, 16.9, 0)), Color(0.15, 0.15, 0.18, 0.0))
-	kit.add(KartMeshKit.cylinder(1.0, 1.0, 1.6, 10), KartMeshKit.xf(Vector3(0, 17.9, 0)), Color(1.0, 0.92, 0.6, 1.0))
-	kit.add(KartMeshKit.cylinder(0.0, 1.3, 1.2, 10), KartMeshKit.xf(Vector3(0, 19.3, 0)), Color(0.88, 0.16, 0.16, 0.0))
+	kit.add(MeshKit3D.cylinder(2.0, 2.0, 0.3, 12), MeshKit3D.xf(Vector3(0, 16.9, 0)), Color(0.15, 0.15, 0.18, 0.0))
+	kit.add(MeshKit3D.cylinder(1.0, 1.0, 1.6, 10), MeshKit3D.xf(Vector3(0, 17.9, 0)), Color(1.0, 0.92, 0.6, 1.0))
+	kit.add(MeshKit3D.cylinder(0.0, 1.3, 1.2, 10), MeshKit3D.xf(Vector3(0, 19.3, 0)), Color(0.88, 0.16, 0.16, 0.0))
 	# A third bigger than life: it's the town's landmark from the grid.
 	world.cell(props, at).add_baked(kit.commit(), Transform3D(Basis().scaled(Vector3.ONE * 1.3), at))
 	_bulbs.append(Transform3D(Basis().scaled(Vector3.ONE * 9.0), at + Vector3.UP * 17.9 * 1.3))
@@ -219,27 +219,27 @@ func _clocktower(props: Dictionary) -> void:
 	var lm := world.landmark("clocktower")
 	if lm.is_empty() or not world.clear_of_road(lm.p, 3.0):
 		return
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 8.0
 	kit.ao_min = 0.7
 	var stone := Color(0.86, 0.8, 0.7, 0.1)
 	var trim := Color(0.96, 0.95, 0.92, 0.1)
-	kit.add(KartMeshKit.box(Vector3(5.0, 22.0, 5.0)), KartMeshKit.xf(Vector3(0, 9.0, 0)), stone)
+	kit.add(MeshKit3D.box(Vector3(5.0, 22.0, 5.0)), MeshKit3D.xf(Vector3(0, 9.0, 0)), stone)
 	for y: float in [6.0, 13.0, 20.2]:
-		kit.add(KartMeshKit.box(Vector3(5.4, 0.4, 5.4)), KartMeshKit.xf(Vector3(0, y, 0)), trim)
+		kit.add(MeshKit3D.box(Vector3(5.4, 0.4, 5.4)), MeshKit3D.xf(Vector3(0, y, 0)), trim)
 	for k in 4:
 		var rot := Basis(Vector3.UP, k * PI * 0.5)
 		# The clock: a glowing face, a dark rim, two hands.
-		kit.add(KartMeshKit.cylinder(1.5, 1.5, 0.12, 14), Transform3D(rot * Basis(Vector3.RIGHT, PI * 0.5), rot * Vector3(0, 16.5, 2.52)), Color(1.0, 0.94, 0.78, 1.0))
-		kit.add(KartMeshKit.torus(1.45, 1.7, 14, 4), Transform3D(rot * Basis(Vector3.RIGHT, PI * 0.5), rot * Vector3(0, 16.5, 2.55)), Color(0.2, 0.18, 0.2, 0.0))
-		kit.add(KartMeshKit.box(Vector3(0.12, 1.0, 0.06)), Transform3D(rot, rot * Vector3(0, 16.9, 2.62)), Color(0.12, 0.1, 0.12, 0.0))
-		kit.add(KartMeshKit.box(Vector3(0.7, 0.12, 0.06)), Transform3D(rot, rot * Vector3(0.3, 16.5, 2.62)), Color(0.12, 0.1, 0.12, 0.0))
+		kit.add(MeshKit3D.cylinder(1.5, 1.5, 0.12, 14), Transform3D(rot * Basis(Vector3.RIGHT, PI * 0.5), rot * Vector3(0, 16.5, 2.52)), Color(1.0, 0.94, 0.78, 1.0))
+		kit.add(MeshKit3D.torus(1.45, 1.7, 14, 4), Transform3D(rot * Basis(Vector3.RIGHT, PI * 0.5), rot * Vector3(0, 16.5, 2.55)), Color(0.2, 0.18, 0.2, 0.0))
+		kit.add(MeshKit3D.box(Vector3(0.12, 1.0, 0.06)), Transform3D(rot, rot * Vector3(0, 16.9, 2.62)), Color(0.12, 0.1, 0.12, 0.0))
+		kit.add(MeshKit3D.box(Vector3(0.7, 0.12, 0.06)), Transform3D(rot, rot * Vector3(0.3, 16.5, 2.62)), Color(0.12, 0.1, 0.12, 0.0))
 		# The belfry's arch: a dark opening.
-		kit.add(KartMeshKit.box(Vector3(2.0, 2.4, 0.1)), Transform3D(rot, rot * Vector3(0, 21.8, 2.52)), Color(0.12, 0.1, 0.14, 0.0))
-	kit.add(KartMeshKit.box(Vector3(5.2, 3.2, 5.2)), KartMeshKit.xf(Vector3(0, 21.8, 0)), Color(0.8, 0.74, 0.64, 0.1))
-	kit.add(KartMeshKit.cylinder(0.0, 3.9, 6.0, 4), KartMeshKit.xf(Vector3(0, 26.4, 0), Vector3(0, 45, 0)), Color(0.36, 0.62, 0.55, 0.0))
-	kit.add(KartMeshKit.sphere(0.3, 6, 3), KartMeshKit.xf(Vector3(0, 29.6, 0)), Color(1.0, 0.82, 0.3, 0.3))
+		kit.add(MeshKit3D.box(Vector3(2.0, 2.4, 0.1)), Transform3D(rot, rot * Vector3(0, 21.8, 2.52)), Color(0.12, 0.1, 0.14, 0.0))
+	kit.add(MeshKit3D.box(Vector3(5.2, 3.2, 5.2)), MeshKit3D.xf(Vector3(0, 21.8, 0)), Color(0.8, 0.74, 0.64, 0.1))
+	kit.add(MeshKit3D.cylinder(0.0, 3.9, 6.0, 4), MeshKit3D.xf(Vector3(0, 26.4, 0), Vector3(0, 45, 0)), Color(0.36, 0.62, 0.55, 0.0))
+	kit.add(MeshKit3D.sphere(0.3, 6, 3), MeshKit3D.xf(Vector3(0, 29.6, 0)), Color(1.0, 0.82, 0.3, 0.3))
 	var at: Vector3 = lm.p - Vector3.UP * 0.3
 	var face: Vector3 = -(lm.out as Vector3)
 	world.cell(props, at).add_baked(kit.commit(), Transform3D(Basis(Vector3.UP, atan2(face.x, face.z)), at))
@@ -277,7 +277,7 @@ func _houses(props: Dictionary) -> void:
 
 ## A house facing +z, `floors` storeys of `bays` windows, with a pitched roof and a door.
 static func _house(facade: Color, roof: Color, floors: int, bays: int) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 3.0
 	kit.ao_min = 0.75
@@ -285,20 +285,20 @@ static func _house(facade: Color, roof: Color, floors: int, bays: int) -> ArrayM
 	var h := 3.0 * floors + 0.6
 	var d := 7.0
 	var f := Color(facade.r, facade.g, facade.b, 0.12)
-	kit.add(KartMeshKit.box(Vector3(w, h + 2.0, d)), KartMeshKit.xf(Vector3(0, (h - 2.0) * 0.5, -d * 0.5)), f)
-	kit.add(KartMeshKit.prism(Vector3(w + 0.6, 2.6, d + 0.6)), KartMeshKit.xf(Vector3(0, h + 1.3, -d * 0.5)), Color(roof.r, roof.g, roof.b, 0.0))
-	kit.add(KartMeshKit.box(Vector3(w + 0.1, 0.25, 0.3)), KartMeshKit.xf(Vector3(0, h, 0.05)), Color(0.96, 0.96, 0.94, 0.1))
+	kit.add(MeshKit3D.box(Vector3(w, h + 2.0, d)), MeshKit3D.xf(Vector3(0, (h - 2.0) * 0.5, -d * 0.5)), f)
+	kit.add(MeshKit3D.prism(Vector3(w + 0.6, 2.6, d + 0.6)), MeshKit3D.xf(Vector3(0, h + 1.3, -d * 0.5)), Color(roof.r, roof.g, roof.b, 0.0))
+	kit.add(MeshKit3D.box(Vector3(w + 0.1, 0.25, 0.3)), MeshKit3D.xf(Vector3(0, h, 0.05)), Color(0.96, 0.96, 0.94, 0.1))
 	for fl in floors:
 		for b in bays:
 			var x := -w * 0.5 + 1.8 + b * 2.4
 			var y := 1.6 + fl * 3.0
 			if fl == 0 and b == bays / 2:
-				kit.add(KartMeshKit.box(Vector3(1.2, 2.2, 0.1)), KartMeshKit.xf(Vector3(x, 1.1, 0.02)), Color(0.35, 0.22, 0.16, 0.0))
+				kit.add(MeshKit3D.box(Vector3(1.2, 2.2, 0.1)), MeshKit3D.xf(Vector3(x, 1.1, 0.02)), Color(0.35, 0.22, 0.16, 0.0))
 				continue
 			var lit := (fl * 7 + b * 3 + bays) % 3 != 0
-			kit.add(KartMeshKit.box(Vector3(1.0, 1.3, 0.1)), KartMeshKit.xf(Vector3(x, y, 0.02)),
+			kit.add(MeshKit3D.box(Vector3(1.0, 1.3, 0.1)), MeshKit3D.xf(Vector3(x, y, 0.02)),
 				Color(1.0, 0.82, 0.45, 1.0) if lit else Color(0.2, 0.26, 0.4, 0.2))
-			kit.add(KartMeshKit.box(Vector3(1.3, 0.12, 0.2)), KartMeshKit.xf(Vector3(x, y - 0.72, 0.06)), Color(0.96, 0.96, 0.94, 0.1))
+			kit.add(MeshKit3D.box(Vector3(1.3, 0.12, 0.2)), MeshKit3D.xf(Vector3(x, y - 0.72, 0.06)), Color(0.96, 0.96, 0.94, 0.1))
 	return kit.commit()
 
 
@@ -306,9 +306,9 @@ static func _house(facade: Color, roof: Color, floors: int, bays: int) -> ArrayM
 func _lights(props: Dictionary) -> void:
 	var track := world.track
 	var bulb_colors := [Color(1.0, 0.85, 0.35), Color(1.0, 0.4, 0.35), Color(0.45, 0.85, 1.0), Color(0.6, 1.0, 0.5), Color(1.0, 0.55, 0.85)]
-	var pole := KartMeshKit.new()
-	pole.add(KartMeshKit.cylinder(0.1, 0.14, 8.0, 6), KartMeshKit.xf(Vector3(0, 4.0, 0)), Color(0.2, 0.22, 0.28, 0.0))
-	pole.add(KartMeshKit.sphere(0.18, 6, 3), KartMeshKit.xf(Vector3(0, 8.0, 0)), Color(0.2, 0.22, 0.28, 0.0))
+	var pole := MeshKit3D.new()
+	pole.add(MeshKit3D.cylinder(0.1, 0.14, 8.0, 6), MeshKit3D.xf(Vector3(0, 4.0, 0)), Color(0.2, 0.22, 0.28, 0.0))
+	pole.add(MeshKit3D.sphere(0.18, 6, 3), MeshKit3D.xf(Vector3(0, 8.0, 0)), Color(0.2, 0.22, 0.28, 0.0))
 	var pole_mesh := pole.commit()
 	var tops := {-1.0: [], 1.0: []}
 	var s := -60.0
@@ -342,10 +342,10 @@ func _festoon(props: Dictionary, a: Vector3, b: Vector3, n: int, sag: float, col
 		var t := float(k) / (n + 1)
 		var p := a.lerp(b, t) + Vector3.DOWN * sag * 4.0 * t * (1.0 - t)
 		var seg := p - prev
-		kit.add(KartMeshKit.box(Vector3(0.03, seg.length(), 0.03)), Transform3D(along(seg), (p + prev) * 0.5), Color(0.1, 0.1, 0.12, 0.0))
+		kit.add(MeshKit3D.box(Vector3(0.03, seg.length(), 0.03)), Transform3D(along(seg), (p + prev) * 0.5), Color(0.1, 0.1, 0.12, 0.0))
 		if k <= n:
 			var c: Color = colors[(k + int(a.x)) % colors.size()]
-			kit.add(KartMeshKit.sphere(0.13, 6, 3), KartMeshKit.xf(p + Vector3.DOWN * 0.15), Color(c.r, c.g, c.b, 1.0))
+			kit.add(MeshKit3D.sphere(0.13, 6, 3), MeshKit3D.xf(p + Vector3.DOWN * 0.15), Color(c.r, c.g, c.b, 1.0))
 			if k % 2 == 0:
 				_bulbs.append(Transform3D(Basis().scaled(Vector3.ONE * 0.9), p + Vector3.DOWN * 0.15))
 				_bulb_colors.append(Color(c.r, c.g, c.b, 0.55))
@@ -355,12 +355,12 @@ func _festoon(props: Dictionary, a: Vector3, b: Vector3, n: int, sag: float, col
 ## Old iron lamp posts with glowing lanterns along the streets.
 func _lamp_posts(props: Dictionary) -> void:
 	var track := world.track
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	var iron := Color(0.14, 0.16, 0.2, 0.0)
-	kit.add(KartMeshKit.cylinder(0.09, 0.14, 4.2, 6), KartMeshKit.xf(Vector3(0, 2.1, 0)), iron)
-	kit.add(KartMeshKit.box(Vector3(0.1, 0.1, 0.9)), KartMeshKit.xf(Vector3(0, 4.15, 0.45)), iron)
-	kit.add(KartMeshKit.box(Vector3(0.42, 0.55, 0.42)), KartMeshKit.xf(Vector3(0, 3.85, 0.9)), Color(1.0, 0.86, 0.55, 1.0))
-	kit.add(KartMeshKit.prism(Vector3(0.6, 0.3, 0.6)), KartMeshKit.xf(Vector3(0, 4.25, 0.9)), iron)
+	kit.add(MeshKit3D.cylinder(0.09, 0.14, 4.2, 6), MeshKit3D.xf(Vector3(0, 2.1, 0)), iron)
+	kit.add(MeshKit3D.box(Vector3(0.1, 0.1, 0.9)), MeshKit3D.xf(Vector3(0, 4.15, 0.45)), iron)
+	kit.add(MeshKit3D.box(Vector3(0.42, 0.55, 0.42)), MeshKit3D.xf(Vector3(0, 3.85, 0.9)), Color(1.0, 0.86, 0.55, 1.0))
+	kit.add(MeshKit3D.prism(Vector3(0.6, 0.3, 0.6)), MeshKit3D.xf(Vector3(0, 4.25, 0.9)), iron)
 	var mesh := kit.commit()
 	var s := 150.0
 	var side := 1.0

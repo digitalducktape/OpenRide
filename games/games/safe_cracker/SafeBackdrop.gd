@@ -1,6 +1,6 @@
 class_name SafeBackdrop
 extends Node2D
-## The room behind the safe (#41): the room's `SafeMesh` batch and the soot vignette, baked into
+## The room behind the safe (#41): the room's `MeshBatch2D` batch and the soot vignette, baked into
 ## one texture when the place changes (`RoomBake`, a SubViewport at the screen's own resolution)
 ## and shown as one opaque sprite, and the place's slow ambient life as children that never
 ## redraw: rain on the office window and
@@ -26,7 +26,11 @@ var place_index := 0
 var bake: SubViewport
 var room: Node2D
 var view: Sprite2D
-var bakes := 0  ## renders made, for tests
+## Renders made, for tests.
+var bakes: int:
+	get:
+		return _baked.bakes
+var _baked: BakedBackdrop
 var rain: ColorRect
 var sea: ColorRect
 var lantern: Node2D
@@ -36,39 +40,28 @@ var _lantern_tween: Tween
 
 
 func _init() -> void:
-	bake = SubViewport.new()
-	bake.name = "RoomBake"
-	bake.disable_3d = true
-	bake.transparent_bg = false
-	bake.gui_disable_input = true
-	bake.size_2d_override = Vector2i(SafePlaces.WIDE)  # past the stage's sides (#57)
-	bake.size_2d_override_stretch = true
-	bake.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(bake)
-	room = SafeDial.Layer.new()
+	_baked = BakedBackdrop.new(SafePlaces.SIZE, SafePlaces.WIDE, SafePlaces.BLEED, "RoomBake", "Room")
+	_baked.name = "Baked"
+	add_child(_baked)
+	bake = _baked.bake
+	view = _baked.view
+	room = PaintLayer.new()
 	room.name = "Room"
 	room.paint = _paint_room
 	room.position = Vector2(SafePlaces.BLEED, 0)
-	bake.add_child(room)
-	bake.add_child(vignette())
-	view = Sprite2D.new()
-	view.name = "Room"
-	view.centered = false
-	view.position = Vector2(-SafePlaces.BLEED, 0)
-	view.texture = bake.get_texture()
-	view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(view)
+	_baked.add_painted(room)
+	_baked.add_painted(vignette())
 	rain = _shader_rect("Rain", RAIN_RECT, preload("res://games/safe_cracker/safe_rain.gdshader"))
 	sea = _shader_rect("Sea", Rect2(PORTHOLE - Vector2.ONE * PORTHOLE_R, Vector2.ONE * PORTHOLE_R * 2.0),
 		preload("res://games/safe_cracker/safe_sea.gdshader"))
-	flasks = SafeDial.Layer.new()
+	flasks = PaintLayer.new()
 	flasks.name = "Flasks"
 	flasks.paint = _paint_flasks
 	var shimmer := ShaderMaterial.new()
 	shimmer.shader = preload("res://games/safe_cracker/safe_shimmer.gdshader")
 	flasks.material = shimmer
 	add_child(flasks)
-	lantern = SafeDial.Layer.new()
+	lantern = PaintLayer.new()
 	lantern.name = "Lantern"
 	lantern.paint = _paint_lantern
 	lantern.position = LANTERN_PIVOT
@@ -122,40 +115,18 @@ func set_place(index: int) -> void:
 	rebake()
 
 
-func _enter_tree() -> void:
-	if not get_tree().root.size_changed.is_connected(rebake):
-		get_tree().root.size_changed.connect(rebake)
-	rebake()
-
-
-func _exit_tree() -> void:
-	if get_tree().root.size_changed.is_connected(rebake):
-		get_tree().root.size_changed.disconnect(rebake)
-
-
-## Renders the room once, at the size the canvas is shown on screen (2090x1008 for the painted
-## room on the bike's 1920x1008 panel), so the sprite maps one texel to one pixel.
+## Renders the room once (`BakedBackdrop`), at the size the canvas is shown on screen.
 func rebake() -> void:
-	if not is_inside_tree():
-		return
-	var win := Vector2(get_tree().root.size)
-	var s := clampf(minf(win.x / SafePlaces.SIZE.x, win.y / SafePlaces.SIZE.y), 0.25, 1.0)
-	var px := Vector2i((SafePlaces.WIDE * s).ceil())
-	if bake.size != px:
-		bake.size = px
-	view.scale = SafePlaces.WIDE / Vector2(px)
-	room.queue_redraw()
-	bake.render_target_update_mode = SubViewport.UPDATE_ONCE
-	bakes += 1
+	_baked.rebake()
 
 
 func _paint_room(ci: CanvasItem) -> void:
 	room_mesh(place_index).draw_on(ci)
 
 
-## The room's batch for a place, built once (`SafeMesh.built`).
-static func room_mesh(index: int) -> SafeMesh:
-	return SafeMesh.built("room:%d" % index, func(m: SafeMesh) -> void: SafePlaces.build_room(m, index))
+## The room's batch for a place, built once (`MeshBatch2D.built`).
+static func room_mesh(index: int) -> MeshBatch2D:
+	return MeshBatch2D.built("room:%d" % index, func(m: MeshBatch2D) -> void: SafePlaces.build_room(m, index))
 
 
 ## A soft soot vignette over the room, so the eye goes to the safe: baked with the room, so it
@@ -187,7 +158,7 @@ static func vignette() -> TextureRect:
 
 ## The flasks' liquids on the lab's shelves (the glass is in the room).
 func _paint_flasks(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var tints := [Color(0.4, 0.85, 0.6), Color(0.9, 0.6, 0.3), Color(0.5, 0.7, 0.95), Color(0.9, 0.5, 0.6)]
 	for shelf in 3:
 		var y := 420.0 + shelf * 150.0
@@ -195,7 +166,7 @@ func _paint_flasks(ci: CanvasItem) -> void:
 			var c: Color = tints[(k + shelf) % 4]
 			var at := Vector2(110.0 + k * 80.0, y + 72.0)
 			var cut := 10.0 - 4.0 * ((k + shelf) % 3)
-			var arc := SafeMesh.arc_points(at, 26.0, asin(-cut / 26.0), PI - asin(-cut / 26.0), 18)
+			var arc := MeshBatch2D.arc_points(at, 26.0, asin(-cut / 26.0), PI - asin(-cut / 26.0), 18)
 			m.fill(arc, c)
 			m.rect(Rect2(at.x - 18, at.y - cut - 2.0, 36, 3), c.lightened(0.4))
 			m.circle(at + Vector2(-9, 8), 5.0, Color(1, 1, 1, 0.25))
@@ -204,7 +175,7 @@ func _paint_flasks(ci: CanvasItem) -> void:
 
 ## The lantern on its chain, from the pivot: a cage with a glowing glass.
 func _paint_lantern(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var iron := Color(0.14, 0.11, 0.08)
 	var acc: Color = SafePlaces.place(place_index).accent
 	for k in 8:
@@ -227,7 +198,7 @@ func _make_dust() -> CPUParticles2D:
 	p.amount = DUST
 	p.lifetime = 9.0
 	p.preprocess = 9.0
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	p.emission_rect_extents = Vector2(200, 200)
 	p.direction = Vector2(0.3, -1)

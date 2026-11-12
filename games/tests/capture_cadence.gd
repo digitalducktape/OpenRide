@@ -67,7 +67,7 @@ func _run() -> void:
 		quit()
 		return
 	if overdraw:
-		var view: SubViewport = game.get("_view")
+		var view: SubViewport = game.get("view")
 		view.debug_draw = Viewport.DEBUG_DRAW_OVERDRAW
 		for frame in 90:
 			await _ride(game, bus, frame / 30.0)
@@ -136,7 +136,7 @@ func _ride_stop() -> void:
 func _measure(game: Node, bus: Node, seconds: float) -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
-	var view: SubViewport = game.get("_view")
+	var view: SubViewport = game.get("view")
 	var rid := view.get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(rid, true)
 	var t := 0.0

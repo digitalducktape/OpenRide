@@ -9,7 +9,7 @@
 > `TugStatus` / `TugOfWar.look` (UI). **Open** marks what the code still doesn't do.
 
 All of it is procedural except the Kenney nature-kit trees, bushes and rocks (CC0, loaded from
-`games/dodge_ball/models/`, recoloured and baked into the riverside mesh). The bots are plain material-and-animal names, nobody's character.
+`games/assets/models/`, recoloured and baked into the riverside mesh). The bots are plain material-and-animal names, nobody's character.
 
 ## 1. Identity
 
@@ -66,7 +66,7 @@ flag the only red, and the rope orange-tan so the meter and the world agree.
   their own fixed key light; the eyes, flames and bulbs are self-lit.
 - **Tug's grade** (the `LOOK_*` defines in `tug_look.gdshaderinc`; the sky repeats it in its
   cubemap pass). The vignette is not per pixel: since the tablet performance pass it is painted
-  into the vertex colours of the grid that draws the view on screen (`TugMeshes.view_image`),
+  into the vertex colours of the grid that draws the view on screen (`StageView3D.view_image`),
   so it darkens the sky's corners too.
 
   | Define | Value |

@@ -118,7 +118,7 @@ func test_finish_builds_the_contract_result() -> void:
 	game.stats = {"laps": 3}
 	var result := game.finish()
 	assert_str(result.game_id).is_equal("probe")
-	assert_int(result.score).is_equal(roundi(Effort.score))
+	assert_int(result.score).is_equal(floori(Effort.score))
 	assert_int(result.stars).is_equal(Stars.for_score(Effort.score, game.declared(), "standard"))
 	assert_bool(result.won).is_true()
 	assert_bool(result.skipped).is_false()
@@ -127,6 +127,25 @@ func test_finish_builds_the_contract_result() -> void:
 	assert_int(result.stats.played_sec).is_equal(30)
 	# The wire format round-trips through JSON as the bridge sends it.
 	assert_bool(JSON.parse_string(JSON.stringify(result)) is Dictionary).is_true()
+
+
+## The HUD and the result floor the same number: a fraction a plain round would lift can't make
+## the summary a point higher than the HUD showed.
+func test_the_result_score_is_the_number_the_hud_shows() -> void:
+	var hud: Hud = auto_free(Hud.new())
+	add_child(hud)
+	var game: ProbeGame = auto_free(ProbeGame.new())
+	game.prepare(_segment())
+	Effort.set_live(true)
+	game.start()
+	for points in [12.7, 12.5, 12.0, 0.9]:
+		Effort.begin_segment(false)
+		Effort.set_live(true)
+		Effort.award(points)  # the game itself stops scoring at finish()
+		hud._process(0.0)
+		var result := game.finish()
+		assert_str(hud.score._value.text).is_equal(str(result.score))
+		assert_int(result.score).is_equal(floori(points))
 
 
 func test_won_is_null_by_default() -> void:

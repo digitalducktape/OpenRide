@@ -59,6 +59,11 @@ var variant_star_thresholds := {}
 ##            the hub's "More options"
 ##   rider_badge  for "cards": the chosen card wears the rider's name (Kart Race's kart)
 var options: Array[Dictionary] = []
+## A one-game summary's extra tiles, from the result's `stats`: `[{key, label, suffix, of, grouped}]`
+## (`suffix` after the value, e.g. "%"; `grouped` true for 384,400; `of` a second stat shown as
+## "value/of", e.g. 3/4). Watt
+## Lane shows in-lane %, the longest streak and the steps caught. Empty: points and time only.
+var summary_stats: Array[Dictionary] = []
 
 
 ## Problems with the declaration, empty when it's valid. The registry test runs this for

@@ -34,7 +34,7 @@ func build() -> void:
 	camera = Segmented.new(["on", "off"], ["On", "Off"], "on" if bool(s.camera_games) else "off")
 	camera.name = "CameraGames"
 	camera.changed.connect(func(v: String): setting.emit("camera_games", v == "on"))
-	col.add_child(_row("Camera games", "Lean to steer. The camera only runs in those games.", camera))
+	col.add_child(_row("Camera games", "Lean or stand to play. The camera only runs in those games.", camera))
 	game_music = Segmented.new(["on", "off"], ["On", "Off"], "on" if bool(s.get("game_music", true)) else "off")
 	game_music.name = "GameMusic"
 	game_music.changed.connect(func(v: String): setting.emit("game_music", v == "on"))

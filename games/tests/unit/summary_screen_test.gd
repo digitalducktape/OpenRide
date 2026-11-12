@@ -165,6 +165,33 @@ func test_a_game_without_a_look_gets_the_house_look_and_no_stars_says_so() -> vo
 	_assert_done_button(screen)
 
 
+## The tallest one-game summary: no stars (the note shows), every stat tile the game declares and
+## a best with its detail line. Done must stay on screen (it was clipped on the bike).
+func test_every_game_stat_tiles_keep_done_on_screen_with_no_stars_and_a_best() -> void:
+	var seen := 0
+	for id in GameRegistry.ids():
+		var info := GameRegistry.info(id)
+		if info == null or info.summary_stats.is_empty():
+			continue
+		seen += 1
+		var stats := {}
+		for spec in info.summary_stats:
+			stats[spec.key] = 888
+			if spec.has("of"):
+				stats[spec.of] = 888
+		var screen := _shown({"results": [{"game_id": id, "score": 574, "stars": 0, "stats": stats}],
+			"totals": {"score": 574, "stars": 0, "elapsed_sec": 3163},
+			"bests": {"score": true, "previous_score": 3900, "previous_stars": 2}},
+			{"kind": "just_ride", "segments": [{"game_id": id, "role": "free"}]})
+		await _settle(screen)
+		assert_bool(screen._stars_note.visible).is_true()
+		assert_int(screen._tiles.get_child_count()).is_equal(2 + mini(info.summary_stats.size(), 3))
+		_assert_tidy(screen, "%s, no stars" % id)
+		_assert_done_button(screen)
+		screen.free()
+	assert_int(seen).is_greater_equal(4)  # Watt Lane, Balloon Pump, Keepy Uppy, The Pull
+
+
 func test_a_circuit_tints_each_row_by_its_game() -> void:
 	var dodge := GameTheme.new(Color("38b6ff"), Color("0e1b3d"))
 	var parts := _circuit(3)
@@ -224,3 +251,10 @@ func test_the_entrance_lands_and_a_second_summary_starts_clean() -> void:
 	assert_int(screen._rows.get_child_count()).is_equal(1)
 	assert_int(screen._tiles.get_child_count()).is_equal(2)
 	assert_bool(screen.done_button.visible).is_true()  # Done works from the first frame
+
+
+func test_a_grouped_stat_tile_has_its_comma() -> void:
+	var tiles: Array = SummaryScreen._stat_tiles(GameRegistry.info("ready_for_launch"),
+		[{"stats": {"best_altitude": 384400.0, "fuel_pct_avg": 88.0, "launches": 2.0}}])
+	assert_str(tiles[0][0]).is_equal("384,400 km")
+	assert_str(tiles[1][0]).is_equal("88%")

@@ -122,7 +122,7 @@ static var _lit: Array[WeakRef] = []
 
 static func noise() -> ImageTexture:
 	if _noise == null:
-		_noise = KartMeshKit.noise_texture(4242)
+		_noise = MeshKit3D.noise_texture(4242)
 	return _noise
 
 

@@ -53,7 +53,8 @@ func test_a_visit_starts_with_a_full_hub_state() -> void:
 	assert_str(s.phase).is_equal("hub")
 	assert_str(s.visit_id).is_equal(Session.visit_id)
 	var ids: Array = s.catalog.map(func(g): return g.id)
-	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke"])
+	assert_array(ids).is_equal(["kart_race", "dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "watt_lane", "the_pull", "balloon_pump",
+		"keepy_uppy", "power_grid", "ready_for_launch", "gate_crasher"])
 	var kart: Dictionary = s.catalog[0]
 	assert_array(kart.minute_steps).is_equal([5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0])
 	assert_str(kart.circuit_role).is_equal("free")
@@ -111,6 +112,74 @@ func test_rounds_and_presets_plan_as_kotlin_does() -> void:
 	assert_str(custom.plan_id).is_equal("custom:cadence_karaoke.180,kart_race.300")
 	assert_str(custom.segments[0].role).is_equal("warmup")
 	assert_str(custom.segments[1].role).is_equal("free")
+
+
+## Eleven catalog entries as the hub_state sends them (min_sec, max_sec, roles, uses_camera).
+static func _eleven() -> Array:
+	var games := [
+		["kart_race", [], 300, true], ["dodge_ball", ["work"], 60, true], ["tug_of_war", ["work"], 60, false],
+		["safe_cracker", ["recovery"], 60, false], ["cadence_karaoke", ["warmup", "recovery", "cooldown"], 60, false],
+		["power_grid", ["warmup", "work", "cooldown"], 60, false], ["watt_lane", ["warmup", "recovery", "cooldown"], 60, false],
+		["gate_crasher", ["work"], 60, true], ["ready_for_launch", ["work"], 90, false],
+		["keepy_uppy", ["recovery"], 60, false], ["the_pull", [], 300, false],
+	]
+	return games.map(func(g): return {"id": g[0], "roles": g[1], "min_sec": g[2], "max_sec": 3600, "uses_camera": g[3]})
+
+
+func _shape_45() -> Array:
+	var shape: Array = [LocalHub.WARMUP]
+	for i in 6:
+		shape.append_array(LocalHub.BLOCK)
+	shape.append(LocalHub.COOLDOWN)
+	return shape
+
+
+func test_circuits_draw_from_role_pools_like_kotlin() -> void:
+	var shape := _shape_45()
+	for entries in [hub.catalog(), _eleven()]:
+		for camera in [true, false]:
+			for seed_value in 40:
+				var slots: Array = LocalHub.draw_slots(shape, entries, camera, seed_value)
+				# Deterministic per seed.
+				assert_array(LocalHub.draw_slots(shape, entries, camera, seed_value)).is_equal(slots)
+				var by_id := {}
+				for e in entries:
+					by_id[e.id] = e
+				var played := {}  # role → ids this pass
+				var before := ""
+				for slot in slots:
+					var e: Dictionary = by_id[slot.game_id]
+					assert_bool(slot.role in e.roles).is_true()
+					assert_bool(int(slot.duration_sec) >= int(e.min_sec)).override_failure_message("%s in %ds" % [e.id, slot.duration_sec]).is_true()
+					assert_bool(camera or not e.uses_camera).is_true()
+					var seen: Dictionary = played.get_or_add(slot.role, {})
+					if seen.has(slot.game_id):
+						# A repeat only once every game that fits the slot has played this pass, but
+						# for the one that played the slot before (not twice running wins).
+						for f in LocalHub.circuit_pool(entries, slot.role, camera):
+							if int(slot.duration_sec) >= int(f.min_sec) and f.id != before:
+								assert_bool(seen.has(f.id)).override_failure_message("%s repeats before %s" % [slot.game_id, f.id]).is_true()
+						seen.clear()
+					seen[slot.game_id] = true
+					before = slot.game_id
+				# 12 work and 12 recovery slots cover those pools.
+				for role in ["work", "recovery"]:
+					var ids := {}
+					for slot in slots.filter(func(s): return s.role == role):
+						ids[slot.game_id] = true
+					assert_int(ids.size()).is_equal(LocalHub.circuit_pool(entries, role, camera).size())
+	# Different seeds, different mixes.
+	var mixes := {}
+	for seed_value in 20:
+		mixes[str(LocalHub.draw_slots(shape, _eleven(), true, seed_value).map(func(s): return s.game_id))] = true
+	assert_int(mixes.size()).is_greater(1)
+
+
+func test_the_hub_shows_the_lineup_that_plays() -> void:
+	var shown: Array = states.back().circuits[2].slots.map(func(s): return s.game_id)
+	var plan: Dictionary = hub.build_plan({"kind": "circuit", "preset_id": "circuit-45"}).plan
+	assert_array(plan.segments.map(func(s): return s.game_id)).is_equal(shown)
+	assert_str(plan.plan_id).is_equal("circuit-45")
 
 
 func test_settings_resend_the_state() -> void:

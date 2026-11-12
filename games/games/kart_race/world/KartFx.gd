@@ -78,7 +78,7 @@ static var _star_tex: ImageTexture
 
 func _ready() -> void:
 	_rng.seed = 77
-	_puff_mm = _pool("Puffs", PUFFS, false, KartMeshKit.soft_disc(32, 0.0))
+	_puff_mm = _pool("Puffs", PUFFS, false, MeshKit3D.soft_disc(32, 0.0))
 	_spark_mm = _pool("Sparks", SPARKS, true, null)
 	_star_mm = _pool("Stars", STARS, false, star_texture())
 	_pp.resize(PUFFS); _pv.resize(PUFFS); _pa.resize(PUFFS); _pl.resize(PUFFS); _ps.resize(PUFFS); _pc.resize(PUFFS)

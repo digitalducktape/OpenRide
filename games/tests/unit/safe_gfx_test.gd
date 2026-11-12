@@ -38,7 +38,7 @@ func _frames(n: int) -> void:
 		await get_tree().process_frame
 
 
-func _assert_batch(m: SafeMesh, what: String) -> void:
+func _assert_batch(m: MeshBatch2D, what: String) -> void:
 	assert_int(m.indices.size() % 3).override_failure_message("%s: not whole triangles" % what).is_equal(0)
 	assert_int(m.colors.size()).is_equal(m.points.size())
 	assert_int(m.uvs.size()).is_equal(m.points.size())
@@ -90,7 +90,7 @@ func test_every_place_has_one_key_light_and_a_well_formed_room() -> void:
 		assert_bool(Rect2(Vector2.ZERO, SafePlaces.SIZE).has_point(at)).override_failure_message("place %d's light is off screen" % i).is_true()
 		assert_float(SafePlaces.to_light(i).length()).is_equal_approx(1.0, 0.001)
 		assert_float(float(l.strength)).is_between(0.05, 0.5)
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		SafePlaces.build_room(m, i)
 		_assert_batch(m, "room %s" % SafePlaces.place(i).id)
 		var body: SafeBody = auto_free(SafeBody.new())
@@ -108,7 +108,7 @@ func test_the_lab_accent_is_not_the_on_target_green() -> void:
 
 
 func test_the_mesh_feathers_and_closes_its_shapes() -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	m.circle(Vector2.ZERO, 20.0, Color.WHITE)
 	_assert_batch(m, "circle")
 	var clear := 0
@@ -132,7 +132,7 @@ func test_the_mesh_feathers_and_closes_its_shapes() -> void:
 	m.glow(Vector2.ZERO, Vector2(300, 300), Color.WHITE, 10, 0.5, 200.0)
 	for p in m.points:
 		assert_float(p.length()).is_greater(150.0)
-	assert_int(SafeMesh.round_rect_outline(Rect2(0, 0, 10, 10), 3.0).size()).is_equal(SafeMesh.round_rect_outline(Rect2(0, 0, 90, 50), 20.0).size())
+	assert_int(MeshBatch2D.round_rect_outline(Rect2(0, 0, 10, 10), 3.0).size()).is_equal(MeshBatch2D.round_rect_outline(Rect2(0, 0, 90, 50), 20.0).size())
 
 
 func test_the_needle_and_the_swing_never_redraw_the_door_or_dial() -> void:
@@ -230,14 +230,14 @@ func test_the_room_is_baked_once_per_place() -> void:
 ## open, so the frame it slides in on builds nothing big.
 func test_the_next_place_is_built_while_the_door_stands_open() -> void:
 	var game := _game()
-	SafeMesh.forget_built()
+	MeshBatch2D.forget_built()
 	game._handle({"type": "vault_open", "points": 1000.0})
 	var next: int = game.get("_next_place")
 	assert_int(next).is_not_equal(game.get("_place"))
-	assert_bool(SafeMesh.is_built("room:%d" % next)).is_false()
+	assert_bool(MeshBatch2D.is_built("room:%d" % next)).is_false()
 	await await_millis(int((_door_sec() + 0.6) * 1000.0))
-	assert_bool(SafeMesh.is_built("room:%d" % next)).override_failure_message("the next room wasn't built ahead").is_true()
-	assert_bool(SafeMesh.is_built("body:%d" % next)).is_true()
+	assert_bool(MeshBatch2D.is_built("room:%d" % next)).override_failure_message("the next room wasn't built ahead").is_true()
+	assert_bool(MeshBatch2D.is_built("body:%d" % next)).is_true()
 	game._handle({"type": "new_vault"})
 	assert_int(game.get("_place")).is_equal(next)
 	assert_int(game.get("_next_place")).is_equal(-1)

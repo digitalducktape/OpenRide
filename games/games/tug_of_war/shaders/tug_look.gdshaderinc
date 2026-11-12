@@ -6,7 +6,7 @@
 #define LOOK_GAIN vec3(1.04, 1.0, 0.94)
 #define LOOK_LIFT vec3(0.03, 0.01, 0.0)
 // The vignette (0.3 toward vec3(1.0, 0.9, 0.8)) is painted into the vertex colours of the grid
-// that draws the view on screen (TugMeshes.view_image), not worked out per pixel here.
+// that draws the view on screen (StageView3D.view_image), not worked out per pixel here.
 #include "res://framework/shaders/world_look.gdshaderinc"
 
 // Haze per vertex: the share of `haze_color` at a distance, worked out in vertex() and passed on

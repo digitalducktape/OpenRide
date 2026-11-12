@@ -21,7 +21,7 @@ extends Node3D
 ## a few degrees at most (and not at all when the rider turns it off), and the hit shake is a
 ## small, brief sideways nudge with no rotation.
 
-const DodgeTimeOfDayRes := preload("res://games/dodge_ball/TimeOfDay.gd")
+const DodgeTimeOfDayRes := preload("res://framework/TimeOfDay.gd")
 
 const RIDER_LINE_Z := -1.4  ## where balls reach the bike (just ahead of the camera)
 const POPUP_INK := Color("0e1b3d")  ## the floating points' outline: Dodge Ball's ink (DodgeStatus.look)
@@ -67,7 +67,7 @@ const CATCH_COLORS := {
 	"double": Color(0.95, 0.9, 0.35),
 }
 
-const MODELS := "res://games/dodge_ball/models/"
+const MODELS := "res://assets/models/"
 
 ## Dev switches from the tablet tuning file (`DodgeBall.TUNING_PATH`, [world] section), for
 ## finding what costs frame time: sky, fog, scenery, verges, road, balls, rig (each true by
@@ -119,7 +119,7 @@ var _bounce_phase := {}  # ball id -> last bounce index, for the landing sound
 var _ball_speed := {}  # ball id -> its approach speed (m/s), fixed when it was thrown
 var _streaks: CPUParticles3D
 var _speed_feel := 0.0  ## 0-1: how fast the ride looks (FOV, streaks), smoothed
-var _tod: DodgeTimeOfDay
+var _tod: TimeOfDay
 var _noise: ImageTexture
 
 
@@ -224,7 +224,7 @@ static func ball_color(kind: String, catch_mode: bool) -> Color:
 	return table.get(kind, table.plain)
 
 
-func set_time_of_day(tod: DodgeTimeOfDay) -> void:
+func set_time_of_day(tod: TimeOfDay) -> void:
 	_tod = tod
 	var env := _env.environment
 	_sky_mat.set_shader_parameter("top_color", tod.sky_top)
@@ -262,7 +262,7 @@ func set_time_of_day(tod: DodgeTimeOfDay) -> void:
 ## ambient as the sky's half of the hemisphere (the ground's a darker share of it), the fog as
 ## the haze. Energies scale the colours in linear light, as the engine's lights did (the
 ## uniforms are `source_color`, so they're handed over in sRGB).
-static func look_for(tod: DodgeTimeOfDay, fog := true) -> Dictionary:
+static func look_for(tod: TimeOfDay, fog := true) -> Dictionary:
 	var ambient := tod.ambient.srgb_to_linear() * tod.ambient_energy
 	return {
 		"sun_dir": WorldLook.sun_dir(tod.sun_elevation, tod.sun_azimuth),
@@ -1005,20 +1005,7 @@ static func BALL_RADIUS() -> float:
 
 
 static func _model_mesh(file: String) -> Mesh:
-	var scene := load(MODELS + file) as PackedScene
-	if scene == null:
-		push_warning("DodgeWorld: can't load %s" % file)
-		return null
-	var root := scene.instantiate()
-	var found: Mesh = null
-	var stack: Array[Node] = [root]
-	while not stack.is_empty() and found == null:
-		var node: Node = stack.pop_back()
-		if node is MeshInstance3D:
-			found = (node as MeshInstance3D).mesh
-		stack.append_array(node.get_children())
-	root.free()
-	return found
+	return MeshKit3D.model_mesh(file)
 
 
 ## A copy of a nature-kit mesh in this road's palette: leaves (the greener surfaces) in

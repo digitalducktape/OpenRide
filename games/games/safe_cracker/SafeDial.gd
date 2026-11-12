@@ -116,15 +116,7 @@ var _bolt_ease := 1.0
 var _bolt_tween: Tween
 var _bolts_shown := -1
 var _pulse_tween: Tween
-var _mesh := SafeMesh.new()
-
-
-## A child layer drawn by a callable (so each layer is one node and one batch).
-class Layer extends Node2D:
-	var paint: Callable
-
-	func _draw() -> void:
-		paint.call(self)
+var _mesh := MeshBatch2D.new()
 
 
 static func angle_for(value: float) -> float:
@@ -182,7 +174,7 @@ func _init() -> void:
 
 
 func _layer(layer_name: String, paint: Callable, behind: bool) -> Node2D:
-	var l := Layer.new()
+	var l := PaintLayer.new()
 	l.name = layer_name
 	l.paint = paint
 	l.show_behind_parent = behind
@@ -315,7 +307,7 @@ func _make_sparkle() -> CPUParticles2D:
 	p.lifetime = 2.2
 	p.explosiveness = 0.75
 	p.local_coords = true
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.position = Vector2(160, 200)
 	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	p.emission_rect_extents = Vector2(240, 60)
@@ -376,7 +368,7 @@ func _paint_reading(ci: CanvasItem) -> void:
 
 ## One light per tumbler: brass when clicked (the newest pops, `light_pop`), an ink socket with
 ## a faint brass ring for the rest. The next one's breathing ring is `NextLight`.
-func _add_lights(m: SafeMesh) -> void:
+func _add_lights(m: MeshBatch2D) -> void:
 	for i in tumblers_total:
 		var at := light_at(i, tumblers_total)
 		if i < tumblers_done:
@@ -393,7 +385,7 @@ func _add_lights(m: SafeMesh) -> void:
 
 
 func _paint_next_light(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	m.ring(Vector2.ZERO, LIGHT_R - 4.0, LIGHT_R, Color(accent, 0.6))
 	m.glow(Vector2.ZERO, Vector2(LIGHT_R, LIGHT_R) * 1.6, Color(accent, 0.18), 6, 0.5)
 	m.flush(ci)
@@ -402,7 +394,7 @@ func _paint_next_light(ci: CanvasItem) -> void:
 ## The needle along +x (`rotation` turns it): a tapered red pointer with a lit edge, a
 ## counterweight and a steel hub. Same reach as ever: from 40 behind the hub to R - 12.
 func _paint_needle(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var tail := -40.0
 	var tip := R - 12.0
 	m.fill(PackedVector2Array([Vector2(tail, -7), Vector2(tip - 18, -3.5), Vector2(tip, 0), Vector2(tip - 18, 3.5), Vector2(tail, 7)]), NEEDLE_RED.darkened(0.15))
@@ -430,7 +422,7 @@ func _paint_numerals(ci: CanvasItem) -> void:
 ## Five steel bolt ends standing out of the door's right edge over the frame, the first
 ## `_bolts_shown` slid back (easing over BOLT_SEC).
 func _paint_bolts(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var steel := colour.lightened(0.45)
 	for i in BOLT_Y.size():
 		var length := lerpf(BOLT_OUT, BOLT_IN, _bolt_now(i))
@@ -447,7 +439,7 @@ func _paint_bolts(ci: CanvasItem) -> void:
 ## the numerals' centres) and a faint one lower right; a glint on it while on target. When
 ## unpowered, a dark cover with the amber KEEP PEDALLING badge.
 func _paint_cover(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	_glass_band(m, deg_to_rad(196.0), deg_to_rad(292.0), R - 50.0, R - 12.0, 0.13)
 	_glass_band(m, deg_to_rad(22.0), deg_to_rad(62.0), R - 30.0, R - 18.0, 0.05)
 	if on_target():
@@ -472,11 +464,11 @@ func _paint_cover(ci: CanvasItem) -> void:
 		_flush_text(ci)
 
 
-func _glass_band(m: SafeMesh, from: float, to: float, r0: float, r1: float, peak: float) -> void:
+func _glass_band(m: MeshBatch2D, from: float, to: float, r0: float, r1: float, peak: float) -> void:
 	var segs := 28
-	var inner := SafeMesh.arc_points(Vector2.ZERO, r0, from, to, segs)
-	var outer := SafeMesh.arc_points(Vector2.ZERO, r1, from, to, segs)
-	var mid := SafeMesh.arc_points(Vector2.ZERO, (r0 + r1) * 0.5, from, to, segs)
+	var inner := MeshBatch2D.arc_points(Vector2.ZERO, r0, from, to, segs)
+	var outer := MeshBatch2D.arc_points(Vector2.ZERO, r1, from, to, segs)
+	var mid := MeshBatch2D.arc_points(Vector2.ZERO, (r0 + r1) * 0.5, from, to, segs)
 	var edge := PackedColorArray()
 	var core := PackedColorArray()
 	for k in segs + 1:
@@ -488,25 +480,25 @@ func _glass_band(m: SafeMesh, from: float, to: float, r0: float, r1: float, peak
 
 
 func _paint_vault(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	SafeBody.build_vault(m, colour)
 	m.flush(ci)
 
 
 ## A red glow round the safe's body (shown, and faded by `alarm`, from `refresh`).
 func _paint_alarm_glow(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var body := SafeBody.BODY
 	var red := Color(0.95, 0.15, 0.1, 0.85)
-	var edge := SafeMesh.round_rect_outline(body.grow(-2.0), 30.0)
-	m.band(edge, SafeMesh.round_rect_outline(body.grow(14.0), 46.0), red, Color(red, 0.55))
-	m.band(SafeMesh.round_rect_outline(body.grow(14.0), 46.0), SafeMesh.round_rect_outline(body.grow(60.0), 92.0), Color(red, 0.55), Color(red, 0.0))
+	var edge := MeshBatch2D.round_rect_outline(body.grow(-2.0), 30.0)
+	m.band(edge, MeshBatch2D.round_rect_outline(body.grow(14.0), 46.0), red, Color(red, 0.55))
+	m.band(MeshBatch2D.round_rect_outline(body.grow(14.0), 46.0), MeshBatch2D.round_rect_outline(body.grow(60.0), 92.0), Color(red, 0.55), Color(red, 0.0))
 	m.flush(ci)
 
 
 ## The vault's warm light spilling out of the open door, onto the frame and the floor (additive).
 func _paint_spill(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	m.glow(Vector2(80, 60), Vector2(820, 560), Color(1.0, 0.72, 0.3, 0.32), 14)
 	m.glow(Vector2(120, 380), Vector2(700, 120), Color(1.0, 0.7, 0.3, 0.25), 10)
 	m.flush(ci)

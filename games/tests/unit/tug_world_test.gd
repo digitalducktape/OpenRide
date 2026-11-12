@@ -34,20 +34,20 @@ func test_every_world_shader_compiles_on_the_shared_look() -> void:
 
 func test_the_look_table_lights_each_time_of_day() -> void:
 	for id in ["dawn", "day", "dusk", "night"]:
-		var tod := DodgeTimeOfDay.load_preset(id)
+		var tod := TimeOfDay.load_preset(id)
 		var look := TugWorld.look_for(tod)
 		for p in WorldLook.PARAMS:
 			if p != &"noise_tex":
 				assert_bool(look.has(p)).override_failure_message("%s lacks %s" % [id, p]).is_true()
 		assert_vector(look.sun_dir).is_equal(WorldLook.sun_dir(tod.sun_elevation, tod.sun_azimuth))
-	var day := TugWorld.look_for(DodgeTimeOfDay.load_preset("day"))
-	var night := TugWorld.look_for(DodgeTimeOfDay.load_preset("night"))
+	var day := TugWorld.look_for(TimeOfDay.load_preset("day"))
+	var night := TugWorld.look_for(TimeOfDay.load_preset("night"))
 	assert_float(night.lamp).is_greater(day.lamp)
 	assert_float(night.lamp).is_equal_approx(1.0, 0.001)
 
 
 func test_set_time_of_day_reaches_every_hand_lit_material() -> void:
-	var night := DodgeTimeOfDay.load_preset("night")
+	var night := TimeOfDay.load_preset("night")
 	world.set_time_of_day(night)
 	var haze: Color = night.fog_color
 	for mat in world._lit:
@@ -74,13 +74,13 @@ func test_the_scenery_is_one_vertex_coloured_mesh_with_sway_and_glow() -> void:
 	assert_int(swaying).is_greater(100)  # reed tips, bunting tips
 	assert_int(glowing).is_greater(50)  # the string lights' bulbs
 	assert_int(grained).is_greater(50)  # the banks
-	assert_int(KartMeshKit.tri_count(mesh)).is_less(40000)
+	assert_int(MeshKit3D.tri_count(mesh)).is_less(40000)
 
 
 func test_the_bot_is_in_budget_with_its_key_behind_it() -> void:
 	var body := TugMeshes.bot_body()
-	var tris := KartMeshKit.tri_count(body) + KartMeshKit.tri_count(TugMeshes.bot_ears()) \
-		+ KartMeshKit.tri_count(TugMeshes.bot_eyes())
+	var tris := MeshKit3D.tri_count(body) + MeshKit3D.tri_count(TugMeshes.bot_ears()) \
+		+ MeshKit3D.tri_count(TugMeshes.bot_eyes())
 	assert_int(tris).is_less(3000)
 	var a := body.surface_get_arrays(0)
 	var verts: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
@@ -172,13 +172,13 @@ func test_the_sky_is_drawn_once_into_its_cubemap_and_sampled() -> void:
 func test_the_vignette_is_in_the_view_grid_not_per_pixel() -> void:
 	var inc: String = FileAccess.get_file_as_string(SHADERS + "tug_look.gdshaderinc")
 	assert_str(inc).not_contains("#define LOOK_VIGNETTE")
-	var mesh := TugMeshes.view_image(Vector2(1920, 1080))
+	var mesh := StageView3D.view_image(Vector2(1920, 1080), TugMeshes.VIGNETTE, TugMeshes.VIGNETTE_TINT)
 	var a := mesh.surface_get_arrays(0)
 	var verts: PackedVector2Array = a[Mesh.ARRAY_VERTEX]
 	var cols: PackedColorArray = a[Mesh.ARRAY_COLOR]
-	assert_int(verts.size()).is_equal((TugMeshes.VIEW_COLS + 1) * (TugMeshes.VIEW_ROWS + 1))
+	assert_int(verts.size()).is_equal((StageView3D.COLS + 1) * (StageView3D.ROWS + 1))
 	assert_vector(verts[verts.size() - 1]).is_equal(Vector2(1920, 1080))
-	var centre := cols[(TugMeshes.VIEW_ROWS / 2) * (TugMeshes.VIEW_COLS + 1) + TugMeshes.VIEW_COLS / 2]
+	var centre := cols[(StageView3D.ROWS / 2) * (StageView3D.COLS + 1) + StageView3D.COLS / 2]
 	assert_float(centre.r).is_greater(0.99)
 	# The corners are darker and warmer (less blue than red).
 	assert_float(cols[0].r).is_less(0.95)

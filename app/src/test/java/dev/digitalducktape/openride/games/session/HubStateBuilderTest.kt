@@ -74,7 +74,10 @@ class HubStateBuilderTest {
         val catalog = HubStateBuilder.build(inputs()).catalog.associateBy { it.id }
 
         assertFalse("demo" in catalog)
-        assertEquals(listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race"), catalog.keys.toList())
+        assertEquals(
+            listOf("dodge_ball", "tug_of_war", "safe_cracker", "cadence_karaoke", "kart_race", "watt_lane", "the_pull", "balloon_pump", "keepy_uppy", "power_grid", "ready_for_launch", "gate_crasher"),
+            catalog.keys.toList(),
+        )
         assertEquals(listOf(5, 10, 15, 20, 30, 45, 60), catalog["kart_race"]!!.minuteSteps)
         assertEquals(listOf("minutes", "open"), catalog["kart_race"]!!.supports)
         assertEquals(listOf("minutes", "rounds", "open"), catalog["dodge_ball"]!!.supports)
@@ -96,6 +99,7 @@ class HubStateBuilderTest {
         assertEquals(SegmentRole.RECOVERY, roles["safe_cracker"])
         assertEquals(SegmentRole.RECOVERY, roles["cadence_karaoke"])
         assertEquals(SegmentRole.FREE, roles["kart_race"])
+        assertEquals(SegmentRole.FREE, roles["the_pull"])
     }
 
     @Test
@@ -113,11 +117,25 @@ class HubStateBuilderTest {
         val on = HubStateBuilder.build(inputs()).circuits.first { it.id == "circuit-20" }
         assertEquals(20, on.minutes)
         assertEquals(1120, on.totalSec)
-        assertTrue(on.slots.any { it.gameId == "dodge_ball" })
+        // A camera game is in some draws, not all, now the work pool is bigger.
+        val cameraGames = GameCatalog.DEFAULT.games.filter { it.usesCamera }.map { it.id }
+        assertTrue((1L..20L).any { seed ->
+            HubStateBuilder.build(inputs().copy(circuitSeed = seed)).circuits.first { it.id == "circuit-20" }.slots.any { it.gameId in cameraGames }
+        })
 
         val off = HubStateBuilder.build(inputs(permission = CameraPermission.DENIED)).circuits.first { it.id == "circuit-20" }
-        assertFalse(off.slots.any { it.gameId == "dodge_ball" })
+        assertFalse(off.slots.any { it.gameId in cameraGames })
         assertEquals(on.slots.map { it.role }, off.slots.map { it.role })
+    }
+
+    @Test
+    fun `presets show the lineup the visit's circuit seed draws, which is the one that plays`() {
+        val ftp = FtpBasis.of(inputs().profile?.ftp)
+        for (seed in listOf(1L, 2L, 99L)) {
+            val shown = HubStateBuilder.build(inputs().copy(circuitSeed = seed)).circuits.first { it.id == "circuit-45" }
+            val played = SessionPlans.forRequest(SessionRequest.Circuit("circuit-45"), ftp, GameCatalog.DEFAULT, circuitSeed = seed)!!
+            assertEquals(played.segments.map { it.gameId }, shown.slots.map { it.gameId })
+        }
     }
 
     @Test

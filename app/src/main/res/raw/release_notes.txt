@@ -1,0 +1,16 @@
+OpenRide 1.1: a music player, a home screen setting, and fixes, on top of everything new in 1.0.
+
+New in 1.1:
+
+Music player: see what's playing in your music app, with cover, song, artist and previous, play/pause and next, in the top bar and on the Just Ride screen. Tried with Spotify, Apple Music, Pandora, SiriusXM and Plexamp. Turn it on in Profile, Music. In the games, game music steps aside while yours plays, and a note button opens the player.
+
+Home screen setting: Profile, Device, Home screen, Turn on. No more adb commands (fixes #47, and the home-screen part of #63 on the newer tablet; Peloton's own overlay on newer software is covered in docs/INSTALL.md). Pressing Home no longer opens a second copy of the app.
+
+Heart-rate strap: connects reliably, reconnects when the link drops, and shows your bpm on the ride screens and in the games.
+
+Fixes: bigger readings on the ride screens, form labels that no longer overlap, games that fill the whole screen with no side bars, and one sensor warning everywhere, including when the bike's sensor board goes quiet.
+
+Still new from 1.0: the Games hub (BETA), the Kart Race, better game graphics and sound, a new look for the whole app with tabs along the bottom, and installing from OpenPelo's app catalog.
+
+The camera only looks for where your head is; nothing is recorded.
+

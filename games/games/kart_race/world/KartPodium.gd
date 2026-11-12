@@ -42,30 +42,30 @@ func stage(mat: Material, origin: Vector3, facing: Vector3) -> void:
 	name = "Podium"
 	_facing = Vector3(facing.x, 0.0, facing.z).normalized()
 	transform = Transform3D(Basis.looking_at(-_facing, Vector3.UP), origin)
-	var plinth := KartMeshKit.new()
+	var plinth := MeshKit3D.new()
 	plinth.ao_y0 = -0.1
 	plinth.ao_y1 = 0.2
 	plinth.ao_min = 0.6
-	plinth.add(KartMeshKit.box(Vector3(8.0, 0.16, 3.1)), KartMeshKit.xf(Vector3(0, 0.08, 0.1)), Color(0.24, 0.16, 0.46))
-	plinth.add(KartMeshKit.box(Vector3(8.2, 0.04, 3.3)), KartMeshKit.xf(Vector3(0, 0.16, 0.1)), Color(0.55, 0.42, 1.0))
-	add_child(KartMeshKit.mesh_node(plinth.commit(), mat, "Plinth"))
+	plinth.add(MeshKit3D.box(Vector3(8.0, 0.16, 3.1)), MeshKit3D.xf(Vector3(0, 0.08, 0.1)), Color(0.24, 0.16, 0.46))
+	plinth.add(MeshKit3D.box(Vector3(8.2, 0.04, 3.3)), MeshKit3D.xf(Vector3(0, 0.16, 0.1)), Color(0.55, 0.42, 1.0))
+	add_child(MeshKit3D.mesh_node(plinth.commit(), mat, "Plinth"))
 	for i in 3:
 		var h: float = HEIGHTS[i]
 		var col: Color = COLORS[i]
-		var kit := KartMeshKit.new()
+		var kit := MeshKit3D.new()
 		kit.ao_y0 = 0.0
 		kit.ao_y1 = h * 0.8
 		kit.ao_min = 0.62
 		var w := BLOCK.x
 		var dd := BLOCK.y
-		kit.add(KartMeshKit.box(Vector3(w, h - 0.1, dd)), KartMeshKit.xf(Vector3(0, (h - 0.1) * 0.5, 0)), col)
+		kit.add(MeshKit3D.box(Vector3(w, h - 0.1, dd)), MeshKit3D.xf(Vector3(0, (h - 0.1) * 0.5, 0)), col)
 		# The bevelled cap: a lighter slab, a little wider, with a softer step under it.
-		kit.add(KartMeshKit.box(Vector3(w + 0.08, 0.1, dd + 0.08)), KartMeshKit.xf(Vector3(0, h - 0.05, 0)), col.lightened(0.35))
-		kit.add(KartMeshKit.box(Vector3(w + 0.03, 0.05, dd + 0.03)), KartMeshKit.xf(Vector3(0, h - 0.125, 0)), col.lightened(0.15))
+		kit.add(MeshKit3D.box(Vector3(w + 0.08, 0.1, dd + 0.08)), MeshKit3D.xf(Vector3(0, h - 0.05, 0)), col.lightened(0.35))
+		kit.add(MeshKit3D.box(Vector3(w + 0.03, 0.05, dd + 0.03)), MeshKit3D.xf(Vector3(0, h - 0.125, 0)), col.lightened(0.15))
 		# A pale stripe across the front under the cap, and a dark foot.
-		kit.add(KartMeshKit.box(Vector3(w * 0.92, 0.07, 0.02)), KartMeshKit.xf(Vector3(0, h - 0.26, dd * 0.5 + 0.005)), col.lightened(0.55))
-		kit.add(KartMeshKit.box(Vector3(w + 0.02, 0.1, dd + 0.02)), KartMeshKit.xf(Vector3(0, 0.05, 0)), col.darkened(0.45))
-		var block := KartMeshKit.mesh_node(kit.commit(), mat, "Block%d" % (i + 1))
+		kit.add(MeshKit3D.box(Vector3(w * 0.92, 0.07, 0.02)), MeshKit3D.xf(Vector3(0, h - 0.26, dd * 0.5 + 0.005)), col.lightened(0.55))
+		kit.add(MeshKit3D.box(Vector3(w + 0.02, 0.1, dd + 0.02)), MeshKit3D.xf(Vector3(0, 0.05, 0)), col.darkened(0.45))
+		var block := MeshKit3D.mesh_node(kit.commit(), mat, "Block%d" % (i + 1))
 		block.position = Vector3(XS[i], 0.16 - h, 0.0)
 		add_child(block)
 		_blocks.append(block)

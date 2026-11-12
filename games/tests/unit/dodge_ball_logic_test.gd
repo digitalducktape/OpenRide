@@ -365,12 +365,12 @@ func test_switching_mode_keeps_thrown_balls_and_resets_the_streak() -> void:
 
 
 func test_time_of_day_follows_the_clock() -> void:
-	assert_str(DodgeTimeOfDay.for_hour(6)).is_equal("dawn")
-	assert_str(DodgeTimeOfDay.for_hour(12)).is_equal("day")
-	assert_str(DodgeTimeOfDay.for_hour(18)).is_equal("dusk")
-	assert_str(DodgeTimeOfDay.for_hour(23)).is_equal("night")
-	assert_str(DodgeTimeOfDay.for_hour(3)).is_equal("night")
-	assert_str(DodgeTimeOfDay.resolve("dusk", 12)).is_equal("dusk")
-	assert_str(DodgeTimeOfDay.resolve("auto", 12)).is_equal("day")
-	for name in DodgeTimeOfDay.NAMES:
-		assert_object(DodgeTimeOfDay.load_preset(name)).is_not_null()
+	assert_str(TimeOfDay.for_hour(6)).is_equal("dawn")
+	assert_str(TimeOfDay.for_hour(12)).is_equal("day")
+	assert_str(TimeOfDay.for_hour(18)).is_equal("dusk")
+	assert_str(TimeOfDay.for_hour(23)).is_equal("night")
+	assert_str(TimeOfDay.for_hour(3)).is_equal("night")
+	assert_str(TimeOfDay.resolve("dusk", 12)).is_equal("dusk")
+	assert_str(TimeOfDay.resolve("auto", 12)).is_equal("day")
+	for name in TimeOfDay.NAMES:
+		assert_object(TimeOfDay.load_preset(name)).is_not_null()

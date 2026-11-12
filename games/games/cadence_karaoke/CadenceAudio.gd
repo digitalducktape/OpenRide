@@ -11,18 +11,10 @@ extends RefCounted
 const SFX_DIR := "res://games/cadence_karaoke/sfx"
 const CadenceMusic := preload("res://games/cadence_karaoke/CadenceMusic.gd")
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
 	SfxSynth.add_preset_dir(SFX_DIR)
-	for sound in CadenceMusic.SOUNDS:
-		var rendered := load(CadenceMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(CadenceMusic.SOUNDS)
 
 
 static func music_effects() -> Array[AudioEffect]:

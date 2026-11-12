@@ -23,6 +23,9 @@ object Destinations {
     /** Opt-in self-updater screen (PRD #22/T22), reachable from the Profile tab. */
     const val AppUpdate = "app_update"
 
+    /** Version, license and the Buy Me a Coffee QR code (#86), reachable from the Profile tab. */
+    const val About = "about"
+
     /** Rider-managed Classes catalog (channels and playlists), reachable from the Profile tab. */
     const val ContentSources = "content_sources"
 
