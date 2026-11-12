@@ -2,7 +2,7 @@ class_name KeepyPlaces
 extends RefCounted
 ## The places Keepy Uppy's balloon flies in (#77, the 2D rework; ART_BIBLE.md §3 and §6): a
 ## summer meadow, seaside cliffs, a city rooftop at dusk and an autumn park. Each is a palette, a
-## sun (its key light) and a few layers of shapes drawn in code into one `SafeMesh` batch, baked
+## sun (its key light) and a few layers of shapes drawn in code into one `MeshBatch2D` batch, baked
 ## once per place by `KeepyBackdrop`; the slow ambient life (clouds, the sea's glitter, gulls,
 ## butterflies, lit windows, falling leaves) lives in `KeepyBackdrop` as shaders, particles and
 ## moving nodes. Names are plain descriptions. Layout constants here are shared by every layer.
@@ -93,7 +93,7 @@ static func band_y(h: float) -> float:
 # --- Painting the place (baked once per place) ---
 
 ## Adds the whole scene behind the fan to `m`, in screen coordinates from x = -BLEED.
-static func build_scene(m: SafeMesh, index: int) -> void:
+static func build_scene(m: MeshBatch2D, index: int) -> void:
 	var p := place(index)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9100 + index
@@ -134,7 +134,7 @@ static func build_scene(m: SafeMesh, index: int) -> void:
 
 
 ## Thin, wind-combed streaks of high cloud.
-static func _high_clouds(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
+static func _high_clouds(m: MeshBatch2D, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	var col := Color((p.sky_low as Color).lightened(0.4), 0.35)
 	for i in 5:
 		var y := rng.randf_range(70.0, 260.0)
@@ -145,7 +145,7 @@ static func _high_clouds(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator)
 
 ## A ridge across the scene: a smooth wavy top (sum of sines) filled down to `bottom`, shading
 ## from `top_col` to `low_col`, its top edge feathered.
-static func ridge(m: SafeMesh, base_y: float, amp: float, freq: float, phase: float, top_col: Color, low_col: Color, bottom: float, step := 24.0) -> void:
+static func ridge(m: MeshBatch2D, base_y: float, amp: float, freq: float, phase: float, top_col: Color, low_col: Color, bottom: float, step := 24.0) -> void:
 	var prev := Vector2.ZERO
 	var x := -BLEED
 	var first := true
@@ -154,7 +154,7 @@ static func ridge(m: SafeMesh, base_y: float, amp: float, freq: float, phase: fl
 		var cur := Vector2(x, y)
 		if not first:
 			m.quad4(prev, cur, Vector2(cur.x, bottom), Vector2(prev.x, bottom), top_col, top_col, low_col, low_col)
-			m.quad4(prev - Vector2(0, SafeMesh.FEATHER), cur - Vector2(0, SafeMesh.FEATHER), cur, prev,
+			m.quad4(prev - Vector2(0, MeshBatch2D.FEATHER), cur - Vector2(0, MeshBatch2D.FEATHER), cur, prev,
 				Color(top_col, 0.0), Color(top_col, 0.0), top_col, top_col)
 			# A lit rim along the crest (GFX_POLISH item 7).
 			var rim := top_col.lightened(0.16)
@@ -165,7 +165,7 @@ static func ridge(m: SafeMesh, base_y: float, amp: float, freq: float, phase: fl
 
 
 ## A round-crowned tree: a trunk and three overlapping crowns, lit from the sun's side.
-static func tree(m: SafeMesh, at: Vector2, size: float, leaf: Color, trunk: Color, sun_dir: Vector2) -> void:
+static func tree(m: MeshBatch2D, at: Vector2, size: float, leaf: Color, trunk: Color, sun_dir: Vector2) -> void:
 	m.rect_v(Rect2(at.x - size * 0.07, at.y - size * 0.55, size * 0.14, size * 0.55), trunk, trunk.darkened(0.3))
 	var crowns := [Vector2(0, -size * 0.85), Vector2(-size * 0.3, -size * 0.62), Vector2(size * 0.3, -size * 0.64)]
 	for c in crowns:
@@ -176,7 +176,7 @@ static func tree(m: SafeMesh, at: Vector2, size: float, leaf: Color, trunk: Colo
 
 
 ## A soft, round cumulus (also drawn by the ambient clouds).
-static func cumulus(m: SafeMesh, at: Vector2, w: float, top: Color, shade: Color) -> void:
+static func cumulus(m: MeshBatch2D, at: Vector2, w: float, top: Color, shade: Color) -> void:
 	var puffs := [Vector2(-0.38, 0.1), Vector2(-0.14, -0.18), Vector2(0.12, -0.28), Vector2(0.36, -0.06), Vector2(0.0, 0.08)]
 	var radii := [0.24, 0.3, 0.34, 0.26, 0.3]
 	for i in puffs.size():
@@ -187,7 +187,7 @@ static func cumulus(m: SafeMesh, at: Vector2, w: float, top: Color, shade: Color
 
 ## Foreground flowers and tufts along the bottom edge (in front of nothing: the fan's crate and
 ## the grass layer cover the middle).
-static func _flowers(m: SafeMesh, rng: RandomNumberGenerator, from_y: float, colors: Array, n: int) -> void:
+static func _flowers(m: MeshBatch2D, rng: RandomNumberGenerator, from_y: float, colors: Array, n: int) -> void:
 	for i in n:
 		var at := Vector2(rng.randf_range(-BLEED, SIZE.x + BLEED), rng.randf_range(from_y, SIZE.y - 10.0))
 		var c: Color = colors[rng.randi() % colors.size()]
@@ -198,7 +198,7 @@ static func _flowers(m: SafeMesh, rng: RandomNumberGenerator, from_y: float, col
 
 ## Alternate lighter stripes from `from_y` to the bottom edge, converging on a point above the
 ## horizon (one-point perspective, as Safe Cracker's floors converge on the safe).
-static func _stripes(m: SafeMesh, from_y: float, col: Color) -> void:
+static func _stripes(m: MeshBatch2D, from_y: float, col: Color) -> void:
 	var vp := Vector2(960, HORIZON_Y - 260)
 	var w := 260.0
 	for k in range(-9, 9):
@@ -208,11 +208,11 @@ static func _stripes(m: SafeMesh, from_y: float, col: Color) -> void:
 		m.quad4(vp.lerp(b0, t), vp.lerp(b1, t), b1, b0, Color(col, 0.0), Color(col, 0.0), col, col)
 
 
-static func _ground(m: SafeMesh, p: Dictionary, from_y: float) -> void:
+static func _ground(m: MeshBatch2D, p: Dictionary, from_y: float) -> void:
 	m.rect_v(Rect2(-BLEED, from_y, WIDE.x, SIZE.y - from_y), p.near, p.near2)
 
 
-static func _meadow(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
+static func _meadow(m: MeshBatch2D, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	var haze: Color = p.haze
 	ridge(m, HORIZON_Y - 40, 46, 0.004, 1.2, (p.far as Color).lerp(haze, 0.45), (p.far as Color).lerp(haze, 0.25), HORIZON_Y + 60)
 	ridge(m, HORIZON_Y + 10, 34, 0.006, 3.1, p.far, (p.mid as Color).lerp(p.far, 0.4), HORIZON_Y + 120)
@@ -235,7 +235,7 @@ static func _meadow(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> v
 
 ## A hedgerow: uneven bushes, each a dark mass under clusters of leaves, lit toward the
 ## sun and shaded at the foot.
-static func _hedge(m: SafeMesh, x0: float, x1: float, y: float, col: Color, sun_dir: Vector2, rng: RandomNumberGenerator) -> void:
+static func _hedge(m: MeshBatch2D, x0: float, x1: float, y: float, col: Color, sun_dir: Vector2, rng: RandomNumberGenerator) -> void:
 	m.rect_v(Rect2(x0, y + 8, x1 - x0, 16), Color(col.darkened(0.45), 0.0), Color(col.darkened(0.45), 0.7))
 	var x := x0
 	while x < x1:
@@ -249,7 +249,7 @@ static func _hedge(m: SafeMesh, x0: float, x1: float, y: float, col: Color, sun_
 		x += r * rng.randf_range(1.0, 1.6)
 
 
-static func _seaside(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
+static func _seaside(m: MeshBatch2D, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	# The sea to the horizon (its glitter is KeepyBackdrop's shader), an island far out.
 	var sea_top := Color("4f86b8")
 	m.rect_v(Rect2(-BLEED, HORIZON_Y - 60, WIDE.x, 200), sea_top.lerp(p.haze, 0.35), Color("2f6a99"))
@@ -284,7 +284,7 @@ static func _seaside(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> 
 	_flowers(m, rng, HORIZON_Y + 170, [Color("f7f4e8"), Color("f2a5c0"), Color("f5d547")], 110)
 
 
-static func _rooftop(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
+static func _rooftop(m: MeshBatch2D, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	# Two rows of towers against the dusk; lit windows in the near row (they twinkle in a shader).
 	var far: Color = p.far
 	var x := -BLEED
@@ -351,7 +351,7 @@ static func _rooftop(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> 
 	m.rect_v(Rect2(1876, HORIZON_Y + 50, 10, 110), Color("4a3834"), Color("2a201e"))
 
 
-static func _park(m: SafeMesh, p: Dictionary, rng: RandomNumberGenerator) -> void:
+static func _park(m: MeshBatch2D, p: Dictionary, rng: RandomNumberGenerator) -> void:
 	var haze: Color = p.haze
 	ridge(m, HORIZON_Y - 10, 30, 0.005, 0.7, (p.far as Color).lerp(haze, 0.4), p.far, HORIZON_Y + 80)
 	# Autumn trees in two rows, warm crowns in three colours.

@@ -2,7 +2,7 @@ class_name LaunchIntroVisual
 extends HBoxContainer
 ## The intro card's picture: a small dawn scene with the real rocket on its pad, then the launch's
 ## three steps with their seconds and watts, every figure from this segment's `LaunchLogic`. Built
-## once with SafeMesh (no per-frame cost).
+## once with MeshBatch2D (no per-frame cost).
 
 const PICTURE := Vector2(440, 270)
 const CORNER := 22.0
@@ -19,7 +19,7 @@ func _init(theme: GameTheme, logic: LaunchLogic) -> void:
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pic.draw.connect(_draw_picture.bind(pic))
 	add_child(pic)
-	var rocket: Node2D = SafeDial.Layer.new()
+	var rocket: Node2D = PaintLayer.new()
 	rocket.name = "Rocket"
 	rocket.position = Vector2(PICTURE.x * 0.56, PICTURE.y - 40.0)
 	rocket.scale = Vector2(ROCKET_SCALE, ROCKET_SCALE)
@@ -59,7 +59,7 @@ func _paint_rocket(ci: CanvasItem) -> void:
 		y += float(parts[i].h) + LaunchRocket.SKIRT_H
 	for i in range(parts.size() - 1, -1, -1):
 		var next_w: float = float(parts[i + 1].w) if i + 1 < parts.size() else 0.0
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		LaunchRocket.paint_section(m, parts[i], next_w, spec.bells, i)
 		for k in m.points.size():
 			m.points[k] += Vector2(0, -offsets[i])
@@ -70,7 +70,7 @@ func _draw_picture(c: Control) -> void:
 	var w := PICTURE.x
 	var h := PICTURE.y
 	var p := LaunchPlaces.place(0)
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	m.round_rect(Rect2(Vector2.ZERO, PICTURE), CORNER, p.sky_top, p.sky_low)
 	m.glow(Vector2(350, 188), Vector2(170, 90), Color(p.sun_col, 0.8), 10)
 	m.circle(Vector2(350, 188), 24.0, Color("fff0c8"))

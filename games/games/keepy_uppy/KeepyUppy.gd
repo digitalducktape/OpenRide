@@ -49,6 +49,8 @@ var foreground: Node2D
 
 var _status: KeepyStatus
 var banner: KeepyBanner
+## The rider's Place option is "random": read once and on change, not from the file every frame.
+var _random_place := true
 var _hum: AudioStreamPlayer
 var _rain: AudioStreamPlayer
 var _squeak_left := 0.0
@@ -142,7 +144,7 @@ func _ready() -> void:
 	balloon = KeepyBalloon.new()
 	balloon.name = "Balloon"
 	add_child(balloon)
-	foreground = SafeDial.Layer.new()
+	foreground = PaintLayer.new()
 	foreground.name = "Foreground"
 	foreground.paint = _paint_foreground
 	var sway := ShaderMaterial.new()
@@ -173,13 +175,12 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = KeepyStatus.new(look)
 	hud.add_widget(_status)
-	_status.resized.connect(_fit_lane)
-	hud.top_bar_moved.connect(_fit_lane)
+	banner.follow(hud, _status)
+	hud.metrics.set_power_source(smoothed_power)
+	_random_place = option("place") == "random"
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.55)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, KeepyAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, KeepyAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(KeepyAudioScript.music_effects(), KeepyAudioScript.sfx_effects())
 	# The scene at rest behind the intro card, and the effects drawn once so they compile now.
 	_draw_state(0.0)
 	balloon.prewarm()
@@ -202,11 +203,10 @@ func _set_place(index: int, fade: bool) -> void:
 	foreground.queue_redraw()
 
 
-## Keeps the callouts' lane under the status area (a circuit's strip pushes it down).
-func _fit_lane() -> void:
-	if not is_instance_valid(_status):
-		return
-	banner.set_lane_top(maxf(KeepyBanner.LANE.position.y, _status.get_global_rect().end.y + 4.0))
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smoothed if logic else InputBus.power
 
 
 func _on_start() -> void:
@@ -231,6 +231,7 @@ func _on_option_changed(key: String, _value: String) -> void:
 			# Switch the camera on or off at once; Kotlin calibrates on the first camera mode.
 			Session.set_tracker_mode(tracker_mode_for_segment(segment))
 		"place":
+			_random_place = option("place") == "random"
 			var fixed := KeepyPlaces.index_of(option("place"))
 			if fixed >= 0 and fixed != _place:
 				_set_place(fixed, true)
@@ -247,7 +248,7 @@ func _on_frame(delta: float) -> void:
 	_draw_state(delta)
 	_update_status()
 	_update_sound(delta)
-	if option("place") == "random":
+	if _random_place:
 		_place_left -= delta
 		if _place_left <= 0.0 and logic.balloon == KeepyLogic.Balloon.FLYING and logic.weather == KeepyLogic.Weather.CALM:
 			_place_left = PLACE_SEC
@@ -407,12 +408,12 @@ func _show_message(text: String, color := GameTheme.INK, seconds := MESSAGE_SEC)
 
 ## Grass tufts along the bottom edge, in front of the fan's feet, swaying (UV.x = sway weight).
 func _paint_foreground(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	_grass(m)
 	m.flush(ci)
 
 
-func _grass(m: SafeMesh) -> void:
+func _grass(m: MeshBatch2D) -> void:
 	var pl := KeepyPlaces.place(_place)
 	if pl.id == "rooftop":
 		return  # a deck has no grass

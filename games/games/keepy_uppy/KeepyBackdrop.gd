@@ -1,6 +1,6 @@
 class_name KeepyBackdrop
 extends Node2D
-## The place behind the fan (#77, 2D; ART_BIBLE.md §6): the place's `SafeMesh` batch and a soft
+## The place behind the fan (#77, 2D; ART_BIBLE.md §6): the place's `MeshBatch2D` batch and a soft
 ## vignette, baked into a texture when the place changes (a SubViewport rendered once, as Safe
 ## Cracker's `SafeBackdrop`), shown as one opaque sprite, and the place's slow ambient life as
 ## children that never redraw:
@@ -20,9 +20,12 @@ const WINDOWS_RECT := Rect2(-160, 566, 2240, 150)
 const GULLS := 2
 
 var place_index := 0
-var bakes := 0  ## renders made, for tests
-var _bake: Array[SubViewport] = []
-var _view: Array[Sprite2D] = []
+## Renders made, for tests.
+var bakes: int:
+	get:
+		return _view[0].bakes + _view[1].bakes
+## The two bakes that take turns: each is its scene baked and the sprite showing it.
+var _view: Array[BakedBackdrop] = []
 var _paint_index: Array[int] = [0, 0]
 var _front := 0
 var _fade: Tween
@@ -39,40 +42,26 @@ var _t := 0.0
 
 func _init() -> void:
 	for i in 2:
-		var bake := SubViewport.new()
-		bake.name = "SceneBake%d" % i
-		bake.disable_3d = true
-		bake.transparent_bg = false
-		bake.gui_disable_input = true
-		bake.size_2d_override = Vector2i(KeepyPlaces.WIDE)
-		bake.size_2d_override_stretch = true
-		bake.render_target_update_mode = SubViewport.UPDATE_DISABLED
-		add_child(bake)
-		var painted := SafeDial.Layer.new()
+		var baked := BakedBackdrop.new(KeepyPlaces.SIZE, KeepyPlaces.WIDE, KeepyPlaces.BLEED, "SceneBake%d" % i)
+		baked.name = "Scene%d" % i
+		baked.visible = i == 0
+		add_child(baked)
+		var painted := PaintLayer.new()
 		painted.name = "Scene"
 		painted.position = Vector2(KeepyPlaces.BLEED, 0)
 		var slot := i
 		painted.paint = func(ci: CanvasItem) -> void: scene_mesh(_paint_index[slot]).draw_on(ci)
-		bake.add_child(painted)
-		bake.add_child(vignette())
-		var view := Sprite2D.new()
-		view.name = "Scene%d" % i
-		view.centered = false
-		view.position = Vector2(-KeepyPlaces.BLEED, 0)
-		view.texture = bake.get_texture()
-		view.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		add_child(view)
-		_bake.append(bake)
-		_view.append(view)
-	_view[1].visible = false
+		baked.add_painted(painted)
+		baked.add_painted(vignette())
+		_view.append(baked)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242
 	for i in CLOUDS:
-		var c := SafeDial.Layer.new()
+		var c := PaintLayer.new()
 		c.name = "Cloud%d" % i
 		var w := rng.randf_range(150.0, 220.0)
 		c.paint = func(ci: CanvasItem) -> void:
-			var m := SafeMesh.new()
+			var m := MeshBatch2D.new()
 			KeepyPlaces.cumulus(m, Vector2.ZERO, w, Color(1, 1, 1, 0.95), Color(0.82, 0.86, 0.92, 0.95))
 			m.flush(ci)
 		c.position = Vector2(rng.randf_range(-100.0, 2000.0), rng.randf_range(450.0, 520.0))  # under the HUD's panels
@@ -82,7 +71,7 @@ func _init() -> void:
 	sea = _shader_rect("Sea", SEA_RECT, preload("res://games/keepy_uppy/shaders/keepy_sea.gdshader"))
 	windows = _shader_rect("Windows", WINDOWS_RECT, preload("res://games/keepy_uppy/shaders/keepy_windows.gdshader"))
 	for i in GULLS:
-		var g := SafeDial.Layer.new()
+		var g := PaintLayer.new()
 		g.name = "Gull%d" % i
 		g.paint = _paint_gull
 		g.position = Vector2(300 + i * 900, 420 + i * 50)
@@ -98,7 +87,7 @@ func _init() -> void:
 	butterflies.angular_velocity_max = 40.0
 	# Motes drifting in the light over the middle of the scene (GFX_POLISH item 8).
 	motes = _particles("Motes", 14, 0.0, Vector2(960, 560), Vector2(760, 240))
-	motes.texture = SafePlaces.soft_dot()
+	motes.texture = MeshBatch2D.soft_dot()
 	motes.scale_amount_min = 0.12
 	motes.scale_amount_max = 0.24
 	motes.gravity = Vector2(4, -3)
@@ -199,17 +188,6 @@ func set_place(index: int, fade := false) -> void:
 		rebake()
 
 
-func _enter_tree() -> void:
-	if not get_tree().root.size_changed.is_connected(rebake):
-		get_tree().root.size_changed.connect(rebake)
-	rebake()
-
-
-func _exit_tree() -> void:
-	if get_tree().root.size_changed.is_connected(rebake):
-		get_tree().root.size_changed.disconnect(rebake)
-
-
 ## Renders the front bake once at the size the canvas is shown on screen.
 func rebake() -> void:
 	if is_inside_tree():
@@ -217,17 +195,7 @@ func rebake() -> void:
 
 
 func _render(slot: int) -> void:
-	if not is_inside_tree():
-		return
-	var win := Vector2(get_tree().root.size)
-	var s := clampf(minf(win.x / KeepyPlaces.SIZE.x, win.y / KeepyPlaces.SIZE.y), 0.25, 1.0)
-	var px := Vector2i((KeepyPlaces.WIDE * s).ceil())
-	if _bake[slot].size != px:
-		_bake[slot].size = px
-	_view[slot].scale = KeepyPlaces.WIDE / Vector2(px)
-	_bake[slot].get_child(0).queue_redraw()
-	_bake[slot].render_target_update_mode = SubViewport.UPDATE_ONCE
-	bakes += 1
+	_view[slot].rebake()
 
 
 ## The ambient life's motion: clouds drift and wrap, gulls glide and flap.
@@ -246,9 +214,9 @@ func step(delta: float) -> void:
 			g.scale.y = 0.75 + 0.25 * sin(_t * (3.0 + i))
 
 
-## The scene's batch for a place, built once (`SafeMesh.built`).
-static func scene_mesh(index: int) -> SafeMesh:
-	return SafeMesh.built("keepy:%d" % index, func(m: SafeMesh) -> void: KeepyPlaces.build_scene(m, index))
+## The scene's batch for a place, built once (`MeshBatch2D.built`).
+static func scene_mesh(index: int) -> MeshBatch2D:
+	return MeshBatch2D.built("keepy:%d" % index, func(m: MeshBatch2D) -> void: KeepyPlaces.build_scene(m, index))
 
 
 ## A soft vignette baked with the scene, so the eye goes to the balloon (its centre of interest
@@ -279,10 +247,10 @@ static func vignette() -> TextureRect:
 
 ## A gull far off: a shallow "m" of two curved wings, no tail (ART_BIBLE §5's silhouette rule).
 func _paint_gull(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var col := Color(0.97, 0.97, 0.95)
-	var left := SafeMesh.arc_points(Vector2(-11, 6), 12.0, PI * 1.05, PI * 1.85, 6)
-	var right := SafeMesh.arc_points(Vector2(11, 6), 12.0, PI * 1.15, PI * 1.95, 6)
+	var left := MeshBatch2D.arc_points(Vector2(-11, 6), 12.0, PI * 1.05, PI * 1.85, 6)
+	var right := MeshBatch2D.arc_points(Vector2(11, 6), 12.0, PI * 1.15, PI * 1.95, 6)
 	for pts in [left, right]:
 		for k in pts.size() - 1:
 			m.line(pts[k], pts[k + 1], 3.0, col)

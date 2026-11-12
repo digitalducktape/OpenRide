@@ -252,7 +252,7 @@ func prewarm() -> void:
 ## The world's light for a time-of-day preset: `WorldLook`'s uniforms (sun, hemisphere ambient,
 ## haze), plus Tug's own keys (`sky_top`, `sky_horizon`, `lamp`: how much the torches, bulbs and
 ## the bot's torch light glow).
-static func look_for(tod: DodgeTimeOfDay) -> Dictionary:
+static func look_for(tod: TimeOfDay) -> Dictionary:
 	var sky := tod.ambient * tod.ambient_energy
 	var ground := Color(sky.r * 0.55 + 0.03, sky.g * 0.5 + 0.02, sky.b * 0.42)
 	return {
@@ -270,7 +270,7 @@ static func look_for(tod: DodgeTimeOfDay) -> Dictionary:
 	}
 
 
-func set_time_of_day(tod: DodgeTimeOfDay) -> void:
+func set_time_of_day(tod: TimeOfDay) -> void:
 	_sky_mat.set_shader_parameter("top_color", tod.sky_top)
 	_sky_mat.set_shader_parameter("horizon_color", tod.sky_horizon)
 	_sky_mat.set_shader_parameter("below_color", tod.sky_ground)
@@ -358,12 +358,12 @@ func _build_river_and_banks() -> void:
 	wi.position = Vector3(0.0, 0.0, -8.6)
 	# The riverside: banks, hills, trees, pier frames, masts, bunting, lights, reeds, the tent.
 	var models := {
-		"trees": [TugMeshes.model(DodgeWorld._model_mesh("tree_default.glb"), Color(0.32, 0.56, 0.2), Color(0.42, 0.29, 0.19)),
-			TugMeshes.model(DodgeWorld._model_mesh("tree_oak.glb"), Color(0.26, 0.48, 0.17), Color(0.42, 0.29, 0.19)),
-			TugMeshes.model(DodgeWorld._model_mesh("tree_pineTallA.glb"), Color(0.16, 0.36, 0.2), Color(0.42, 0.29, 0.19)),
-			TugMeshes.model(DodgeWorld._model_mesh("tree_cone.glb"), Color(0.38, 0.6, 0.22), Color(0.42, 0.29, 0.19))],
-		"bush": TugMeshes.model(DodgeWorld._model_mesh("plant_bushLarge.glb"), Color(0.3, 0.52, 0.2), Color(0.3, 0.52, 0.2)),
-		"rock": TugMeshes.model(DodgeWorld._model_mesh("rock_largeA.glb"), Color(0.42, 0.41, 0.39), Color(0.5, 0.5, 0.47)),
+		"trees": [TugMeshes.model(MeshKit3D.model_mesh("tree_default.glb"), Color(0.32, 0.56, 0.2), Color(0.42, 0.29, 0.19)),
+			TugMeshes.model(MeshKit3D.model_mesh("tree_oak.glb"), Color(0.26, 0.48, 0.17), Color(0.42, 0.29, 0.19)),
+			TugMeshes.model(MeshKit3D.model_mesh("tree_pineTallA.glb"), Color(0.16, 0.36, 0.2), Color(0.42, 0.29, 0.19)),
+			TugMeshes.model(MeshKit3D.model_mesh("tree_cone.glb"), Color(0.38, 0.6, 0.22), Color(0.42, 0.29, 0.19))],
+		"bush": TugMeshes.model(MeshKit3D.model_mesh("plant_bushLarge.glb"), Color(0.3, 0.52, 0.2), Color(0.3, 0.52, 0.2)),
+		"rock": TugMeshes.model(MeshKit3D.model_mesh("rock_largeA.glb"), Color(0.42, 0.41, 0.39), Color(0.5, 0.5, 0.47)),
 	}
 	_scenery_mat = _material("scenery.gdshader")
 	var scenery := _instance(TugMeshes.scenery(models), _scenery_mat, "Scenery")

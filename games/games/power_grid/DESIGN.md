@@ -118,7 +118,7 @@ minutes (`grid_logic_test`). Half a ride on target is one star.
 ## 6. Dependencies
 
 `InputBus` (power, cadence, sensors_ok), `Effort` through `award`, `Hud`, `AudioDirector`, `GameMix`,
-Safe Cracker's `SafeMesh` and `SafePlaces.soft_dot` (read only). Kotlin sends `demand_lo_watts`,
+Safe Cracker's `MeshBatch2D` and `MeshBatch2D.soft_dot` (read only). Kotlin sends `demand_lo_watts`,
 `demand_hi_watts` and `storm_watts`, plus the usual `ftp_watts` and `power_cap_watts`.
 
 ## 7. Tuning knobs (`GridLogic` constants)
@@ -149,9 +149,9 @@ All provisional until the bike.
 | --- | --- | --- | --- |
 | Rules | `state-machine`, `godot-testing` | A `RefCounted` class; a three-state enum FSM for the storm, plain timers for the brown-out | Node-based states: no enter/exit logic worth nodes, and rules must run headless |
 | Districts | `gdscript-patterns` | A prefix (`powered` of `online`) plus one `down_index` | Four independent district objects: "newest goes first" would need its own ordering, and could disagree with the HUD |
-| The scene | `2d-essentials` | Paint everything still into a `SafeMesh` batch, baked by two SubViewports (dusk, night) | Grading one bake in a shader: night would only be a darker dusk. Redrawing per frame: tablet cost |
+| The scene | `2d-essentials` | Paint everything still into a `MeshBatch2D` batch, baked by two SubViewports (dusk, night) | Grading one bake in a shader: night would only be a darker dusk. Redrawing per frame: tablet cost |
 | Dusk to night | `shader-basics` | One opaque shader sprite mixing the two bakes (`blend_disabled`) | Two stacked sprites with alpha: two screens of blended fill on a fill-bound tablet |
-| Lights | `shader-basics`, `godot-optimization` | One mesh, each light's channel and turn in its UV, four uniform levels | Light2D: per-pixel cost in Compatibility. A Node per district with `modulate`: can't come on window by window. SafeMesh: every vertex of a light must share a UV, and it can't |
+| Lights | `shader-basics`, `godot-optimization` | One mesh, each light's channel and turn in its UV, four uniform levels | Light2D: per-pixel cost in Compatibility. A Node per district with `modulate`: can't come on window by window. MeshBatch2D: every vertex of a light must share a UV, and it can't |
 | Power on the wires | `shader-basics` | A strip mesh with one phase uniform, advanced in GDScript | `TIME` in the shader: a change of speed would jump every dash |
 | Small effects | `particles-vfx` | `CPUParticles2D`, as every game here does | GPU particles: not worth a process material for 6-34 sparks on GL Compatibility |
 | Callouts | `hud-system` | The game's own `GridBanner` lane, by priority | `hud.show_message`: it sits on the town, the hero |

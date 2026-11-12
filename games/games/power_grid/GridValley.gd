@@ -1,7 +1,7 @@
 class_name GridValley
 extends RefCounted
 ## The valley town at dusk (#81; ART_BIBLE.md): one illustrated scene, drawn in code into a
-## `SafeMesh` batch (Safe Cracker's batcher, read only). `paint` draws everything that doesn't
+## `MeshBatch2D` batch (Safe Cracker's batcher, read only). `paint` draws everything that doesn't
 ## move, twice: once in the dusk palette and once in the night palette, and `GridStage` bakes both
 ## and blends them in one shader as the evening goes on. Every window, lamp and bulb sits dark in
 ## the bake; `lights` lists the same layout for the additive light mesh (`GridLights`), so a
@@ -249,7 +249,7 @@ static func lamps() -> Array[Vector2]:
 
 
 ## Everything that doesn't move, in the palette `night` (0 dusk, 1 night), stage coordinates.
-static func paint(m: SafeMesh, night: int) -> void:
+static func paint(m: MeshBatch2D, night: int) -> void:
 	var p := palette(night)
 	_sky(m, p)
 	_mountains(m, p)
@@ -266,17 +266,17 @@ static func paint(m: SafeMesh, night: int) -> void:
 
 
 ## The corners pulled in toward the town. Painted last, over the shed too.
-static func vignette(m: SafeMesh, night: int) -> void:
+static func vignette(m: MeshBatch2D, night: int) -> void:
 	var col: Color = PALETTE.vignette[night]
 	var c := Vector2(1040, 640)
-	var inner := SafeMesh._ellipse(c, Vector2(1050, 500), 48)
-	var outer := SafeMesh._ellipse(c, Vector2(1900, 1160), 48)
+	var inner := MeshBatch2D._ellipse(c, Vector2(1050, 500), 48)
+	var outer := MeshBatch2D._ellipse(c, Vector2(1900, 1160), 48)
 	m.band(inner, outer, Color(col, 0.0), col)
 
 
 # --- The sky ---
 
-static func _sky(m: SafeMesh, p: Dictionary) -> void:
+static func _sky(m: MeshBatch2D, p: Dictionary) -> void:
 	m.rect_v(Rect2(LEFT, 0, WIDE.x, 230), p.sky_top, p.sky_mid)
 	m.rect_v(Rect2(LEFT, 230, WIDE.x, 170), p.sky_mid, p.sky_low)
 	m.rect_v(Rect2(LEFT, 400, WIDE.x, 190), p.sky_low, p.horizon)
@@ -293,7 +293,7 @@ static func _sky(m: SafeMesh, p: Dictionary) -> void:
 		_streak(m, at, w, h, p.cloud, p.cloud_rim)
 
 
-static func _streak(m: SafeMesh, at: Vector2, w: float, h: float, col: Color, rim: Color) -> void:
+static func _streak(m: MeshBatch2D, at: Vector2, w: float, h: float, col: Color, rim: Color) -> void:
 	m.glow(at, Vector2(w, h * 1.5), Color(col, 0.7), 8, 0.35)
 	m.glow(at + Vector2(w * 0.15, h * 0.7), Vector2(w * 0.72, h * 0.6), rim, 6, 0.3)
 
@@ -301,14 +301,14 @@ static func _streak(m: SafeMesh, at: Vector2, w: float, h: float, col: Color, ri
 # --- The land ---
 
 ## A ridge from sum-of-sines, top to `bottom`, shading from `top` to `low` down its face.
-static func _ridge(m: SafeMesh, crest: PackedVector2Array, bottom: float, top: Color, low: Color) -> void:
+static func _ridge(m: MeshBatch2D, crest: PackedVector2Array, bottom: float, top: Color, low: Color) -> void:
 	for k in crest.size() - 1:
 		var a := crest[k]
 		var b := crest[k + 1]
 		m.quad4(a, b, Vector2(b.x, bottom), Vector2(a.x, bottom), top, top, low, low)
 
 
-static func _mountains(m: SafeMesh, p: Dictionary) -> void:
+static func _mountains(m: MeshBatch2D, p: Dictionary) -> void:
 	# The far range: a few real peaks, lit on the sun's side, with snow on the tallest.
 	var peaks := [Vector2(LEFT, 470), Vector2(40, 430), Vector2(230, 470), Vector2(470, 400), Vector2(690, 462), Vector2(900, 372), Vector2(1040, 436),
 		Vector2(1160, 480), Vector2(1370, 402), Vector2(1560, 464), Vector2(1770, RIDGE_TOP + 22.0), Vector2(1950, 448), Vector2(RIGHT, 420)]
@@ -337,7 +337,7 @@ static func _mountains(m: SafeMesh, p: Dictionary) -> void:
 	_ridge(m, near, 600.0, p.mid, p.mid_low)
 
 
-static func _snowcap(m: SafeMesh, peak: Vector2, col: Color, size: float) -> void:
+static func _snowcap(m: MeshBatch2D, peak: Vector2, col: Color, size: float) -> void:
 	var s := PackedVector2Array([peak, peak + Vector2(size * 0.72, size * 0.74), peak + Vector2(size * 0.34, size * 0.52), peak + Vector2(size * 0.12, size * 0.8),
 		peak + Vector2(-size * 0.2, size * 0.5), peak + Vector2(-size * 0.42, size * 0.76), peak + Vector2(-size * 0.74, size * 0.72)])
 	# Convex pieces: a fan from the peak.
@@ -346,7 +346,7 @@ static func _snowcap(m: SafeMesh, peak: Vector2, col: Color, size: float) -> voi
 
 
 ## The forested hills behind the town: a crest of tree tops, two depths.
-static func _hills(m: SafeMesh, p: Dictionary) -> void:
+static func _hills(m: MeshBatch2D, p: Dictionary) -> void:
 	var crest := PackedVector2Array()
 	var x := LEFT
 	while x <= RIGHT + 16.0:
@@ -369,7 +369,7 @@ static func _hill_y(x: float) -> float:
 	return 524.0 - 22.0 * sin(x * 0.0042 + 2.2) - 10.0 * sin(x * 0.011 + 0.4)
 
 
-static func _floor(m: SafeMesh, p: Dictionary) -> void:
+static func _floor(m: MeshBatch2D, p: Dictionary) -> void:
 	m.rect_v(Rect2(LEFT, FLOOR_Y, WIDE.x, SIZE.y - FLOOR_Y), p.floor, p.floor_low)
 	# Fields in perspective: strips of two tints running across the valley, hedged.
 	var rng := RandomNumberGenerator.new()
@@ -417,7 +417,7 @@ static func river_edges() -> Array[PackedVector2Array]:
 	return [left, right]
 
 
-static func _river(m: SafeMesh, p: Dictionary, from_y := 0.0) -> void:
+static func _river(m: MeshBatch2D, p: Dictionary, from_y := 0.0) -> void:
 	var edges := river_edges()
 	var left: PackedVector2Array = edges[0]
 	var right: PackedVector2Array = edges[1]
@@ -433,25 +433,25 @@ static func _river(m: SafeMesh, p: Dictionary, from_y := 0.0) -> void:
 		m.quad4(left[k], right[k], right[k + 1], left[k + 1], ca, ca, cb, cb)
 
 
-static func _stadium(m: SafeMesh, p: Dictionary) -> void:
+static func _stadium(m: MeshBatch2D, p: Dictionary) -> void:
 	var c := STADIUM_AT
 	var r := STADIUM_R
 	m.glow(c + Vector2(0, r.y + 6.0), Vector2(r.x * 1.1, 16.0), Color(0, 0, 0, 0.32), 6)
 	# The outer wall, the stands stepping down, the pitch.
-	var wall := SafeMesh._ellipse(c + Vector2(0, 12), r, 56)
+	var wall := MeshBatch2D._ellipse(c + Vector2(0, 12), r, 56)
 	m.fill(wall, p.stand_lo)
-	m.fill(SafeMesh._ellipse(c, r, 56), p.stand)
+	m.fill(MeshBatch2D._ellipse(c, r, 56), p.stand)
 	# Tiers: rings of slightly different value, with aisles.
 	for k in 5:
 		var t := float(k) / 5.0
 		var ring := r * lerpf(1.0, 0.68, t)
 		var inner := r * lerpf(1.0, 0.68, t + 0.2)
-		m.band(SafeMesh._ellipse(c, inner, 56), SafeMesh._ellipse(c, ring, 56), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15))
+		m.band(MeshBatch2D._ellipse(c, inner, 56), MeshBatch2D._ellipse(c, ring, 56), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15), Color(p.stand_lo, 0.5 if k % 2 == 0 else 0.15))
 	for k in 20:
 		var a := TAU * k / 20.0
 		m.line(c + Vector2(cos(a), sin(a)) * r * 0.68, c + Vector2(cos(a), sin(a)) * r * 0.98, 1.5, Color(p.stand_lo, 0.6))
 	var pitch := r * 0.66
-	m.fill(SafeMesh._ellipse(c, pitch, 48), p.pitch)
+	m.fill(MeshBatch2D._ellipse(c, pitch, 48), p.pitch)
 	for k in 8:
 		if k % 2 == 0:
 			var x0 := c.x - pitch.x * 0.8 + k * pitch.x * 0.2
@@ -473,7 +473,7 @@ static func _stadium(m: SafeMesh, p: Dictionary) -> void:
 		m.round_rect(Rect2(top + Vector2(-17, -11), Vector2(34, 18)), 2.0, p.steel_hi, p.steel)
 
 
-static func _funfair(m: SafeMesh, p: Dictionary) -> void:
+static func _funfair(m: MeshBatch2D, p: Dictionary) -> void:
 	# The yard, then the wheel's stand (the wheel itself turns in its own layer).
 	var yard := PackedVector2Array([Vector2(976, 740), Vector2(1296, 740), Vector2(1300, 850), Vector2(960, 852)])
 	m.fill(yard, Color(p.yard, 0.75))
@@ -501,7 +501,7 @@ static func stall_at(k: int) -> Vector2:
 
 
 ## A striped tent: a pointed roof over a short drum.
-static func _tent(m: SafeMesh, foot: Vector2, w: float, p: Dictionary, style: int) -> void:
+static func _tent(m: MeshBatch2D, foot: Vector2, w: float, p: Dictionary, style: int) -> void:
 	var h := w * 0.6
 	var roof := w * 0.86
 	var a: Color = p.tent_a if style == 0 else p.tent_c
@@ -518,10 +518,10 @@ static func _tent(m: SafeMesh, foot: Vector2, w: float, p: Dictionary, style: in
 	m.round_rect(Rect2(foot.x - w * 0.24, foot.y - h * 0.8, w * 0.48, h * 0.8), 3.0, p.glass)
 
 
-static func _carousel(m: SafeMesh, p: Dictionary) -> void:
+static func _carousel(m: MeshBatch2D, p: Dictionary) -> void:
 	var c := CAROUSEL_AT
-	m.fill(SafeMesh._ellipse(c + Vector2(0, 8), Vector2(58, 13), 28), p.stone_dark)
-	m.fill(SafeMesh._ellipse(c + Vector2(0, 3), Vector2(55, 12), 28), p.stone)
+	m.fill(MeshBatch2D._ellipse(c + Vector2(0, 8), Vector2(58, 13), 28), p.stone_dark)
+	m.fill(MeshBatch2D._ellipse(c + Vector2(0, 3), Vector2(55, 12), 28), p.stone)
 	for k in 8:
 		var x := c.x - 49.0 + k * 14.0
 		m.line(Vector2(x, c.y - 42), Vector2(x, c.y + 5), 2.0, p.steel_hi)
@@ -534,7 +534,7 @@ static func _carousel(m: SafeMesh, p: Dictionary) -> void:
 	m.line(apex, apex + Vector2(0, -11), 2.0, p.steel)
 
 
-static func _town(m: SafeMesh, p: Dictionary) -> void:
+static func _town(m: MeshBatch2D, p: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
 	var drawn_church := false
@@ -551,7 +551,7 @@ static func _town(m: SafeMesh, p: Dictionary) -> void:
 		_house(m, h, p)
 
 
-static func _house(m: SafeMesh, h: Dictionary, p: Dictionary) -> void:
+static func _house(m: MeshBatch2D, h: Dictionary, p: Dictionary) -> void:
 	var at: Vector2 = h.at
 	var w: float = h.w
 	var ht: float = h.h
@@ -593,7 +593,7 @@ static func _house(m: SafeMesh, h: Dictionary, p: Dictionary) -> void:
 		m.rect(Rect2(at.x - w * 0.06, at.y - ht * 0.36, w * 0.12, ht * 0.36), tile.darkened(0.3))
 
 
-static func _church(m: SafeMesh, p: Dictionary) -> void:
+static func _church(m: MeshBatch2D, p: Dictionary) -> void:
 	var c := CHURCH_AT
 	var wall: Color = p.stone
 	var shade: Color = p.stone_dark
@@ -618,7 +618,7 @@ static func church_windows() -> Array[Rect2]:
 	return out
 
 
-static func _road(m: SafeMesh, p: Dictionary) -> void:
+static func _road(m: MeshBatch2D, p: Dictionary) -> void:
 	var x := LEFT
 	while x < RIGHT:
 		var x2 := x + 12.0
@@ -653,7 +653,7 @@ static func lamp_head(at: Vector2) -> Vector2:
 
 
 ## A stone road bridge over the river: a parapet and three low arches.
-static func _bridge(m: SafeMesh, p: Dictionary) -> void:
+static func _bridge(m: MeshBatch2D, p: Dictionary) -> void:
 	var c := BRIDGE_AT
 	var w := 74.0
 	var water := c.y + 34.0
@@ -661,7 +661,7 @@ static func _bridge(m: SafeMesh, p: Dictionary) -> void:
 	# Three low arches: half ellipses down to the water, dark under the stone.
 	for k in 3:
 		var ax := c.x + (k - 1) * 46.0
-		var arch := SafeMesh.arc_points(Vector2(ax, water), 19.0, PI, TAU, 14)
+		var arch := MeshBatch2D.arc_points(Vector2(ax, water), 19.0, PI, TAU, 14)
 		m.fill(arch, Color(p.river_bank, 0.95), false)
 	m.rect(Rect2(c.x - w - 4, c.y + 3, 2.0 * w + 8, 5), p.stone)
 	m.rect(Rect2(c.x - w, c.y - 9, 2.0 * w, 3), Color(p.stone, 0.9))
@@ -669,7 +669,7 @@ static func _bridge(m: SafeMesh, p: Dictionary) -> void:
 		m.rect(Rect2(c.x - w + k * (2.0 * w - 4.0) / 6.0, c.y - 9, 4, 12), Color(p.stone_dark, 0.9))
 
 
-static func _pylons(m: SafeMesh, p: Dictionary) -> void:
+static func _pylons(m: MeshBatch2D, p: Dictionary) -> void:
 	for i in range(PYLONS.size() - 1, -1, -1):
 		_pylon(m, PYLONS[i][0], float(PYLONS[i][1]), p, 1.0 + 1.4 * float(PYLONS[i][1]) / 262.0)
 	for wire in wires():
@@ -679,7 +679,7 @@ static func _pylons(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## A lattice tower: splayed legs, cross braces, three arms that taper to a point at the top.
-static func _pylon(m: SafeMesh, foot: Vector2, h: float, p: Dictionary, w: float) -> void:
+static func _pylon(m: MeshBatch2D, foot: Vector2, h: float, p: Dictionary, w: float) -> void:
 	var steel: Color = p.steel
 	var base := h * 0.17
 	var waist := h * 0.05
@@ -716,7 +716,7 @@ static func _pylon(m: SafeMesh, foot: Vector2, h: float, p: Dictionary, w: float
 
 
 ## The near land: the hill the shed stands on, the right bank, the foreground.
-static func _near(m: SafeMesh, p: Dictionary) -> void:
+static func _near(m: MeshBatch2D, p: Dictionary) -> void:
 	# The right bank: a low swell of meadow under the road's far end.
 	var right_bank := PackedVector2Array()
 	var x := 1380.0
@@ -895,7 +895,7 @@ static func wheel_lights(m: GridLights) -> void:
 
 
 ## The wheel's frame (it turns in its own layer), for either palette: `shade` is its colour.
-static func paint_wheel(m: SafeMesh, ink: Color) -> void:
+static func paint_wheel(m: MeshBatch2D, ink: Color) -> void:
 	var r := WHEEL_R
 	m.ring(Vector2.ZERO, r - 4.0, r + 1.0, ink)
 	m.ring(Vector2.ZERO, r * 0.55 - 2.0, r * 0.55 + 1.0, ink)

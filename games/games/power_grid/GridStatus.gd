@@ -27,14 +27,12 @@ const DISTRICT_COLORS := [Color("ffd27a"), Color("ffe9a8"), Color("ff8fa0"), Col
 
 var look: GameTheme
 
-var bar: Control
+var bar: GaugeBar
 var badge: PanelContainer
 var badge_label: Label
 var pips: Control
 var note: Label
 
-var _fill_px := -1
-var _line_px := -1
 var _good := false
 var _state := ""
 var _fill := 0.0
@@ -58,12 +56,8 @@ func _init(theme: GameTheme = null) -> void:
 	box.add_theme_constant_override("separation", 0)
 	add_child(box)
 	var top := _row(box)
-	bar = Control.new()
+	bar = GaugeBar.new(BAR_SIZE, look.ink)
 	bar.name = "SupplyBar"
-	bar.custom_minimum_size = BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.draw.connect(_draw_bar)
 	top.add_child(bar)
 	var slot := CenterContainer.new()
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -109,14 +103,10 @@ func _row(parent: Control) -> HBoxContainer:
 func set_state(supply: float, line: float, state: String) -> void:
 	_fill = clampf(supply, 0.0, 1.0)
 	_line = clampf(line, 0.0, 1.0)
-	var fill_px := roundi(_fill * BAR_SIZE.x)
-	var line_px := roundi(_line * BAR_SIZE.x)
 	var good := state == "powered" or state == "easy" or (state == "repair" and _fill >= _line)
-	if fill_px != _fill_px or line_px != _line_px or good != _good:
-		_fill_px = fill_px
-		_line_px = line_px
-		_good = good
-		bar.queue_redraw()
+	_good = good
+	bar.set_line(_line)
+	bar.set_fill(_fill, GameTheme.GOOD if good else GameTheme.WARN)
 	if state != _state:
 		_set_badge(state)
 
@@ -169,30 +159,6 @@ func set_note(text: String, color := GameTheme.TARGET) -> void:
 	_note = text
 	note.text = text
 	note.add_theme_color_override("font_color", color)
-
-
-func _draw_bar() -> void:
-	var b := ShapeBatch.new()
-	var w := BAR_SIZE.x
-	var h := BAR_SIZE.y
-	var r := h * 0.5
-	_pill(b, Rect2(Vector2.ZERO, BAR_SIZE), Color(look.ink.darkened(0.4), 0.92))
-	var line_x := clampf(_line * w, r, w - 2.0)
-	_pill(b, Rect2(line_x - r, 4.0, w - line_x + r - 4.0, h - 8.0), Color(GameTheme.TARGET, 0.2))
-	var fill_w := _fill * w
-	if fill_w > 2.0:
-		_pill(b, Rect2(4.0, 6.0, maxf(fill_w - 8.0, h - 12.0), h - 12.0), GameTheme.GOOD if _good else GameTheme.WARN)
-	b.line(Vector2(line_x, -4.0), Vector2(line_x, h + 4.0), 9.0, look.ink)
-	b.line(Vector2(line_x, -2.0), Vector2(line_x, h + 2.0), 5.0, GameTheme.TARGET)
-	b.draw(bar)
-
-
-static func _pill(b: ShapeBatch, rect: Rect2, color: Color) -> void:
-	var r := rect.size.y * 0.5
-	if rect.size.x <= rect.size.y:
-		b.circle(rect.get_center(), r, color, 16)
-		return
-	b.line(rect.position + Vector2(r, r), rect.position + Vector2(rect.size.x - r, r), rect.size.y, color)
 
 
 func _draw_pips() -> void:

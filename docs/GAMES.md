@@ -891,6 +891,23 @@ text, panel, badge and card styles, buttons, a HUD skin, and `pop` / `slam` / `f
   calibration step and strip, and the summary in its shapes (one game, a new best, no stars, a
   circuit, one ended early, a long one, Kart Race's house look).
 
+### Shared game kits
+
+What more than one game needs lives in the framework, not in the first game that needed it. A new
+game uses these; it never reaches into another game's folder.
+
+| Kit | For |
+|---|---|
+| `GameAudio` (`games/audio/`) | `register(sounds, loops)` in the game's `_ready` (every time: two games may use the same sound name, and the game on screen owns it), `loop_player(name, path)` for a loop the game fades itself, `apply_mix(music_fx, sfx_fx)` for its bus effects |
+| `Hud.show_message(text, color, seconds)` | a timed centre message; the HUD hides it (no timer in the game) |
+| `CalloutBanner` (`framework/ui/`) | callouts in a lane under the status widget, for a game whose hero is mid-screen. `follow(hud, status)` keeps the lane clear of the ride panel and the Music button |
+| `RideMetrics.set_power_source(method)` | the ride panel shows the watts the rules use (a smoothed reading). Pass a bound method of the game |
+| `GaugeBar` (`framework/hud/`) | the status widget's bar: fill, target line, ticks, a best flag, a chequered end, a red alert track |
+| `MeshBatch2D`, `PaintLayer`, `MeshLayer` (`framework/draw/`) | code-drawn 2D: shapes batched into one draw call per layer |
+| `BakedBackdrop` (`framework/draw/`) | a painted 2D backdrop rendered once into a texture at the screen's size, baked again when the window changes |
+| `MeshKit3D`, `StageView3D` (`framework/draw/`) | 3D: merged vertex-coloured meshes, and the low-resolution view with its image, wide-stage fit and quality step |
+| `TimeOfDay` (`framework/`, presets in `framework/tod/`) and `MeshKit3D.model_mesh` (`games/assets/models/`) | an outdoor 3D world's lighting presets, and the shared trees, bushes and rocks |
+
 ### World look (3D)
 
 The 3D games light their worlds by hand: every world surface is `unshaded, fog_disabled` (the
@@ -1620,7 +1637,7 @@ pier into the river; losing pulls the camera in. It follows the tablet recipe (a
 `shaders/tug_look.gdshaderinc`): every surface is unshaded and lit by hand from one table
 (`TugWorld.look_for(preset)`), with no engine lights, fog or post passes.
 
-- `TugMeshes` bakes the statics into one vertex-coloured mesh with painted AO (`KartMeshKit`
+- `TugMeshes` bakes the statics into one vertex-coloured mesh with painted AO (`MeshKit3D`
   shapes): sloped earth banks, reeds, shore rocks, hills, the nature-kit trees, pier frames,
   pilings, torch posts, masts, bunting, string lights, a striped tent and hay bales.
   `scenery.gdshader` reads `COLOR.a` as 1 − sway, `UV.x` as ground grain and `UV.y` as a bulb's
@@ -1639,7 +1656,7 @@ pier into the river; losing pulls the camera in. It follows the tablet recipe (a
   and 35 in play with the tracker on). The sky shader runs only in its cubemap pass (256 a face,
   rebuilt when the time of day changes; the sky is set as the reflection source so the cubemap
   stays up to date) and the background samples it. The vignette is painted into the vertex
-  colours of the grid that draws the view on screen (`TugMeshes.view_image`, a `MeshInstance2D`),
+  colours of the grid that draws the view on screen (`StageView3D.view_image`, a `MeshInstance2D`),
   not in each shader. The water, deck, riverside and crowd haze per vertex
   (`haze_amount`/`hazed` in `tug_look.gdshaderinc`), and the water's flat light is per vertex.
   `prewarm` draws the steam, ripple and droplets behind the intro card so their shaders compile
@@ -1689,7 +1706,7 @@ never in the HUD's centre message, which would cover the dial. `safe_scene_test`
 layout (no overlaps, the needle's sweep, the status budget) and the events.
 
 **Graphics** (`games/safe_cracker/ART_BIBLE.md`, punch list `GFX_POLISH.md`): one heavy steel
-safe in a pool of light. Every shape goes through `SafeMesh`, which batches a node's shapes into
+safe in a pool of light. Every shape goes through `MeshBatch2D`, which batches a node's shapes into
 one `canvas_item_add_triangle_array` with per-vertex colours and a 1.2 px feather for
 antialiasing. In Compatibility each `draw_circle`, `draw_colored_polygon` or `draw_arc` is a draw
 call of its own (the bank's rivets alone were 168), so a whole room, body or door is one call.
@@ -1697,7 +1714,7 @@ Each place has one key light (`SafePlaces.PLACES[i].light`): a smooth pool drawn
 batch, with the safe's steel (`SafePlaces.steel_shade`), bevels and cast shadow agreeing with it.
 The room's batch and the vignette are baked once per place into one texture at the on-screen size
 (`SafeBackdrop.bake`, a SubViewport), shown as one opaque sprite. Each place's room and body are
-built once (`SafeMesh.built`), the next place's while a cracked door stands open.
+built once (`MeshBatch2D.built`), the next place's while a cracked door stands open.
 The door's layers (`SafeDial` docs) redraw only on a change: the needle is a static drawing turned
 by `rotation`; the reading's number has its own text-only layer; the door swing is a perspective
 turn about the hinge in `safe_door.gdshader` (a uniform; the door's thickness comes from UV
@@ -1712,7 +1729,7 @@ with the HUD (86 before the graphics pass; the bank was 258, the lab 125).
 **Tablet cost** (`GFX_POLISH.md`, "Tablet performance"). The tablet is fill-bound and 2D is all
 blended, so what counts is the pixels shaded a frame, seen or not. `tests/measure_safe.gd`
 (needs a window) prints each layer's pixels per place, the batches rebuilt a frame and the build
-times. Shapes under opaque ones have holes (`SafeMesh.round_frame`, `holed_round_rect`, the
+times. Shapes under opaque ones have holes (`MeshBatch2D.round_frame`, `holed_round_rect`, the
 `hollow` of `glow` and `soft_shadow`), and the vault draws only while the door is open. Play
 shades 2.1-2.2 screens a frame (6.9-7.7 before the tablet pass, which read 50 fps on the bike,
 31 in the intro), 3.6 at worst (a crack, or under the intro card).
@@ -2243,7 +2260,7 @@ Thresholds (2026-11 retune; FTP shares, empty to full for a medium balloon, a la
 **Look** (2D, like Safe Cracker; `ART_BIBLE.md`, `GFX_POLISH.md`): the pump and its balloon in a
 warm key light at the fair after dark, in three places (a fair at dusk with a Ferris wheel,
 backstage in a big top, a pier at night), changing after each Race heat or every 6 balloons in
-Max. `PumpPlaces` and `PumpArt` draw the room and the pump into one `SafeMesh` batch, baked once
+Max. `PumpPlaces` and `PumpArt` draw the room and the pump into one `MeshBatch2D` batch, baked once
 per place; `PumpStage` adds the live layers (the plunger moving with the cadence, the gauge's
 needle and push wedge, the balloon and the bunch shaded per pixel by `pump_balloon.gdshader`,
 twinkling bulbs, confetti). `pump_layout_test` keeps every element inside the stage and clear of

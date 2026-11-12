@@ -237,7 +237,7 @@ func test_the_rooftop_has_no_grass() -> void:
 	var seen := {}
 	for i in KeepyPlaces.count():
 		game._set_place(i, false)
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		game._grass(m)
 		seen[KeepyPlaces.place(i).id] = m.vertex_count()
 	assert_int(seen.rooftop).is_equal(0)

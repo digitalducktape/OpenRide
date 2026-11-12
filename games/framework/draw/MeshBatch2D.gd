@@ -1,6 +1,7 @@
-class_name SafeMesh
+class_name MeshBatch2D
 extends RefCounted
-## Safe Cracker's shape batcher (#41). A node adds its shapes here and `flush`es them inside its
+## The code-drawn games' shape batcher (from Safe Cracker, #41; shared since the second wave of
+## games). A node adds its shapes here and `flush`es them inside its
 ## `_draw()` as one `canvas_item_add_triangle_array`: one draw call for the whole room, door or
 ## dial, with per-vertex colours for the gradients. In the Compatibility renderer every
 ## `draw_circle`, `draw_colored_polygon` and `draw_arc` is a draw call of its own (the bank's
@@ -24,7 +25,8 @@ var depth := 0.0
 ## Tests and tools only: called on every flush with (canvas item, points, indices), to count
 ## rebuilds and measure fill (tests/measure_safe.gd). Never set in the game.
 static var probe := Callable()
-static var _built := {}  ## key -> SafeMesh (`built`)
+static var _dot: Texture2D
+static var _built := {}  ## key -> MeshBatch2D (`built`)
 
 
 func clear() -> void:
@@ -54,15 +56,15 @@ func draw_on(ci: CanvasItem) -> void:
 		RenderingServer.canvas_item_add_triangle_array(ci.get_canvas_item(), indices, points, colors, uvs)
 
 
-## A batch built once by `build` (a Callable taking the SafeMesh) and kept under `key`: a
+## A batch built once by `build` (a Callable taking the MeshBatch2D) and kept under `key`: a
 ## place's room and body are built in GDScript (the bank's room is 27k vertices, ~11 ms on the
 ## desktop and several times that on the tablet), so they're built once per place and can be
 ## built ahead (`SafeCracker` does it while a cracked door stands open), not on the frame the
 ## next safe slides in. A few MB for all six places.
-static func built(key: String, build: Callable) -> SafeMesh:
-	var m: SafeMesh = _built.get(key)
+static func built(key: String, build: Callable) -> MeshBatch2D:
+	var m: MeshBatch2D = _built.get(key)
 	if m == null:
-		m = SafeMesh.new()
+		m = MeshBatch2D.new()
 		build.call(m)
 		_built[key] = m
 	return m
@@ -379,3 +381,47 @@ static func grow_outline(outline: PackedVector2Array, by: float) -> PackedVector
 	for k in outline.size():
 		out[k] = outline[k] + normals[k] * by
 	return out
+
+
+# --- Shared shapes and textures ---
+
+## A domed rivet: a dark ring, the dome, a highlight toward the light.
+static func rivet(m: MeshBatch2D, at: Vector2, r: float, colour: Color, dir: Vector2) -> void:
+	m.circle(at + Vector2(1.5, 2.5), r, Color(0, 0, 0, 0.35))
+	m.circle(at, r, colour.darkened(0.45))
+	m.circle(at, r * 0.72, colour.lightened(0.12))
+	m.circle(at + dir * r * 0.3, r * 0.3, colour.lightened(0.6))
+
+
+## A soft white dot (32 px, radial), shared by the dust and the sparkles.
+static func soft_dot() -> Texture2D:
+	if _dot == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.35, Color(1, 1, 1, 0.75))
+		var t := GradientTexture2D.new()
+		t.gradient = g
+		t.fill = GradientTexture2D.FILL_RADIAL
+		t.fill_from = Vector2(0.5, 0.5)
+		t.fill_to = Vector2(1.0, 0.5)
+		t.width = 32
+		t.height = 32
+		_dot = t
+	return _dot
+
+
+## A ring whose colour follows its normal: `hi` facing the light, `lo` away.
+static func lit_ring(m: MeshBatch2D, c: Vector2, r0: float, r1: float, hi: Color, lo: Color, to_light: Vector2) -> void:
+	var segs := segments_for(r1)
+	var inner := arc_points(c, r0, 0.0, TAU, segs)
+	var outer := arc_points(c, r1, 0.0, TAU, segs)
+	var cols := PackedColorArray()
+	var clear := PackedColorArray()
+	for k in segs:
+		var a := TAU * k / segs
+		var col := lo.lerp(hi, clampf(0.5 + 0.7 * Vector2(cos(a), sin(a)).dot(to_light), 0.0, 1.0))
+		cols.append(col)
+		clear.append(Color(col, 0.0))
+	m.band_colors(inner, outer, cols, cols)
+	m.band_colors(outer, arc_points(c, r1 + FEATHER, 0.0, TAU, segs), cols, clear)

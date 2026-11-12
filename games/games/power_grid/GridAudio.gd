@@ -25,8 +25,6 @@ const RAIN_DB := -15.0
 const CRACKLE_GAP := 1.1  ## s between crackles while a district dims
 const SILENT_DB := -60.0
 
-static var _registered := false
-
 var _hum: AudioStreamPlayer
 var _rain: AudioStreamPlayer
 var _hum_level := 0.0
@@ -35,23 +33,13 @@ var _crackle_left := 0.0
 
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in GridMusic.SOUNDS:
-		if sound in LOOPS:
-			continue
-		var rendered := load(GridMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(GridMusic.SOUNDS, LOOPS)
 
 
 static func start_music() -> void:
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.6)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(music_effects(), sfx_effects())
 
 
 ## Gives the two loops their players, under `holder` (so they're freed with the scene).
@@ -63,16 +51,7 @@ func attach(holder: Node) -> void:
 
 
 static func _loop_player(sound: String) -> AudioStreamPlayer:
-	var p := AudioStreamPlayer.new()
-	p.name = sound.capitalize().replace(" ", "")
-	p.bus = AudioDirector.SFX_BUS
-	var stream := load(GridMusic.SOUNDS.get(sound, "")) as AudioStreamOggVorbis
-	if stream:
-		stream = stream.duplicate()
-		stream.loop = true
-		p.stream = stream
-	p.volume_db = -80.0
-	return p
+	return GameAudio.loop_player(sound, GridMusic.SOUNDS.get(sound, ""))
 
 
 func start() -> void:

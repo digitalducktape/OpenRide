@@ -5,7 +5,7 @@
 > `LaunchPad.gd` (tower, clock, smoke), `LaunchRocket.gd`, `LaunchSky.gd`, `shaders/*`,
 > `tools/art/make_earth_map.py`. **AD-ART-BIBLE:** §10.
 
-Drawn in code (rider, 2026-11-05: "continue as is for v1"): `SafeMesh` batches, small canvas shaders,
+Drawn in code (rider, 2026-11-05: "continue as is for v1"): `MeshBatch2D` batches, small canvas shaders,
 and one generated texture, `earth_map.png`. No third-party art.
 
 ## 1. Identity

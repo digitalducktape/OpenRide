@@ -2,7 +2,7 @@ class_name PumpPlaces
 extends RefCounted
 ## The places Balloon Pump's pump stands in (#76, the 2D rework; ART_BIBLE.md §3 and §6): a fair
 ## at dusk, backstage in a big top, and a pier at night. Each is a palette, one key light and a
-## few shapes drawn in code into one `SafeMesh` batch (Safe Cracker's batcher, read only), baked
+## few shapes drawn in code into one `MeshBatch2D` batch (Safe Cracker's batcher, read only), baked
 ## once per place with the pump, its hose and stand (`PumpStage`). The slow ambient life (twinkling
 ## bulbs, the turning wheel, the sea, dust in the spotlight) is `PumpStage`'s, in shaders and
 ## tweens. Names are plain descriptions; nothing here refers to any existing fair, circus or pier.
@@ -80,7 +80,7 @@ static func floor_x(x0: float, y: float) -> float:
 
 ## The whole room for place `index`, the pump and stand included, into `m` (stage coordinates;
 ## the bake shifts it by BLEED). Static: drawn once per place.
-static func paint(m: SafeMesh, index: int) -> void:
+static func paint(m: MeshBatch2D, index: int) -> void:
 	var p := place(index)
 	match str(p.id):
 		"fair":
@@ -99,21 +99,21 @@ static func paint(m: SafeMesh, index: int) -> void:
 
 
 ## The soot vignette: the corners pulled in toward the hero.
-static func vignette(m: SafeMesh) -> void:
+static func vignette(m: MeshBatch2D) -> void:
 	var c := Vector2(930, 600)
-	var inner := SafeMesh._ellipse(c, Vector2(980, 600), 48)
-	var outer := SafeMesh._ellipse(c, Vector2(1700, 1150), 48)
+	var inner := MeshBatch2D._ellipse(c, Vector2(980, 600), 48)
+	var outer := MeshBatch2D._ellipse(c, Vector2(1700, 1150), 48)
 	m.band(inner, outer, Color(0.04, 0.02, 0.05, 0.0), Color(0.04, 0.02, 0.05, 0.75))
 
 
 # --- The places ---
 
-static func _sky(m: SafeMesh, p: Dictionary, horizon_y: float) -> void:
+static func _sky(m: MeshBatch2D, p: Dictionary, horizon_y: float) -> void:
 	m.rect_v(Rect2(-BLEED, 0, WIDE.x, horizon_y * 0.6), p.sky_top, p.sky_mid)
 	m.rect_v(Rect2(-BLEED, horizon_y * 0.6, WIDE.x, horizon_y * 0.4 + 1.0), p.sky_mid, p.horizon)
 
 
-static func _stars(m: SafeMesh, seed: int, count: int, max_y: float) -> void:
+static func _stars(m: MeshBatch2D, seed: int, count: int, max_y: float) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	for i in count:
@@ -121,7 +121,7 @@ static func _stars(m: SafeMesh, seed: int, count: int, max_y: float) -> void:
 		m.circle(at, rng.randf_range(1.0, 2.2), Color(1, 0.96, 0.9, rng.randf_range(0.35, 0.8)))
 
 
-static func _fair(m: SafeMesh, p: Dictionary) -> void:
+static func _fair(m: MeshBatch2D, p: Dictionary) -> void:
 	var horizon := FAIR_HORIZON
 	_sky(m, p, horizon)
 	_stars(m, 76, 40, 380)
@@ -198,7 +198,7 @@ static func _fair(m: SafeMesh, p: Dictionary) -> void:
 	_lantern(m, Vector2(1015, 330), p.accent)
 
 
-static func _bigtop(m: SafeMesh, p: Dictionary) -> void:
+static func _bigtop(m: MeshBatch2D, p: Dictionary) -> void:
 	# Red velvet curtains in folds, a gold-fringed valance, a spotlight from the rigging.
 	var red: Color = p.sky_mid
 	m.rect_v(Rect2(-BLEED, 0, WIDE.x, FLOOR_Y), p.sky_top, p.horizon)
@@ -263,12 +263,12 @@ static func _bigtop(m: SafeMesh, p: Dictionary) -> void:
 		m.line(Vector2(rx, 0), Vector2(rx + 6, FLOOR_Y - 34), 5.0, Color(0.6, 0.5, 0.34, 0.9))
 		m.line(Vector2(rx + 1, 0), Vector2(rx + 7, FLOOR_Y - 34), 1.5, Color(1, 0.9, 0.7, 0.25))
 		var bag := Vector2(rx + 6, FLOOR_Y - 14)
-		m.fill(SafeMesh._ellipse(bag + Vector2(4, 16), Vector2(34, 7), 20), Color(0, 0, 0, 0.35))
+		m.fill(MeshBatch2D._ellipse(bag + Vector2(4, 16), Vector2(34, 7), 20), Color(0, 0, 0, 0.35))
 		m.round_rect(Rect2(bag - Vector2(26, 22), Vector2(52, 40)), 16.0, Color(0.62, 0.52, 0.36), Color(0.38, 0.3, 0.2))
 		m.line(bag + Vector2(-14, -16), bag + Vector2(14, -16), 4.0, Color(0.3, 0.22, 0.14))
 
 
-static func _pier(m: SafeMesh, p: Dictionary) -> void:
+static func _pier(m: MeshBatch2D, p: Dictionary) -> void:
 	var horizon := SEA.position.y
 	_sky(m, p, horizon)
 	_stars(m, 11, 90, 520)
@@ -319,7 +319,7 @@ static func _pier(m: SafeMesh, p: Dictionary) -> void:
 
 ## Planks from x0 to x1 (at the floor line) running from `top` to the bottom of the view, toward
 ## the vanishing point, with lit tops and dark gaps, and cross battens.
-static func _duckboards(m: SafeMesh, x0: float, x1: float, top: float) -> void:
+static func _duckboards(m: MeshBatch2D, x0: float, x1: float, top: float) -> void:
 	var wood := Color(0.42, 0.3, 0.2)
 	var n := 9
 	var rng := RandomNumberGenerator.new()
@@ -345,13 +345,13 @@ static func _duckboards(m: SafeMesh, x0: float, x1: float, top: float) -> void:
 
 
 ## A silhouette from a ridge line down to `bottom`.
-static func _ridge(m: SafeMesh, ridge: PackedVector2Array, bottom: float, col: Color) -> void:
+static func _ridge(m: MeshBatch2D, ridge: PackedVector2Array, bottom: float, col: Color) -> void:
 	for k in ridge.size() - 1:
 		m.quad(ridge[k], ridge[k + 1], Vector2(ridge[k + 1].x, bottom), Vector2(ridge[k].x, bottom), col)
 
 
 ## A striped tent: a cone roof over a short drum, its doorway lit.
-static func _tent(m: SafeMesh, foot: Vector2, w: float, col: Color, accent: Color) -> void:
+static func _tent(m: MeshBatch2D, foot: Vector2, w: float, col: Color, accent: Color) -> void:
 	var h := w * 0.55
 	var roof := w * 0.7
 	for k in 6:
@@ -370,7 +370,7 @@ static func _tent(m: SafeMesh, foot: Vector2, w: float, col: Color, accent: Colo
 
 
 ## A hanging lantern: a cap, a glass box glowing warm, a bracket.
-static func _lantern(m: SafeMesh, at: Vector2, accent: Color) -> void:
+static func _lantern(m: MeshBatch2D, at: Vector2, accent: Color) -> void:
 	m.glow(at + Vector2(0, 30), Vector2(150, 150), Color(1.0, 0.85, 0.55, 0.45), 10, 0.2)
 	m.rect_v(Rect2(at.x - 22, at.y + 10, 44, 46), Color(1.0, 0.95, 0.75), Color(1.0, 0.75, 0.4))
 	m.rect(Rect2(at.x - 26, at.y + 6, 52, 6), Color(0.15, 0.12, 0.12))
@@ -414,6 +414,6 @@ static func _catenary(a: Vector2, b: Vector2, sag: float, n: int) -> PackedVecto
 	return pts
 
 
-static func _wire(m: SafeMesh, pts: PackedVector2Array, col: Color) -> void:
+static func _wire(m: MeshBatch2D, pts: PackedVector2Array, col: Color) -> void:
 	for k in pts.size() - 1:
 		m.line(pts[k], pts[k + 1], 2.5, col)

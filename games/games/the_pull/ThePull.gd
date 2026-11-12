@@ -39,8 +39,8 @@ var logic: PullLogic
 var world: PullWorld
 var audio: PullAudio
 
-var _view: SubViewport
-var _shown: MeshInstance2D
+## The 3D view: the world renders in it, and its image draws it over the whole canvas.
+var view: StageView3D
 var _status: PullStatus
 var _mode := "open"
 var _view_distance := 0.0
@@ -51,11 +51,8 @@ var _total_full := 0
 var _peak_power := 0.0
 var _bonus_shown := 0
 var _start_best := 0.0
-var _message_left := 0.0
 var _tint := 0.0
 ## Steps the 3D view down to a lower render scale if the frame rate stays low in a pull.
-var governor := RenderScaleStep.new()
-var _view_scale := RENDER_SCALE
 var _end_left := -1.0  ## counts down to end_segment after the last result (game time: a pause holds it)
 
 
@@ -127,20 +124,10 @@ func _ready() -> void:
 	PullAudio.register()
 	world = PullWorld.new()
 	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_view.msaa_3d = Viewport.MSAA_DISABLED
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	_shown = MeshInstance2D.new()
-	_shown.name = "View3DImage"
-	_shown.texture = _view.get_texture()
-	_shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(_shown)
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	view = StageView3D.new(RENDER_SCALE)
+	add_child(view)
+	view.add_child(world)
+	add_child(view.image)
 	audio = PullAudio.new()
 	audio.name = "Audio"
 	add_child(audio)
@@ -157,8 +144,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_total_full = 0
 	_peak_power = 0.0
 	_end_left = -1.0
-	governor = RenderScaleStep.new()
-	_set_render_scale(RENDER_SCALE)
+	view.reset_quality()
 	world.build(logic.full_m, _start_best)
 	hud.set_skin(look.hud_skin())
 	_status = PullStatus.new(look)
@@ -167,9 +153,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_update_status()
 	AudioDirector.play_music(MUSIC_STYLE, PullMusic.BPM)
 	AudioDirector.set_intensity(0.4)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, PullAudio.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, PullAudio.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(PullAudio.music_effects(), PullAudio.sfx_effects())
 	# The sled in the look back behind the intro card (the pull's SET turns to the track), and
 	# the effects warmed up.
 	world.update_view(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0)
@@ -190,10 +174,7 @@ func _on_resume() -> void:
 
 
 func _on_frame(delta: float) -> void:
-	if governor.sample(delta, logic.phase == PullLogic.Phase.PULL):
-		_set_render_scale(governor.render_scale(RENDER_SCALE))
-		print("OPENRIDE_GAMES the_pull quality tier=%d fps=%.1f scale=%.2f" % [
-			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
+	view.sample(delta, logic.phase == PullLogic.Phase.PULL, "the_pull")
 	var power := InputBus.power
 	var events := logic.step(delta, power, _clock(), InputBus.sensors_ok)
 	if logic.last_points > 0.0:
@@ -204,10 +185,6 @@ func _on_frame(delta: float) -> void:
 		_handle(event)
 	_update_view(delta, power)
 	_update_status()
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	if _end_left >= 0.0:
 		_end_left -= delta
 		if _end_left < 0.0:
@@ -260,7 +237,7 @@ func _update_view(delta: float, power: float) -> void:
 	if logic.warned:
 		target_tint = 0.5 + 0.5 * sin(played_sec * TAU * 1.5)
 	_tint = move_toward(_tint, target_tint, delta * 4.0)
-	_shown.modulate = Color.WHITE.lerp(DIG_IN_TINT, _tint * 0.6)
+	view.image.modulate = Color.WHITE.lerp(DIG_IN_TINT, _tint * 0.6)
 
 
 ## The widget and the ride metrics' power band, from the one logic.
@@ -313,7 +290,6 @@ func _handle(event: Dictionary) -> void:
 			_show_message("Dig in!", 1.5, GameTheme.WARN)
 		"dig_in_clear":
 			hud.hide_message()
-			_message_left = 0.0
 		"best_near":
 			AudioDirector.play_sfx("crowd_swell", -6.0)
 		"best_passed":
@@ -391,20 +367,5 @@ func finish() -> Dictionary:
 	return result
 
 
-func _fit_view() -> void:
-	_shown.position = -Stage.pad
-	_shown.mesh = PullMeshes.view_image(Stage.visible_size)
-	_set_render_scale(_view_scale)
-
-
-## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

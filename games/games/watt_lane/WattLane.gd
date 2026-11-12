@@ -36,7 +36,6 @@ var track: WattLaneTrack
 var _status: WattLaneStatus
 var _hum_in: AudioStreamPlayer
 var _hum_out: AudioStreamPlayer
-var _message_left := 0.0
 var _beat := 0.0
 var _beat_phase := 0.0
 var _beats := 0
@@ -135,9 +134,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	_band = Vector2i(-1, -1)
 	AudioDirector.play_music(MUSIC_STYLE, WattLaneMusic.BPM)
 	AudioDirector.set_intensity(0.5)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, WattLaneAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, WattLaneAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(WattLaneAudioScript.music_effects(), WattLaneAudioScript.sfx_effects())
 	# The rider starts in the lane's middle on the intro card: one frame of the lane at rest.
 	var centre := float(logic.course.centre_at(0.0))
 	track.update_view(0.0, logic.course, 0.0, centre, true, -1.0, true)
@@ -173,10 +170,6 @@ func _on_frame(delta: float) -> void:
 	backdrop.update_view(track.scroll, _beat)
 	_update_status()
 	_update_audio(delta)
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 
 
 func _handle(event: Dictionary) -> void:
@@ -266,5 +259,4 @@ func _music_beat(delta: float) -> void:
 
 
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

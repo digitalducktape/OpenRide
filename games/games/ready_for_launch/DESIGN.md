@@ -111,7 +111,7 @@ earned (at standard it takes about 1.1 × the target with a full tank).
 | System | Skill | Picked | Rejected, and why |
 | --- | --- | --- | --- |
 | Rules | state-machine | Enum FSM in a `RefCounted` | Node states: one shared clock, must run headless |
-| The picture | 2d-essentials | `SafeMesh` batches; the place baked once by a SubViewport | `_draw` per frame (a call per shape); texture art (the rider's approach is drawn in code) |
+| The picture | 2d-essentials | `MeshBatch2D` batches; the place baked once by a SubViewport | `_draw` per frame (a call per shape); texture art (the rider's approach is drawn in code) |
 | The camera ride | 2d-essentials | The climb scrolls and scales layers by hand | `Camera2D`: it would fight `Stage`'s canvas transform |
 | Sky, sea, aurora, flame, plume, hose | shader-basics | Small `canvas_item` shaders on one rect each | Per-frame mesh rebuilds |
 | The Earth | shader-basics | A sphere shader over an original generated map | Mesh blobs (the rider: "earth doesn't even look like earth"); a photo (not original) |

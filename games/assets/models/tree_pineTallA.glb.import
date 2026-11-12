@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://op0i3f6r0ocr"
-path="res://.godot/imported/tree_oak.glb-2d96daf4f0bffebfb243c52c5008dd22.scn"
+uid="uid://dc4mpusc3fwc0"
+path="res://.godot/imported/tree_pineTallA.glb-8b854ceb0267acca58bedf292078d347.scn"
 
 [deps]
 
-source_file="res://games/dodge_ball/models/tree_oak.glb"
-dest_files=["res://.godot/imported/tree_oak.glb-2d96daf4f0bffebfb243c52c5008dd22.scn"]
+source_file="res://assets/models/tree_pineTallA.glb"
+dest_files=["res://.godot/imported/tree_pineTallA.glb-8b854ceb0267acca58bedf292078d347.scn"]
 
 [params]
 

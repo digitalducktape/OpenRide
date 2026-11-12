@@ -29,7 +29,7 @@ const BALLOON_COLORS := PumpArt.BALLOON_COLORS
 
 var look: GameTheme
 
-var bar: Control
+var bar: GaugeBar
 var badge: PanelContainer
 var badge_label: Label
 var count_icon: Control
@@ -38,8 +38,6 @@ var race_label: Label
 var next_caption: Label
 var next_icon: Control
 
-var _fill_px := -1
-var _line_px := -1
 var _over := false
 var _state := ""
 var _count := -1
@@ -66,12 +64,8 @@ func _init(theme: GameTheme = null) -> void:
 	add_child(box)
 
 	var top := _row(box)
-	bar = Control.new()
+	bar = GaugeBar.new(BAR_SIZE, look.ink)
 	bar.name = "PressureBar"
-	bar.custom_minimum_size = BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.draw.connect(_draw_bar)
 	top.add_child(bar)
 	var badge_slot := CenterContainer.new()
 	badge_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -142,15 +136,11 @@ func _icon(node_name: String, painter: Callable) -> Control:
 func set_state(needle: float, line: float, state: String) -> void:
 	_fill = clampf(needle, 0.0, 1.0)
 	_line = clampf(line, 0.0, 1.0)
-	var fill_px := roundi(_fill * BAR_SIZE.x)
-	var line_px := roundi(_line * BAR_SIZE.x)
 	# The fill's colour follows the valve, as the badge does: amber whenever it reads PUSH!.
 	var over := state != "push" and state != "pedal"
-	if fill_px != _fill_px or line_px != _line_px or over != _over:
-		_fill_px = fill_px
-		_line_px = line_px
-		_over = over
-		bar.queue_redraw()
+	_over = over
+	bar.set_line(_line)
+	bar.set_fill(_fill, GameTheme.GOOD if over else GameTheme.WARN)
 	if state != _state:
 		_set_badge(state)
 
@@ -223,35 +213,6 @@ func set_next(kind: String) -> void:
 	next_icon.queue_redraw()
 	if kind == "gold":
 		GameTheme.pop(next_icon, 1.35)
-
-
-func _draw_bar() -> void:
-	var b := ShapeBatch.new()
-	var w := BAR_SIZE.x
-	var h := BAR_SIZE.y
-	var r := h * 0.5
-	var track := Rect2(Vector2.ZERO, BAR_SIZE)
-	# The track (rounded ends), the part past the push line tinted gold.
-	_pill(b, track, Color(0.06, 0.02, 0.06, 0.9))
-	var line_x := clampf(_line * w, r, w - 2.0)
-	_pill(b, Rect2(line_x - r, 4.0, w - line_x + r - 4.0, h - 8.0), Color(GameTheme.TARGET, 0.22))
-	# The fill: green over the line, amber under it.
-	var fill_w := _fill * w
-	if fill_w > 2.0:
-		_pill(b, Rect2(4.0, 6.0, maxf(fill_w - 8.0, h - 12.0), h - 12.0), GameTheme.GOOD if _over else GameTheme.WARN)
-	# The push line: a gold tick standing proud of the bar, inked.
-	b.line(Vector2(line_x, -4.0), Vector2(line_x, h + 4.0), 9.0, look.ink)
-	b.line(Vector2(line_x, -2.0), Vector2(line_x, h + 2.0), 5.0, GameTheme.TARGET)
-	b.draw(bar)
-
-
-## A rounded bar inside `rect`: a box with round ends.
-static func _pill(b: ShapeBatch, rect: Rect2, color: Color) -> void:
-	var r := rect.size.y * 0.5
-	if rect.size.x <= rect.size.y:
-		b.circle(rect.get_center(), r, color, 16)
-		return
-	b.line(rect.position + Vector2(r, r), rect.position + Vector2(rect.size.x - r, r), rect.size.y, color)
 
 
 ## A little balloon on a string, in `color`, sized `scale` (1 fills the icon).

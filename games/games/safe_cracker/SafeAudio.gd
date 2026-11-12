@@ -11,18 +11,10 @@ extends RefCounted
 const SFX_DIR := "res://games/safe_cracker/sfx"
 const SafeMusic := preload("res://games/safe_cracker/SafeMusic.gd")
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
 	SfxSynth.add_preset_dir(SFX_DIR)
-	for sound in SafeMusic.SOUNDS:
-		var rendered := load(SafeMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(SafeMusic.SOUNDS)
 
 
 static func music_effects() -> Array[AudioEffect]:

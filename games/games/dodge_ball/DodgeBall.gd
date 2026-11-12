@@ -51,13 +51,9 @@ var _power_glow := 0.0
 var _run_awarded := 0.0
 var _best_awarded := 0.0
 var _round_limit := -1.0  ## seconds, for a rounds Just Ride (end_mode game)
-var _view: SubViewport
-## The tablet's one quality step: the 3D view from _full_scale to 0.55 if play stays under 54 fps.
-var governor := RenderScaleStep.new()
-var _full_scale := RENDER_SCALE
-var _view_scale := RENDER_SCALE  ## the scale the 3D view renders at now
+## The 3D view: the world renders in it, and its image draws it over the whole canvas.
+var view: StageView3D
 var _mode_sec := {"dodge": 0.0, "catch": 0.0}
-var _message_left := 0.0
 var _perf_usec := 0
 var _perf_frames := 0
 var _perf_left := 5.0
@@ -136,24 +132,13 @@ func _ready() -> void:
 			world.tuning[key] = bool(tuning.get_value("world", key))
 	world.name = "World"
 	var scale := clampf(float(tuning.get_value("render", "scale", RENDER_SCALE)) if tuned else RENDER_SCALE, 0.4, 1.0)
-	_full_scale = scale
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_set_render_scale(scale)
-	_view.msaa_3d = int(tuning.get_value("render", "msaa", MSAA)) if tuned else MSAA
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	var shown := TextureRect.new()
-	shown.name = "View3DImage"
-	shown.texture = _view.get_texture()
-	shown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shown.stretch_mode = TextureRect.STRETCH_SCALE
-	shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shown)
-	Stage.bleed(shown)  # the whole window, past the centred stage (#57)
+	# No vignette in the image: Dodge Ball's look grades in its world shaders.
+	view = StageView3D.new(scale)
+	view.vignette = 0.0
+	view.msaa_3d = int(tuning.get_value("render", "msaa", MSAA)) if tuned else MSAA
+	add_child(view)
+	view.add_child(world)
+	add_child(view.image)
 	world.ball_bounced.connect(func(loud: float): AudioDirector.play_sfx("ball_bounce", linear_to_db(loud) - 10.0, randf_range(0.9, 1.1)))
 	_fx_layer = CanvasLayer.new()
 	_fx_layer.layer = SCREEN_FX_LAYER
@@ -174,8 +159,8 @@ func _ready() -> void:
 	_wind.volume_db = -80.0
 	add_child(_wind)
 	if tuned:
-		print("OPENRIDE_GAMES dodge_ball render scale=%.2f size=%s msaa=%d world=%s" % [scale, _view.size,
-			_view.msaa_3d, world.tuning])
+		print("OPENRIDE_GAMES dodge_ball render scale=%.2f size=%s msaa=%d world=%s" % [scale, view.size,
+			view.msaa_3d, world.tuning])
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -188,8 +173,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	if str(seg.get("end_mode", "timer")) == "game" and float(seg.get("duration_sec", -1)) > 0.0:
 		_round_limit = maxf(1.0, float(params.get("rounds", 1))) * DodgeBallLogic.ROUND_SEC
 	_apply_options()
-	governor = RenderScaleStep.new()
-	_set_render_scale(_full_scale)
+	view.reset_quality()
 
 	hud.set_skin(DodgeStatus.look.hud_skin())
 	_status = DodgeStatus.new(logic.cadence_floor, logic.has_lives, logic.is_catch())
@@ -201,9 +185,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	# A rendered track at its own tempo: the same request every segment, so it plays on.
 	AudioDirector.play_music(MUSIC_STYLE, DodgeMusic.BPM)
 	AudioDirector.set_intensity(0.6)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, DodgeAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, DodgeAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(DodgeAudioScript.music_effects(), DodgeAudioScript.sfx_effects())
 	# Draw one frame of the road at rest behind the intro card, and warm up the effects there.
 	world.update_view(0.0, logic, 0.0, 0.0)
 	world.prewarm()
@@ -230,16 +212,8 @@ func _on_option_changed(key: String, _value: String) -> void:
 		_show_message("Catch the balls!" if logic.is_catch() else "Dodge the balls!", 2.0)
 
 
-## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
 func _apply_options() -> void:
-	world.set_time_of_day(DodgeTimeOfDay.load_preset(DodgeTimeOfDay.resolve(option("scene"))))
+	world.set_time_of_day(TimeOfDay.load_preset(TimeOfDay.resolve(option("scene"))))
 	world.roll_enabled = option("camera_roll") == "on"
 
 
@@ -264,10 +238,7 @@ func _on_frame(delta: float) -> void:
 
 
 func _frame(delta: float) -> void:
-	if governor.sample(delta, true):
-		_set_render_scale(governor.render_scale(_full_scale))
-		print("OPENRIDE_GAMES dodge_ball quality tier=%d fps=%.1f scale=%.2f" % [
-			governor.tier, governor.last_fps, governor.render_scale(_full_scale)])
+	view.sample(delta, true, "dodge_ball")
 	var cadence := InputBus.cadence
 	var power := InputBus.power
 	_mode_sec[logic.mode] += delta
@@ -288,10 +259,6 @@ func _frame(delta: float) -> void:
 	if logic.game_over_left > 0.0:
 		hud.show_message("Game over! Best run: %d\nNext run in %d" % [roundi(_best_run()), ceili(logic.game_over_left)],
 			GameTheme.BAD)
-	elif _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	# Speed you can hear: the wind rises with the road speed, and the music fills out above the
 	# floor and again over the power target.
 	var speed := clampf(world.road_speed / DodgeWorld.FAST_SPEED, 0.0, 1.0)
@@ -402,8 +369,7 @@ func score() -> float:
 
 
 func _show_message(text: String, seconds: float) -> void:
-	hud.show_message(text)
-	_message_left = seconds
+	hud.show_message(text, HudTheme.INK, seconds)
 
 
 ## Juice on the element that changed (UI_STYLE.md, "Motion"): a new score pops the HUD's score.

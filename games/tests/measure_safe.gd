@@ -4,11 +4,11 @@ extends SceneTree
 ## The tablet (PowerVR GX6250) is fill-bound: every 2D layer is blended, so what it pays for is
 ## how many pixels each frame shades, not the draw calls. This prints, per place, the pixels
 ## each layer covers (canvas px, clipped to the 1920x1080 canvas; "screens" = /2.07 M) as the
-## rider sees it in play, then with the intro card up; how many `SafeMesh` batches are rebuilt a
+## rider sees it in play, then with the intro card up; how many `MeshBatch2D` batches are rebuilt a
 ## frame in the intro and in play (should be ~0: static layers redraw only on a change); and the
 ## CPU time to build each place's room, body and door, and a place change's longest frame.
 ##
-## Pixels: every SafeMesh triangle (via `SafeMesh.probe`), and each visible ColorRect,
+## Pixels: every MeshBatch2D triangle (via `MeshBatch2D.probe`), and each visible ColorRect,
 ## TextureRect, Panel, PanelContainer and Sprite2D as its rect (text and particles are left out: small).
 
 const SCREEN := Rect2(0, 0, 1920, 1080)
@@ -26,7 +26,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	SafeMesh.probe = _on_flush
+	MeshBatch2D.probe = _on_flush
 	_session = root.get_node("Session")
 	_director = _session.director
 	_session._local.start({"kind": "just_ride", "plan_id": "measure", "difficulty": "standard", "total_sec": -1,
@@ -54,8 +54,8 @@ func _run() -> void:
 	await _count_rebuilds("play, needle sweeping", 120, game)
 	# A place change's longest frame, first built and built ahead (desktop ms; the tablet's CPU
 	# is several times slower).
-	SafeMesh.forget_built()
-	SafeMesh.probe = Callable()  # the fill count is slow: off while timing
+	MeshBatch2D.forget_built()
+	MeshBatch2D.probe = Callable()  # the fill count is slow: off while timing
 	for ahead in [false, true]:
 		var line := PackedStringArray()
 		for place in ["office", "bank", "museum", "cabin", "lab", "library"]:
@@ -69,7 +69,7 @@ func _run() -> void:
 				t = now
 			line.append("%s %.1f" % [place, worst])
 		print("PLACE CHANGE %s, longest frame ms: %s" % ["built ahead" if ahead else "first build", ", ".join(line)])
-	SafeMesh.probe = _on_flush
+	MeshBatch2D.probe = _on_flush
 	for place in ["office", "bank", "museum", "cabin", "lab", "library"]:
 		game.change_option("scene", place)
 		for i in 6:
@@ -117,7 +117,7 @@ static func _poly_area(p: PackedVector2Array) -> float:
 	return s * 0.5
 
 
-## Pixels per layer: the SafeMesh batches of visible items, then the plain rects.
+## Pixels per layer: the MeshBatch2D batches of visible items, then the plain rects.
 func _report_fill(label: String) -> void:
 	var rows := []
 	var total := 0.0
@@ -163,7 +163,7 @@ func _rects(n: Node, rows: Array) -> void:
 		_rects(c, rows)
 
 
-## SafeMesh batches rebuilt a frame (should be ~0), and the process time.
+## MeshBatch2D batches rebuilt a frame (should be ~0), and the process time.
 func _count_rebuilds(label: String, frames: int, game: Node) -> void:
 	_flushes = 0
 	_verts = 0
@@ -187,21 +187,21 @@ func _build_times() -> void:
 		dial.accent = SafePlaces.place(i).accent
 		dial.place_index = i
 		var t0 := Time.get_ticks_usec()
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		SafePlaces.build_room(m, i)
 		var room_v := m.vertex_count()
 		var t1 := Time.get_ticks_usec()
-		m = SafeMesh.new()
+		m = MeshBatch2D.new()
 		var body := SafeBody.new()
 		body.place_index = i
 		body.build(m)
 		var body_v := m.vertex_count()
 		var t2 := Time.get_ticks_usec()
-		m = SafeMesh.new()
+		m = MeshBatch2D.new()
 		door.build(m)
 		var t3 := Time.get_ticks_usec()
 		var door_v := m.vertex_count()
-		m = SafeMesh.new()
+		m = MeshBatch2D.new()
 		SafeBody.build_vault(m, dial.colour)
 		var t4 := Time.get_ticks_usec()
 		print("BUILD %-8s room %5.1f ms (%d verts)  body %5.1f ms (%d)  door %5.1f ms (%d)  vault %5.1f ms (%d)" % [

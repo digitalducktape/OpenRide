@@ -31,12 +31,11 @@ var unit_label: Label
 var chip: PanelContainer
 var chip_label: Label
 var pull_label: Label
-var bar: Control
+var bar: GaugeBar
 
 var full_m := 336.0
 var best_m := 0.0
 var _distance_m := -1
-var _fill_px := -1
 var _chip_key := ""
 var _pull_text := ""
 
@@ -87,12 +86,9 @@ func _init(theme: GameTheme = null) -> void:
 	pull_label.custom_minimum_size = Vector2(PULL_WIDTH, 0)
 	pull_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bottom.add_child(pull_label)
-	bar = Control.new()
+	bar = GaugeBar.new(BAR_SIZE, look.ink)
 	bar.name = "Progress"
-	bar.custom_minimum_size = BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.draw.connect(_draw_bar)
+	bar.checked_end = true
 	bottom.add_child(bar)
 	set_chip("need", 0)
 
@@ -101,8 +97,8 @@ func _init(theme: GameTheme = null) -> void:
 func set_track(new_full_m: float, new_best_m: float) -> void:
 	full_m = maxf(new_full_m, 1.0)
 	best_m = new_best_m
-	_fill_px = -1
-	bar.queue_redraw()
+	bar.set_flag(best_m / full_m if best_m > 0.5 else -1.0)
+	bar.set_fill(maxf(_distance_m, 0) / full_m, look.accent)
 
 
 ## The distance in whole metres (`PullLogic.shown_m`).
@@ -111,10 +107,7 @@ func set_distance(metres: int) -> void:
 		return
 	_distance_m = metres
 	distance_label.text = str(metres)
-	var px := roundi(BAR_SIZE.x * clampf(metres / full_m, 0.0, 1.0))
-	if px != _fill_px:
-		_fill_px = px
-		bar.queue_redraw()
+	bar.set_fill(metres / full_m, look.accent)
 
 
 ## "PULL 2/3" in rounds, "PULL 2" otherwise.
@@ -173,32 +166,3 @@ func set_chip(state: String, value: int, need := 0) -> void:
 
 func chip_state() -> String:
 	return _chip_key.get_slice(":", 0)
-
-
-func _draw_bar() -> void:
-	var s := bar.size
-	var radius := s.y / 2.0
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color(0, 0, 0, 0.45)
-	track.border_color = Color(1, 1, 1, 0.25)
-	track.set_border_width_all(2)
-	track.set_corner_radius_all(int(radius))
-	track.anti_aliasing = true
-	bar.draw_style_box(track, Rect2(Vector2.ZERO, s))
-	# The checked end: the Full Pull line.
-	var check := 8.0
-	for i in 2:
-		for j in int(s.y / check):
-			if (i + j) % 2 == 0:
-				bar.draw_rect(Rect2(s.x - check * (i + 1) - 4, j * check + 1, check, check), Color("f2c230", 0.85))
-	if _fill_px > 0:
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = look.accent
-		fill.set_corner_radius_all(int(radius))
-		fill.anti_aliasing = true
-		bar.draw_style_box(fill, Rect2(0, 0, maxf(_fill_px, s.y), s.y))
-	if best_m > 0.5:
-		var x := s.x * clampf(best_m / full_m, 0.0, 1.0)
-		bar.draw_rect(Rect2(x - 2, -6, 4, s.y + 12), GameTheme.TARGET)
-		bar.draw_colored_polygon(PackedVector2Array([Vector2(x + 2, -6), Vector2(x + 18, -1), Vector2(x + 2, 4)]),
-			GameTheme.TARGET)

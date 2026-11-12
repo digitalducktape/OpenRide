@@ -22,6 +22,7 @@ var hero: Label
 var _slot: MarginContainer
 var _alarm_on := false
 var _hero_tween: Tween
+var _status: Control
 
 
 func _init(look: GameTheme) -> void:
@@ -48,6 +49,26 @@ func _init(look: GameTheme) -> void:
 	hero.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	hero.visible = false
 	_slot.add_child(hero)
+
+
+
+## Keeps the slot under `status` (the game's widget on `hud`) from now on: a circuit's progress
+## strip pushes the status area down, and the slot goes with it (as `CalloutBanner.follow`).
+func follow(hud: Hud, status: Control) -> void:
+	_status = status
+	status.resized.connect(fit)
+	hud.top_bar_moved.connect(fit)
+	fit()
+
+
+func fit() -> void:
+	if is_instance_valid(_status):
+		_slot.add_theme_constant_override("margin_top", int(ceilf(slot_top(_status.get_global_rect().end.y))))
+
+
+## The slot's top for a status area ending at `status_bottom`.
+static func slot_top(status_bottom: float) -> float:
+	return maxf(TOP, status_bottom + CalloutBanner.STATUS_GAP)
 
 
 ## Shows the alarm badge (slammed in, then breathing) or takes it away.

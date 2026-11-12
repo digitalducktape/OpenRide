@@ -49,7 +49,7 @@ const CREAM := Color("efe4c8")
 
 
 ## The shed and the still parts of its machine, in the palette `night` (0 dusk, 1 night).
-static func paint(m: SafeMesh, night: int) -> void:
+static func paint(m: MeshBatch2D, night: int) -> void:
 	var wood: Color = WOOD[night]
 	var dark: Color = WOOD_DARK[night]
 	var tin: Color = TIN[night]
@@ -117,12 +117,12 @@ static func paint(m: SafeMesh, night: int) -> void:
 
 
 ## A lightning-bolt plate: a jagged flash, two convex halves.
-static func _bolt(m: SafeMesh, c: Vector2, s: float, col: Color) -> void:
+static func _bolt(m: MeshBatch2D, c: Vector2, s: float, col: Color) -> void:
 	m.fill(PackedVector2Array([c + Vector2(0.15, -1.0) * s, c + Vector2(-0.55, 0.15) * s, c + Vector2(0.05, 0.15) * s]), col, false)
 	m.fill(PackedVector2Array([c + Vector2(-0.15, 1.0) * s, c + Vector2(0.55, -0.15) * s, c + Vector2(-0.05, -0.15) * s]), col, false)
 
 
-static func _crank_stand(m: SafeMesh) -> void:
+static func _crank_stand(m: MeshBatch2D) -> void:
 	# An A-frame of iron tube carrying the crank's axle.
 	var foot_l := Vector2(CRANK.x - 66.0, 868)
 	var foot_r := Vector2(CRANK.x + 66.0, 868)
@@ -140,7 +140,7 @@ static func _tangent(c0: Vector2, r0: float, c1: Vector2, r1: float, side: float
 	return [c0 + n * r0, c1 + n * r1]
 
 
-static func _chain(m: SafeMesh) -> void:
+static func _chain(m: MeshBatch2D) -> void:
 	for side in [-1.0, 1.0]:
 		var t := _tangent(CRANK, CRANK_R, FLYWHEEL, PINION_R, side)
 		m.line(t[0], t[1], 7.0, Color(0.1, 0.1, 0.13))
@@ -152,21 +152,21 @@ static func _chain(m: SafeMesh) -> void:
 			m.circle(p, 1.7, Color(0.62, 0.64, 0.7), false)
 
 
-static func _flywheel_stand(m: SafeMesh) -> void:
+static func _flywheel_stand(m: MeshBatch2D) -> void:
 	var f := FLYWHEEL
 	# A cast pedestal under the axle; the wheel turns in front of it.
 	m.fill(PackedVector2Array([f + Vector2(-18, 6), f + Vector2(18, 6), f + Vector2(64, 868 - f.y), f + Vector2(-64, 868 - f.y)]), Color("2b2f3a"))
 	m.round_rect(Rect2(f.x - 78, 860, 156, 10), 3.0, IRON_HI, IRON)
 
 
-static func _belt(m: SafeMesh) -> void:
+static func _belt(m: MeshBatch2D) -> void:
 	for side in [-1.0, 1.0]:
 		var t := _tangent(FLYWHEEL, FLYWHEEL_R * 0.86, PULLEY, PULLEY_R, side)
 		m.line(t[0], t[1], 8.0, Color("3a2418"))
 		m.line(t[0], t[1], 2.0, Color("7a5234"))
 
 
-static func _dynamo(m: SafeMesh) -> void:
+static func _dynamo(m: MeshBatch2D) -> void:
 	var r := DYNAMO
 	# Its feet and bed.
 	m.round_rect(Rect2(r.position.x - 10, 852, r.size.x + 20, 16), 3.0, IRON_HI, IRON)
@@ -186,7 +186,7 @@ static func _dynamo(m: SafeMesh) -> void:
 	_bolt(m, r.position + Vector2(54, 53), 10.0, Color("3a2a10"))
 
 
-static func _meter(m: SafeMesh) -> void:
+static func _meter(m: MeshBatch2D) -> void:
 	var c := METER
 	var r := METER_R
 	m.soft_shadow(Rect2(c - Vector2(r, r) + Vector2(4, 6), Vector2(r, r) * 2.0), r, 12.0, Color(0, 0, 0, 0.5))
@@ -208,21 +208,21 @@ static func meter_angle(share: float) -> float:
 
 
 ## The supply needle (drawn pointing along +x; turned by rotation).
-static func paint_needle(m: SafeMesh) -> void:
+static func paint_needle(m: MeshBatch2D) -> void:
 	m.fill(PackedVector2Array([Vector2(-8, -3.5), Vector2(METER_R - 7.0, 0), Vector2(-8, 3.5)]), Color("b8261e"))
 	m.circle(Vector2.ZERO, 6.0, BRASS)
 	m.circle(Vector2.ZERO, 2.5, BRASS_LO)
 
 
 ## The demand marker: a gold pointer on the scale's edge, a plain triangle.
-static func paint_marker(m: SafeMesh) -> void:
+static func paint_marker(m: MeshBatch2D) -> void:
 	var r := METER_R
 	m.fill(PackedVector2Array([Vector2(r - 16.0, 0), Vector2(r + 1.0, -8), Vector2(r + 1.0, 8)]), Color("2a2420"))
 	m.fill(PackedVector2Array([Vector2(r - 12.0, 0), Vector2(r, -5), Vector2(r, 5)]), Color("f2b632"))
 
 
 ## The chainring and the crank arms, turned about the axle.
-static func paint_crank(m: SafeMesh) -> void:
+static func paint_crank(m: MeshBatch2D) -> void:
 	var r := CRANK_R
 	# Teeth, then the ring, then its spider.
 	var teeth := 28
@@ -249,14 +249,14 @@ static func paint_crank(m: SafeMesh) -> void:
 
 
 ## One pedal, kept level as the crank turns (its layer is moved, never turned).
-static func paint_pedal(m: SafeMesh) -> void:
+static func paint_pedal(m: MeshBatch2D) -> void:
 	var s := PEDAL
 	m.round_rect(Rect2(-s * 0.5, s), 3.0, Color("3a3f4c"), Color("20222a"))
 	m.rect(Rect2(-s.x * 0.5 + 3, -2, s.x - 6, 3), Color("8a92a2"))
 
 
 ## The flywheel: a heavy cast rim, six spokes and a hub, its pinion in front.
-static func paint_flywheel(m: SafeMesh) -> void:
+static func paint_flywheel(m: MeshBatch2D) -> void:
 	var r := FLYWHEEL_R
 	m.ring(Vector2.ZERO, r - 24.0, r, Color("2b2f3a"))
 	m.ring(Vector2.ZERO, r - 24.0, r - 20.0, Color("181a22"))
@@ -284,7 +284,7 @@ static func paint_flywheel(m: SafeMesh) -> void:
 
 
 ## The dynamo's pulley.
-static func paint_pulley(m: SafeMesh) -> void:
+static func paint_pulley(m: MeshBatch2D) -> void:
 	var r := PULLEY_R
 	m.circle(Vector2.ZERO, r, Color("5c6372"))
 	m.ring(Vector2.ZERO, r - 5.0, r, Color("2b2f3a"))

@@ -23,8 +23,6 @@ const SQUEAK_GAP := Vector2(0.7, 1.4)  ## seconds between squeaks: slow when emp
 const HISS_GAP := 0.5
 const TICK_FROM := 5  ## a Race heat ticks each of its last seconds from here
 
-static var _registered := false
-
 var _stroke := 0.0  ## 0-1 through the current pedal stroke
 var _squeak_left := 0.6
 var _hiss_left := 0.0
@@ -32,21 +30,13 @@ var _last_tick := -1
 
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in PumpMusic.SOUNDS:
-		var rendered := load(PumpMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(PumpMusic.SOUNDS)
 
 
 static func start_music() -> void:
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.3)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(music_effects(), sfx_effects())
 
 
 ## The music's intensity for the moment: the bed alone while resting or leaking, the harmony

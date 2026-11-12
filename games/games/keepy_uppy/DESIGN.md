@@ -271,7 +271,7 @@ fresh reviewer comes next.
   widget.
 - **LP-CODE-REVIEW: APPROVE, with one concern.** Rules untouched in a `RefCounted`; the scene only
   wires; shapes drawn once, labels set on change. Concern: the game reuses Safe Cracker's
-  `SafeMesh` and `SafeDial.Layer`, so it depends on another game's classes (as Tug does on Kart's
+  `MeshBatch2D` and `PaintLayer`, so it depends on another game's classes (as Tug does on Kart's
   mesh kit). Promoting them to the framework is a job for a later pass.
 - **QL-TEST-COVERAGE: ADEQUATE.** `keepy_logic_test` covers every rule in #77; `keepy_scene_test`
   adds the frame check (the balloon, fan and pole against the stage, the grille and the HUD at
@@ -292,7 +292,7 @@ fresh reviewer comes next.
 | Rules | `gdscript-patterns`, `state-machine` | A `RefCounted` logic class with an enum FSM for the balloon (flying, popped, arriving) and the weather (idle, telegraph, active) | Node-based states | Two small machines with a handful of states; enum `match` is headless-testable and allocation-free, as `TugLogic` |
 | Tests | `godot-testing` | GdUnit4 suites driving the logic with scripted power at 60 Hz | Scene-level sims for the rules | The rules are deterministic and fast to test without a tree; one scene test covers the wiring |
 | Scene | `scene-organization` | One `Game` root over small Node2D parts (backdrop, rig, balloon, weather), each owning its layers | One big `_draw` | Safe Cracker's structure: static layers never redraw, only positions move |
-| 2D drawing | `2d-essentials`, `shader-basics` | Shapes batched by `SafeMesh`, the place baked once into a SubViewport texture, life in small canvas shaders | `Parallax2D` layers and `PointLight2D` | 2D is all blended on a fill-bound tablet: one opaque sprite costs one screen; live layers and 2D lights cost several |
+| 2D drawing | `2d-essentials`, `shader-basics` | Shapes batched by `MeshBatch2D`, the place baked once into a SubViewport texture, life in small canvas shaders | `Parallax2D` layers and `PointLight2D` | 2D is all blended on a fill-bound tablet: one opaque sprite costs one screen; live layers and 2D lights cost several |
 | Effects | `particles-vfx` | `CPUParticles2D` for the pop, butterflies and leaves; rain and the downdraft in a streak shader on one rect each | `GPUParticles2D` | Tiny counts (10-26), and Safe Cracker's dust and sparkles already work this way on the tablet |
 | HUD | `hud-system` | One themed `PanelContainer` widget in the top-centre slot, labels set only on change, and callouts in the game's own banner lane | The HUD's centre message | It sits on the balloon; Safe Cracker's banner solved the same problem |
 | Motion | `tween-animation` | Tweens for one-offs (the pop's ring, the cross-fade, callouts); the balloon's bob and squash set each frame from the logic | AnimationPlayer | Motion follows the logic; nothing is keyframed |

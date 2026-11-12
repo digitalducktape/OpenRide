@@ -54,7 +54,7 @@ func test_every_place_has_a_key_light_and_builds() -> void:
 	for i in PumpPlaces.count():
 		var l := PumpPlaces.light(i)
 		assert_float(l.strength).is_greater(0.0)
-		assert_bool(SafeMesh.is_built("pump_room_%d" % i)).is_true()
+		assert_bool(MeshBatch2D.is_built("pump_room_%d" % i)).is_true()
 
 
 func test_the_nozzle_balloon_grows_with_the_fill() -> void:

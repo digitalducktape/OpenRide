@@ -14,30 +14,17 @@ const PullMusic := preload("res://games/the_pull/PullMusic.gd")
 const SILENT_DB := -60.0
 const LOOPS := ["engine_drone", "chain_strain", "box_scrape"]
 
-static var _registered := false
-
 var players := {}  ## loop name -> AudioStreamPlayer
 
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in PullMusic.SOUNDS:
-		if sound in LOOPS:
-			continue
-		var rendered := load(PullMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(PullMusic.SOUNDS, LOOPS)
 
 
 func _ready() -> void:
 	for sound in LOOPS:
-		var player := AudioStreamPlayer.new()
+		var player := GameAudio.loop_player(sound, PullMusic.SOUNDS[sound], SILENT_DB)
 		player.name = sound
-		player.bus = AudioDirector.SFX_BUS
-		player.stream = load(PullMusic.SOUNDS[sound]) as AudioStream
-		player.volume_db = SILENT_DB
 		add_child(player)
 		players[sound] = player
 

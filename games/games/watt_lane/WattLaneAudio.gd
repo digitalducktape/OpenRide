@@ -13,18 +13,11 @@ const WattLaneMusic := preload("res://games/watt_lane/WattLaneMusic.gd")
 const HUM_RATE := 22050
 const HUM_HZ := 78.0  ## near Eb2, the key; whole cycles in a second, so the loop is seamless
 
-static var _registered := false
 static var _hums := {}
 
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in WattLaneMusic.SOUNDS:
-		var rendered := load(WattLaneMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(WattLaneMusic.SOUNDS)
 
 
 ## The hum loop: `bright` adds the saw's upper harmonics and a fifth (in the lane); without it,

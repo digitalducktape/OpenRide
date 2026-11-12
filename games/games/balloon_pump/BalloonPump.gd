@@ -27,7 +27,6 @@ var _place := 0
 var _gauge_max := 100.0
 
 var _mode_name := "max"
-var _message_left := 0.0
 
 
 func info() -> GameInfo:
@@ -182,7 +181,7 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.add_widget(_status)
 	# One watts reading on screen: the ride panel shows the smoothed watts the rules use, with a
 	# gauge ticked at the biggest balloon's push line, and its rpm gauge at the "keep pumping" floor.
-	hud.metrics.set_power_source(func() -> float: return logic.smoothed)
+	hud.metrics.set_power_source(smoothed_power)
 	hud.metrics.set_power_band(logic.line_at(1.0, "large"))
 	hud.metrics.set_cadence_band(PumpLogic.KEEP_PUMPING_RPM)
 	_audio = PumpAudioScript.new()
@@ -196,6 +195,12 @@ func _on_prepare(seg: Dictionary) -> void:
 	_update_status()
 
 
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smoothed if logic else InputBus.power
+
+
 func _on_frame(delta: float) -> void:
 	var events := logic.step(delta, InputBus.power, InputBus.cadence, InputBus.sensors_ok)
 	for event in events:
@@ -205,10 +210,6 @@ func _on_frame(delta: float) -> void:
 	AudioDirector.set_intensity(PumpAudioScript.intensity(logic))
 	_update_world(delta)
 	_update_status()
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	won = logic.race_won()
 
 
@@ -301,5 +302,4 @@ func _update_status() -> void:
 
 
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

@@ -2,7 +2,7 @@ class_name KeepyIntroVisual
 extends HBoxContainer
 ## The intro card's picture: a small scene of the game (the fan in its crate over a meadow, the
 ## coral balloon riding its column of air, the pole's three bands beside it), then the bands with
-## their stars and two lines on what pushes it down. Built with SafeMesh once (no per-frame cost).
+## their stars and two lines on what pushes it down. Built with MeshBatch2D once (no per-frame cost).
 
 const PICTURE := Vector2(440, 250)
 const CORNER := 22.0
@@ -57,7 +57,7 @@ func _band(theme: GameTheme, i: int) -> Control:
 func _draw_picture(c: Control, ink: Color) -> void:
 	var w := PICTURE.x
 	var h := PICTURE.y
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	# The sky, the sun, a far ridge and the meadow, inside the rounded frame.
 	m.round_rect(Rect2(Vector2.ZERO, PICTURE), CORNER, Color("7fc4e8"), Color("e3f2ee"))
 	m.glow(Vector2(96, 62), Vector2(84, 84), Color(1.0, 0.95, 0.72, 0.75), 10)
@@ -88,7 +88,7 @@ func _draw_picture(c: Control, ink: Color) -> void:
 
 
 ## A rolling crest across the picture, down to the meadow's flat part.
-func _hills(m: SafeMesh, y: float, swell: float, wave: float, col: Color) -> void:
+func _hills(m: MeshBatch2D, y: float, swell: float, wave: float, col: Color) -> void:
 	var bottom := PICTURE.y - CORNER
 	var x := 0.0
 	while x < PICTURE.x:

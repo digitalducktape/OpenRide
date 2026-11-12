@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bhhkkcbdv1q2w"
-path="res://.godot/imported/rock_largeA.glb-92ee5ab17a2dfe322febc679251fb7f0.scn"
+uid="uid://cs6nvalrc0jd1"
+path="res://.godot/imported/light-curved.glb-c3fe9a5b1b0719c69744709d37eaf969.scn"
 
 [deps]
 
-source_file="res://games/dodge_ball/models/rock_largeA.glb"
-dest_files=["res://.godot/imported/rock_largeA.glb-92ee5ab17a2dfe322febc679251fb7f0.scn"]
+source_file="res://assets/models/light-curved.glb"
+dest_files=["res://.godot/imported/light-curved.glb-c3fe9a5b1b0719c69744709d37eaf969.scn"]
 
 [params]
 

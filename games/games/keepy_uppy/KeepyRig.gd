@@ -4,7 +4,7 @@ extends Node2D
 ## with brass corner brackets and rivets, a brass grille over four turning blades, a drive pulley),
 ## its rails, the height pole painted in the three
 ## bands with its streamers, and the column of air the fan blows. Every shape goes through
-## `SafeMesh` (one draw call a layer) and is drawn once per place; per frame only the fan's x, the
+## `MeshBatch2D` (one draw call a layer) and is drawn once per place; per frame only the fan's x, the
 ## blades' rotation and the column's two uniforms change.
 ##
 ## Layers, back to front: Pole, Streamers (sway shader), Rails, Fan (its Column, Crate, Bowl,
@@ -66,13 +66,13 @@ func _init() -> void:
 	grille = _layer("Grille", _paint_grille, fan)
 	# The balloon's shadow on the grille: darker and tighter the lower it flies.
 	shadow = _layer("BalloonShadow", func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.glow(Vector2.ZERO, Vector2(110, 26), Color(0, 0, 0, 0.55), 8)
 		m.flush(ci), fan)
 	shadow.position = Vector2(0, KeepyPlaces.FAN_AT.y - 4.0)
 	# The balloon's height on the pole: a small coral pointer beside the bands.
 	marker = _layer("HeightMarker", func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.fill(PackedVector2Array([Vector2(-26, -13), Vector2(0, 0), Vector2(-26, 13)]), Color("12233a"))
 		m.fill(PackedVector2Array([Vector2(-22, -8), Vector2(-5, 0), Vector2(-22, 8)]), KeepyBalloon.CORAL)
 		m.flush(ci), self)
@@ -80,7 +80,7 @@ func _init() -> void:
 
 
 func _layer(layer_name: String, paint: Callable, parent: Node) -> Node2D:
-	var l := SafeDial.Layer.new()
+	var l := PaintLayer.new()
 	l.name = layer_name
 	l.paint = paint
 	parent.add_child(l)
@@ -146,7 +146,7 @@ func _shade() -> Callable:
 
 
 func _paint_crate(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var pl := KeepyPlaces.place(place_index)
 	var sun_col: Color = pl.sun_col
 	var r := front_rect()
@@ -221,7 +221,7 @@ func _paint_crate(ci: CanvasItem) -> void:
 
 ## The dark bowl under the grille, so the blades read against it.
 func _paint_blades(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var rx := KeepyPlaces.GRILLE.x - 8.0
 	m.circle(Vector2.ZERO, rx, Color(0.08, 0.08, 0.09))
 	m.glow(Vector2.ZERO, Vector2(rx, rx), Color(0.25, 0.25, 0.28, 0.6), 8)
@@ -239,17 +239,17 @@ func _paint_blades(ci: CanvasItem) -> void:
 
 ## The brass grille: a rim ring and spokes, over the turning blades.
 func _paint_grille(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var c := Vector2(0.0, KeepyPlaces.FAN_AT.y)  # the fan's own space: x is centred on 0
 	var g := KeepyPlaces.GRILLE
-	var outline := SafeMesh._ellipse(c, g + Vector2(10, 4), 64)
-	var inner := SafeMesh._ellipse(c, g - Vector2(4, 1), 64)
+	var outline := MeshBatch2D._ellipse(c, g + Vector2(10, 4), 64)
+	var inner := MeshBatch2D._ellipse(c, g - Vector2(4, 1), 64)
 	m.band(outline, inner, BRASS.darkened(0.15), BRASS.lightened(0.25))
-	m.band(SafeMesh.grow_outline(outline, SafeMesh.FEATHER), outline, Color(BRASS, 0.0), BRASS.darkened(0.15))
+	m.band(MeshBatch2D.grow_outline(outline, MeshBatch2D.FEATHER), outline, Color(BRASS, 0.0), BRASS.darkened(0.15))
 	for k in 3:
 		var t := 0.35 + k * 0.28
-		var ring_o := SafeMesh._ellipse(c, g * t, 48)
-		var ring_i := SafeMesh._ellipse(c, g * t - Vector2(3, 0.8), 48)
+		var ring_o := MeshBatch2D._ellipse(c, g * t, 48)
+		var ring_i := MeshBatch2D._ellipse(c, g * t - Vector2(3, 0.8), 48)
 		m.band(ring_o, ring_i, Color(BRASS.darkened(0.25), 0.85), Color(BRASS.darkened(0.25), 0.85))
 	for k in 12:
 		var a := k * TAU / 12.0
@@ -259,7 +259,7 @@ func _paint_grille(ci: CanvasItem) -> void:
 
 
 func _paint_rails(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var y := KeepyPlaces.FAN_AT.y + TOP_DEPTH + KeepyPlaces.CRATE_H + 6.0
 	var span := KeepyPlaces.X_SHOWN * KeepyPlaces.PX_PER_M + KeepyPlaces.CRATE_W * 0.5 + 30.0
 	var x0 := KeepyPlaces.FAN_AT.x - span
@@ -276,7 +276,7 @@ func _paint_rails(ci: CanvasItem) -> void:
 ## The height pole: a pine post painted in the three bands (cream, mint, sun), a peg at each band
 ## line, a cap; its foot staked in the ground.
 func _paint_pole(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var x := KeepyPlaces.POLE_X
 	var w := 18.0
 	var foot := KeepyPlaces.FAN_AT.y + TOP_DEPTH + 70.0
@@ -301,7 +301,7 @@ func _paint_pole(ci: CanvasItem) -> void:
 ## windsock-orange pennant at the top. UV.x (depth) runs 0 at the pole to 1 at the tip: the sway
 ## shader's weight.
 func _paint_streamers(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var x := KeepyPlaces.POLE_X + 10.0
 	var lines := [[KeepyPlaces.band_y(KeepyLogic.MID_FROM), KeepyStatus.BAND_COLORS[1], 96.0, 11.0],
 		[KeepyPlaces.band_y(KeepyLogic.HIGH_FROM), KeepyStatus.BAND_COLORS[2], 96.0, 11.0],

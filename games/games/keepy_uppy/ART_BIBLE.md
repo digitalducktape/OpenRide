@@ -8,7 +8,7 @@
 > `KeepyWeather.gd`, `shaders/*.gdshader`, and `KeepyStatus` / `KeepyUppy.look` (UI).
 > **AD-ART-BIBLE:** §11. The graphics punch list is `GFX_POLISH.md`.
 
-Everything is drawn in code: shapes batched by Safe Cracker's `SafeMesh` (one draw call a layer,
+Everything is drawn in code: shapes batched by Safe Cracker's `MeshBatch2D` (one draw call a layer,
 1.2 px feathered edges, per-vertex gradients), a few small canvas shaders, and three tiny sprites
 drawn into images at start (a butterfly, a leaf, a latex shard). No textures from files, no
 third-party art.

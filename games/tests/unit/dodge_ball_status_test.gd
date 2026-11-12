@@ -142,11 +142,11 @@ func test_the_bonus_badge_shows_only_while_the_bonus_is_on() -> void:
 func test_an_empty_shield_does_not_redraw_every_frame() -> void:
 	status.set_state(0.0, true, false, 0, 3, 1)
 	await _settle()
-	var draws := status.draws
+	var draws := status.draws + status.bar.draws
 	for i in 20:
 		status.set_state(0.0, true, false, 0, 3, 1)
 		await get_tree().process_frame
-	assert_int(status.draws - draws).is_less_equal(1)
+	assert_int(status.draws + status.bar.draws - draws).is_less_equal(1)
 
 
 func test_no_text_under_34_px() -> void:

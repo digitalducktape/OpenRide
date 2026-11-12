@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://yhwkp0tl1kjj"
-path="res://.godot/imported/tree_default.glb-7c82a1b8f39cf263c1dc6a3665c2fd0d.scn"
+uid="uid://ckwdabuuaxfvr"
+path="res://.godot/imported/construction-cone.glb-2e1e11eb7b0352ff9e1dfc1e522245fe.scn"
 
 [deps]
 
-source_file="res://games/dodge_ball/models/tree_default.glb"
-dest_files=["res://.godot/imported/tree_default.glb-7c82a1b8f39cf263c1dc6a3665c2fd0d.scn"]
+source_file="res://assets/models/construction-cone.glb"
+dest_files=["res://.godot/imported/construction-cone.glb-2e1e11eb7b0352ff9e1dfc1e522245fe.scn"]
 
 [params]
 

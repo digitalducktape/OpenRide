@@ -139,22 +139,22 @@ func test_playing_redraws_nothing_in_the_world() -> void:
 	_start(_segment())
 	var world: GridStage = game.world
 	var calls := [0]
-	SafeMesh.probe = func(_ci, _p, _i): calls[0] += 1
+	MeshBatch2D.probe = func(_ci, _p, _i): calls[0] += 1
 	for i in 5:
 		await get_tree().process_frame
 	calls[0] = 0
 	for i in 30:
 		world.update_view(0.016, Vector4(1, 1, 0.5, 0), 0.5, 0.6, 0.5, 85.0, true)
 		await get_tree().process_frame
-	SafeMesh.probe = Callable()
+	MeshBatch2D.probe = Callable()
 	assert_int(calls[0]).is_equal(0)
 
 
 func test_the_valley_bakes_once_in_each_palette() -> void:
 	_start(_segment())
 	assert_int(game.world.bakes).is_equal(2)
-	assert_bool(SafeMesh.is_built("grid_valley_0")).is_true()
-	assert_bool(SafeMesh.is_built("grid_valley_1")).is_true()
+	assert_bool(MeshBatch2D.is_built("grid_valley_0")).is_true()
+	assert_bool(MeshBatch2D.is_built("grid_valley_1")).is_true()
 
 
 func test_storm_events_show_and_clear() -> void:

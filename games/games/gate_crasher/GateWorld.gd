@@ -89,18 +89,18 @@ func build(count: int, spacing: float, line_gap: float, stripe_m: float) -> void
 	_lower.clear()
 	_rails.clear()
 	_rail_home.clear()
-	_scenery = KartMeshKit.mesh_node(GateMeshes.scenery(count, spacing), _scenery_mat, "Scenery")
+	_scenery = MeshKit3D.mesh_node(GateMeshes.scenery(count, spacing), _scenery_mat, "Scenery")
 	add_child(_scenery)
-	_markers = KartMeshKit.mesh_node(GateMeshes.markers(count, spacing, line_gap, stripe_m), _marker_mat, "Markers")
+	_markers = MeshKit3D.mesh_node(GateMeshes.markers(count, spacing, line_gap, stripe_m), _marker_mat, "Markers")
 	_markers.custom_aabb = AABB(Vector3(-60, -60, -130), Vector3(120, 70, 260))
 	add_child(_markers)
 	for k in count:
 		var f := GateCourse.frame((k + 1) * spacing)
-		var lower := KartMeshKit.mesh_node(GateMeshes.rails(k), _scenery_mat, "Rails%d" % k)
+		var lower := MeshKit3D.mesh_node(GateMeshes.rails(k), _scenery_mat, "Rails%d" % k)
 		lower.transform = f
 		add_child(lower)
 		_lower.append(lower)
-		var top := KartMeshKit.mesh_node(GateMeshes.top_rail(k), _scenery_mat, "TopRail%d" % k)
+		var top := MeshKit3D.mesh_node(GateMeshes.top_rail(k), _scenery_mat, "TopRail%d" % k)
 		top.transform = f * Transform3D(Basis(), Vector3(0.0, GateMeshes.RAIL_HEIGHTS[-1], 0.0))
 		add_child(top)
 		_rails.append(top)
@@ -261,13 +261,13 @@ func _build_environment() -> void:
 	dome.height = SKY_RADIUS * 2.0
 	dome.radial_segments = 16
 	dome.rings = 8
-	_sky = KartMeshKit.mesh_node(dome, _sky_mat, "Sky")
+	_sky = MeshKit3D.mesh_node(dome, _sky_mat, "Sky")
 	add_child(_sky)
 
 
 func _build_ground() -> void:
-	var ground := PullMeshes.ground_grid(1000.0, 1000.0, 40, 40, 500.0)
-	add_child(KartMeshKit.mesh_node(ground, _ground_mat, "Ground"))
+	var ground := MeshKit3D.ground_grid(1000.0, 1000.0, 40, 40, 500.0)
+	add_child(MeshKit3D.mesh_node(ground, _ground_mat, "Ground"))
 
 
 func _build_rig() -> void:
@@ -283,7 +283,7 @@ func _build_rig() -> void:
 	camera.far = FAR
 	camera.current = true
 	_rig.add_child(camera)
-	_horse = KartMeshKit.mesh_node(GateMeshes.horse(), _horse_mat, "Horse")
+	_horse = MeshKit3D.mesh_node(GateMeshes.horse(), _horse_mat, "Horse")
 	_horse.position = Vector3(0.0, EYE_HEIGHT, 0.0)
 	_rig.add_child(_horse)
 
@@ -307,7 +307,7 @@ func _build_crowd() -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.85)
 	quad.center_offset = Vector3(0.0, 0.425, 0.0)
-	var crowd := KartMeshKit.multimesh_node(quad, transforms, "Crowd", custom, colors)
+	var crowd := MeshKit3D.multimesh_node(quad, transforms, "Crowd", custom, colors)
 	crowd.material_override = _crowd_mat
 	crowd.custom_aabb = AABB(Vector3(GateMeshes.STAND_X - 2.0, -1.0, GateMeshes.STAND_Z.x - 2.0), Vector3(12.0, 8.0, 120.0))
 	add_child(crowd)
@@ -335,7 +335,7 @@ func _build_fx() -> void:
 	ramp.set_color(0, Color(0.85, 0.74, 0.55, 0.6))
 	ramp.set_color(1, Color(0.85, 0.74, 0.55, 0.0))
 	_dust.color_ramp = ramp
-	_dust.mesh = _particle_quad(0.7, KartMeshKit.soft_disc())
+	_dust.mesh = _particle_quad(0.7, MeshKit3D.soft_disc())
 	add_child(_dust)
 	_confetti = CPUParticles3D.new()
 	_confetti.name = "Confetti"

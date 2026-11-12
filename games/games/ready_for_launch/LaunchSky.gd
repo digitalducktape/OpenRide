@@ -12,6 +12,7 @@ const RECT := Rect2(-160, 0, 2240, 1080)
 const STAR_COUNT := 150
 const EARTH_R := 1500.0
 const EARTH_AIR := 170.0  ## the atmosphere's glow past the limb
+const EARTH_MAP := "res://games/ready_for_launch/earth_map.png"
 const MAP_PX_PER_RAD := 2048.0 / TAU  ## earth_map.png's width round the equator
 ## The view of the Earth, in degrees. Near it the limb shows the Mediterranean, Europe and North
 ## Africa along the top of the disc; far away the whole Atlantic side, Africa and the Americas.
@@ -58,15 +59,15 @@ func _init() -> void:
 	mat.shader = preload("res://games/ready_for_launch/shaders/rfl_sky.gdshader")
 	rect.material = mat
 	add_child(rect)
-	stars = SafeDial.Layer.new()
+	stars = PaintLayer.new()
 	stars.name = "Stars"
 	stars.paint = func(ci: CanvasItem) -> void:
-		SafeMesh.built("rfl:stars", func(m: SafeMesh) -> void: paint_stars(m)).draw_on(ci)
+		MeshBatch2D.built("rfl:stars", func(m: MeshBatch2D) -> void: paint_stars(m)).draw_on(ci)
 	add_child(stars)
-	moon = SafeDial.Layer.new()
+	moon = PaintLayer.new()
 	moon.name = "Moon"
 	moon.paint = func(ci: CanvasItem) -> void:
-		SafeMesh.built("rfl:moon", func(m: SafeMesh) -> void: paint_moon(m)).draw_on(ci)
+		MeshBatch2D.built("rfl:moon", func(m: MeshBatch2D) -> void: paint_moon(m)).draw_on(ci)
 	add_child(moon)
 	earth = Node2D.new()
 	earth.name = "Earth"
@@ -78,15 +79,17 @@ func _init() -> void:
 	globe.position = -globe.size * 0.5
 	var globe_mat := ShaderMaterial.new()
 	globe_mat.shader = preload("res://games/ready_for_launch/shaders/rfl_earth.gdshader")
-	globe_mat.set_shader_parameter("map", preload("res://games/ready_for_launch/earth_map.png"))
+	# Loaded, not preloaded: a preload is held by this script for the app's life (about 11 MB of
+	# texture with its mipmaps); this way the map is freed with the game.
+	globe_mat.set_shader_parameter("map", load(EARTH_MAP))
 	globe_mat.set_shader_parameter("disc", EARTH_R / (EARTH_R + EARTH_AIR))
 	globe.material = globe_mat
 	earth.add_child(globe)
-	deck_far = SafeDial.Layer.new()
+	deck_far = PaintLayer.new()
 	deck_far.name = "DeckFar"
 	deck_far.paint = _paint_deck.bind(0)
 	add_child(deck_far)
-	front = SafeDial.Layer.new()
+	front = PaintLayer.new()
 	front.name = "DeckNear"
 	front.paint = _paint_deck.bind(1)
 
@@ -186,7 +189,7 @@ func moon_rect() -> Rect2:
 
 
 ## Two copies of the same field, one screen apart, so the drift wraps without a seam.
-static func paint_stars(m: SafeMesh) -> void:
+static func paint_stars(m: MeshBatch2D) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90
 	for i in STAR_COUNT:
@@ -201,7 +204,7 @@ static func paint_stars(m: SafeMesh) -> void:
 
 
 ## The Moon: grey with dark seas and craters, lit from the right. Centred on the origin.
-static func paint_moon(m: SafeMesh) -> void:
+static func paint_moon(m: MeshBatch2D) -> void:
 	var r := MOON_R
 	m.glow(Vector2.ZERO, Vector2(r + 70.0, r + 70.0), Color(0.86, 0.9, 1.0, 0.07), 8, 0.86, r - 30.0)
 	m.circle(Vector2.ZERO, r, Color("b9b7b2"))
@@ -227,10 +230,10 @@ static func paint_moon(m: SafeMesh) -> void:
 
 ## A soft lump: solid to 60% of its radius, fading out by the edge. Few vertices, because the
 ## decks and the Earth's weather are drawn every frame they show, not baked.
-static func _soft(m: SafeMesh, at: Vector2, radius: Vector2, col: Color) -> void:
-	var inner := SafeMesh._ellipse(at, radius * 0.6, 16)
+static func _soft(m: MeshBatch2D, at: Vector2, radius: Vector2, col: Color) -> void:
+	var inner := MeshBatch2D._ellipse(at, radius * 0.6, 16)
 	m.fill(inner, col, false)
-	m.band(inner, SafeMesh._ellipse(at, radius, 16), col, Color(col, 0.0))
+	m.band(inner, MeshBatch2D._ellipse(at, radius, 16), col, Color(col, 0.0))
 
 
 ## A soft-edged land or sea shape: an ellipse wobbled by two low sine waves, so it never looks cut.
@@ -248,7 +251,7 @@ static func _blob(at: Vector2, size: Vector2, rng: RandomNumberGenerator) -> Pac
 ## A wide cloud deck: lumpy tops, a flat base, lit from the right. Deck 0 is a full-width floor,
 ## deck 1 banks at the sides with a gap for the rocket.
 func _paint_deck(ci: CanvasItem, deck: int) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var p := LaunchPlaces.place(_place)
 	var lit: Color = p.cloud
 	var shade: Color = p.cloud2

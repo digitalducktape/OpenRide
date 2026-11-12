@@ -16,7 +16,7 @@ extends Node2D
 ##   Bunch      every tied balloon, one MultiMesh, swaying on a rotation tween; its strings one batch
 ##              redrawn only when a balloon lands;
 ##   Nozzle / Flyer  the balloon on the nozzle and the one flying up: a quad each, shaded per pixel.
-## Each SafeMesh batch (Safe Cracker's batcher, read only) is one draw call.
+## Each MeshBatch2D batch (Safe Cracker's batcher, read only) is one draw call.
 
 const BUNCH_MAX := 40  ## the bunch shows at most this many; later balloons replace the oldest
 const BUNCH_SCALE := 0.42  ## a bunch balloon's size as a share of its nozzle size
@@ -44,21 +44,21 @@ var place_index := -1
 var bakes := 0  ## room renders made (tests)
 
 var _bake: SubViewport
-var _room: Layer
+var _room: MeshLayer
 var _room_view: Sprite2D
 var _sea: ColorRect
-var _wheel: Layer
+var _wheel: MeshLayer
 var _wheel_tween: Tween
-var _bulbs: Layer
+var _bulbs: MeshLayer
 var _dust: CPUParticles2D
 var _plunger_clip: Control
-var _plunger: Layer
-var _lip: Layer
+var _plunger: MeshLayer
+var _lip: MeshLayer
 var _wedge: ColorRect
 var _wedge_mat: ShaderMaterial
-var _needle: Layer
+var _needle: MeshLayer
 var _bunch: Node2D
-var _strings: Layer
+var _strings: MeshLayer
 var _bunch_mm: MultiMesh
 var _bunch_mat: ShaderMaterial
 var _sway_tween: Tween
@@ -88,20 +88,6 @@ var _warming := false
 var _lx := 0.0
 
 
-## A Node2D that draws one SafeMesh batch, built by `paint` (a Callable taking the SafeMesh).
-class Layer extends Node2D:
-	var paint: Callable
-	var batch: SafeMesh
-
-	func _draw() -> void:
-		if batch:
-			batch.draw_on(self)
-		elif paint.is_valid():
-			var m := SafeMesh.new()
-			paint.call(m)
-			m.flush(self)
-
-
 func _init() -> void:
 	_sea = ColorRect.new()
 	_sea.name = "Sea"
@@ -120,7 +106,7 @@ func _init() -> void:
 	_bake.size = Vector2i(PumpPlaces.WIDE)
 	_bake.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_bake)
-	_room = Layer.new()
+	_room = MeshLayer.new()
 	_room.name = "Room"
 	_room.position = Vector2(PumpPlaces.BLEED, 0)
 	_bake.add_child(_room)
@@ -144,12 +130,12 @@ func _init() -> void:
 	_plunger_clip.position = Vector2(PumpPlaces.PUMP_X - 160, 160)
 	_plunger_clip.size = Vector2(320, PumpPlaces.COLLAR.position.y - 160)
 	add_child(_plunger_clip)
-	_plunger = Layer.new()
+	_plunger = MeshLayer.new()
 	_plunger.name = "Plunger"
-	_plunger.paint = func(m: SafeMesh): PumpArt.paint_plunger(m, _lx)
+	_plunger.paint = func(m: MeshBatch2D): PumpArt.paint_plunger(m, _lx)
 	_plunger.position = Vector2(160, PLUNGER_TOP - 160)
 	_plunger_clip.add_child(_plunger)
-	_lip = _layer("CollarLip", func(m: SafeMesh): PumpArt.paint_collar_lip(m, _lx))
+	_lip = _layer("CollarLip", func(m: MeshBatch2D): PumpArt.paint_collar_lip(m, _lx))
 	_wedge = ColorRect.new()
 	_wedge.name = "Wedge"
 	_wedge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -166,7 +152,7 @@ func _init() -> void:
 	_bunch.name = "Bunch"
 	_bunch.position = PumpPlaces.TETHER
 	add_child(_bunch)
-	_strings = Layer.new()
+	_strings = MeshLayer.new()
 	_strings.name = "Strings"
 	_strings.paint = _paint_strings
 	_bunch.add_child(_strings)
@@ -186,7 +172,7 @@ func _init() -> void:
 	# The nozzle balloon's soft shadow on the floor, growing with it (a sprite: no redraw).
 	_shadow = Sprite2D.new()
 	_shadow.name = "BalloonShadow"
-	_shadow.texture = SafePlaces.soft_dot()
+	_shadow.texture = MeshBatch2D.soft_dot()
 	_shadow.modulate = Color(0, 0, 0, 0.5)
 	_shadow.position = Vector2(PumpPlaces.NOZZLE.x - 30, PumpPlaces.FLOOR_Y - 2)
 	add_child(_shadow)
@@ -210,8 +196,8 @@ func _ready() -> void:
 	_start_sway()
 
 
-func _layer(layer_name: String, paint: Callable, mat: Material = null) -> Layer:
-	var l := Layer.new()
+func _layer(layer_name: String, paint: Callable, mat: Material = null) -> MeshLayer:
+	var l := MeshLayer.new()
 	l.name = layer_name
 	l.paint = paint
 	l.material = mat
@@ -263,7 +249,7 @@ static func balloon_quad() -> ArrayMesh:
 ## Builds every place's room batch ahead (behind the intro card), so a place change only bakes.
 static func prebuild() -> void:
 	for i in PumpPlaces.count():
-		SafeMesh.built("pump_room_%d" % i, func(m: SafeMesh): PumpPlaces.paint(m, i))
+		MeshBatch2D.built("pump_room_%d" % i, func(m: MeshBatch2D): PumpPlaces.paint(m, i))
 
 ## Moves the stage to place `index` (PumpPlaces): the room is baked again, the ambient life
 ## switches, and every balloon takes the new key light.
@@ -276,7 +262,7 @@ func set_place(index: int) -> void:
 	var id := str(p.id)
 	var l := PumpPlaces.light(index)
 	_lx = clampf(((l.at as Vector2).x - PumpPlaces.PUMP_X) / 600.0, -1.0, 1.0)
-	_room.batch = SafeMesh.built("pump_room_%d" % index, func(m: SafeMesh): PumpPlaces.paint(m, index))
+	_room.batch = MeshBatch2D.built("pump_room_%d" % index, func(m: MeshBatch2D): PumpPlaces.paint(m, index))
 	_room.queue_redraw()
 	_bake.transparent_bg = id == "pier"
 	_bake.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -378,7 +364,7 @@ func _place_nozzle_balloon() -> void:
 	var slide := (1.0 - ease(_load_t, 0.4)) * -60.0
 	var lean := sin(Time.get_ticks_msec() * 0.0011) * 0.025 * (0.3 + f)
 	_nozzle.transform = Transform2D(lean, Vector2(s, s * limp), 0.0, PumpPlaces.NOZZLE + Vector2(0, slide))
-	var dot := float(SafePlaces.soft_dot().get_width())
+	var dot := float(MeshBatch2D.soft_dot().get_width())
 	_shadow.scale = Vector2(s * 1.7, s * 0.28) / (dot * 0.5)
 	_shadow.modulate.a = 0.22 + 0.25 * f
 
@@ -396,7 +382,7 @@ func _slot(i: int, kind: String) -> Array:
 	return [Transform2D(tilt, Vector2(r, r), 0.0, knot), knot + up * r * 1.22]
 
 
-func _paint_strings(m: SafeMesh) -> void:
+func _paint_strings(m: MeshBatch2D) -> void:
 	for i in mini(_bunch_count, BUNCH_MAX):
 		var knot: Vector2 = (_slot(i, _slot_kinds.get(i, "small"))[0] as Transform2D).origin
 		var mid := knot * 0.5 + Vector2(sin(i * 1.7) * 10.0, 0)
@@ -549,7 +535,7 @@ static func burst_top(at: Vector2, big: bool) -> float:
 
 # --- Drawings and effects ---
 
-func _paint_wheel(m: SafeMesh) -> void:
+func _paint_wheel(m: MeshBatch2D) -> void:
 	var r := PumpPlaces.WHEEL_R
 	var ink := Color(0.16, 0.12, 0.22)
 	m.ring(Vector2.ZERO, r - 6.0, r + 4.0, ink)
@@ -575,7 +561,7 @@ func _paint_wheel(m: SafeMesh) -> void:
 	m.depth = 0.0
 
 
-func _paint_bulbs(m: SafeMesh) -> void:
+func _paint_bulbs(m: MeshBatch2D) -> void:
 	if place_index < 0:
 		return
 	var colours := [Color(1.0, 0.88, 0.55), Color(1.0, 0.6, 0.55), Color(0.7, 0.9, 1.0), Color(0.75, 1.0, 0.7)]
@@ -601,7 +587,7 @@ func _make_dust() -> CPUParticles2D:
 	d.amount = DUST
 	d.lifetime = 9.0
 	d.preprocess = 9.0
-	d.texture = SafePlaces.soft_dot()
+	d.texture = MeshBatch2D.soft_dot()
 	d.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	d.emission_rect_extents = Vector2(380, 320)
 	d.position = Vector2(930, 520)
@@ -663,7 +649,7 @@ func _make_hiss() -> CPUParticles2D:
 	h.amount = 10
 	h.lifetime = 0.7
 	h.emitting = false
-	h.texture = SafePlaces.soft_dot()
+	h.texture = MeshBatch2D.soft_dot()
 	h.position = PumpPlaces.NOZZLE + Vector2(14, -6)
 	h.direction = Vector2(1, -0.3)
 	h.spread = 25.0
@@ -687,7 +673,7 @@ func _make_puff() -> CPUParticles2D:
 	p.one_shot = true
 	p.explosiveness = 0.9
 	p.emitting = false
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.position = Vector2(PumpPlaces.PUMP_X, PumpPlaces.COLLAR.position.y - 4)
 	p.direction = Vector2(0, -1)
 	p.spread = 70.0

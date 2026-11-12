@@ -20,12 +20,12 @@ var dial: SafeDial
 
 
 func _draw() -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	build(m)
 	m.flush(self)
 
 
-func build(m: SafeMesh) -> void:
+func build(m: MeshBatch2D) -> void:
 	var colour := dial.colour
 	var accent := dial.accent
 	var index := dial.place_index
@@ -53,7 +53,7 @@ func build(m: SafeMesh) -> void:
 	m.bevel(D.grow(-28.0), 12.0, 3.0, -to_light, colour.lightened(0.3), colour.darkened(0.45))
 	m.shade = Callable()
 	for p in _rivets():
-		SafePlaces.rivet(m, p, 10.0, colour, to_light)
+		MeshBatch2D.rivet(m, p, 10.0, colour, to_light)
 	_hinges(m, colour, to_light)
 	_handle(m, colour, to_light)
 	_sockets(m, colour, to_light)
@@ -62,7 +62,7 @@ func build(m: SafeMesh) -> void:
 
 
 ## 36 thin horizontal streaks at 4-6% white, seeded by the place.
-func _streaks(m: SafeMesh, colour: Color, index: int) -> void:
+func _streaks(m: MeshBatch2D, colour: Color, index: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 101 + index
 	for i in 36:
@@ -89,7 +89,7 @@ func _rivets() -> Array[Vector2]:
 
 
 ## Two hinge barrels on the hinge (left) edge: lit cylinders with caps and a pin.
-func _hinges(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
+func _hinges(m: MeshBatch2D, colour: Color, to_light: Vector2) -> void:
 	var steel := colour.lightened(0.15)
 	var hi := steel.lightened(0.45)
 	var lo := steel.darkened(0.55)
@@ -102,11 +102,11 @@ func _hinges(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
 		m.rect_h(Rect2(r.position.x + r.size.x * 0.4, r.position.y, r.size.x * 0.6, r.size.y), steel.lightened(0.25), right)
 		for cap_y in [r.position.y, r.end.y - 8.0, y - 2.0]:
 			m.rect_v(Rect2(r.position.x - 2.0, cap_y, r.size.x + 4.0, 8.0 if cap_y != y - 2.0 else 4.0), hi, lo)
-		SafePlaces.rivet(m, Vector2(r.get_center().x, r.position.y - 6.0), 6.0, colour, to_light)
+		MeshBatch2D.rivet(m, Vector2(r.get_center().x, r.position.y - 6.0), 6.0, colour, to_light)
 
 
 ## A compact four-spoke handle wheel under the tumbler lights.
-func _handle(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
+func _handle(m: MeshBatch2D, colour: Color, to_light: Vector2) -> void:
 	var c := HANDLE
 	var steel := colour.lightened(0.35)
 	m.glow(c + Vector2(8, 12), Vector2(HANDLE_R + 16, HANDLE_R + 16), Color(0, 0, 0, 0.45), 8, 0.5)
@@ -117,27 +117,27 @@ func _handle(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
 		m.line(c + dir * 12.0 + dir.orthogonal() * -2.0, c + dir * (HANDLE_R - 6.0) + dir.orthogonal() * -2.0, 3.0, steel.lightened(0.3))
 		m.circle(c + dir * HANDLE_R, 8.0, steel.darkened(0.1))
 		m.circle(c + dir * HANDLE_R + to_light * 3.0, 3.5, steel.lightened(0.5))
-	lit_ring(m, c, HANDLE_R - 6.0, HANDLE_R + 3.0, steel.lightened(0.4), steel.darkened(0.45), to_light)
+	MeshBatch2D.lit_ring(m, c, HANDLE_R - 6.0, HANDLE_R + 3.0, steel.lightened(0.4), steel.darkened(0.45), to_light)
 	m.circle(c, 16.0, steel.darkened(0.35))
 	m.circle(c + Vector2(-2, -3), 12.0, steel.lightened(0.2))
 	m.circle(c + Vector2(-4, -5), 4.0, Color(1, 1, 1, 0.55))
 
 
 ## Recessed sockets for the tumbler lights (dark on the lit side: they're cut in).
-func _sockets(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
+func _sockets(m: MeshBatch2D, colour: Color, to_light: Vector2) -> void:
 	for i in dial.tumblers_total:
 		var at := SafeDial.light_at(i, dial.tumblers_total)
-		lit_ring(m, at, SafeDial.LIGHT_R + 4.0, SafeDial.LIGHT_R + 10.0, colour.darkened(0.5), colour.lightened(0.35), to_light)
+		MeshBatch2D.lit_ring(m, at, SafeDial.LIGHT_R + 4.0, SafeDial.LIGHT_R + 10.0, colour.darkened(0.5), colour.lightened(0.35), to_light)
 
 
 ## The bezel (a knurled steel ring), the dark dial face with a faint centre lift, the ticks.
-func _dial_face(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
+func _dial_face(m: MeshBatch2D, colour: Color, to_light: Vector2) -> void:
 	var r := SafeDial.R
 	# The bezel's shadow: only its rim shows past the bezel (the face disc, r + 8, covers the
 	# rings inside r - 10 even 19 px off centre).
 	m.glow(Vector2(10, 16), Vector2(r + 70.0, r + 70.0), Color(0, 0, 0, 0.5), 10, 0.75, r - 10.0)
-	lit_ring(m, Vector2.ZERO, r + 22.0, r + 40.0, colour.lightened(0.15), colour.darkened(0.6), to_light)
-	lit_ring(m, Vector2.ZERO, r + 8.0, r + 24.0, colour.lightened(0.5), colour.darkened(0.25), to_light)
+	MeshBatch2D.lit_ring(m, Vector2.ZERO, r + 22.0, r + 40.0, colour.lightened(0.15), colour.darkened(0.6), to_light)
+	MeshBatch2D.lit_ring(m, Vector2.ZERO, r + 8.0, r + 24.0, colour.lightened(0.5), colour.darkened(0.25), to_light)
 	# The knurl: short radial ridges on the outer ring.
 	for k in 120:
 		var a := TAU * k / 120.0
@@ -155,7 +155,7 @@ func _dial_face(m: SafeMesh, colour: Color, to_light: Vector2) -> void:
 
 
 ## The target's plate: soot with a brass edge (grey when the target is hidden), two brass pins.
-func _plate(m: SafeMesh, accent: Color) -> void:
+func _plate(m: MeshBatch2D, accent: Color) -> void:
 	var plate := SafeDial.TARGET_PLATE
 	var edge := accent if not dial.target_hidden else Color(0.75, 0.78, 0.85)
 	m.soft_shadow(Rect2(plate.position + Vector2(4, 8), plate.size), 16.0, 12.0, Color(0, 0, 0, 0.45))
@@ -167,17 +167,3 @@ func _plate(m: SafeMesh, accent: Color) -> void:
 		m.circle(Vector2(x - 1.0, plate.get_center().y - 3.0), 2.5, edge.lightened(0.4))
 
 
-## A ring whose colour follows its normal: `hi` facing the light, `lo` away.
-static func lit_ring(m: SafeMesh, c: Vector2, r0: float, r1: float, hi: Color, lo: Color, to_light: Vector2) -> void:
-	var segs := SafeMesh.segments_for(r1)
-	var inner := SafeMesh.arc_points(c, r0, 0.0, TAU, segs)
-	var outer := SafeMesh.arc_points(c, r1, 0.0, TAU, segs)
-	var cols := PackedColorArray()
-	var clear := PackedColorArray()
-	for k in segs:
-		var a := TAU * k / segs
-		var col := lo.lerp(hi, clampf(0.5 + 0.7 * Vector2(cos(a), sin(a)).dot(to_light), 0.0, 1.0))
-		cols.append(col)
-		clear.append(Color(col, 0.0))
-	m.band_colors(inner, outer, cols, cols)
-	m.band_colors(outer, SafeMesh.arc_points(c, r1 + SafeMesh.FEATHER, 0.0, TAU, segs), cols, clear)

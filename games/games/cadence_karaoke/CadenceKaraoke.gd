@@ -39,7 +39,8 @@ const BUTTON_MARGIN := 30  ## from the bottom edge
 var logic: CadenceLogic
 var world: CadenceWorld
 
-var _view: SubViewport
+## The 3D view: the world renders in it, and its image draws it over the whole canvas.
+var view: StageView3D
 var _status: CadenceStatus
 var _minus: Button
 var _plus: Button
@@ -52,7 +53,6 @@ var _beat_flare := 0.0
 var _requested_tempo := 0
 var _retempo_left := RETEMPO_SEC
 var _pending_wait := 0.0
-var _message_left := 0.0
 var _seed := 0
 var _band_for := -1
 var _circuit := false
@@ -107,24 +107,13 @@ func _ready() -> void:
 	CadenceAudioScript.register()
 	world = CadenceWorld.new()
 	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_fit_view()
-	Stage.changed.connect(_fit_view)
-	_view.msaa_3d = MSAA
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	var shown := TextureRect.new()
-	shown.name = "View3DImage"
-	shown.texture = _view.get_texture()
-	shown.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	shown.stretch_mode = TextureRect.STRETCH_SCALE
-	shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	shown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shown)
-	Stage.bleed(shown)  # the whole window, past the centred stage (#57)
+	# No vignette in the image: the tunnel's look is its own.
+	view = StageView3D.new(RENDER_SCALE)
+	view.vignette = 0.0
+	view.msaa_3d = MSAA
+	add_child(view)
+	view.add_child(world)
+	add_child(view.image)
 	# The target buttons (−5 and +5 rpm), bottom centre: far from End (top right). Built here in
 	# the free segment's look; `_on_prepare` restyles them in the segment's.
 	var layer := CanvasLayer.new()
@@ -190,11 +179,6 @@ func _restyle() -> void:
 	ui_theme_changed.emit()  # the intro card, the pause screen and the summary follow
 
 
-## The 3D view's size for the window: it draws over the whole window (#57).
-func _fit_view() -> void:
-	_view.size = Stage.view_size(RENDER_SCALE)
-
-
 func _on_prepare(seg: Dictionary) -> void:
 	_circuit = params.has("cadence_profile")
 	var rules := params.duplicate()
@@ -202,6 +186,7 @@ func _on_prepare(seg: Dictionary) -> void:
 		# A Just Ride caps power at 75% of FTP (Endurance).
 		rules["power_cap_watts"] = float(params.get("ftp_watts", 0.0)) * 0.75
 	logic = CadenceLogic.new(difficulty, rules)
+	hud.metrics.set_power_source(smoothed_power)
 	_seed = int(seg.get("seed", 0))
 	_beat_phase = 0.0
 	_pending_wait = 0.0
@@ -216,13 +201,17 @@ func _on_prepare(seg: Dictionary) -> void:
 	_requested_tempo = roundi(logic.target())
 	AudioDirector.play_music(MUSIC_STYLE, float(_requested_tempo), _seed)
 	AudioDirector.set_intensity(0.4)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, CadenceAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, CadenceAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(CadenceAudioScript.music_effects(), CadenceAudioScript.sfx_effects())
 	if not AudioDirector.tempo_swapped.is_connected(_on_tempo_swapped):
 		AudioDirector.tempo_swapped.connect(_on_tempo_swapped)
 	world.update_view(0.0, 0.0, logic.band_fraction(), 0.0, "out", false, 0.0, logic.target() / 60.0)
 	_update_status()
+
+
+## The ride panel's W: the rules' smoothed power (the "Ease off" freeze is judged on it). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smoothed_power if logic and logic.smoothed_power >= 0.0 else InputBus.power
 
 
 func _on_start() -> void:
@@ -313,10 +302,6 @@ func _on_frame(delta: float) -> void:
 	_update_bands()
 	_update_status()
 	AudioDirector.set_intensity(1.0 if logic.in_band and not logic.frozen else 0.4)
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	stats = {
 		"pct_in_band": roundi(logic.pct_in_band()),
 		"longest_streak": roundi(logic.longest_streak),
@@ -339,7 +324,7 @@ func _handle(event: Dictionary) -> void:
 			GameMix.duck_for_moment(1.0)
 			_show_message("Ease off a little", 2.0, HudTheme.WARN)
 		"recovered":
-			_message_left = 0.01
+			hud.hide_message()
 
 
 ## The beat: one a pedal stroke at the target cadence. The visual flares on it and, if the rider
@@ -413,5 +398,4 @@ func _swap_eta_text() -> String:
 
 
 func _show_message(text: String, seconds: float, color := HudTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

@@ -1,7 +1,7 @@
 class_name LaunchRocket
 extends Node2D
 ## The hero (#82; ART_BIBLE.md §3): a chunky stepped spacecraft, drawn in code. Each section is one
-## `SafeMesh` layer, built once per mark, so a stage can drop away as its own node. The origin is
+## `MeshBatch2D` layer, built once per mark, so a stage can drop away as its own node. The origin is
 ## the engines' exit, on the launch table; y is negative upward.
 ##
 ## Silhouette (the rider's warning): the outline is a stepped tower that gets narrower going up,
@@ -113,7 +113,7 @@ func setup(index: int) -> void:
 	var parts: Array = spec.sections
 	var made: Array[Node2D] = []
 	for i in parts.size():
-		var layer: Node2D = SafeDial.Layer.new()
+		var layer: Node2D = PaintLayer.new()
 		layer.name = "Section%d" % i
 		layer.position = Vector2(0, -y)
 		var key := "rfl:mk%d:%d" % [mark, i]
@@ -121,7 +121,7 @@ func setup(index: int) -> void:
 		var next_w: float = float(parts[i + 1].w) if i + 1 < parts.size() else 0.0
 		var bells: int = spec.bells
 		layer.paint = func(ci: CanvasItem) -> void:
-			SafeMesh.built(key, func(m: SafeMesh) -> void: paint_section(m, part, next_w, bells, i)).draw_on(ci)
+			MeshBatch2D.built(key, func(m: MeshBatch2D) -> void: paint_section(m, part, next_w, bells, i)).draw_on(ci)
 		made.append(layer)
 		sections.append(layer)
 		offsets.append(y)
@@ -130,21 +130,21 @@ func setup(index: int) -> void:
 	for i in range(made.size() - 1, -1, -1):
 		add_child(made[i])
 	# The sight glass's level on the booster, and the capsule's folded legs.
-	sight = SafeDial.Layer.new()
+	sight = PaintLayer.new()
 	sight.name = "FuelLevel"
 	var booster_h: float = parts[0].h
 	sight.position = Vector2(0, -24.0)
 	sight.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.rect_v(Rect2(-13.0, -(booster_h - 48.0), 26.0, booster_h - 48.0), Color("ffe08a"), Color("f5a623"))
 		m.flush(ci)
 	sight.scale.y = 0.0
 	sections[0].add_child(sight)
-	legs = SafeDial.Layer.new()
+	legs = PaintLayer.new()
 	legs.name = "Legs"
 	var cap_w: float = parts[-1].w
 	legs.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		paint_legs(m, cap_w)
 		m.flush(ci)
 	legs.visible = false
@@ -242,7 +242,7 @@ func _place_flame() -> void:
 	(flame.material as ShaderMaterial).set_shader_parameter("tongues", float(count))
 
 
-# --- Painting (all once per mark, through SafeMesh.built) ---
+# --- Painting (all once per mark, through MeshBatch2D.built) ---
 
 ## The cylinder's light across its width: u is -1 at the left, 1 at the right; the key light is
 ## right of centre, a soft bounce on the far left edge.
@@ -256,7 +256,7 @@ static func _lit(col: Color, u: float) -> Color:
 
 
 ## A hull band from `y0` to `y1` (y0 lower, both negative up), `w0` wide at y0 and `w1` at y1.
-static func _hull(m: SafeMesh, y0: float, y1: float, w0: float, w1: float, col: Color) -> void:
+static func _hull(m: MeshBatch2D, y0: float, y1: float, w0: float, w1: float, col: Color) -> void:
 	var strips := 12
 	for k in strips:
 		var a := -1.0 + 2.0 * k / strips
@@ -270,7 +270,7 @@ static func _hull(m: SafeMesh, y0: float, y1: float, w0: float, w1: float, col: 
 
 
 ## A straight joint round the hull with a row of rivets on it.
-static func _seam(m: SafeMesh, y: float, w: float, rivets := 9) -> void:
+static func _seam(m: MeshBatch2D, y: float, w: float, rivets := 9) -> void:
 	m.line(Vector2(-w * 0.5, y), Vector2(w * 0.5, y), 2.0, Color(0.1, 0.1, 0.16, 0.34))
 	m.line(Vector2(-w * 0.5, y + 2.0), Vector2(w * 0.5, y + 2.0), 1.4, Color(1, 1, 1, 0.22))
 	for k in rivets:
@@ -279,7 +279,7 @@ static func _seam(m: SafeMesh, y: float, w: float, rivets := 9) -> void:
 
 
 ## A collar: a ring wider than the hull, the silhouette's step.
-static func _collar(m: SafeMesh, y: float, w: float, h := 14.0) -> void:
+static func _collar(m: MeshBatch2D, y: float, w: float, h := 14.0) -> void:
 	_hull(m, y, y - h, w + 20.0, w + 20.0, STEEL)
 	m.line(Vector2(-w * 0.5 - 10.0, y - h), Vector2(w * 0.5 + 10.0, y - h), 2.0, Color(1, 1, 1, 0.38))
 	for k in 11:
@@ -288,7 +288,7 @@ static func _collar(m: SafeMesh, y: float, w: float, h := 14.0) -> void:
 
 
 ## A ribbed adapter, `w0` wide at the bottom and `w1` at the top.
-static func _skirt(m: SafeMesh, y: float, w0: float, w1: float) -> void:
+static func _skirt(m: MeshBatch2D, y: float, w0: float, w1: float) -> void:
 	_hull(m, y, y - SKIRT_H, w0, w1, Color("9aa0ae"))
 	for k in 15:
 		var u := -0.93 + 1.86 * k / 14.0
@@ -296,7 +296,7 @@ static func _skirt(m: SafeMesh, y: float, w0: float, w1: float) -> void:
 
 
 ## A porthole: a brass rim with bolts, warm glass and a glint.
-static func _porthole(m: SafeMesh, at: Vector2, r: float) -> void:
+static func _porthole(m: MeshBatch2D, at: Vector2, r: float) -> void:
 	m.circle(at + Vector2(-1.5, 3.0), r + 7.0, Color(0, 0, 0, 0.25))
 	m.circle(at, r + 6.0, BRASS.darkened(0.15))
 	m.ring(at, r + 2.0, r + 6.0, BRASS.lightened(0.25), -PI * 0.5, PI * 0.4)
@@ -309,7 +309,7 @@ static func _porthole(m: SafeMesh, at: Vector2, r: float) -> void:
 
 
 ## One engine bell, its mouth at `y` and throat above.
-static func _bell(m: SafeMesh, x: float, y: float, h: float, w: float) -> void:
+static func _bell(m: MeshBatch2D, x: float, y: float, h: float, w: float) -> void:
 	var dark := Color("2c2f3c")
 	var strips := 6
 	for k in strips:
@@ -326,7 +326,7 @@ static func _bell(m: SafeMesh, x: float, y: float, h: float, w: float) -> void:
 
 
 ## An angular swept fin on side `s` (-1 left, 1 right): straight edges, sharp corners.
-static func _fin(m: SafeMesh, s: float, root_top: float, root_bottom: float, half_w: float, span: float) -> void:
+static func _fin(m: MeshBatch2D, s: float, root_top: float, root_bottom: float, half_w: float, span: float) -> void:
 	var a := Vector2(s * (half_w - 3.0), root_top)
 	var b := Vector2(s * (half_w + span * 0.8), root_bottom + 6.0)
 	var c := Vector2(s * (half_w + span), root_bottom + BELL_H + 10.0)
@@ -345,7 +345,7 @@ static func _fin(m: SafeMesh, s: float, root_top: float, root_bottom: float, hal
 
 
 ## Grime running down from a seam: soft dark streaks, never many.
-static func _streaks(m: SafeMesh, seed_value: int, y0: float, y1: float, w: float) -> void:
+static func _streaks(m: MeshBatch2D, seed_value: int, y0: float, y1: float, w: float) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	for k in 7:
@@ -357,7 +357,7 @@ static func _streaks(m: SafeMesh, seed_value: int, y0: float, y1: float, w: floa
 			Color(0.16, 0.13, 0.13, 0.17), Color(0.16, 0.13, 0.13, 0.17), Color(0.16, 0.13, 0.13, 0.0), Color(0.16, 0.13, 0.13, 0.0))
 
 
-static func paint_section(m: SafeMesh, part: Dictionary, next_w: float, bells: int, index: int) -> void:
+static func paint_section(m: MeshBatch2D, part: Dictionary, next_w: float, bells: int, index: int) -> void:
 	var w: float = part.w
 	var h: float = part.h
 	match str(part.kind):
@@ -371,7 +371,7 @@ static func paint_section(m: SafeMesh, part: Dictionary, next_w: float, bells: i
 			_paint_capsule(m, w, h)
 
 
-static func _paint_booster(m: SafeMesh, w: float, h: float, next_w: float, bells: int, fin: float) -> void:
+static func _paint_booster(m: MeshBatch2D, w: float, h: float, next_w: float, bells: int, fin: float) -> void:
 	var bell_w := w * (0.62 if bells == 1 else 0.44 if bells == 2 else 0.34)
 	var spread := 0.0 if bells == 1 else w * 0.26 if bells == 2 else w * 0.33
 	for k in bells:
@@ -401,7 +401,7 @@ static func _paint_booster(m: SafeMesh, w: float, h: float, next_w: float, bells
 
 
 ## A wrapped colour block on the hull between `left` and `left + block` (x), shaded with the hull.
-static func _block(m: SafeMesh, left: float, y: float, block: float, h: float, col: Color, w: float) -> void:
+static func _block(m: MeshBatch2D, left: float, y: float, block: float, h: float, col: Color, w: float) -> void:
 	var strips := 4
 	for k in strips:
 		var x0 := left + block * k / strips
@@ -411,7 +411,7 @@ static func _block(m: SafeMesh, left: float, y: float, block: float, h: float, c
 		m.quad4(Vector2(x0, y - h), Vector2(x1, y - h), Vector2(x1, y), Vector2(x0, y), c0, c1, c1, c0)
 
 
-static func _paint_middle(m: SafeMesh, w: float, h: float, next_w: float, index: int) -> void:
+static func _paint_middle(m: MeshBatch2D, w: float, h: float, next_w: float, index: int) -> void:
 	_bell(m, 0.0, 34.0, 34.0, w * 0.5)
 	_hull(m, 0.0, -h, w, w, HULL)
 	_collar(m, 6.0, w)
@@ -428,7 +428,7 @@ static func _paint_middle(m: SafeMesh, w: float, h: float, next_w: float, index:
 	_skirt(m, -h, w, next_w)
 
 
-static func _paint_upper(m: SafeMesh, w: float, h: float, next_w: float, index: int) -> void:
+static func _paint_upper(m: MeshBatch2D, w: float, h: float, next_w: float, index: int) -> void:
 	_bell(m, 0.0, 34.0, 34.0, w * 0.54)
 	_hull(m, 0.0, -h, w, w, HULL)
 	_collar(m, 6.0, w)
@@ -442,7 +442,7 @@ static func _paint_upper(m: SafeMesh, w: float, h: float, next_w: float, index: 
 
 
 ## The capsule: a straight-sided cone with a stepped base, big portholes and a sharp tip mast.
-static func _paint_capsule(m: SafeMesh, w: float, h: float) -> void:
+static func _paint_capsule(m: MeshBatch2D, w: float, h: float) -> void:
 	_bell(m, 0.0, 34.0, 34.0, w * 0.6)
 	_collar(m, 6.0, w, 16.0)
 	# The service drum, then two cone facets (a break in the line: angular, not an ogive).
@@ -464,7 +464,7 @@ static func _paint_capsule(m: SafeMesh, w: float, h: float) -> void:
 
 
 ## The capsule's landing legs: splayed struts with flat pads.
-static func paint_legs(m: SafeMesh, w: float) -> void:
+static func paint_legs(m: MeshBatch2D, w: float) -> void:
 	for s in [-1.0, 1.0]:
 		var hip := Vector2(s * w * 0.44, -18.0)
 		var foot := Vector2(s * (w * 0.5 + 44.0), 52.0)

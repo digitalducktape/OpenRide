@@ -79,7 +79,7 @@ No characters. The rider is the chevron: a pointer, not a creature.
   - beat lines at the lane's own speed, one a beat, brighter at each bar and flaring on the beat;
   - a vignette and a pixel of dither.
 - **No imported textures.** Everything is drawn by canvas shaders (two layers baked once) and
-  small `SafeMesh` batches, on the full 1080p canvas.
+  small `MeshBatch2D` batches, on the full 1080p canvas.
 - **Density:** the field stays dim (each layer under 10% brightness) so the lane dominates.
 
 ## 7. UI/HUD visual direction
@@ -95,7 +95,7 @@ No characters. The rider is the chevron: a pointer, not a creature.
 ## 8. Asset standards
 
 - No imported assets. The field and the lane are canvas shaders on two rects; the chevron is one
-  `SafeMesh` batch, redrawn only when its state changes; catch sparks are one CPUParticles2D.
+  `MeshBatch2D` batch, redrawn only when its state changes; catch sparks are one CPUParticles2D.
 - **Tablet budget** (Gen 2, PowerVR GX6250, Compatibility): 60 fps measured. Static layers baked
   once (`GFX_POLISH.md`, "Tablet performance"); per frame the field is two texture reads a pixel,
   the lane a strip mesh with its light per vertex and one read a pixel.

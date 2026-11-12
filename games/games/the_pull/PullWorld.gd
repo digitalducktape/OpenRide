@@ -112,7 +112,7 @@ func build(new_full_m: float, best: float) -> void:
 	if _scenery:
 		remove_child(_scenery)  # gone at once: its name is free for the new one, and no orphan waits
 		_scenery.free()
-	_scenery = KartMeshKit.mesh_node(PullMeshes.scenery(full_m), _scenery_mat, "Scenery")
+	_scenery = MeshKit3D.mesh_node(PullMeshes.scenery(full_m), _scenery_mat, "Scenery")
 	add_child(_scenery)
 	_build_labels()
 	_build_crowd()
@@ -251,22 +251,22 @@ func _build_environment() -> void:
 	dome.height = SKY_RADIUS * 2.0
 	dome.radial_segments = 16
 	dome.rings = 8
-	_sky = KartMeshKit.mesh_node(dome, _sky_mat, "Sky")
+	_sky = MeshKit3D.mesh_node(dome, _sky_mat, "Sky")
 	add_child(_sky)
 
 
 func _build_ground() -> void:
-	var track := PullMeshes.ground_grid(PullMeshes.HALF_WIDTH * 2.0, PullMeshes.LENGTH + 20.0, 8, 240, 20.0)
-	add_child(KartMeshKit.mesh_node(track, _track_mat, "Track"))
+	var track := MeshKit3D.ground_grid(PullMeshes.HALF_WIDTH * 2.0, PullMeshes.LENGTH + 20.0, 8, 240, 20.0)
+	add_child(MeshKit3D.mesh_node(track, _track_mat, "Track"))
 	# The infield: wide strips either side of the track, out past the trees.
 	for side: float in [-1.0, 1.0]:
-		var strip := PullMeshes.ground_grid(60.0, PullMeshes.LENGTH + 140.0, 20, 120, 60.0)
-		var node := KartMeshKit.mesh_node(strip, _infield_mat, "Infield")
+		var strip := MeshKit3D.ground_grid(60.0, PullMeshes.LENGTH + 140.0, 20, 120, 60.0)
+		var node := MeshKit3D.mesh_node(strip, _infield_mat, "Infield")
 		node.position.x = side * (PullMeshes.HALF_WIDTH + 30.0)
 		node.position.y = -0.01
 		add_child(node)
-	var far := PullMeshes.ground_grid(140.0, 140.0, 14, 14, -PullMeshes.LENGTH - 20.0)
-	var far_node := KartMeshKit.mesh_node(far, _infield_mat, "FarField")
+	var far := MeshKit3D.ground_grid(140.0, 140.0, 14, 14, -PullMeshes.LENGTH - 20.0)
+	var far_node := MeshKit3D.mesh_node(far, _infield_mat, "FarField")
 	far_node.position.y = -0.01
 	add_child(far_node)
 
@@ -283,7 +283,7 @@ func _build_rig() -> void:
 	camera.far = FAR
 	camera.current = true
 	_rig.add_child(camera)
-	_rig.add_child(KartMeshKit.mesh_node(PullMeshes.bike(BARS, MIRROR, MIRROR_SIZE), _bike_mat, "Bike"))
+	_rig.add_child(MeshKit3D.mesh_node(PullMeshes.bike(BARS, MIRROR, MIRROR_SIZE), _bike_mat, "Bike"))
 	# The mirror: a small camera looking back, shown on the glass.
 	_mirror_view = SubViewport.new()
 	_mirror_view.name = "MirrorView"
@@ -304,7 +304,7 @@ func _build_rig() -> void:
 	glass_mat.set_shader_parameter("view", _mirror_view.get_texture())
 	var quad := QuadMesh.new()
 	quad.size = MIRROR_SIZE
-	var glass := KartMeshKit.mesh_node(quad, glass_mat, "MirrorGlass")
+	var glass := MeshKit3D.mesh_node(quad, glass_mat, "MirrorGlass")
 	glass.position = MIRROR
 	_rig.add_child(glass)
 
@@ -313,13 +313,13 @@ func _build_sled() -> void:
 	_sled = Node3D.new()
 	_sled.name = "Sled"
 	add_child(_sled)
-	_sled.add_child(KartMeshKit.mesh_node(PullMeshes.sled(), _sled_mat, "Pan"))
-	_box = KartMeshKit.mesh_node(PullMeshes.weight_box(), _sled_mat, "WeightBox")
+	_sled.add_child(MeshKit3D.mesh_node(PullMeshes.sled(), _sled_mat, "Pan"))
+	_box = MeshKit3D.mesh_node(PullMeshes.weight_box(), _sled_mat, "WeightBox")
 	_sled.add_child(_box)
 	var transforms := []
 	for i in CHAIN_LINKS:
 		transforms.append(Transform3D())
-	var chain := KartMeshKit.multimesh_node(PullMeshes.chain_link(), transforms, "Chain")
+	var chain := MeshKit3D.multimesh_node(PullMeshes.chain_link(), transforms, "Chain")
 	chain.material_override = _sled_mat
 	# Its links are placed in world space along the whole track.
 	chain.custom_aabb = AABB(Vector3(-2, -1, -PullMeshes.LENGTH - 20.0), Vector3(4, 4, PullMeshes.LENGTH + 40.0))
@@ -327,7 +327,7 @@ func _build_sled() -> void:
 	_chain = chain.multimesh
 	_flag = Node3D.new()
 	_flag.name = "BestFlag"
-	_flag.add_child(KartMeshKit.mesh_node(PullMeshes.flag(), _flag_mat, "Cloth"))
+	_flag.add_child(MeshKit3D.mesh_node(PullMeshes.flag(), _flag_mat, "Cloth"))
 	var label := _label("YOUR BEST", 56, PullMeshes.INK)
 	label.position = Vector3(-0.62, 2.92, 0.09)
 	_flag.add_child(label)
@@ -394,7 +394,7 @@ func _build_glows() -> void:
 	for head in PullMeshes.lamp_heads():
 		transforms.append(Transform3D(Basis(), head))
 		colors.append(FLOOD_HALO)
-	var halos := KartMeshKit.multimesh_node(quad, transforms, "Halos", [], colors)
+	var halos := MeshKit3D.multimesh_node(quad, transforms, "Halos", [], colors)
 	halos.material_override = _glow_mat
 	halos.custom_aabb = AABB(Vector3(-12, 10, -PullMeshes.LENGTH - 30.0), Vector3(24, 12, PullMeshes.LENGTH + 40.0))
 	add_child(halos)
@@ -425,7 +425,7 @@ func _build_glows() -> void:
 	_wheel = Node3D.new()
 	_wheel.name = "Wheel"
 	_wheel.position = PullMeshes.WHEEL_HUB
-	_wheel.add_child(KartMeshKit.mesh_node(PullMeshes.wheel(), _scenery_mat, "Ring"))
+	_wheel.add_child(MeshKit3D.mesh_node(PullMeshes.wheel(), _scenery_mat, "Ring"))
 	add_child(_wheel)
 
 
@@ -502,7 +502,7 @@ func _build_crowd() -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.85)
 	quad.center_offset = Vector3(0.0, 0.425, 0.0)
-	_crowd = KartMeshKit.multimesh_node(quad, transforms, "Crowd", custom, colors)
+	_crowd = MeshKit3D.multimesh_node(quad, transforms, "Crowd", custom, colors)
 	_crowd.material_override = _crowd_mat
 	_crowd.custom_aabb = AABB(Vector3(-30, -2, -PullMeshes.LENGTH - 20.0), Vector3(60, 10, PullMeshes.LENGTH + 60.0))
 	add_child(_crowd)

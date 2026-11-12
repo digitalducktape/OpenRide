@@ -38,19 +38,16 @@ static var look := GameTheme.new(GateMeshes.ACCENT, GateMeshes.INK, 0.08)
 var logic: GateLogic
 var world: GateWorld
 
-var _view: SubViewport
-var _shown: MeshInstance2D
+## The 3D view: the world renders in it, and its image draws it over the whole canvas.
+var view: StageView3D
 var _status: GateStatus
 var _mode := "open"
 var _stage := 0
-var _message_left := 0.0
 var _round_faults := 0
 var _end_left := -1.0
 var _lead_rest := 0.0
 var _band_set := false
 ## Steps the 3D view down to a lower render scale if the frame rate stays low.
-var governor := RenderScaleStep.new()
-var _view_scale := RENDER_SCALE
 
 
 func info() -> GameInfo:
@@ -109,20 +106,10 @@ func _ready() -> void:
 	GateAudio.register()
 	world = GateWorld.new()
 	world.name = "World"
-	_view = SubViewport.new()
-	_view.name = "View3D"
-	_view.msaa_3d = Viewport.MSAA_DISABLED
-	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_view.audio_listener_enable_3d = false
-	add_child(_view)
-	_view.add_child(world)
-	_shown = MeshInstance2D.new()
-	_shown.name = "View3DImage"
-	_shown.texture = _view.get_texture()
-	_shown.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(_shown)
-	_fit_view()
-	Stage.changed.connect(_fit_view)
+	view = StageView3D.new(RENDER_SCALE)
+	add_child(view)
+	view.add_child(world)
+	add_child(view.image)
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -133,29 +120,30 @@ func _on_prepare(seg: Dictionary) -> void:
 	_end_left = -1.0
 	_lead_rest = 0.0
 	_band_set = false
-	governor = RenderScaleStep.new()
-	_set_render_scale(RENDER_SCALE)
+	view.reset_quality()
 	world.build(logic.fences, logic.spacing, GateLogic.LINE_GAP, GateLogic.V_PACE)
 	world.set_marker(0, 0)
 	hud.set_skin(look.hud_skin())
 	_status = GateStatus.new(look)
 	hud.add_widget(_status)
 	_status.set_fences(logic.fences)
+	hud.metrics.set_power_source(smoothed_power)
 	_update_status()
 	AudioDirector.play_music(MUSIC_STYLE, GateMusic.BPM)
 	AudioDirector.set_intensity(0.6)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, GateAudio.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, GateAudio.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(GateAudio.music_effects(), GateAudio.sfx_effects())
 	world.update_view(0.0, 0.0, 0.0, 0.0, 0.0, GateLogic.CIRCLE_RADIUS)
 	world.prewarm()
 
 
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smooth_power if logic else InputBus.power
+
+
 func _on_frame(delta: float) -> void:
-	if governor.sample(delta, logic.phase == GateLogic.Phase.RIDE):
-		_set_render_scale(governor.render_scale(RENDER_SCALE))
-		print("OPENRIDE_GAMES gate_crasher quality tier=%d fps=%.1f scale=%.2f" % [
-			governor.tier, governor.last_fps, governor.render_scale(RENDER_SCALE)])
+	view.sample(delta, logic.phase == GateLogic.Phase.RIDE, "gate_crasher")
 	# Anything but tracking: a stand can't be seen, so no fence may be judged (a failed calibration
 	# reads 0, and on the tablet it faulted every fence before this).
 	var camera_ok := InputBus.tracker_state == InputBus.TRACKER_TRACKING
@@ -171,10 +159,6 @@ func _on_frame(delta: float) -> void:
 	_lead_rest = maxf(_lead_rest - delta, 0.0)
 	AudioDirector.set_intensity(1.0 if logic.speed >= CANTER_SPEED and _lead_rest <= 0.0 else 0.6)
 	_update_status()
-	if _message_left > 0.0:
-		_message_left -= delta
-		if _message_left <= 0.0:
-			hud.hide_message()
 	if _end_left >= 0.0:
 		_end_left -= delta
 		if _end_left < 0.0:
@@ -241,7 +225,6 @@ func _handle(event: Dictionary) -> void:
 			_show_message("Can't see you: circling", 2.5, GameTheme.WARN)
 		"circle_end":
 			hud.hide_message()
-			_message_left = 0.0
 		"done":
 			_end_left = RESULT_END_DELAY
 
@@ -279,20 +262,5 @@ func pose_for_card() -> void:
 	world.update_view(0.0, logic.line_s(0) + 2.0, 0.0, 0.0, 0.0, GateLogic.CIRCLE_RADIUS)
 
 
-func _fit_view() -> void:
-	_shown.position = -Stage.pad
-	_shown.mesh = PullMeshes.view_image(Stage.visible_size)
-	_set_render_scale(_view_scale)
-
-
-## The 3D view renders at `scale` of the screen's resolution (drawn scaled up under the HUD).
-func _set_render_scale(scale: float) -> void:
-	_view_scale = scale
-	var size := Stage.view_size(scale)
-	if _view.size != size:
-		_view.size = size
-
-
 func _show_message(text: String, seconds: float, color := GameTheme.INK) -> void:
-	hud.show_message(text, color)
-	_message_left = seconds
+	hud.show_message(text, color, seconds)

@@ -19,15 +19,11 @@ var look: GameTheme
 var chip: PanelContainer
 var chip_label: Label
 var value: Label
-var bar: Control
+var bar: GaugeBar
 
 var _chip_text := ""
 var _chip_color := Color.BLACK
 var _value_text := ""
-var _fill := -1.0
-var _fill_px := -1
-var _fill_color := Color.WHITE
-var _ticks: Array[float] = []
 
 
 func _init(theme: GameTheme = null) -> void:
@@ -55,12 +51,8 @@ func _init(theme: GameTheme = null) -> void:
 	chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	chip_label.add_theme_constant_override("outline_size", 0)
 	chip.add_child(chip_label)
-	bar = Control.new()
+	bar = GaugeBar.new(BAR_SIZE, look.ink)
 	bar.name = "Bar"
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.custom_minimum_size = BAR_SIZE
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bar.draw.connect(_draw_bar)
 	row.add_child(bar)
 	value = look.label("", 52, GameTheme.INK, true)
 	value.custom_minimum_size = Vector2(VALUE_W, 0)
@@ -82,28 +74,6 @@ func show_state(word: String, chip_color: Color, fill: float, fill_color: Color,
 	if figure != _value_text:
 		_value_text = figure
 		value.text = figure
-	var px := roundi(fill * BAR_SIZE.x)
-	if px != _fill_px or fill_color != _fill_color or ticks != _ticks:
-		_fill_px = px
-		_fill = fill
-		_fill_color = fill_color
-		_ticks = ticks
-		bar.queue_redraw()
+	bar.set_fill(fill, fill_color)
+	bar.set_ticks(ticks)
 
-
-func _draw_bar() -> void:
-	var r := Rect2(Vector2.ZERO, bar.size)
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color(look.ink, 0.9)
-	track.set_corner_radius_all(10)
-	track.set_border_width_all(3)
-	track.border_color = Color(1, 1, 1, 0.42)
-	bar.draw_style_box(track, r)
-	if _fill > 0.0:
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = _fill_color
-		fill.set_corner_radius_all(7)
-		bar.draw_style_box(fill, Rect2(4, 4, maxf((r.size.x - 8.0) * clampf(_fill, 0.0, 1.0), 12.0), r.size.y - 8.0))
-	for t in _ticks:
-		var x := 4.0 + (r.size.x - 8.0) * t
-		bar.draw_rect(Rect2(x - 2.0, 0.0, 4.0, r.size.y), Color.WHITE)

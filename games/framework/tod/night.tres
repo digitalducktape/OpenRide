@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="DodgeTimeOfDay" format=3]
+[gd_resource type="Resource" script_class="TimeOfDay" format=3]
 
-[ext_resource type="Script" path="res://games/dodge_ball/TimeOfDay.gd" id="1_tod"]
+[ext_resource type="Script" path="res://framework/TimeOfDay.gd" id="1_tod"]
 
 [resource]
 script = ExtResource("1_tod")

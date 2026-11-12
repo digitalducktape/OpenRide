@@ -41,7 +41,6 @@ const CLIMB_COLOR := Color("2fd6c8")
 ## badges leaning a little. Clear of Dodge Ball's sky blue and the meaning colours.
 static var look := GameTheme.new(Color("2fd6c8"), Color("0a1a2e"), 0.1)
 
-const LANE_MUSIC_GAP := 8.0  ## px kept between the callouts' lane and the Music button
 
 var logic: LaunchLogic
 var sky: LaunchSky
@@ -181,34 +180,21 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.set_skin(look.hud_skin())
 	_status = LaunchStatus.new(look)
 	hud.add_widget(_status)
-	_status.resized.connect(_fit_lane)
-	hud.top_bar_moved.connect(_fit_lane)
-	hud.ride_panel.resized.connect(_fit_lane)
-	hud.music_button.visibility_changed.connect(_fit_lane)
-	hud.metrics.set_power_source(func() -> float: return logic.smoothed)
+	banner.follow(hud, _status)
+	hud.metrics.set_power_source(smoothed_power)
 	_set_band()
 	AudioDirector.play_music(MUSIC_STYLE, MUSIC_BPM)
 	AudioDirector.set_intensity(0.55)
-	AudioDirector.set_bus_effects(AudioDirector.MUSIC_BUS, LaunchAudioScript.music_effects())
-	AudioDirector.set_bus_effects(AudioDirector.SFX_BUS, LaunchAudioScript.sfx_effects())
-	AudioDirector.set_bus_effects(AudioDirector.MASTER_BUS, GameMix.master_effects())
+	GameAudio.apply_mix(LaunchAudioScript.music_effects(), LaunchAudioScript.sfx_effects())
 	_draw_state(0.0)
 	_update_status()
 
 
-## Keeps the callouts' lane under the status area, clear of a ride panel a heart strap widens and,
-## when a circuit's strip brings it down beside the Music button, short of the button.
-func _fit_lane() -> void:
-	if not is_instance_valid(_status):
-		return
-	var lane := LaunchBanner.LANE
-	lane.position.y = maxf(lane.position.y, _status.get_global_rect().end.y + 4.0)
-	var left := maxf(lane.position.x, hud.ride_panel.get_global_rect().end.x + LANE_MUSIC_GAP)
-	var right := lane.end.x
-	var music := hud.music_button.get_global_rect().grow(LANE_MUSIC_GAP)
-	if hud.music_button.visible and lane.intersects(music):
-		right = music.position.x
-	banner.set_lane(Rect2(left, lane.position.y, right - left, lane.size.y))
+
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.smoothed if logic else InputBus.power
 
 
 func _on_start() -> void:

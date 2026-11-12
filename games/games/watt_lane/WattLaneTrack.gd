@@ -317,7 +317,7 @@ func _build_step_marks() -> void:
 	_beam.material = add
 	_riser = Sprite2D.new()
 	_riser.name = "Riser"
-	_riser.texture = SafePlaces.soft_dot()
+	_riser.texture = MeshBatch2D.soft_dot()
 	_riser.material = add
 	_riser.modulate = Color(WARN_LIGHT, 0.8)
 	_riser.visible = false
@@ -330,7 +330,7 @@ func _build_step_marks() -> void:
 
 ## A soft horizontal shaft of light, fading along its length and to either side.
 func _paint_beam(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var hot := Color(1.0, 0.93, 0.75, 1.0) * Color(0.5, 0.5, 0.5, 1.0)
 	var clear := Color(hot, 0.0)
 	clear.r = 0.0
@@ -343,7 +343,7 @@ func _paint_beam(ci: CanvasItem) -> void:
 
 ## One chevron (Λ), amber with an ink edge; `scale.y` -1 points it down.
 func _paint_mark(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var pts := [Vector2(-28, 14), Vector2(0, -16), Vector2(28, 14)]
 	for pass_ in [[20.0, Color("0f1a2e", 0.5)], [14.0, WARN_LIGHT]]:
 		m.line(pts[0], pts[1], pass_[0], pass_[1])
@@ -363,7 +363,7 @@ func _build_cursor() -> void:
 	cursor = Node2D.new()
 	cursor.name = "Cursor"
 	_cursor_glow = Sprite2D.new()
-	_cursor_glow.texture = SafePlaces.soft_dot()
+	_cursor_glow.texture = MeshBatch2D.soft_dot()
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	_cursor_glow.material = add
@@ -388,19 +388,19 @@ func _set_state(state: String) -> void:
 ## The chevron: an ink outline, a rim in the state's colour (green in the lane, amber out) and
 ## a white-hot core, with a lit upper facet so it reads as a solid shape.
 func _paint_cursor(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var rim := GameTheme.GOOD if _state == "in" else GameTheme.WARN
 	var shape := chevron()
-	_fill(m, SafeMesh.grow_outline(shape, 7.0), INK)
-	_fill(m, SafeMesh.grow_outline(shape, 3.5), rim)
+	_fill(m, MeshBatch2D.grow_outline(shape, 7.0), INK)
+	_fill(m, MeshBatch2D.grow_outline(shape, 3.5), rim)
 	_fill(m, shape, Color(1.0, 0.98, 0.92))
 	_fill(m, PackedVector2Array([Vector2(-24, -27), Vector2(22, -2), Vector2(-10, -2)]), Color(1, 1, 1))
 	_fill(m, PackedVector2Array([Vector2(-24, 27), Vector2(22, 2), Vector2(-10, 2)]), rim.lerp(Color.WHITE, 0.55))
 	m.flush(ci)
 
 
-## A possibly concave outline, triangulated (SafeMesh.fill fans from the centre).
-static func _fill(m: SafeMesh, pts: PackedVector2Array, col: Color) -> void:
+## A possibly concave outline, triangulated (MeshBatch2D.fill fans from the centre).
+static func _fill(m: MeshBatch2D, pts: PackedVector2Array, col: Color) -> void:
 	var tris := Geometry2D.triangulate_polygon(pts)
 	var base := m.vertex_count()
 	for p in pts:

@@ -11,33 +11,14 @@ extends RefCounted
 const LaunchMusic := preload("res://games/ready_for_launch/LaunchMusic.gd")
 const LOOPS := ["rfl_hiss", "rfl_engine"]
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in LaunchMusic.SOUNDS:
-		if sound in LOOPS:
-			continue
-		var rendered := load(LaunchMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(LaunchMusic.SOUNDS, LOOPS)
 
 
 ## A player on the SFX bus for one of the loops, silent until the game raises it.
 static func loop_player(sound: String) -> AudioStreamPlayer:
-	var p := AudioStreamPlayer.new()
-	p.name = sound.capitalize().replace(" ", "")
-	p.bus = AudioDirector.SFX_BUS
-	var stream := load(LaunchMusic.SOUNDS.get(sound, "")) as AudioStreamOggVorbis
-	if stream:
-		stream = stream.duplicate()
-		stream.loop = true
-		p.stream = stream
-	p.volume_db = -80.0
-	return p
+	return GameAudio.loop_player(sound, LaunchMusic.SOUNDS.get(sound, ""))
 
 
 static func music_effects() -> Array[AudioEffect]:

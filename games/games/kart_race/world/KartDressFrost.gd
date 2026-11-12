@@ -50,14 +50,14 @@ func _huts(props: Dictionary) -> void:
 		var p0: Vector3 = lm.p
 		var ice_y := road_level(p0.x, p0.z) - 0.55
 		for k in 5:
-			var kit := KartMeshKit.new()
+			var kit := MeshKit3D.new()
 			kit.ao_y0 = 0.0
 			kit.ao_y1 = 2.0
 			kit.ao_min = 0.7
-			kit.add(KartMeshKit.box(Vector3(2.2, 2.0, 2.6)), KartMeshKit.xf(Vector3(0, 1.0, 0)), colors[k % colors.size()])
-			kit.add(KartMeshKit.prism(Vector3(2.8, 1.0, 3.0)), KartMeshKit.xf(Vector3(0, 2.5, 0)), Color(0.95, 0.97, 1.0, 0.1))
-			kit.add(KartMeshKit.box(Vector3(0.7, 1.3, 0.06)), KartMeshKit.xf(Vector3(0, 0.65, 1.32)), Color(0.3, 0.2, 0.14, 0.0))
-			kit.add(KartMeshKit.box(Vector3(0.5, 0.4, 0.06)), KartMeshKit.xf(Vector3(0.6, 1.35, 1.32)), Color(1.0, 0.8, 0.45, 1.0))
+			kit.add(MeshKit3D.box(Vector3(2.2, 2.0, 2.6)), MeshKit3D.xf(Vector3(0, 1.0, 0)), colors[k % colors.size()])
+			kit.add(MeshKit3D.prism(Vector3(2.8, 1.0, 3.0)), MeshKit3D.xf(Vector3(0, 2.5, 0)), Color(0.95, 0.97, 1.0, 0.1))
+			kit.add(MeshKit3D.box(Vector3(0.7, 1.3, 0.06)), MeshKit3D.xf(Vector3(0, 0.65, 1.32)), Color(0.3, 0.2, 0.14, 0.0))
+			kit.add(MeshKit3D.box(Vector3(0.5, 0.4, 0.06)), MeshKit3D.xf(Vector3(0.6, 1.35, 1.32)), Color(1.0, 0.8, 0.45, 1.0))
 			var a := TAU * k / 5.0 + rng.randf_range(-0.3, 0.3)
 			var r := rng.randf_range(12.0, 38.0)
 			var at := Vector3(p0.x + cos(a) * r, ice_y, p0.z + sin(a) * r)
@@ -71,12 +71,12 @@ func _huts(props: Dictionary) -> void:
 		toward.y = 0.0
 		toward = toward.normalized()
 		var r2: float = lake.r
-		var kit := KartMeshKit.new()
+		var kit := MeshKit3D.new()
 		var wood := Color(0.5, 0.34, 0.22, 0.0)
 		for k in 6:
-			kit.add(KartMeshKit.box(Vector3(2.0, 0.15, 1.3)), KartMeshKit.xf(Vector3(0, 0.6, -k * 1.4)), wood if k % 2 == 0 else wood.darkened(0.1))
-			kit.add(KartMeshKit.box(Vector3(0.2, 1.2, 0.2)), KartMeshKit.xf(Vector3(0.9, 0.1, -k * 1.4)), wood.darkened(0.3))
-			kit.add(KartMeshKit.box(Vector3(0.2, 1.2, 0.2)), KartMeshKit.xf(Vector3(-0.9, 0.1, -k * 1.4)), wood.darkened(0.3))
+			kit.add(MeshKit3D.box(Vector3(2.0, 0.15, 1.3)), MeshKit3D.xf(Vector3(0, 0.6, -k * 1.4)), wood if k % 2 == 0 else wood.darkened(0.1))
+			kit.add(MeshKit3D.box(Vector3(0.2, 1.2, 0.2)), MeshKit3D.xf(Vector3(0.9, 0.1, -k * 1.4)), wood.darkened(0.3))
+			kit.add(MeshKit3D.box(Vector3(0.2, 1.2, 0.2)), MeshKit3D.xf(Vector3(-0.9, 0.1, -k * 1.4)), wood.darkened(0.3))
 		var at := c + toward * r2 * 0.95
 		at.y = road_level(c.x, c.z) - 0.55
 		world.cell(props, at).add_baked(kit.commit(), Transform3D(Basis.looking_at(-toward, Vector3.UP), at))
@@ -89,19 +89,19 @@ static func _snowy_rock(seed_value: int) -> ArrayMesh:
 
 ## A snowman with a carrot nose, coal buttons and a red scarf, facing +z.
 static func _snowman() -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	var snow := Color(0.96, 0.97, 1.0, 0.1)
-	kit.add(KartMeshKit.sphere(0.75, 10, 5), KartMeshKit.xf(Vector3(0, 0.6, 0)), snow)
-	kit.add(KartMeshKit.sphere(0.55, 10, 5), KartMeshKit.xf(Vector3(0, 1.55, 0)), snow)
-	kit.add(KartMeshKit.sphere(0.4, 10, 5), KartMeshKit.xf(Vector3(0, 2.25, 0)), snow)
-	kit.add(KartMeshKit.cylinder(0.0, 0.07, 0.4, 6), KartMeshKit.xf(Vector3(0, 2.25, 0.5), Vector3(90, 0, 0)), Color(1.0, 0.5, 0.1, 0.0))
+	kit.add(MeshKit3D.sphere(0.75, 10, 5), MeshKit3D.xf(Vector3(0, 0.6, 0)), snow)
+	kit.add(MeshKit3D.sphere(0.55, 10, 5), MeshKit3D.xf(Vector3(0, 1.55, 0)), snow)
+	kit.add(MeshKit3D.sphere(0.4, 10, 5), MeshKit3D.xf(Vector3(0, 2.25, 0)), snow)
+	kit.add(MeshKit3D.cylinder(0.0, 0.07, 0.4, 6), MeshKit3D.xf(Vector3(0, 2.25, 0.5), Vector3(90, 0, 0)), Color(1.0, 0.5, 0.1, 0.0))
 	for e: float in [-0.13, 0.13]:
-		kit.add(KartMeshKit.sphere(0.05, 4, 2), KartMeshKit.xf(Vector3(e, 2.35, 0.36)), Color(0.05, 0.05, 0.06, 0.0))
+		kit.add(MeshKit3D.sphere(0.05, 4, 2), MeshKit3D.xf(Vector3(e, 2.35, 0.36)), Color(0.05, 0.05, 0.06, 0.0))
 	for y: float in [1.4, 1.65]:
-		kit.add(KartMeshKit.sphere(0.06, 4, 2), KartMeshKit.xf(Vector3(0, y, 0.53)), Color(0.05, 0.05, 0.06, 0.0))
-	kit.add(KartMeshKit.torus(0.38, 0.52, 10, 4), KartMeshKit.xf(Vector3(0, 1.95, 0)), Color(0.85, 0.15, 0.18, 0.0))
-	kit.add(KartMeshKit.cylinder(0.28, 0.28, 0.4, 8), KartMeshKit.xf(Vector3(0, 2.75, 0)), Color(0.1, 0.1, 0.12, 0.0))
-	kit.add(KartMeshKit.cylinder(0.42, 0.42, 0.05, 8), KartMeshKit.xf(Vector3(0, 2.57, 0)), Color(0.1, 0.1, 0.12, 0.0))
+		kit.add(MeshKit3D.sphere(0.06, 4, 2), MeshKit3D.xf(Vector3(0, y, 0.53)), Color(0.05, 0.05, 0.06, 0.0))
+	kit.add(MeshKit3D.torus(0.38, 0.52, 10, 4), MeshKit3D.xf(Vector3(0, 1.95, 0)), Color(0.85, 0.15, 0.18, 0.0))
+	kit.add(MeshKit3D.cylinder(0.28, 0.28, 0.4, 8), MeshKit3D.xf(Vector3(0, 2.75, 0)), Color(0.1, 0.1, 0.12, 0.0))
+	kit.add(MeshKit3D.cylinder(0.42, 0.42, 0.05, 8), MeshKit3D.xf(Vector3(0, 2.57, 0)), Color(0.1, 0.1, 0.12, 0.0))
 	return kit.commit()
 
 
@@ -121,7 +121,7 @@ func _ice(parent: Node3D) -> void:
 		disc.height = 0.02
 		disc.radial_segments = 40
 		disc.rings = 1
-		var node := KartMeshKit.mesh_node(disc, world.water_mat, "Ice")
+		var node := MeshKit3D.mesh_node(disc, world.water_mat, "Ice")
 		var p: Vector3 = lm.p
 		node.position = Vector3(p.x, road_level(p.x, p.z) - 0.55, p.z)
 		parent.add_child(node)
@@ -151,7 +151,7 @@ func _cabins(props: Dictionary) -> void:
 
 ## A log cabin facing +z; `big` adds a porch and a second window row.
 static func _cabin(big: bool) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.ao_y0 = 0.0
 	kit.ao_y1 = 3.0
 	kit.ao_min = 0.7
@@ -159,32 +159,32 @@ static func _cabin(big: bool) -> ArrayMesh:
 	var d := 6.0
 	var h := 3.2
 	var log_color := Color(0.5, 0.32, 0.2, 0.0)
-	kit.add(KartMeshKit.box(Vector3(w, h + 1.5, d)), KartMeshKit.xf(Vector3(0, (h - 1.5) * 0.5, -d * 0.5)), log_color)
+	kit.add(MeshKit3D.box(Vector3(w, h + 1.5, d)), MeshKit3D.xf(Vector3(0, (h - 1.5) * 0.5, -d * 0.5)), log_color)
 	for k in 5:
-		kit.add(KartMeshKit.box(Vector3(w + 0.1, 0.12, d + 0.1)), KartMeshKit.xf(Vector3(0, 0.4 + k * 0.62, -d * 0.5)), log_color.darkened(0.25))
+		kit.add(MeshKit3D.box(Vector3(w + 0.1, 0.12, d + 0.1)), MeshKit3D.xf(Vector3(0, 0.4 + k * 0.62, -d * 0.5)), log_color.darkened(0.25))
 	# Roof: dark eaves under a thick snow blanket.
-	kit.add(KartMeshKit.prism(Vector3(w + 1.2, 2.6, d + 1.2)), KartMeshKit.xf(Vector3(0, h + 1.3, -d * 0.5)), Color(0.35, 0.22, 0.16, 0.0))
-	kit.add(KartMeshKit.prism(Vector3(w + 1.4, 2.4, d + 1.4)), KartMeshKit.xf(Vector3(0, h + 1.55, -d * 0.5)), Color(0.96, 0.97, 1.0, 0.1))
-	kit.add(KartMeshKit.box(Vector3(0.8, 2.2, 0.8)), KartMeshKit.xf(Vector3(w * 0.25, h + 2.6, -d * 0.6)), Color(0.45, 0.42, 0.42, 0.0))
-	kit.add(KartMeshKit.box(Vector3(1.1, 2.0, 0.1)), KartMeshKit.xf(Vector3(0, 1.0, 0.03)), Color(0.32, 0.2, 0.12, 0.0))
+	kit.add(MeshKit3D.prism(Vector3(w + 1.2, 2.6, d + 1.2)), MeshKit3D.xf(Vector3(0, h + 1.3, -d * 0.5)), Color(0.35, 0.22, 0.16, 0.0))
+	kit.add(MeshKit3D.prism(Vector3(w + 1.4, 2.4, d + 1.4)), MeshKit3D.xf(Vector3(0, h + 1.55, -d * 0.5)), Color(0.96, 0.97, 1.0, 0.1))
+	kit.add(MeshKit3D.box(Vector3(0.8, 2.2, 0.8)), MeshKit3D.xf(Vector3(w * 0.25, h + 2.6, -d * 0.6)), Color(0.45, 0.42, 0.42, 0.0))
+	kit.add(MeshKit3D.box(Vector3(1.1, 2.0, 0.1)), MeshKit3D.xf(Vector3(0, 1.0, 0.03)), Color(0.32, 0.2, 0.12, 0.0))
 	for x: float in [-w * 0.3, w * 0.3]:
-		kit.add(KartMeshKit.box(Vector3(1.1, 0.9, 0.1)), KartMeshKit.xf(Vector3(x, 1.7, 0.03)), Color(1.0, 0.78, 0.4, 1.0))
-		kit.add(KartMeshKit.box(Vector3(1.3, 0.14, 0.25)), KartMeshKit.xf(Vector3(x, 1.2, 0.08)), Color(0.96, 0.97, 1.0, 0.1))
+		kit.add(MeshKit3D.box(Vector3(1.1, 0.9, 0.1)), MeshKit3D.xf(Vector3(x, 1.7, 0.03)), Color(1.0, 0.78, 0.4, 1.0))
+		kit.add(MeshKit3D.box(Vector3(1.3, 0.14, 0.25)), MeshKit3D.xf(Vector3(x, 1.2, 0.08)), Color(0.96, 0.97, 1.0, 0.1))
 	if big:
-		kit.add(KartMeshKit.box(Vector3(w, 0.15, 2.0)), KartMeshKit.xf(Vector3(0, 0.1, 1.0)), log_color.darkened(0.1))
+		kit.add(MeshKit3D.box(Vector3(w, 0.15, 2.0)), MeshKit3D.xf(Vector3(0, 0.1, 1.0)), log_color.darkened(0.1))
 		for x: float in [-w * 0.45, w * 0.45]:
-			kit.add(KartMeshKit.box(Vector3(0.2, 2.6, 0.2)), KartMeshKit.xf(Vector3(x, 1.3, 1.9)), log_color)
-		kit.add(KartMeshKit.box(Vector3(w + 0.3, 0.5, 2.3)), KartMeshKit.xf(Vector3(0, 2.75, 1.0), Vector3(-12, 0, 0)), Color(0.96, 0.97, 1.0, 0.1))
+			kit.add(MeshKit3D.box(Vector3(0.2, 2.6, 0.2)), MeshKit3D.xf(Vector3(x, 1.3, 1.9)), log_color)
+		kit.add(MeshKit3D.box(Vector3(w + 0.3, 0.5, 2.3)), MeshKit3D.xf(Vector3(0, 2.75, 1.0), Vector3(-12, 0, 0)), Color(0.96, 0.97, 1.0, 0.1))
 	return kit.commit()
 
 
 ## Lanterns on wooden posts at the barrier, lighting the way round.
 func _lanterns(props: Dictionary) -> void:
 	var track := world.track
-	var kit := KartMeshKit.new()
-	kit.add(KartMeshKit.box(Vector3(0.16, 2.4, 0.16)), KartMeshKit.xf(Vector3(0, 1.2, 0)), Color(0.42, 0.28, 0.18, 0.0))
-	kit.add(KartMeshKit.box(Vector3(0.36, 0.45, 0.36)), KartMeshKit.xf(Vector3(0, 2.55, 0)), Color(1.0, 0.8, 0.45, 1.0))
-	kit.add(KartMeshKit.prism(Vector3(0.5, 0.25, 0.5)), KartMeshKit.xf(Vector3(0, 2.9, 0)), Color(0.96, 0.97, 1.0, 0.1))
+	var kit := MeshKit3D.new()
+	kit.add(MeshKit3D.box(Vector3(0.16, 2.4, 0.16)), MeshKit3D.xf(Vector3(0, 1.2, 0)), Color(0.42, 0.28, 0.18, 0.0))
+	kit.add(MeshKit3D.box(Vector3(0.36, 0.45, 0.36)), MeshKit3D.xf(Vector3(0, 2.55, 0)), Color(1.0, 0.8, 0.45, 1.0))
+	kit.add(MeshKit3D.prism(Vector3(0.5, 0.25, 0.5)), MeshKit3D.xf(Vector3(0, 2.9, 0)), Color(0.96, 0.97, 1.0, 0.1))
 	var mesh := kit.commit()
 	var s := 30.0
 	var side := 1.0

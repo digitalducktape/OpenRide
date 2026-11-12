@@ -43,18 +43,18 @@ func _init() -> void:
 	back.name = "WeatherBack"
 	front = Node2D.new()
 	front.name = "WeatherFront"
-	shadow = SafeDial.Layer.new()
+	shadow = PaintLayer.new()
 	shadow.name = "CloudShadow"
 	shadow.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.glow(Vector2.ZERO, Vector2(420, 70), Color(0.05, 0.08, 0.14, 0.32), 10)
 		m.flush(ci)
 	shadow.visible = false
 	back.add_child(shadow)
-	cloud = SafeDial.Layer.new()
+	cloud = PaintLayer.new()
 	cloud.name = "RainCloud"
 	cloud.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		KeepyPlaces.cumulus(m, Vector2.ZERO, CLOUD_W, Color("8592a4"), Color("56606f"))
 		KeepyPlaces.cumulus(m, Vector2(-150, 34), CLOUD_W * 0.6, Color("75818f"), Color("4c5562"))
 		m.flush(ci)
@@ -68,12 +68,12 @@ func _init() -> void:
 		"fall": 1.3, "columns": 90.0, "slant": -0.35, "density": 0.55, "opacity": 0.55, "soft_edge": 0.16})
 	front.add_child(curtain)
 	curtain.visible = false
-	flyer = SafeDial.Layer.new()
+	flyer = PaintLayer.new()
 	flyer.name = "FlyingBird"
 	flyer.paint = func(ci: CanvasItem) -> void: KeepyBalloon.paint_bird(ci, false, true)
 	flyer.visible = false
 	front.add_child(flyer)
-	wind_lines = SafeDial.Layer.new()
+	wind_lines = PaintLayer.new()
 	wind_lines.name = "WindLines"
 	wind_lines.paint = _paint_wind_lines
 	wind_lines.visible = false
@@ -166,10 +166,10 @@ func prewarm() -> void:
 
 ## Three pale curved strokes, like a breeze in a picture book.
 func _paint_wind_lines(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	for k in 3:
 		var y := -60.0 + k * 55.0
-		var pts := SafeMesh.arc_points(Vector2(0, y + 120.0), 140.0, PI * 1.35, PI * 1.65, 10)
+		var pts := MeshBatch2D.arc_points(Vector2(0, y + 120.0), 140.0, PI * 1.35, PI * 1.65, 10)
 		for j in pts.size() - 1:
 			m.line(pts[j] + Vector2(k * 40.0, 0), pts[j + 1] + Vector2(k * 40.0, 0), 4.0, Color(1, 1, 1, 0.55))
 	m.flush(ci)

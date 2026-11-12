@@ -7,17 +7,9 @@ extends RefCounted
 
 const GateMusic := preload("res://games/gate_crasher/GateMusic.gd")
 
-static var _registered := false
-
 
 static func register() -> void:
-	if _registered:
-		return
-	_registered = true
-	for sound in GateMusic.SOUNDS:
-		var rendered := load(GateMusic.SOUNDS[sound]) as AudioStream
-		if rendered:
-			AudioDirector.register_sound(sound, rendered)
+	GameAudio.register(GateMusic.SOUNDS)
 
 
 static func music_effects() -> Array[AudioEffect]:

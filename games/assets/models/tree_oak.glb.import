@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cs6nvalrc0jd1"
-path="res://.godot/imported/light-curved.glb-56f6685ced504ac28a166775813cef02.scn"
+uid="uid://op0i3f6r0ocr"
+path="res://.godot/imported/tree_oak.glb-5211b659f3c0b817156c18d0b782054a.scn"
 
 [deps]
 
-source_file="res://games/dodge_ball/models/light-curved.glb"
-dest_files=["res://.godot/imported/light-curved.glb-56f6685ced504ac28a166775813cef02.scn"]
+source_file="res://assets/models/tree_oak.glb"
+dest_files=["res://.godot/imported/tree_oak.glb-5211b659f3c0b817156c18d0b782054a.scn"]
 
 [params]
 

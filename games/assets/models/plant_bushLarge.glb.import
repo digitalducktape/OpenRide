@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://wbx7lcsr6v7q"
-path="res://.godot/imported/plant_bushLarge.glb-054ed427742ed232ade85bd0711825db.scn"
+path="res://.godot/imported/plant_bushLarge.glb-283f6210a2d5efdb619b121cf9cdfeb6.scn"
 
 [deps]
 
-source_file="res://games/dodge_ball/models/plant_bushLarge.glb"
-dest_files=["res://.godot/imported/plant_bushLarge.glb-054ed427742ed232ade85bd0711825db.scn"]
+source_file="res://assets/models/plant_bushLarge.glb"
+dest_files=["res://.godot/imported/plant_bushLarge.glb-283f6210a2d5efdb619b121cf9cdfeb6.scn"]
 
 [params]
 

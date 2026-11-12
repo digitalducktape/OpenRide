@@ -1,6 +1,7 @@
-class_name KartMeshKit
+class_name MeshKit3D
 extends RefCounted
-## Procedural mesh helpers for Kart Race's look (#43, the hero slice). Every model in the game is
+## Procedural mesh helpers for the 3D games (from Kart Race's look, #43; The Pull and Gate Crasher
+## build their worlds with it too). Every model in a game is
 ## built here from primitive shapes merged into one vertex-coloured ArrayMesh per object, so a
 ## kart is a couple of draw calls and a whole forest is one MultiMesh. Colours carry the look:
 ## painted ambient occlusion (darker low down and underneath) is baked into them, and the alpha
@@ -447,3 +448,52 @@ static func mesh_node(mesh: Mesh, mat: Material, node_name: String) -> MeshInsta
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return mi
+
+
+## A flat grid in the xz plane, `width` across and from z = `z0` to `z0 - length`, with `cols`
+## and `rows` cells (per-vertex light and haze need the vertices).
+static func ground_grid(width: float, length: float, cols: int, rows: int, z0: float) -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var idx := PackedInt32Array()
+	for j in rows + 1:
+		for i in cols + 1:
+			verts.append(Vector3(-width / 2.0 + width * i / cols, 0.0, z0 - length * j / rows))
+			normals.append(Vector3.UP)
+	for j in rows:
+		for i in cols:
+			var a := j * (cols + 1) + i
+			var c := a + cols + 1
+			# Seen from above (front faces clockwise in Godot).
+			idx.append_array([a, c, a + 1, a + 1, c, c + 1])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+## The shared low-poly models (`games/assets/models/`, sources in `games/assets/SOURCES.md`): the
+## trees, bushes and rocks more than one world plants.
+const MODELS := "res://assets/models/"
+
+
+## The first mesh in the model scene `file` under `MODELS` (a .glb), or null.
+static func model_mesh(file: String) -> Mesh:
+	var scene := load(MODELS + file) as PackedScene
+	if scene == null:
+		push_warning("MeshKit3D: can't load %s" % file)
+		return null
+	var root := scene.instantiate()
+	var found: Mesh = null
+	var stack: Array[Node] = [root]
+	while not stack.is_empty() and found == null:
+		var node: Node = stack.pop_back()
+		if node is MeshInstance3D:
+			found = (node as MeshInstance3D).mesh
+		stack.append_array(node.get_children())
+	root.free()
+	return found

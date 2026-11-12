@@ -1,6 +1,6 @@
 class_name PullMeshes
 extends RefCounted
-## Every mesh of The Pull's world (#79), built in code from primitive shapes with KartMeshKit:
+## Every mesh of The Pull's world (#79), built in code from primitive shapes with MeshKit3D:
 ## vertex colours with painted AO, so each object is one draw call on the shared scenery shader.
 ## UV.x says how much the floodlight pools reach a vertex (0 on the far horizon), UV.y is the
 ## self-lit glow (lamps, fair lights, the boards' faces, the Full Pull line); COLOR.a is 1 - sway.
@@ -20,10 +20,6 @@ const TIER_RISE := 0.55
 const SECTION := 34.0  ## a stand section's length (gaps at the towers)
 const FAIR_Z := -540.0
 ## The view grid (as Tug's): the vignette in its vertex colours.
-const VIEW_COLS := 12
-const VIEW_ROWS := 8
-const VIGNETTE := 0.32
-const VIGNETTE_TINT := Color(0.75, 0.8, 1.05)
 
 const CLAY := Color("c27a4a")
 const CHALK := Color("ede6d6")
@@ -48,42 +44,16 @@ const WHEEL_RADIUS := 13.7
 const BAR_HALF := 0.42  ## the handlebar's half width, grips included
 
 
-## A flat grid in the xz plane, `width` across and from z = `z0` to `z0 - length`, with `cols`
-## and `rows` cells (per-vertex light and haze need the vertices).
-static func ground_grid(width: float, length: float, cols: int, rows: int, z0: float) -> ArrayMesh:
-	var verts := PackedVector3Array()
-	var normals := PackedVector3Array()
-	var idx := PackedInt32Array()
-	for j in rows + 1:
-		for i in cols + 1:
-			verts.append(Vector3(-width / 2.0 + width * i / cols, 0.0, z0 - length * j / rows))
-			normals.append(Vector3.UP)
-	for j in rows:
-		for i in cols:
-			var a := j * (cols + 1) + i
-			var c := a + cols + 1
-			# Seen from above (front faces clockwise in Godot).
-			idx.append_array([a, c, a + 1, a + 1, c, c + 1])
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_INDEX] = idx
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-
-static func _kit() -> KartMeshKit:
-	var kit := KartMeshKit.new()
+static func _kit() -> MeshKit3D:
+	var kit := MeshKit3D.new()
 	kit.flags = true
 	kit.outline = 1.0  # UV.x: the pools reach it
 	kit.glow = 0.0
 	return kit
 
 
-static func _box(kit: KartMeshKit, size: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> void:
-	kit.add(KartMeshKit.box(size), KartMeshKit.xf(pos, rot), color)
+static func _box(kit: MeshKit3D, size: Vector3, pos: Vector3, color: Color, rot := Vector3.ZERO) -> void:
+	kit.add(MeshKit3D.box(size), MeshKit3D.xf(pos, rot), color)
 
 
 ## The track's statics: barriers, stands, floodlight towers, distance boards, the Full Pull line
@@ -105,7 +75,7 @@ static func scenery(full_m: float, seed_value := 79) -> ArrayMesh:
 	return kit.commit()
 
 
-static func _barriers(kit: KartMeshKit) -> void:
+static func _barriers(kit: MeshKit3D) -> void:
 	# A low rail each side in red and white blocks of 2 m, on dark feet.
 	for side: float in [-1.0, 1.0]:
 		var z := 6.0
@@ -118,7 +88,7 @@ static func _barriers(kit: KartMeshKit) -> void:
 			k += 1
 
 
-static func _stands(kit: KartMeshKit) -> void:
+static func _stands(kit: MeshKit3D) -> void:
 	var z := 14.0
 	while z > -LENGTH + 20.0:
 		var length := SECTION
@@ -139,7 +109,7 @@ static func _stands(kit: KartMeshKit) -> void:
 
 ## The stand's front: a low wall of painted panels facing the track (plain colour blocks and
 ## stripes, no words or logos).
-static func _stand_front(kit: KartMeshKit, side: float, z: float, length: float) -> void:
+static func _stand_front(kit: MeshKit3D, side: float, z: float, length: float) -> void:
 	var x := side * (STAND_X - 0.08)
 	var panels := int(length / 2.0)
 	for i in panels:
@@ -154,7 +124,7 @@ static func _stand_front(kit: KartMeshKit, side: float, z: float, length: float)
 
 ## The roof: posts at the front, a corrugated sheet (alternating tones) sloping back, pennant
 ## bunting along its front edge (it sways: COLOR.a < 1) and a string of warm bulbs under it.
-static func _stand_roof(kit: KartMeshKit, side: float, z: float, length: float) -> void:
+static func _stand_roof(kit: MeshKit3D, side: float, z: float, length: float) -> void:
 	var front_x := side * (STAND_X + 0.15)
 	var eave := 4.3
 	var depth := TIER_DEPTH * STAND_TIERS + 1.0
@@ -189,7 +159,7 @@ static func _stand_roof(kit: KartMeshKit, side: float, z: float, length: float) 
 	kit.glow = 0.0
 
 
-static func _boards(kit: KartMeshKit) -> void:
+static func _boards(kit: MeshKit3D) -> void:
 	var m := 25.0
 	while m < LENGTH - 10.0:
 		var z := -m
@@ -205,12 +175,12 @@ static func _boards(kit: KartMeshKit) -> void:
 		m += 25.0
 
 
-static func _towers(kit: KartMeshKit) -> void:
+static func _towers(kit: MeshKit3D) -> void:
 	var z := 0.0
 	while z > -LENGTH - 20.0:
 		for side: float in [-1.0, 1.0]:
 			var x := side * TOWER_X
-			kit.add(KartMeshKit.cylinder(0.14, 0.2, 16.0, 6), KartMeshKit.xf(Vector3(x, 8.0, z)), Color("4a4f57"))
+			kit.add(MeshKit3D.cylinder(0.14, 0.2, 16.0, 6), MeshKit3D.xf(Vector3(x, 8.0, z)), Color("4a4f57"))
 			_box(kit, Vector3(2.6, 1.1, 0.25), Vector3(x - side * 0.6, 16.2, z), Color("2c3036"), Vector3(0, 0, side * 12.0))
 			kit.glow = 1.0
 			for i in 4:
@@ -220,7 +190,7 @@ static func _towers(kit: KartMeshKit) -> void:
 		z -= TOWER_SPACING
 
 
-static func _full_line(kit: KartMeshKit, full_m: float) -> void:
+static func _full_line(kit: MeshKit3D, full_m: float) -> void:
 	var z := -full_m
 	kit.glow = 0.55
 	var squares := 24
@@ -240,7 +210,7 @@ static func _full_line(kit: KartMeshKit, full_m: float) -> void:
 	kit.glow = 0.0
 
 
-static func _fair(kit: KartMeshKit, rng: RandomNumberGenerator) -> void:
+static func _fair(kit: MeshKit3D, rng: RandomNumberGenerator) -> void:
 	kit.outline = 0.0  # beyond the pools
 	# A tree line around everything.
 	var tree := Color("17241e")
@@ -248,28 +218,28 @@ static func _fair(kit: KartMeshKit, rng: RandomNumberGenerator) -> void:
 	while z > FAIR_Z - 40.0:
 		for side: float in [-1.0, 1.0]:
 			var h := rng.randf_range(7.0, 13.0)
-			kit.add(KartMeshKit.cylinder(0.0, rng.randf_range(2.5, 4.0), h, 6),
-				KartMeshKit.xf(Vector3(side * rng.randf_range(40.0, 48.0), h / 2.0, z)), tree)
+			kit.add(MeshKit3D.cylinder(0.0, rng.randf_range(2.5, 4.0), h, 6),
+				MeshKit3D.xf(Vector3(side * rng.randf_range(40.0, 48.0), h / 2.0, z)), tree)
 		z -= rng.randf_range(5.0, 8.0)
 	var x := -60.0
 	while x < 60.0:
 		var h := rng.randf_range(8.0, 14.0)
-		kit.add(KartMeshKit.cylinder(0.0, 3.5, h, 6), KartMeshKit.xf(Vector3(x, h / 2.0, FAIR_Z - 30.0)), tree)
+		kit.add(MeshKit3D.cylinder(0.0, 3.5, h, 6), MeshKit3D.xf(Vector3(x, h / 2.0, FAIR_Z - 30.0)), tree)
 		x += rng.randf_range(5.0, 8.0)
 	# Tents on the left, striped.
 	var stripes := [Color("d94a3a"), Color("f2e6c8"), Color("3a7fd9"), Color("f2c230")]
 	for i in 5:
 		var pos := Vector3(-34.0 + i * 7.5, 0.0, FAIR_Z + 10.0 - (i % 2) * 8.0)
 		var c: Color = stripes[i % stripes.size()]
-		kit.add(KartMeshKit.cylinder(2.6, 2.6, 2.4, 8), KartMeshKit.xf(pos + Vector3(0, 1.2, 0)), c)
-		kit.add(KartMeshKit.cylinder(0.0, 3.2, 2.6, 8), KartMeshKit.xf(pos + Vector3(0, 3.7, 0)), c.lightened(0.15))
+		kit.add(MeshKit3D.cylinder(2.6, 2.6, 2.4, 8), MeshKit3D.xf(pos + Vector3(0, 1.2, 0)), c)
+		kit.add(MeshKit3D.cylinder(0.0, 3.2, 2.6, 8), MeshKit3D.xf(pos + Vector3(0, 3.7, 0)), c.lightened(0.15))
 		kit.glow = 1.0
 		_box(kit, Vector3(0.3, 0.3, 0.3), pos + Vector3(0, 5.1, 0), FAIR_LIGHTS[i % 4])
 		kit.glow = 0.0
 	# The wheel's legs (the wheel itself turns: `wheel()`).
 	var hub := WHEEL_HUB
 	for leg: float in [-1.0, 1.0]:
-		kit.add(KartMeshKit.box(Vector3(0.4, 1.0, 0.4)), KartMeshKit.between(hub, Vector3(36.0 + leg * 9.0, 0.0, FAIR_Z), Vector3(1, 1, 1)),
+		kit.add(MeshKit3D.box(Vector3(0.4, 1.0, 0.4)), MeshKit3D.between(hub, Vector3(36.0 + leg * 9.0, 0.0, FAIR_Z), Vector3(1, 1, 1)),
 			Color("4a4f57"))
 	# String lights across the far end.
 	kit.glow = 1.0
@@ -303,9 +273,9 @@ static func sled() -> ArrayMesh:
 	_box(kit, Vector3(1.88, 0.25, 0.2), Vector3(0, 0.35, 4.6), SLED_YELLOW.darkened(0.2))
 	# The hitch tower: an A-frame up to the chain's ring.
 	for side: float in [-1.0, 1.0]:
-		kit.add(KartMeshKit.box(Vector3(0.12, 1.0, 0.12)),
-			KartMeshKit.between(Vector3(side * 0.7, 0.25, 0.9), Vector3(0, 0.62, 0.05), Vector3.ONE), SLED_YELLOW)
-	kit.add(KartMeshKit.torus(0.06, 0.11, 10, 4), KartMeshKit.xf(Vector3(0, 0.6, 0.0), Vector3(0, 0, 90)), STEEL.lightened(0.3))
+		kit.add(MeshKit3D.box(Vector3(0.12, 1.0, 0.12)),
+			MeshKit3D.between(Vector3(side * 0.7, 0.25, 0.9), Vector3(0, 0.62, 0.05), Vector3.ONE), SLED_YELLOW)
+	kit.add(MeshKit3D.torus(0.06, 0.11, 10, 4), MeshKit3D.xf(Vector3(0, 0.6, 0.0), Vector3(0, 0, 90)), STEEL.lightened(0.3))
 	return kit.commit()
 
 
@@ -338,25 +308,25 @@ static func bike(bars: Vector3, mirror: Vector3, mirror_size: Vector2) -> ArrayM
 	kit.outline = 0.4
 	var steel := Color("7a818c")
 	var rubber := Color("17181b")
-	kit.add(KartMeshKit.cylinder(0.017, 0.017, BAR_HALF * 2.0 - 0.1, 10), KartMeshKit.xf(bars, Vector3(0, 0, 90)), steel)
+	kit.add(MeshKit3D.cylinder(0.017, 0.017, BAR_HALF * 2.0 - 0.1, 10), MeshKit3D.xf(bars, Vector3(0, 0, 90)), steel)
 	for side: float in [-1.0, 1.0]:
-		kit.add(KartMeshKit.cylinder(0.023, 0.023, 0.15, 10), KartMeshKit.xf(bars + Vector3(side * (BAR_HALF - 0.075), 0, 0), Vector3(0, 0, 90)), rubber)
-		kit.add(KartMeshKit.cylinder(0.015, 0.015, 0.12, 8), KartMeshKit.xf(bars + Vector3(side * (BAR_HALF - 0.16), -0.05, -0.02), Vector3(25, 0, 0)), steel)
+		kit.add(MeshKit3D.cylinder(0.023, 0.023, 0.15, 10), MeshKit3D.xf(bars + Vector3(side * (BAR_HALF - 0.075), 0, 0), Vector3(0, 0, 90)), rubber)
+		kit.add(MeshKit3D.cylinder(0.015, 0.015, 0.12, 8), MeshKit3D.xf(bars + Vector3(side * (BAR_HALF - 0.16), -0.05, -0.02), Vector3(25, 0, 0)), steel)
 	_box(kit, Vector3(0.06, 0.05, 0.16), bars + Vector3(0, -0.02, 0.07), ACCENT.darkened(0.15))
 	_box(kit, Vector3(0.07, 0.3, 0.06), bars + Vector3(0, -0.17, 0.14), ACCENT.darkened(0.25))
 	# The mirror's straight stalk, a chrome rim and a dark back.
 	var bar_end := bars + Vector3(BAR_HALF, 0.0, 0.0)
 	var joint := bar_end + Vector3(0.07, 0.05, -0.02)
 	var foot := mirror + Vector3(-0.05, -mirror_size.y / 2.0 + 0.006, -0.01)
-	kit.add(KartMeshKit.box(Vector3(0.016, 1.0, 0.016)), KartMeshKit.between(bar_end, joint), steel)
-	kit.add(KartMeshKit.box(Vector3(0.03, 0.03, 0.03)), KartMeshKit.xf(joint), Color("8a9098"))
-	kit.add(KartMeshKit.box(Vector3(0.014, 1.0, 0.014)), KartMeshKit.between(joint, foot), steel)
+	kit.add(MeshKit3D.box(Vector3(0.016, 1.0, 0.016)), MeshKit3D.between(bar_end, joint), steel)
+	kit.add(MeshKit3D.box(Vector3(0.03, 0.03, 0.03)), MeshKit3D.xf(joint), Color("8a9098"))
+	kit.add(MeshKit3D.box(Vector3(0.014, 1.0, 0.014)), MeshKit3D.between(joint, foot), steel)
 	var half := mirror_size.x / 2.0
 	kit.glow = 0.3
-	kit.add(KartMeshKit.torus(half - 0.002, half + 0.012, 28, 4), KartMeshKit.xf(mirror + Vector3(0, 0, -0.002), Vector3(90, 0, 0),
+	kit.add(MeshKit3D.torus(half - 0.002, half + 0.012, 28, 4), MeshKit3D.xf(mirror + Vector3(0, 0, -0.002), Vector3(90, 0, 0),
 		Vector3(1.0, 1.0, mirror_size.y / mirror_size.x)), Color("d4d9e0"))
 	kit.glow = 0.0
-	kit.add(KartMeshKit.blob(Vector3(half, mirror_size.y / 2.0, 0.03), 1.0, 1.0, 16, 8), KartMeshKit.xf(mirror + Vector3(0, 0, -0.034)), Color("1a1c1f"))
+	kit.add(MeshKit3D.blob(Vector3(half, mirror_size.y / 2.0, 0.03), 1.0, 1.0, 16, 8), MeshKit3D.xf(mirror + Vector3(0, 0, -0.034)), Color("1a1c1f"))
 	return kit.commit()
 
 
@@ -364,11 +334,11 @@ static func bike(bars: Vector3, mirror: Vector3, mirror_size: Vector2) -> ArrayM
 static func wheel() -> ArrayMesh:
 	var kit := _kit()
 	kit.outline = 0.0
-	kit.add(KartMeshKit.torus(13.4, 14.0, 28, 4), KartMeshKit.xf(Vector3.ZERO, Vector3(90, 0, 0)), Color("6a6f7a"))
+	kit.add(MeshKit3D.torus(13.4, 14.0, 28, 4), MeshKit3D.xf(Vector3.ZERO, Vector3(90, 0, 0)), Color("6a6f7a"))
 	for i in 12:
 		var a := TAU * i / 12.0
 		var tip := Vector3(cos(a), sin(a), 0.0) * WHEEL_RADIUS
-		kit.add(KartMeshKit.box(Vector3(0.15, 1.0, 0.15)), KartMeshKit.between(Vector3.ZERO, tip, Vector3.ONE), Color("6a6f7a"))
+		kit.add(MeshKit3D.box(Vector3(0.15, 1.0, 0.15)), MeshKit3D.between(Vector3.ZERO, tip, Vector3.ONE), Color("6a6f7a"))
 	kit.glow = 1.0
 	for i in 24:
 		var a := TAU * i / 24.0
@@ -396,7 +366,7 @@ static func lamp_heads() -> Array[Vector3]:
 ## One chain link (a flattened ring).
 static func chain_link() -> ArrayMesh:
 	var kit := _kit()
-	kit.add(KartMeshKit.torus(0.022, 0.045, 8, 4), KartMeshKit.xf(Vector3.ZERO, Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.6)),
+	kit.add(MeshKit3D.torus(0.022, 0.045, 8, 4), MeshKit3D.xf(Vector3.ZERO, Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.6)),
 		Color("8a9098"))
 	return kit.commit()
 
@@ -404,7 +374,7 @@ static func chain_link() -> ArrayMesh:
 ## The best flag: a pole and a cloth in the accent (the cloth sways: COLOR.a 0).
 static func flag() -> ArrayMesh:
 	var kit := _kit()
-	kit.add(KartMeshKit.cylinder(0.04, 0.05, 3.4, 6), KartMeshKit.xf(Vector3(0, 1.7, 0)), Color("d8d8d8"))
+	kit.add(MeshKit3D.cylinder(0.04, 0.05, 3.4, 6), MeshKit3D.xf(Vector3(0, 1.7, 0)), Color("d8d8d8"))
 	kit.glow = 0.45
 	var segs := 8
 	for i in segs:
@@ -415,42 +385,3 @@ static func flag() -> ArrayMesh:
 		kit.quad(Vector3(x0, 3.3, 0), Vector3(x1, 3.3, 0), Vector3(x1, 2.55, 0), Vector3(x0, 2.55, 0), c)
 		kit.quad(Vector3(x1, 3.3, 0), Vector3(x0, 3.3, 0), Vector3(x0, 2.55, 0), Vector3(x1, 2.55, 0), c)
 	return kit.commit()
-
-
-static func vignette_at(suv: Vector2) -> Color:
-	var p := suv * 2.0 - Vector2.ONE
-	p.x *= 1.35
-	var v := smoothstep(0.7, 1.75, p.length())
-	var m := 1.0 - v * VIGNETTE
-	var tint := Color.WHITE.lerp(VIGNETTE_TINT, v * 0.5)
-	return Color(m * tint.r, m * tint.g, m * tint.b)
-
-
-## The grid that draws the 3D view's image at `size` on screen, the vignette in its vertex
-## colours (display values, so the linear multiplier goes to the power 1/2.2).
-static func view_image(size: Vector2) -> ArrayMesh:
-	var verts := PackedVector2Array()
-	var uvs := PackedVector2Array()
-	var cols := PackedColorArray()
-	var idx := PackedInt32Array()
-	for j in VIEW_ROWS + 1:
-		for i in VIEW_COLS + 1:
-			var uv := Vector2(float(i) / VIEW_COLS, float(j) / VIEW_ROWS)
-			verts.append(uv * size)
-			uvs.append(uv)
-			var m := vignette_at(uv)
-			cols.append(Color(pow(m.r, 1.0 / 2.2), pow(m.g, 1.0 / 2.2), pow(m.b, 1.0 / 2.2)))
-	for j in VIEW_ROWS:
-		for i in VIEW_COLS:
-			var a := j * (VIEW_COLS + 1) + i
-			var c := a + VIEW_COLS + 1
-			idx.append_array([a, a + 1, c, a + 1, c + 1, c])
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_TEX_UV] = uvs
-	arrays[Mesh.ARRAY_COLOR] = cols
-	arrays[Mesh.ARRAY_INDEX] = idx
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh

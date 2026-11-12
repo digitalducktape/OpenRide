@@ -2,7 +2,7 @@ class_name LaunchPlaces
 extends RefCounted
 ## The launch sites (#82, 2D like Safe Cracker; ART_BIBLE.md §4 and §6): a coastal pad at first
 ## light, desert flats at dusk and a polar shelf at night. Each is a palette and a few layers of
-## shapes drawn in code into one `SafeMesh` batch, baked once per place by `LaunchBackdrop`. Layout
+## shapes drawn in code into one `MeshBatch2D` batch, baked once per place by `LaunchBackdrop`. Layout
 ## constants here are shared by every layer. Props stay out from under the HUD's panels: nothing
 ## tall left of x 640 or right of x 1400 above y 310.
 
@@ -54,7 +54,7 @@ static func index_of(id: String) -> int:
 
 
 ## The whole place, in stage coordinates (the bake shifts it by BLEED).
-static func build_scene(m: SafeMesh, index: int) -> void:
+static func build_scene(m: MeshBatch2D, index: int) -> void:
 	var p := place(index)
 	_sky(m, p)
 	match str(p.id):
@@ -69,7 +69,7 @@ static func build_scene(m: SafeMesh, index: int) -> void:
 	_table(m, p)
 
 
-static func _sky(m: SafeMesh, p: Dictionary) -> void:
+static func _sky(m: MeshBatch2D, p: Dictionary) -> void:
 	var l := -BLEED
 	var w := WIDE.x
 	m.rect_v(Rect2(l, 0, w, 300), p.sky_top, p.sky_mid)
@@ -90,7 +90,7 @@ static func _sky(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## A rolling crest: a strip of quads down to `bottom`, shaded top to bottom.
-static func _ridge(m: SafeMesh, y: float, swell: float, wave: float, phase: float, top: Color, under: Color, bottom: float) -> void:
+static func _ridge(m: MeshBatch2D, y: float, swell: float, wave: float, phase: float, top: Color, under: Color, bottom: float) -> void:
 	var x := -BLEED
 	while x < SIZE.x + BLEED:
 		var x2 := x + 24.0
@@ -100,7 +100,7 @@ static func _ridge(m: SafeMesh, y: float, swell: float, wave: float, phase: floa
 		x = x2
 
 
-static func _coast(m: SafeMesh, p: Dictionary) -> void:
+static func _coast(m: MeshBatch2D, p: Dictionary) -> void:
 	# The sea under the dawn, and a low headland far off at the left.
 	m.rect_v(Rect2(-BLEED, HORIZON_Y - 18.0, WIDE.x, 110.0), Color("c9a0a6"), Color("4f6a8f"))
 	m.glow(Vector2(p.sun.x, HORIZON_Y), Vector2(420, 34), Color(p.sun_col, 0.5), 8)
@@ -111,7 +111,7 @@ static func _coast(m: SafeMesh, p: Dictionary) -> void:
 	_ridge(m, 868.0, 14.0, 0.0034, 2.2, p.near, p.near2, 1080.0)
 
 
-static func _desert(m: SafeMesh, p: Dictionary) -> void:
+static func _desert(m: MeshBatch2D, p: Dictionary) -> void:
 	# Mesas: flat-topped blocks with stepped shoulders, far then near.
 	_mesa(m, -60.0, 420.0, 610.0, p.far, p)
 	_mesa(m, 300.0, 240.0, 650.0, (p.far as Color).lerp(p.sky_low, 0.25), p)
@@ -133,7 +133,7 @@ static func _desert(m: SafeMesh, p: Dictionary) -> void:
 		m.line(Vector2(x + r * 0.5, y - r * 0.5), Vector2(x + r, y + r * 0.3), 3.0, Color(p.lit, 0.5))
 
 
-static func _polar(m: SafeMesh, p: Dictionary) -> void:
+static func _polar(m: MeshBatch2D, p: Dictionary) -> void:
 	# Ice cliffs on the horizon: faceted, pale at the top, floodlit from the pad's side.
 	m.rect_v(Rect2(-BLEED, HORIZON_Y - 10.0, WIDE.x, 120.0), p.mid, (p.near2 as Color).lerp(p.mid, 0.5))
 	var rng := RandomNumberGenerator.new()
@@ -154,7 +154,7 @@ static func _polar(m: SafeMesh, p: Dictionary) -> void:
 
 ## The site's far buildings, wide of the mission clock and the HUD: the assembly hall and water
 ## tower right of the rocket, a low control bunker left of it, the tracking dish at the far right.
-static func _buildings(m: SafeMesh, base: float, p: Dictionary) -> void:
+static func _buildings(m: MeshBatch2D, base: float, p: Dictionary) -> void:
 	_hangar(m, 1160.0, 250.0, 180.0, p)
 	_tower_tank(m, 1490.0, base, p)
 	_dish(m, 1700.0, base, p)
@@ -162,7 +162,7 @@ static func _buildings(m: SafeMesh, base: float, p: Dictionary) -> void:
 
 
 ## A low control bunker: a flat slab with a slit of lit windows.
-static func _bunker(m: SafeMesh, x: float, base: float, p: Dictionary) -> void:
+static func _bunker(m: MeshBatch2D, x: float, base: float, p: Dictionary) -> void:
 	var wall: Color = (p.mid as Color).lerp(p.dark, 0.2)
 	m.quad(Vector2(x, base), Vector2(x + 36.0, base - 62.0), Vector2(x + 300.0, base - 62.0), Vector2(x + 336.0, base), wall)
 	m.rect(Rect2(x + 30.0, base - 70.0, 276.0, 10.0), wall.lightened(0.2))
@@ -171,7 +171,7 @@ static func _bunker(m: SafeMesh, x: float, base: float, p: Dictionary) -> void:
 
 
 ## A flat-topped rock with one step in its shoulder, its sunward face lit.
-static func _mesa(m: SafeMesh, x: float, w: float, top: float, col: Color, p: Dictionary) -> void:
+static func _mesa(m: MeshBatch2D, x: float, w: float, top: float, col: Color, p: Dictionary) -> void:
 	var base := HORIZON_Y + 10.0
 	var shoulder := lerpf(top, base, 0.45)
 	m.quad(Vector2(x, base), Vector2(x + w * 0.08, shoulder), Vector2(x + w * 0.92, shoulder), Vector2(x + w, base), col)
@@ -182,7 +182,7 @@ static func _mesa(m: SafeMesh, x: float, w: float, top: float, col: Color, p: Di
 
 
 ## The assembly hall on the far side of the site: a big box with a tall door and lit windows.
-static func _hangar(m: SafeMesh, x: float, w: float, h: float, p: Dictionary) -> void:
+static func _hangar(m: MeshBatch2D, x: float, w: float, h: float, p: Dictionary) -> void:
 	var base := HORIZON_Y + 40.0
 	var wall: Color = (p.mid as Color).lerp(p.dark, 0.25)
 	var r := Rect2(x, base - h, w, h)
@@ -198,7 +198,7 @@ static func _hangar(m: SafeMesh, x: float, w: float, h: float, p: Dictionary) ->
 
 
 ## A water tower on four legs, its round tank capped by a cone.
-static func _tower_tank(m: SafeMesh, x: float, base: float, p: Dictionary) -> void:
+static func _tower_tank(m: MeshBatch2D, x: float, base: float, p: Dictionary) -> void:
 	var steel: Color = (p.mid as Color).lerp(p.dark, 0.4)
 	for k in [-34.0, 34.0]:
 		m.line(Vector2(x + k * 0.6, base - 110.0), Vector2(x + k, base + 16.0), 6.0, steel)
@@ -211,12 +211,12 @@ static func _tower_tank(m: SafeMesh, x: float, base: float, p: Dictionary) -> vo
 
 
 ## A tracking dish on a pylon, tipped toward the rocket: a shallow fan of arcs, not a ball.
-static func _dish(m: SafeMesh, x: float, base: float, p: Dictionary) -> void:
+static func _dish(m: MeshBatch2D, x: float, base: float, p: Dictionary) -> void:
 	var steel: Color = (p.mid as Color).lerp(p.dark, 0.3)
 	m.fill(PackedVector2Array([Vector2(x - 44.0, base + 24.0), Vector2(x - 12.0, base - 80.0), Vector2(x + 12.0, base - 80.0), Vector2(x + 44.0, base + 24.0)]), steel)
 	var at := Vector2(x, base - 110.0)
-	var dish := SafeMesh.arc_points(at, 92.0, deg_to_rad(120.0), deg_to_rad(280.0), 14)
-	var rim := SafeMesh.arc_points(at, 66.0, deg_to_rad(120.0), deg_to_rad(280.0), 14)
+	var dish := MeshBatch2D.arc_points(at, 92.0, deg_to_rad(120.0), deg_to_rad(280.0), 14)
+	var rim := MeshBatch2D.arc_points(at, 66.0, deg_to_rad(120.0), deg_to_rad(280.0), 14)
 	m.band(dish, rim, steel.lightened(0.34), steel.lightened(0.08), false)
 	m.line(dish[0], dish[14], 6.0, steel.lightened(0.42))
 	var aim: Vector2 = (dish[0] + dish[14]) * 0.5
@@ -225,7 +225,7 @@ static func _dish(m: SafeMesh, x: float, base: float, p: Dictionary) -> void:
 
 
 ## The concrete apron: a trapezoid in one-point perspective toward the pad, its joints converging.
-static func _apron(m: SafeMesh, p: Dictionary) -> void:
+static func _apron(m: MeshBatch2D, p: Dictionary) -> void:
 	var top := 846.0
 	var bottom := 1080.0
 	var a := Vector2(PAD_X - 460.0, top)
@@ -250,7 +250,7 @@ static func _apron(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## The fuel line along the ground from the tank farm at the right to the table.
-static func _pipes(m: SafeMesh, p: Dictionary) -> void:
+static func _pipes(m: MeshBatch2D, p: Dictionary) -> void:
 	var steel: Color = (p.concrete2 as Color).darkened(0.1)
 	var y := 872.0
 	# Two horizontal storage tanks, flat-ended, their ends lit.
@@ -270,7 +270,7 @@ static func _pipes(m: SafeMesh, p: Dictionary) -> void:
 
 
 ## The launch table: a steel deck on two piers, the flame trench dark between them, on the apron.
-static func _table(m: SafeMesh, p: Dictionary) -> void:
+static func _table(m: MeshBatch2D, p: Dictionary) -> void:
 	var w := TABLE_W
 	var l := PAD_X - w * 0.5
 	var steel := Color("565b6c").lerp(p.concrete2, 0.35)

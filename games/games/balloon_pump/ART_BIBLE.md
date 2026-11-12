@@ -8,7 +8,7 @@
 > `PumpStage.gd` (the layers, the bake, the bunch, the motion), `shaders/*.gdshader`,
 > `BalloonPump.look` (UI). `GFX_POLISH.md` records the work.
 
-Everything is drawn in code: shapes batched by `SafeMesh` (Safe Cracker's batcher, read only) and
+Everything is drawn in code: shapes batched by `MeshBatch2D` (Safe Cracker's batcher, read only) and
 four small canvas shaders. No textures but a soft dot. Places are plain descriptions; nothing
 refers to a real fair, circus, pier or maker, and nothing carries lettering.
 
@@ -52,7 +52,7 @@ the soft shadows agree with it. The vignette (soot plum) pulls the corners in.
 ## 4. Light, materials and drawing
 
 - **Bake.** The room, the pump, its hose, the stand, the basket, the key light's pools, the soft
-  shadows and the vignette are one `SafeMesh` batch per place, rendered once into a SubViewport and
+  shadows and the vignette are one `MeshBatch2D` batch per place, rendered once into a SubViewport and
   shown as one sprite (Safe Cracker's tablet recipe). Only what moves is drawn live.
 - **Brass:** a vertical cylinder ramp with the hot stripe on the light's side and a faint reflected
   light on the far edge; hoops with a lit lip, a dark seam and rivets spaced as on a cylinder; a

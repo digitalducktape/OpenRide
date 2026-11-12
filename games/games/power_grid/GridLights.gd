@@ -4,7 +4,7 @@ extends RefCounted
 ## vertices whose UV carries its channel and its turn: UV.x = channel + threshold, UV.y = seed.
 ## `grid_lights.gdshader` reads them against four uniform levels, so a district coming on window by
 ## window, or a brown-out dropping lights one by one, costs one uniform a frame and no redraw.
-## SafeMesh can't be used here: every vertex of one light must share one UV, and a light has no
+## MeshBatch2D can't be used here: every vertex of one light must share one UV, and a light has no
 ## feather (they're additive and soft already).
 ##
 ## Seeds: 0-1 twinkles slowly; 2 and up is a chasing bulb (2.0, 2.25, 2.5, 2.75 are its four phases).

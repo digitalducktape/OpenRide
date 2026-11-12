@@ -41,39 +41,39 @@ func _init() -> void:
 	name = "Pad"
 	back = Node2D.new()
 	back.name = "PadBack"
-	tower = SafeDial.Layer.new()
+	tower = PaintLayer.new()
 	tower.name = "Tower"
 	tower.paint = func(ci: CanvasItem) -> void: _tower_mesh().draw_on(ci)
 	back.add_child(tower)
 	for i in 2:
-		var arm: Node2D = SafeDial.Layer.new()
+		var arm: Node2D = PaintLayer.new()
 		arm.name = "Arm%d" % i
 		arm.paint = _paint_arm.bind(i)
 		back.add_child(arm)
 		arms.append(arm)
-	lights = SafeDial.Layer.new()
+	lights = PaintLayer.new()
 	lights.name = "Beacons"
 	lights.paint = _paint_lights
 	back.add_child(lights)
 	_build_clock()
-	hose = SafeDial.Layer.new()
+	hose = PaintLayer.new()
 	hose.name = "Hose"
 	hose.paint = _paint_hose
 	var flow := ShaderMaterial.new()
 	flow.shader = preload("res://games/ready_for_launch/shaders/rfl_flow.gdshader")
 	hose.material = flow
 	back.add_child(hose)
-	foreground = SafeDial.Layer.new()
+	foreground = PaintLayer.new()
 	foreground.name = "Foreground"
 	foreground.paint = _paint_foreground
 	for i in 2:
 		var s := _steam_emitter(i)
 		add_child(s)
 		steam.append(s)
-	trench_glow = SafeDial.Layer.new()
+	trench_glow = PaintLayer.new()
 	trench_glow.name = "TrenchGlow"
 	trench_glow.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.glow(Vector2(LaunchPlaces.PAD_X, LaunchPlaces.PAD_Y + 44.0), Vector2(520.0, 150.0), Color(1.0, 0.68, 0.3, 0.85), 10)
 		m.flush(ci)
 	var add := CanvasItemMaterial.new()
@@ -195,14 +195,14 @@ static func _tower_top(mark: int) -> float:
 	return LaunchPlaces.PAD_Y - LaunchRocket.height_of(mark) + 30.0
 
 
-func _tower_mesh() -> SafeMesh:
+func _tower_mesh() -> MeshBatch2D:
 	var mark := _mark
 	var place := _place
-	return SafeMesh.built("rfl:tower:%d:%d" % [mark, place], func(m: SafeMesh) -> void: paint_tower(m, mark, place))
+	return MeshBatch2D.built("rfl:tower:%d:%d" % [mark, place], func(m: MeshBatch2D) -> void: paint_tower(m, mark, place))
 
 
 ## The service tower: a square steel lattice with decks and a stair, red and white at the top.
-static func paint_tower(m: SafeMesh, mark: int, place: int) -> void:
+static func paint_tower(m: MeshBatch2D, mark: int, place: int) -> void:
 	var p := LaunchPlaces.place(place)
 	var x := LaunchPlaces.TOWER_X
 	var top := _tower_top(mark)
@@ -244,7 +244,7 @@ static func paint_tower(m: SafeMesh, mark: int, place: int) -> void:
 
 ## The rocket's contact shadow on the deck, and two floodlight cones up its sides from the table's
 ## corners (faint at dawn, strong in the dark): what ties the hero to its place.
-static func _floods(m: SafeMesh, mark: int, p: Dictionary) -> void:
+static func _floods(m: MeshBatch2D, mark: int, p: Dictionary) -> void:
 	var cx := LaunchPlaces.PAD_X
 	var deck := LaunchPlaces.PAD_Y
 	var top := deck - LaunchRocket.height_of(mark) * 0.8
@@ -260,7 +260,7 @@ static func _floods(m: SafeMesh, mark: int, p: Dictionary) -> void:
 
 ## A swing arm from the tower to the rocket: a boxed truss with a hand rail.
 func _paint_arm(ci: CanvasItem, i: int) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var height := LaunchRocket.height_of(_mark)
 	var y := LaunchPlaces.PAD_Y - height * (0.42 if i == 0 else 0.74)
 	var from := LaunchPlaces.TOWER_X + TOWER_HALF
@@ -284,7 +284,7 @@ func _paint_arm(ci: CanvasItem, i: int) -> void:
 ## The fuel hose: a sagging line from the tower to the booster's filler; UV.x runs along it, for
 ## the flow shader's dashes.
 func _paint_hose(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var start := Vector2(LaunchPlaces.TOWER_X + TOWER_HALF - 4.0, LaunchPlaces.PAD_Y - 170.0)
 	var end := Vector2(LaunchPlaces.PAD_X - LaunchRocket.MARKS[_mark].sections[0].w * 0.5, LaunchPlaces.PAD_Y - 150.0)
 	(ci as Node2D).position = start
@@ -309,7 +309,7 @@ func _paint_hose(ci: CanvasItem) -> void:
 
 ## The beacons: red lamps on the tower's cap and the lightning mast's foot.
 func _paint_lights(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var top := _tower_top(_mark)
 	for at: Vector2 in [Vector2(LaunchPlaces.TOWER_X - 52.0, top - 34.0), Vector2(LaunchPlaces.TOWER_X + 52.0, top - 34.0),
 			Vector2(LaunchPlaces.PAD_X - 262.0, LaunchPlaces.PAD_Y - 6.0), Vector2(LaunchPlaces.PAD_X + 262.0, LaunchPlaces.PAD_Y - 6.0)]:
@@ -320,7 +320,7 @@ func _paint_lights(ci: CanvasItem) -> void:
 
 ## The near ground in front of the pad: dune grass, rocks or snow drifts, wide of the table.
 func _paint_foreground(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var p := LaunchPlaces.place(_place)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 91 + _place
@@ -349,7 +349,7 @@ func _paint_foreground(ci: CanvasItem) -> void:
 
 
 func _build_clock() -> void:
-	var board: Node2D = SafeDial.Layer.new()
+	var board: Node2D = PaintLayer.new()
 	board.name = "ClockBoard"
 	board.paint = _paint_board
 	back.add_child(board)
@@ -371,7 +371,7 @@ func _build_clock() -> void:
 
 ## The mission clock's board on its two legs, lit along the top.
 func _paint_board(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var r := CLOCK_RECT
 	var steel := Color("3a4054")
 	for x in [r.position.x + 70.0, r.end.x - 70.0]:

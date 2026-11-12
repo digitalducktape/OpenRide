@@ -25,12 +25,12 @@ var _ring_tween: Tween
 
 
 func _init() -> void:
-	body = SafeDial.Layer.new()
+	body = PaintLayer.new()
 	body.name = "Body"
 	body.paint = _paint_body
 	add_child(body)
 	for i in PERCHES.size():
-		var b := SafeDial.Layer.new()
+		var b := PaintLayer.new()
 		b.name = "Bird%d" % i
 		b.paint = func(ci: CanvasItem) -> void: KeepyBalloon.paint_bird(ci, i % 2 == 1, false)
 		b.position = PERCHES[i]
@@ -67,10 +67,10 @@ func _init() -> void:
 	fade.add_point(0.7, Color(1, 1, 1, 1))
 	shards.color_ramp = fade
 	add_child(shards)
-	ring = SafeDial.Layer.new()
+	ring = PaintLayer.new()
 	ring.name = "Ring"
 	ring.paint = func(ci: CanvasItem) -> void:
-		var m := SafeMesh.new()
+		var m := MeshBatch2D.new()
 		m.ring(Vector2.ZERO, 92.0, 104.0, Color(1, 0.97, 0.9, 0.9))
 		m.flush(ci)
 	ring.visible = false
@@ -143,7 +143,7 @@ func prewarm() -> void:
 
 
 func _paint_body(ci: CanvasItem) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var r := KeepyPlaces.BALLOON_R
 	var sun := KeepyPlaces.to_sun(place_index)
 	var pl := KeepyPlaces.place(place_index)
@@ -169,9 +169,9 @@ func _paint_body(ci: CanvasItem) -> void:
 	var clear := PackedColorArray()
 	for c in cols:
 		clear.append(Color(c, 0.0))
-	m.band_colors(outline, SafeMesh.grow_outline(outline, SafeMesh.FEATHER), cols, clear)
+	m.band_colors(outline, MeshBatch2D.grow_outline(outline, MeshBatch2D.FEATHER), cols, clear)
 	# A sky-coloured rim on the shadow side, and the sun showing through the latex at the edge.
-	var rim_in := SafeMesh.grow_outline(outline, -9.0)
+	var rim_in := MeshBatch2D.grow_outline(outline, -9.0)
 	var rim_c := PackedColorArray()
 	var rim_clear := PackedColorArray()
 	for k in segs:
@@ -195,7 +195,7 @@ func _paint_body(ci: CanvasItem) -> void:
 ## A small round bird: slate body, cream belly, a dark eye, a short wedge tail and a folded wing
 ## (perched), or both wings raised (`flying`). Facing right unless `mirror`. About 70 px across.
 static func paint_bird(ci: CanvasItem, mirror: bool, flying: bool) -> void:
-	var m := SafeMesh.new()
+	var m := MeshBatch2D.new()
 	var s := -1.0 if mirror else 1.0
 	if flying:
 		# Both wings up: broad triangles, the far one a little darker.

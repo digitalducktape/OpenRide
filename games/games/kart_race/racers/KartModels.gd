@@ -1,7 +1,7 @@
 class_name KartModels
 extends RefCounted
 ## The racers' models (#43): a toy kart in one of three designs (light, medium, heavy) and its
-## animal driver, built in code from smooth shapes (KartMeshKit: superellipsoids, lathes and
+## animal driver, built in code from smooth shapes (MeshKit3D: superellipsoids, lathes and
 ## tubes with analytic normals) into ONE mesh per kart, each vertex tagged with its bone (UV2.x).
 ## KartView poses the bones and the kart shaders move the vertices, so a kart and driver is one
 ## draw plus its outline pass.
@@ -91,7 +91,7 @@ static func bone_points(r: Dictionary) -> Array:
 
 ## The whole kart with its driver: one rigged mesh.
 static func model(r: Dictionary) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.skinned = true
 	kit.flags = true
 	var cls := KartRoster.kart_class(r)
@@ -118,7 +118,7 @@ static func model(r: Dictionary) -> ArrayMesh:
 
 ## The head alone, centred at the origin and facing -Z, sized for the HUD's portraits.
 static func head(r: Dictionary) -> ArrayMesh:
-	var kit := KartMeshKit.new()
+	var kit := MeshKit3D.new()
 	kit.flags = true
 	_head(kit, r, Vector3.ZERO)
 	return _scaled(kit.commit(), 0.84)
@@ -143,8 +143,8 @@ static func _stripe(accent: Color, width: float) -> Callable:
 		return c.lerp(accent, k)
 
 
-static func _kart_medium(kit: KartMeshKit, r: Dictionary, _l: Dictionary) -> void:
-	var K := KartMeshKit
+static func _kart_medium(kit: MeshKit3D, r: Dictionary, _l: Dictionary) -> void:
+	var K := MeshKit3D
 	var paint := _paint(r)
 	var accent := _accent(r)
 	var deep := Color(paint.r * 0.72, paint.g * 0.72, paint.b * 0.72, 0.9)
@@ -169,8 +169,8 @@ static func _kart_medium(kit: KartMeshKit, r: Dictionary, _l: Dictionary) -> voi
 	_wing(kit, Vector3(0, 1.0, 1.06), 0.74, 0.34, paint, accent, 0.17)
 
 
-static func _kart_light(kit: KartMeshKit, r: Dictionary, _l: Dictionary) -> void:
-	var K := KartMeshKit
+static func _kart_light(kit: MeshKit3D, r: Dictionary, _l: Dictionary) -> void:
+	var K := MeshKit3D
 	var paint := _paint(r)
 	var accent := _accent(r)
 	kit.add(K.blob(Vector3(0.42, 0.05, 1.0), 0.4, 0.4, 10, 4), K.xf(Vector3(0, 0.19, 0.0)), DARK)
@@ -197,8 +197,8 @@ static func _kart_light(kit: KartMeshKit, r: Dictionary, _l: Dictionary) -> void
 	_wing(kit, Vector3(0, 1.0, 0.98), 0.5, 0.28, paint, accent, 0.0)
 
 
-static func _kart_heavy(kit: KartMeshKit, r: Dictionary, _l: Dictionary) -> void:
-	var K := KartMeshKit
+static func _kart_heavy(kit: MeshKit3D, r: Dictionary, _l: Dictionary) -> void:
+	var K := MeshKit3D
 	var paint := _paint(r)
 	var accent := _accent(r)
 	kit.add(K.blob(Vector3(0.66, 0.07, 1.1), 0.35, 0.35, 12, 4), K.xf(Vector3(0, 0.22, 0.0)), DARK)
@@ -231,14 +231,14 @@ static func _pipe_profile(radius: float, length: float) -> PackedVector2Array:
 
 
 ## A round bar through `pts` (bumpers, hoops).
-static func _bar(kit: KartMeshKit, pts: Array, radius: float, color: Color) -> void:
-	kit.add(KartMeshKit.tube(PackedVector3Array(pts), PackedFloat32Array([radius]), 6), Transform3D.IDENTITY, color)
+static func _bar(kit: MeshKit3D, pts: Array, radius: float, color: Color) -> void:
+	kit.add(MeshKit3D.tube(PackedVector3Array(pts), PackedFloat32Array([radius]), 6), Transform3D.IDENTITY, color)
 
 
 ## A solid rear wing spanning x, `chord` deep: a rounded blade in the body colour with an accent
 ## trailing edge, endplates `plate` tall in the accent (none at 0), raked back 8 degrees.
-static func _wing(kit: KartMeshKit, at: Vector3, half_span: float, chord: float, color: Color, trim: Color, plate: float) -> void:
-	var K := KartMeshKit
+static func _wing(kit: MeshKit3D, at: Vector3, half_span: float, chord: float, color: Color, trim: Color, plate: float) -> void:
+	var K := MeshKit3D
 	var c := chord * 0.5
 	kit.paint = func(p: Vector3, _n: Vector3, col: Color) -> Color:
 		return col.lerp(trim, smoothstep(c * 0.55, c * 0.75, p.z))
@@ -250,30 +250,30 @@ static func _wing(kit: KartMeshKit, at: Vector3, half_span: float, chord: float,
 
 
 ## Two taillight bars in one: a wide self-lit red lens `half_width` wide, facing back.
-static func _taillight(kit: KartMeshKit, at: Vector3, half_width: float) -> void:
+static func _taillight(kit: MeshKit3D, at: Vector3, half_width: float) -> void:
 	var g := kit.glow
 	var o := kit.outline
 	kit.glow = 0.9
 	kit.outline = 0.5
-	kit.add(KartMeshKit.blob(Vector3(half_width, 0.04, 0.03), 0.4, 0.4, 6, 3), KartMeshKit.xf(at), Color(TAIL_RED.r, TAIL_RED.g, TAIL_RED.b, 1.0))
+	kit.add(MeshKit3D.blob(Vector3(half_width, 0.04, 0.03), 0.4, 0.4, 6, 3), MeshKit3D.xf(at), Color(TAIL_RED.r, TAIL_RED.g, TAIL_RED.b, 1.0))
 	kit.glow = g
 	kit.outline = o
 
 
 ## A glowing ember inside an exhaust tip at `at`.
-static func _hot_tip(kit: KartMeshKit, at: Vector3, radius: float) -> void:
+static func _hot_tip(kit: MeshKit3D, at: Vector3, radius: float) -> void:
 	var g := kit.glow
 	var o := kit.outline
 	kit.glow = 0.7
 	kit.outline = 0.0
-	kit.add(KartMeshKit.blob(Vector3.ONE * radius, 1.0, 1.0, 5, 3), KartMeshKit.xf(at), Color(1.0, 0.55, 0.2, 0.0))
+	kit.add(MeshKit3D.blob(Vector3.ONE * radius, 1.0, 1.0, 5, 3), MeshKit3D.xf(at), Color(1.0, 0.55, 0.2, 0.0))
 	kit.glow = g
 	kit.outline = o
 
 
 ## The dark diffuser under the tail, with three fins.
-static func _diffuser(kit: KartMeshKit, at: Vector3, half_width: float) -> void:
-	var K := KartMeshKit
+static func _diffuser(kit: MeshKit3D, at: Vector3, half_width: float) -> void:
+	var K := MeshKit3D
 	kit.add(K.blob(Vector3(half_width, 0.06, 0.12), 0.3, 0.3, 8, 3), K.xf(at, Vector3(-12, 0, 0)), DARK)
 	for i in 3:
 		var x := (i - 1) * half_width * 0.5
@@ -282,14 +282,14 @@ static func _diffuser(kit: KartMeshKit, at: Vector3, half_width: float) -> void:
 
 
 ## A small self-lit lamp (a dome facing out of the kart's nearest face).
-static func _lamp(kit: KartMeshKit, at: Vector3, color: Color, radius: float) -> void:
+static func _lamp(kit: MeshKit3D, at: Vector3, color: Color, radius: float) -> void:
 	var g := kit.glow
 	var o := kit.outline
 	kit.glow = 0.85
 	kit.outline = 0.4
 	var out := Vector3(0, 0, signf(at.z))
 	var b := Basis.looking_at(out, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
-	kit.add(KartMeshKit.lathe(_dome(), 6), Transform3D(b.scaled_local(Vector3(radius, radius * 0.6, radius)), at), Color(color.r, color.g, color.b, 1.0))
+	kit.add(MeshKit3D.lathe(_dome(), 6), Transform3D(b.scaled_local(Vector3(radius, radius * 0.6, radius)), at), Color(color.r, color.g, color.b, 1.0))
 	kit.glow = g
 	kit.outline = o
 
@@ -303,8 +303,8 @@ static func _dome() -> PackedVector2Array:
 	return PackedVector2Array([Vector2(1.0, 0.0), Vector2(0.9, 0.45), Vector2(0.55, 0.85), Vector2(0.0, 1.0)])
 
 
-static func _steering(kit: KartMeshKit, l: Dictionary) -> void:
-	var K := KartMeshKit
+static func _steering(kit: MeshKit3D, l: Dictionary) -> void:
+	var K := MeshKit3D
 	var s: Vector3 = l.steer
 	kit.bone = BODY
 	kit.outline = 0.6
@@ -318,8 +318,8 @@ static func _steering(kit: KartMeshKit, l: Dictionary) -> void:
 
 
 ## A chunky tyre around its axle (x), a two-tone hub cap outside: three lobes read as spin.
-static func _wheel(kit: KartMeshKit, r: Dictionary, at: Vector3, radius: float, width: float, side: float) -> void:
-	var K := KartMeshKit
+static func _wheel(kit: MeshKit3D, r: Dictionary, at: Vector3, radius: float, width: float, side: float) -> void:
+	var K := MeshKit3D
 	var hw := width * 0.5
 	var ri := radius * 0.6
 	var tyre := PackedVector2Array([Vector2(ri, -hw * 0.95), Vector2(radius * 0.86, -hw), Vector2(radius, -hw * 0.55),
@@ -345,8 +345,8 @@ static func _wheel(kit: KartMeshKit, r: Dictionary, at: Vector3, radius: float, 
 
 # --- The driver ---
 
-static func _driver(kit: KartMeshKit, r: Dictionary, seat: Vector3, steer: Vector3) -> void:
-	var K := KartMeshKit
+static func _driver(kit: MeshKit3D, r: Dictionary, seat: Vector3, steer: Vector3) -> void:
+	var K := MeshKit3D
 	var suit: Color = r.get("suit", Color(0.2, 0.2, 0.3))
 	suit.a = 0.3
 	var paint := _paint(r)
@@ -379,7 +379,7 @@ static func _driver(kit: KartMeshKit, r: Dictionary, seat: Vector3, steer: Vecto
 	_head(kit, r, seat + HEAD_C, HEAD_SCALE)
 
 
-static func _tail(kit: KartMeshKit, r: Dictionary, seat: Vector3) -> void:
+static func _tail(kit: MeshKit3D, r: Dictionary, seat: Vector3) -> void:
 	var fur := fur_color(r)
 	var cols := PackedColorArray()
 	var pts := PackedVector3Array()
@@ -393,7 +393,7 @@ static func _tail(kit: KartMeshKit, r: Dictionary, seat: Vector3) -> void:
 			cols.append(Color(0.22, 0.2, 0.24, 0.1) if i % 2 == 1 else fur)
 		else:
 			cols.append(WHITE if i >= n - 2 else fur)
-	kit.add(KartMeshKit.tube(pts, radii, 5, cols), Transform3D.IDENTITY, Color.WHITE)
+	kit.add(MeshKit3D.tube(pts, radii, 5, cols), Transform3D.IDENTITY, Color.WHITE)
 
 
 ## The species' fur colour (COLOR.a = a little sheen).
@@ -441,8 +441,8 @@ static func eye_spot(r: Dictionary) -> Vector2:
 
 # --- The head: fur, face, ears, eyes, helmet and goggles ---
 
-static func _head(kit: KartMeshKit, r: Dictionary, h: Vector3, scale := 1.0) -> void:
-	var K := KartMeshKit
+static func _head(kit: MeshKit3D, r: Dictionary, h: Vector3, scale := 1.0) -> void:
+	var K := MeshKit3D
 	# Built at portrait size, scaled about the head's centre.
 	kit.pre = Transform3D(Basis.from_scale(Vector3.ONE * scale), h * (1.0 - scale))
 	var sp := str(r.get("species", "fox"))
@@ -576,8 +576,8 @@ static func _fur_painter(sp: String, hr: Vector3) -> Callable:
 
 ## One big cartoon eye at `t` (+Y out of the face, +Z up): a white, a deep iris with a pupil, and
 ## two self-lit glints (no outlines but the white's soft rim).
-static func _eye(kit: KartMeshKit, t: Transform3D, iris: Color, side: float, size: float) -> void:
-	var K := KartMeshKit
+static func _eye(kit: MeshKit3D, t: Transform3D, iris: Color, side: float, size: float) -> void:
+	var K := MeshKit3D
 	var s := size
 	kit.outline = 0.55
 	kit.add(K.lathe(_flat(), 9), Transform3D(t.basis.scaled_local(Vector3(0.068, 0.025, 0.088) * s), t.origin), Color(0.98, 0.98, 1.0, 0.9))
@@ -595,16 +595,16 @@ static func _eye(kit: KartMeshKit, t: Transform3D, iris: Color, side: float, siz
 	kit.outline = 1.0
 
 
-static func _smile(kit: KartMeshKit, at: Vector3, width: float) -> void:
+static func _smile(kit: MeshKit3D, at: Vector3, width: float) -> void:
 	var pts := PackedVector3Array()
 	for i in 4:
 		var u := (i / 3.0) * 2.0 - 1.0
 		pts.append(at + Vector3(u * width, -0.02 * (1.0 - u * u) + 0.004, -0.004 * (1.0 - u * u)))
-	kit.add(KartMeshKit.tube(pts, PackedFloat32Array([0.009]), 4), Transform3D.IDENTITY, Color(0.32, 0.1, 0.12, 0.6))
+	kit.add(MeshKit3D.tube(pts, PackedFloat32Array([0.009]), 4), Transform3D.IDENTITY, Color(0.32, 0.1, 0.12, 0.6))
 
 
-static func _ears(kit: KartMeshKit, sp: String, h: Vector3, hr: Vector3, fur: Color) -> void:
-	var K := KartMeshKit
+static func _ears(kit: MeshKit3D, sp: String, h: Vector3, hr: Vector3, fur: Color) -> void:
+	var K := MeshKit3D
 	var inner := Color(1.0, 0.72, 0.72, 0.1)
 	for side: float in [-1.0, 1.0]:
 		match sp:
@@ -647,8 +647,8 @@ static func _ears(kit: KartMeshKit, sp: String, h: Vector3, hr: Vector3, fur: Co
 ## The open-face helmet in the racer's colour: an accent stripe over the crown, a darker rim, and
 ## a wide dark goggle strap that wraps round the back (what the chase camera sees), the goggles
 ## pushed up on its brow.
-static func _helmet(kit: KartMeshKit, r: Dictionary, h: Vector3, hr: Vector3) -> void:
-	var K := KartMeshKit
+static func _helmet(kit: MeshKit3D, r: Dictionary, h: Vector3, hr: Vector3) -> void:
+	var K := MeshKit3D
 	var paint := helmet_color(r)
 	var accent := _accent(r) if not r.has("helmet") else _paint(r)
 	var strap := Color(0.12, 0.11, 0.16, 0.7)

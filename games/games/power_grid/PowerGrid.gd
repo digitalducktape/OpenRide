@@ -20,7 +20,6 @@ const BAND_STEP := 5.0  ## the ride panel's tick moves in steps this big (a re-l
 ## Short names for the callouts, so the longest still fits the lane.
 const NAMES := ["Houses", "Street lamps", "Funfair", "Stadium"]
 const REST_LINES := ["", "Street lamps off for the night", "The funfair's closing up", "The stadium's emptying"]
-const LANE_MUSIC_GAP := 8.0  ## px kept between the callouts' lane and the Music button
 ## Which callouts may cut in on which (GridBanner): a storm's instruction outranks all news.
 const NEWS := 0
 const WARNING := 2
@@ -125,18 +124,20 @@ func _on_prepare(seg: Dictionary) -> void:
 	hud.add_widget(_status)
 	# One watts reading on screen: the ride panel shows the same smoothed supply the rules use, its
 	# gauge ticked at what meets demand, and its rpm gauge at the "pedalling" floor.
-	hud.metrics.set_power_source(func() -> float: return logic.supply)
+	hud.metrics.set_power_source(smoothed_power)
 	hud.metrics.set_cadence_band(GridLogic.PEDAL_RPM)
 	_update_band()
 	GridAudioScript.start_music()
 	_update_status()
-	_status.resized.connect(_fit_lane)
-	hud.top_bar_moved.connect(_fit_lane)
-	hud.ride_panel.resized.connect(_fit_lane)
-	hud.music_button.visibility_changed.connect(_fit_lane)
-	_fit_lane()
+	banner.follow(hud, _status)
 	world.pose(_levels(), logic.night(), 0.0, logic.need() / _scale)
 	world.prewarm()
+
+
+## The ride panel's W: the rules' smoothed power (one watts number on the whole HUD). A bound
+## method, so the panel's Callable stops being valid if the game is freed before `clear_widgets`.
+func smoothed_power() -> float:
+	return logic.supply if logic else InputBus.power
 
 
 func _on_start() -> void:
@@ -228,24 +229,10 @@ func pose_for_card() -> void:
 	world.pose(Vector4.ONE, 0.82, 0.7, 0.62)
 
 
-## Keeps the callouts' lane under the status area, clear of a ride panel a heart strap widens and,
-## when a circuit's strip brings it down beside the Music button, short of the button.
-func _fit_lane() -> void:
-	if not is_instance_valid(_status):
-		return
-	var lane := GridBanner.LANE
-	lane.position.y = lane_top(_status.get_global_rect().end.y)
-	var left := maxf(lane.position.x, hud.ride_panel.get_global_rect().end.x + LANE_MUSIC_GAP)
-	var right := lane.end.x
-	var music := hud.music_button.get_global_rect().grow(LANE_MUSIC_GAP)
-	if hud.music_button.visible and lane.intersects(music):
-		right = music.position.x
-	banner.set_lane(Rect2(left, lane.position.y, right - left, lane.size.y))
-
 
 ## The callout lane's top, a little under a status area ending at `status_bottom`.
 func lane_top(status_bottom: float) -> float:
-	return maxf(GridBanner.LANE.position.y, status_bottom + 4.0)
+	return maxf(GridBanner.LANE.position.y, status_bottom + CalloutBanner.STATUS_GAP)
 
 
 ## The ride panel's gauge ticks at what meets demand (the repair in a storm), moved in steps; an

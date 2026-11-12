@@ -67,6 +67,8 @@ var _widgets: HBoxContainer
 var _message: Label
 var _score_text := ""
 var _clock_squeezed := false  ## `_fit_clock`: the time and score at `HudTheme.MEDIUM`
+var _message_left := 0.0  ## seconds until a timed message hides (`show_message`); 0: it stays
+var _paused := false
 var _message_pop := false  ## a skin's `message_font`: the message pops in
 ## What `set_skin` overrode, to put back: [Control, kind, name, had_override, old value].
 var _skin_saved: Array = []
@@ -383,7 +385,10 @@ func _skin_set(c: Control, kind: String, key: StringName, value: Variant) -> voi
 
 
 ## A short centred message over the middle of the screen ("Game over! Next run in 5").
-func show_message(text: String, color := HudTheme.INK) -> void:
+## Shows `text` in the middle of the screen. With `seconds` it hides by itself after that long
+## (the countdown stops while the game is paused); without, it stays until `hide_message`.
+func show_message(text: String, color := HudTheme.INK, seconds := 0.0) -> void:
+	_message_left = maxf(seconds, 0.0)
 	var fresh := text != _message.text or not _message.visible
 	_message.text = text
 	_message.add_theme_color_override("font_color", color)
@@ -394,6 +399,7 @@ func show_message(text: String, color := HudTheme.INK) -> void:
 
 func hide_message() -> void:
 	_message.visible = false
+	_message_left = 0.0
 
 
 func is_showing_message() -> bool:
@@ -401,10 +407,15 @@ func is_showing_message() -> bool:
 
 
 func set_paused(paused: bool) -> void:
+	_paused = paused
 	pause_button.text = "Resume" if paused else "Pause"
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _message_left > 0.0 and not _paused:
+		_message_left -= delta
+		if _message_left <= 0.0:
+			hide_message()
 	var shown := str(Effort.whole_points(Effort.score))
 	if shown != _score_text:
 		_score_text = shown

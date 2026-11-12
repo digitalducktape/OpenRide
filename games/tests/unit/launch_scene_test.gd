@@ -278,12 +278,12 @@ func test_the_exhaust_in_vacuum_is_a_short_wide_fan_never_a_tail() -> void:
 func test_nothing_redraws_while_fuelling() -> void:
 	await get_tree().process_frame
 	var flushes := [0]
-	SafeMesh.probe = func(_ci, _points, _indices) -> void: flushes[0] += 1
+	MeshBatch2D.probe = func(_ci, _points, _indices) -> void: flushes[0] += 1
 	var was: float = InputBus.power
 	for i in 5:
 		InputBus.power = 130.0
 		game._on_frame(1.0 / 60.0)
 		await get_tree().process_frame
 	InputBus.power = was
-	SafeMesh.probe = Callable()
+	MeshBatch2D.probe = Callable()
 	assert_int(flushes[0]).is_equal(0)

@@ -1,6 +1,7 @@
-class_name DodgeTimeOfDay
+class_name TimeOfDay
 extends Resource
-## One lighting preset for Dodge Ball's road (`tod/<name>.tres`): sky, sun, ambient light, fog,
+## One lighting preset for an outdoor 3D world (`framework/tod/<name>.tres`; Dodge Ball's road and
+## Tug of War's riverside): sky, sun, ambient light, fog,
 ## and how much the street lamps and the bike's headlight glow. The rider picks one in the
 ## pause screen's "Game options", or "Auto" follows the local clock (`for_hour`).
 
@@ -32,8 +33,8 @@ const NAMES := ["dawn", "day", "dusk", "night"]
 @export var ball_glow := 0.0  ## extra self-lighting on the balls, so they read at night
 
 
-static func load_preset(name: String) -> DodgeTimeOfDay:
-	return load("res://games/dodge_ball/tod/%s.tres" % name) as DodgeTimeOfDay
+static func load_preset(name: String) -> TimeOfDay:
+	return load("res://framework/tod/%s.tres" % name) as TimeOfDay
 
 
 ## The preset for a local hour: dawn 5-8, day 8-17, dusk 17-20, night otherwise.

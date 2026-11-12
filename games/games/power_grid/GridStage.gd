@@ -15,7 +15,7 @@ extends Node2D
 ##   Wires     the power running down the line: one strip mesh, one phase uniform;
 ##   Machine   crank, pedals, flywheel, pulley and the meter's needle: static drawings, transformed;
 ##   Storm     a cloud bank, rain and a bolt, hidden unless a storm is on.
-## Each SafeMesh batch (Safe Cracker's batcher, read only) is one draw call.
+## Each MeshBatch2D batch (Safe Cracker's batcher, read only) is one draw call.
 
 const SkyShader := preload("res://games/power_grid/shaders/grid_sky.gdshader")
 const LightsShader := preload("res://games/power_grid/shaders/grid_lights.gdshader")
@@ -56,12 +56,12 @@ var _sky: Sprite2D
 var _sky_mat: ShaderMaterial
 var _stars: MeshInstance2D
 var _stars_mat: ShaderMaterial
-var _moon: Layer
-var _clouds: Array[Layer] = []
-var _birds: Layer
+var _moon: MeshLayer
+var _clouds: Array[MeshLayer] = []
+var _birds: MeshLayer
 var _river: MeshInstance2D
 var _river_mat: ShaderMaterial
-var _wheel: Layer
+var _wheel: MeshLayer
 var _wheel_lights: MeshInstance2D
 var _lights: MeshInstance2D
 var _lights_mat: ShaderMaterial
@@ -74,16 +74,16 @@ var _fireflies: CPUParticles2D
 var _lamp_glow: Sprite2D
 var _coil_glow: Sprite2D
 var _brushes: CPUParticles2D
-var _crank: Layer
-var _pedals: Array[Layer] = []
-var _flywheel: Layer
-var _pulley: Layer
-var _needle: Layer
-var _marker: Layer
-var _storm_cloud: Layer
+var _crank: MeshLayer
+var _pedals: Array[MeshLayer] = []
+var _flywheel: MeshLayer
+var _pulley: MeshLayer
+var _needle: MeshLayer
+var _marker: MeshLayer
+var _storm_cloud: MeshLayer
 var _rain: ColorRect
 var _rain_mat: ShaderMaterial
-var _bolt: Layer
+var _bolt: MeshLayer
 var _sparks: CPUParticles2D
 var _fireworks: Array[CPUParticles2D] = []
 
@@ -105,20 +105,6 @@ var _car_t := [0.1, 0.45, 0.8]
 var _bird_t := 0.0
 var _bolt_to := Vector2.ZERO
 var _bolt_rng := RandomNumberGenerator.new()
-
-
-## A Node2D that draws one SafeMesh batch, built by `paint` (a Callable taking the SafeMesh).
-class Layer extends Node2D:
-	var paint: Callable
-	var batch: SafeMesh
-
-	func _draw() -> void:
-		if batch:
-			batch.draw_on(self)
-		elif paint.is_valid():
-			var m := SafeMesh.new()
-			paint.call(m)
-			m.flush(self)
 
 
 func _init() -> void:
@@ -146,7 +132,7 @@ func _init() -> void:
 	_river_mat.shader = RiverShader
 	_river = _mesh_node("River", _river_mesh(), _river_mat)
 	_lights_mat = _lights_material()
-	_wheel = _layer("Wheel", func(m: SafeMesh): GridValley.paint_wheel(m, Color.WHITE))
+	_wheel = _layer("Wheel", func(m: MeshBatch2D): GridValley.paint_wheel(m, Color.WHITE))
 	_wheel.position = GridValley.WHEEL_AT
 	var wheel_lights := GridLights.new()
 	GridValley.wheel_lights(wheel_lights)
@@ -222,7 +208,7 @@ func _make_bake(bake_name: String, night: int) -> SubViewport:
 	bake.size = Vector2i(GridValley.WIDE)
 	bake.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(bake)
-	var layer := Layer.new()
+	var layer := MeshLayer.new()
 	layer.name = "Valley"
 	layer.position = Vector2(GridValley.BLEED, 0)
 	layer.batch = valley_batch(night)
@@ -232,15 +218,15 @@ func _make_bake(bake_name: String, night: int) -> SubViewport:
 
 
 ## The valley and the shed in one palette, built once for the engine's life.
-static func valley_batch(night: int) -> SafeMesh:
-	return SafeMesh.built("grid_valley_%d" % night, func(m: SafeMesh) -> void:
+static func valley_batch(night: int) -> MeshBatch2D:
+	return MeshBatch2D.built("grid_valley_%d" % night, func(m: MeshBatch2D) -> void:
 		GridValley.paint(m, night)
 		GridShed.paint(m, night)
 		GridValley.vignette(m, night))
 
 
-func _layer(layer_name: String, paint: Callable) -> Layer:
-	var l := Layer.new()
+func _layer(layer_name: String, paint: Callable) -> MeshLayer:
+	var l := MeshLayer.new()
 	l.name = layer_name
 	l.paint = paint
 	add_child(l)
@@ -265,9 +251,9 @@ func _lights_material() -> ShaderMaterial:
 func _glow_sprite(node_name: String, at: Vector2, size: Vector2, color: Color) -> Sprite2D:
 	var s := Sprite2D.new()
 	s.name = node_name
-	s.texture = SafePlaces.soft_dot()
+	s.texture = MeshBatch2D.soft_dot()
 	s.position = at
-	s.scale = size / float(SafePlaces.soft_dot().get_width())
+	s.scale = size / float(MeshBatch2D.soft_dot().get_width())
 	s.modulate = color
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -319,7 +305,7 @@ func _wire_mesh() -> ArrayMesh:
 	return m.mesh()
 
 
-func _paint_moon(m: SafeMesh) -> void:
+func _paint_moon(m: MeshBatch2D) -> void:
 	var r := MOON_R
 	m.glow(Vector2.ZERO, Vector2.ONE * r * 3.2, Color(0.72, 0.8, 1.0, 0.22), 10)
 	m.circle(Vector2.ZERO, r, Color("efe9d6"))
@@ -327,7 +313,7 @@ func _paint_moon(m: SafeMesh) -> void:
 		m.circle(c[0], c[1], Color("d4cdb8"), false)
 
 
-func _paint_cloud(m: SafeMesh, i: int) -> void:
+func _paint_cloud(m: MeshBatch2D, i: int) -> void:
 	var w: float = CLOUDS[i][2]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 40 + i
@@ -337,13 +323,13 @@ func _paint_cloud(m: SafeMesh, i: int) -> void:
 
 
 ## Three birds as plain chevrons: wings only, no head and no tail.
-func _paint_birds(m: SafeMesh) -> void:
+func _paint_birds(m: MeshBatch2D) -> void:
 	for b in [Vector2(0, 0), Vector2(30, -13), Vector2(38, 15)]:
 		m.line(b + Vector2(-11, -4), b, 2.5, Color.WHITE)
 		m.line(b, b + Vector2(11, -4), 2.5, Color.WHITE)
 
 
-func _paint_storm_cloud(m: SafeMesh) -> void:
+func _paint_storm_cloud(m: MeshBatch2D) -> void:
 	var r := STORM_RECT
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 8
@@ -357,7 +343,7 @@ func _paint_storm_cloud(m: SafeMesh) -> void:
 		m.glow(at, Vector2(rng.randf_range(60, 120), 16), Color("4a4a72", 0.6), 6, 0.3)
 
 
-func _paint_bolt(m: SafeMesh) -> void:
+func _paint_bolt(m: MeshBatch2D) -> void:
 	var from := Vector2(_bolt_to.x + _bolt_rng.randf_range(-90, 90), BOLT_FROM_Y)
 	var pts := PackedVector2Array([from])
 	var n := 7
@@ -373,7 +359,7 @@ func _paint_bolt(m: SafeMesh) -> void:
 func _make_smoke() -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.name = "Smoke"
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.position = Vector2(860, 610)
 	p.amount = 10
 	p.lifetime = 7.0
@@ -398,7 +384,7 @@ func _make_smoke() -> CPUParticles2D:
 func _make_fireflies() -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.name = "Fireflies"
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.position = Vector2(1080, 960)
 	p.amount = 14
 	p.lifetime = 6.0
@@ -445,7 +431,7 @@ func _make_sparks() -> CPUParticles2D:
 func _spark_base(node_name: String, amount: int, life: float) -> CPUParticles2D:
 	var p := CPUParticles2D.new()
 	p.name = node_name
-	p.texture = SafePlaces.soft_dot()
+	p.texture = MeshBatch2D.soft_dot()
 	p.amount = amount
 	p.lifetime = life
 	p.direction = Vector2(0, -1)

@@ -172,8 +172,8 @@ made Race worth 40% more than Max for the same legs.
 
 `Effort` (award, multiplier), `InputBus` (power, cadence, sensors_ok), `Session` /
 `SessionDirector` (segment, timer, end modes), `GameOptions` (Mode), `AudioDirector` (rendered
-theme and effects), `SafeMesh` (Safe Cracker's shape batcher, read only) and its static
-helpers `SafePlaces.rivet`, `SafePlaces.soft_dot` and `SafeDoor.lit_ring`, Kotlin `GameCatalog.BALLOON_PUMP` (roles, params).
+theme and effects), `MeshBatch2D` (Safe Cracker's shape batcher, read only) and its static
+helpers `MeshBatch2D.rivet`, `MeshBatch2D.soft_dot` and `MeshBatch2D.lit_ring`, Kotlin `GameCatalog.BALLOON_PUMP` (roles, params).
 
 ## 7. Tuning knobs
 
@@ -268,7 +268,7 @@ Filled in pass by pass (picked / rejected / why).
 | Rules' phases | `state-machine` | an enum FSM in a `RefCounted` (`PumpLogic.Phase`: LOAD, FILL, TIE, BREAK, OVER) stepped by the scene | node-based states | five states with no per-state nodes, animation or input; nodes would make the rules untestable headless |
 | Tests | `godot-testing` | GdUnit4 suites with scripted power (`pump_logic_test`), the repo's framework | GUT | GdUnit4 is vendored and every suite here uses it; a scripted-rider simulation pins the star thresholds |
 | Scene tree | `scene-organization` | one game scene (`BalloonPump`) wiring logic, a `PumpStage` Node2D (a baked room and live layers), a `PumpStatus` widget and `PumpAudio`; calls down, events up from the logic's `step` return | separate .tscn per part, or an event bus | each part is used once and owned by the scene; the framework already owns the session's signals |
-| 2D look | `2d-essentials` | Safe Cracker's recipe: shapes batched into one `SafeMesh` triangle array per layer, the static room, pump and stand baked once per place into a SubViewport texture shown as one sprite, live layers only for what moves | `Polygon2D`/`Line2D` nodes, `Light2D` | each 2D draw call is a batch in Compatibility; `Light2D` draws every lit item again; the bake pays the room's fill once per place |
+| 2D look | `2d-essentials` | Safe Cracker's recipe: shapes batched into one `MeshBatch2D` triangle array per layer, the static room, pump and stand baked once per place into a SubViewport texture shown as one sprite, live layers only for what moves | `Polygon2D`/`Line2D` nodes, `Light2D` | each 2D draw call is a batch in Compatibility; `Light2D` draws every lit item again; the bake pays the room's fill once per place |
 | Shaders | `shader-basics` | four small `canvas_item` shaders: the balloon (a teardrop SDF lit per pixel, one quad, shared by the nozzle, the flyer and the bunch's MultiMesh), the gauge's push wedge (one uniform), the bulbs' twinkle (phase in UV.x), the pier's sea | balloon sprites per kind and size, redrawn gauges | smooth edges at any size, no textures, no redraws |
 | Confetti, hiss, vapour, dust | `particles-vfx` | pooled `CPUParticles2D` one-shots and small continuous emitters | `GPUParticles2D` | Safe Cracker's precedent on the tablet: a few dozen particles, no process-material compile stall |
 | The bunch | `godot-optimization` | one `MultiMeshInstance2D` of balloon quads (colour per instance, gold in custom data), swayed by a rotation tween on its parent | a node per balloon | 40 balloons in one draw call; the sway costs a transform |

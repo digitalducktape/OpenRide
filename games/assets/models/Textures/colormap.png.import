@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dm67m6oa3cdmj"
-path="res://.godot/imported/colormap.png-6bc31391ba266fa4f805948782bd70ce.ctex"
+path="res://.godot/imported/colormap.png-8189f3c9e30f86aaa136872b6ce58318.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://games/dodge_ball/models/Textures/colormap.png"
-dest_files=["res://.godot/imported/colormap.png-6bc31391ba266fa4f805948782bd70ce.ctex"]
+source_file="res://assets/models/Textures/colormap.png"
+dest_files=["res://.godot/imported/colormap.png-8189f3c9e30f86aaa136872b6ce58318.ctex"]
 
 [params]
 

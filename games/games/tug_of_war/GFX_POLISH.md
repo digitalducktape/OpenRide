@@ -38,7 +38,7 @@ noise (1.12-1.24 → 1.17-1.25 ms, vsync off). The tablet still needs a run with
    `_mat`, `_box`). About 40 `MeshInstance3D`, each its own draw and engine-lit. Build the banks,
    hills, pilings, torch posts and both pier decks' frames into one or two vertex-coloured
    `ArrayMesh`es (painted AO: darker at the waterline and under the deck) with a scenery shader
-   on the shared include (Tug's `LOOK_*`, ART_BIBLE §4). `KartMeshKit` (`add`, `commit`, `box`,
+   on the shared include (Tug's `LOOK_*`, ART_BIBLE §4). `MeshKit3D` (`add`, `commit`, `box`,
    `blob`, `lathe`, `tube`) can be called as-is; don't edit it from here (Kart is in flight on
    another branch). Light everything through one look dictionary in `set_time_of_day` with
    `WorldLook.apply` (the water and sky too). Cost: about −25 draw calls. Verify: the before and
@@ -171,7 +171,7 @@ Each trim is its own commit. Savings are estimates for the GX6250 at 0.62 (about
 | 4 | **Haze per vertex** on the near deck, the riverside and the crowd (`haze_amount` / `hazed` in `tug_look.gdshaderinc`). | About 10 ALU on about half the view | A few per cent of haze shifts on the near deck's long triangles; not visible |
 | 5 | **Flash as a tint.** The lost-round flash is the modulate of the image that draws the view, not a 1920x1080 blended ColorRect. | The full-screen pass (about 5 fps) during each lost round's 0.75 s, at the moment the camera dips into the river | The flash multiplies toward the river's blue instead of covering; the scene shows through more |
 | 6 | **No per-frame allocations.** TugStatus formats its badge key only when the surge, alert or rest count change; the result's stats are built in `finish()`. | 0.6 µs on the desktop, about 15 µs on the tablet; and less garbage | Nothing |
-| 7 | **Vignette in the view grid.** The view is drawn on screen by a 17x10 vertex grid (`TugMeshes.view_image`, a MeshInstance2D for the TextureRect) with the vignette in its vertex colours; `LOOK_VIGNETTE` is gone from `tug_look.gdshaderinc`. | About 20 ALU on every non-sky pixel, about 14 a pixel averaged | The sky's corners darken too, which the per-pixel sky didn't do |
+| 7 | **Vignette in the view grid.** The view is drawn on screen by a 17x10 vertex grid (`StageView3D.view_image`, a MeshInstance2D for the TextureRect) with the vignette in its vertex colours; `LOOK_VIGNETTE` is gone from `tug_look.gdshaderinc`. | About 20 ALU on every non-sky pixel, about 14 a pixel averaged | The sky's corners darken too, which the per-pixel sky didn't do |
 | 8 | **Quality step** (`RenderScaleStep`). Each 4 s of a round under 54 fps steps the 3D view from 0.62 to 0.55 of the screen, once; it never steps back up in that game. Logs `OPENRIDE_GAMES tug_of_war quality tier=1 fps=… scale=0.55`. | About a fifth of all per-pixel work, only when needed | A slightly softer 3D view; the HUD stays sharp |
 | 9 | **Near deck skips the far pier's light.** The bot's blob shadow and the torch pools branch on a per-vertex flag (`v_far`), constant over each pier. | About 15 ALU on the near deck (28% of the intro view) | Nothing |
 
