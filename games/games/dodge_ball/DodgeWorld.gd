@@ -377,7 +377,7 @@ func _ghost(ball: Dictionary) -> void:
 
 ## Points lost to a hit with the shield down, floating up in red where the ball struck.
 func penalty_fx(x: float, points: float) -> void:
-	_popup(x, -points, false, GameTheme.DANGER)
+	_popup(x, -points, false, GameTheme.BAD)
 
 
 func _popup(x_at: float, points: float, _bonus: bool, color: Color) -> void:
