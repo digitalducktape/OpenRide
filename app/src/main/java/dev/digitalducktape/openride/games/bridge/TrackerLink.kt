@@ -166,10 +166,9 @@ class TrackerLink(
         }
         if (hubCalibrating) {
             hubCalibrating = false
-            // Only a calibration that completed is a success; one that ended as unavailable sends nothing.
-            if (state.trackerState == CameraTrackerState.TRACKING || state.trackerState == CameraTrackerState.FACE_LOST) {
-                trackCalibration(CalibrationResult.SUCCESS)
-            }
+            // Completed is a success; ending unavailable (no face, no camera) is a failure.
+            val completed = state.trackerState == CameraTrackerState.TRACKING || state.trackerState == CameraTrackerState.FACE_LOST
+            trackCalibration(if (completed) CalibrationResult.SUCCESS else CalibrationResult.FAILED)
             tracker.setMode(CameraMode.OFF)
             onHubCalibrationEnded()
         }

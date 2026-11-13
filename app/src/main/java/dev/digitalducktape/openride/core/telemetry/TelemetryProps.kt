@@ -103,7 +103,7 @@ enum class VisitEndReason(override val wire: String) : Wire {
 
 enum class OnOff(override val wire: String) : Wire { ON("on"), OFF("off") }
 
-enum class CalibrationResult(override val wire: String) : Wire { SUCCESS("success"), CANCELLED("cancelled") }
+enum class CalibrationResult(override val wire: String) : Wire { SUCCESS("success"), CANCELLED("cancelled"), FAILED("failed") }
 
 enum class CalibrationMode(override val wire: String) : Wire { LEAN_X("lean_x"), LEAN_2D("lean_2d") }
 

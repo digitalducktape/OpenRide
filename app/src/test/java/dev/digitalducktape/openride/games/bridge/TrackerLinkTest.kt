@@ -303,7 +303,7 @@ class TrackerLinkTest {
     }
 
     @Test
-    fun `a calibration that fails to complete emits nothing, and nor does one outside the hub`() {
+    fun `a hub calibration that ends unavailable emits failed, and one outside the hub emits nothing`() {
         link.startVisit()
         scope.runCurrent()
         link.hubCalibrate("lean_x", full = false)
@@ -313,6 +313,6 @@ class TrackerLinkTest {
         tracker.finishCalibration()
         scope.runCurrent()
 
-        assertTrue(calibrations().isEmpty())
+        assertEquals(listOf("failed" to "lean_x"), calibrations())
     }
 }
