@@ -246,6 +246,41 @@ class ProfileTabViewModelTest {
     }
 
     @Test
+    fun `an Error during restore is a failure result, not a crash`() = runTest {
+        val empty = backupRepository.exportJson()
+        val failing = erroringBackupRepository()
+        val vm = ProfileTabViewModel(
+            activeProfileHolder, profileRepository, failing, rideRepository, telemetry, consentStore,
+        ) { ZoneOffset.UTC }
+
+        val result = vm.restoreFromContent(empty)
+
+        assertTrue(result.isFailure)
+        assertEquals(listOf(BackupRestore(RestoreResult.FAILED)), telemetry.events)
+    }
+
+    @Test
+    fun `an Error during backup export still propagates after reporting failed`() = runTest {
+        val vm = ProfileTabViewModel(
+            activeProfileHolder, profileRepository, erroringBackupRepository(), rideRepository, telemetry, consentStore,
+        ) { ZoneOffset.UTC }
+
+        val thrown = runCatching { vm.createBackupContent() }.exceptionOrNull()
+
+        assertTrue(thrown is OutOfMemoryError)
+        assertEquals(listOf(BackupExport(SuccessResult.FAILED)), telemetry.events)
+    }
+
+    /** A repository whose profile DAO throws an [Error] on every call. */
+    private fun erroringBackupRepository(): BackupRepository {
+        val dao = java.lang.reflect.Proxy.newProxyInstance(
+            javaClass.classLoader,
+            arrayOf(dev.digitalducktape.openride.core.data.ProfileDao::class.java),
+        ) { _, _, _ -> throw OutOfMemoryError("test") } as dev.digitalducktape.openride.core.data.ProfileDao
+        return BackupRepository(db, dao, db.rideDao())
+    }
+
+    @Test
     fun `restoring a backup from a newer app reports failed`() = runTest {
         viewModel.restoreFromContent("""{"version":999,"exportedAtEpochMs":1,"profiles":[],"rides":[],"samples":[]}""")
 

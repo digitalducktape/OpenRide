@@ -6,7 +6,7 @@ We use it to see which screens and features get used, and where things fail, so 
 
 ## Turning it on or off
 
-Go to **Profile, then Device, then Share usage data**. Sending stops right away when you turn it off. A request already on its way when you switch it off may still complete. Nothing is queued or kept on the tablet to send later.
+Go to **Profile, then Device, then Share usage data**. Sending stops right away when you turn it off. Events already handed to the sender are held in memory only and may still be sent until the app closes. Nothing is stored on the tablet.
 
 The choice is **per tablet**. It covers every rider who uses that tablet. The in-app **What's collected** screen shows a short version of this page.
 
@@ -59,7 +59,7 @@ Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5
 | --- | --- | --- |
 | `games_plan_start` | `mode`: single, circuit, custom_circuit. `difficulty`: easy, standard, hard. `music`: game_music, own_music, off | Which ways of playing are used |
 | `game_finish` | `game`: the game's catalogue id. `difficulty`. `game_difficulty`: game and difficulty together. `outcome`: completed, quit, skipped, no_result. `won`: yes, no, n/a. `stars`: 0, 1, 2, 3. `played`: bucket. `music`: game_music, own_music, off | Which games are fun, and whether the difficulty is right |
-| `games_visit_end` | `played`: bucket. `games`: 0, 1, 2, 3, 4, 5+. `reason`: exit, idle, app_resumed, replaced. `music`: game_music, own_music, mixed, off. `music_controls_used`: true, false | How long a visit to Games lasts |
+| `games_visit_end` | `played`: bucket. `games`: 0, 1, 2, 3, 4, 5+. `reason`: exit, idle, app_resumed. `music`: game_music, own_music, mixed, off. `music_controls_used`: true, false | How long a visit to Games lasts |
 | `game_music_switch` | `value`: on, off | Whether Game music is wanted |
 | `head_calibration` | `result`: success, cancelled, failed. `mode`: lean_x, lean_2d | Whether head-lean setup works. `failed` means setup ended with no face or camera |
 

@@ -26,20 +26,24 @@ object TelemetryLabels {
     val notice: List<Pair<String, String>> = listOf(
         "What's sent" to
             "Which screens are opened. Each event carries the time it happened. " +
-            "When the app starts: the tablet model, its software version, and how many " +
-            "riders it has (1, 2 or 3 or more). Your answer to this prompt, sent when you say yes. " +
+            "When the app starts: the tablet model, its software version, whether this is the bike build or a " +
+            "test build, and how many riders it has (1, 2 or 3 or more). " +
+            "Your answer to this prompt, sent when you say yes. " +
             "When you finish setting up a rider, and whether it has a photo. " +
-            "When a ride starts and ends: its type, a rough length, whether it was saved, and whether the " +
+            "When a ride starts and ends: its type, where it was started from, whether a route was loaded, " +
+            "a rough length, whether it was saved, why a ride was discarded, and whether the " +
             "heart-rate strap and bike sensors stayed connected.",
         "Classes" to
             "Which class channel you watch, how long, whether the class finished, whether it was muted, and " +
             "playback errors. The name of a class channel you add yourself is sent, as YouTube lists it. " +
             "Playlists are sent only as \"playlist\".",
         "Games and music" to
-            "Which games you play, the difficulty, and the result as 0 to 3 stars. Whether Game music is on or off, " +
+            "Which games you play, the difficulty, and the result as 0 to 3 stars. How long each game was played " +
+            "and how it ended (finished, quit or skipped), and why a games visit ended. " +
+            "Whether Game music is on or off, " +
             "and whether head-lean setup finished, was cancelled, or failed to find a face or camera. " +
             "Whether the music player was used, which music app you chose, and " +
-            "whether your own music was playing.",
+            "whether your own music was playing, including during a ride.",
         "Sensors and camera" to
             "Whether a heart-rate strap was selected or Bluetooth was off, whether the bike's sensors connected, and " +
             "whether you allowed camera access.",
@@ -61,6 +65,7 @@ object TelemetryLabels {
             "A ride that is abandoned, or that the system closes, shows up as a start with no matching end.",
         "Turning it off" to
             "Go to Profile, then Device, then turn off Share usage data. Sending stops right away. " +
-            "A request already on its way may still complete.",
+            "Events already handed to the sender are held in memory only and may still be sent until the " +
+            "app closes. Nothing is stored on the tablet.",
     )
 }

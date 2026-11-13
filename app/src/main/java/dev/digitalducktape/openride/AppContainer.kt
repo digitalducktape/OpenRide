@@ -435,13 +435,11 @@ class AppContainer(private val applicationContext: Context) {
 
     /** The games' music card was used: `music_player_open` (games), once per process, since it has no separate open. */
     private fun reportGamesMusicReach() {
-        if (gamesMusicReported) return
-        gamesMusicReported = true
+        if (!gamesMusicReported.compareAndSet(false, true)) return
         telemetry.trackSafely { MusicPlayerOpen(MusicSurface.GAMES) }
     }
 
-    @Volatile
-    private var gamesMusicReported = false
+    private val gamesMusicReported = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Where the app goes after a games visit (the ride summary, or the profile editor): consumed by the NavHost. */
     val visitNavigator: VisitNavigator by lazy { VisitNavigator() }

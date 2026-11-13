@@ -2,6 +2,7 @@ package dev.digitalducktape.openride.core.telemetry
 
 import android.os.Build
 import dev.digitalducktape.openride.BuildConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -41,7 +42,15 @@ class AppOpenReporter(
         if (fired || !granted || !foreground) return
         fired = true
         scope.launch {
-            telemetry.track(AppOpen(tablet, firmware, TelemetryBuckets.profiles(profileCount()), flavor))
+            // A failing count (Room) must not reach the process: report one profile instead.
+            val profiles = try {
+                profileCount()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                1
+            }
+            telemetry.trackSafely { AppOpen(tablet, firmware, TelemetryBuckets.profiles(profiles), flavor) }
         }
     }
 }

@@ -236,6 +236,31 @@ class AutoBackupManagerTest {
         assertEquals(listOf(AutoBackupFailed), telemetry.events)
     }
 
+    private class ErrorStore : AutoBackupStore {
+        @Volatile
+        var attempts = 0
+        override fun write(json: String): Boolean {
+            attempts++
+            throw OutOfMemoryError("test")
+        }
+        override fun readLatest(): String? = null
+    }
+
+    @Test
+    fun `an Error from the store is swallowed and counted as a failure`() = runBlocking {
+        val telemetry = RecordingTelemetry()
+        profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 1, weightKg = null, ftp = null),
+        )
+        val store = ErrorStore()
+        manager(store, MutableStateFlow(0), telemetry).start()
+
+        awaitUntil("the failure is reported") { telemetry.events.isNotEmpty() }
+
+        assertEquals(listOf(AutoBackupFailed), telemetry.events)
+        assertTrue("the collector must still be alive", scope.coroutineContext[kotlinx.coroutines.Job]!!.isActive)
+    }
+
     @Test
     fun `a store that refuses the write counts as a failure`() = runBlocking {
         val telemetry = RecordingTelemetry()

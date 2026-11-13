@@ -1,6 +1,7 @@
 package dev.digitalducktape.openride.core.telemetry
 
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -43,15 +44,16 @@ class RideTelemetryTracker(
     private val ownMusic: OwnMusicSignal,
     private val scope: CoroutineScope,
 ) {
-    private var jobs: List<Job> = emptyList()
-    private var type: RideType = RideType.JUST_RIDE
-    private var hrEverConnected = false
-    private var hrWasConnected = false
-    private var hrDrops = 0
-    private var sensorSawData = false
-    private var sensorDropped = false
-    private var ownMusicPlayed = false
-    private var controlsUsed = false
+    // Written by collectors on Dispatchers.Default and the Godot thread, read by end() on main.
+    @Volatile private var jobs: List<Job> = emptyList()
+    @Volatile private var type: RideType = RideType.JUST_RIDE
+    @Volatile private var hrEverConnected = false
+    @Volatile private var hrWasConnected = false
+    private val hrDrops = AtomicInteger(0)
+    @Volatile private var sensorSawData = false
+    @Volatile private var sensorDropped = false
+    @Volatile private var ownMusicPlayed = false
+    @Volatile private var controlsUsed = false
 
     fun begin(type: RideType) {
         runCatching {
@@ -59,7 +61,7 @@ class RideTelemetryTracker(
             this.type = type
             hrEverConnected = false
             hrWasConnected = false
-            hrDrops = 0
+            hrDrops.set(0)
             sensorSawData = false
             sensorDropped = false
             ownMusicPlayed = false
@@ -88,12 +90,12 @@ class RideTelemetryTracker(
         jobs = emptyList()
         RideSummary(
             hr = when {
-                hrEverConnected && hrDrops > 0 -> HrState.DROPPED
+                hrEverConnected && hrDrops.get() > 0 -> HrState.DROPPED
                 hrEverConnected -> HrState.CONNECTED
                 strapSaved.value -> HrState.NEVER_CONNECTED
                 else -> HrState.NONE
             },
-            hrDrops = TelemetryBuckets.hrDrops(hrDrops),
+            hrDrops = TelemetryBuckets.hrDrops(hrDrops.get()),
             sensor = when {
                 !sensorSawData -> SensorState.NEVER
                 sensorDropped -> SensorState.DROPPED
@@ -111,7 +113,7 @@ class RideTelemetryTracker(
     private fun onHr(state: ConnectionState) {
         val connected = state is ConnectionState.Connected
         if (connected) hrEverConnected = true
-        else if (hrWasConnected && strapWanted.value) hrDrops++
+        else if (hrWasConnected && strapWanted.value) hrDrops.incrementAndGet()
         hrWasConnected = connected
     }
 

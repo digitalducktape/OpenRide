@@ -97,6 +97,7 @@ enum class Stars(override val wire: String) : Wire {
     }
 }
 
+/** [REPLACED] is not produced by any code path today. */
 enum class VisitEndReason(override val wire: String) : Wire {
     EXIT("exit"), IDLE("idle"), APP_RESUMED("app_resumed"), REPLACED("replaced"),
 }

@@ -17,7 +17,7 @@ class TelemetryLabelsTest {
     @Test
     fun noticeCoversOffSwitchAndInFlightRequests() {
         assertTrue(notice.contains("Share usage data"))
-        assertTrue(notice.contains("already on its way"))
+        assertTrue(notice.contains("held in memory only"))
     }
 
     @Test

@@ -22,6 +22,7 @@ import dev.digitalducktape.openride.core.telemetry.TelemetryBuckets
 import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
 import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
 import dev.digitalducktape.openride.core.telemetry.trackSafely
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -66,7 +67,8 @@ class ProfileTabViewModel(
     suspend fun createBackupContent(): String {
         val json = try {
             backupRepository.exportJson()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             telemetry.trackSafely { BackupExport(SuccessResult.FAILED) }
             throw e
         }
@@ -85,17 +87,21 @@ class ProfileTabViewModel(
     suspend fun restoreFromContent(content: String): Result<Unit> {
         val snapshot = try {
             backupRepository.parse(content)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             telemetry.trackSafely { BackupRestore(RestoreResult.BAD_FILE) }
             return Result.failure(e)
         }
-        return runCatching {
+        return try {
             backupRepository.restore(snapshot)
             activeProfileHolder.clear()
-        }.onSuccess {
             telemetry.trackSafely { BackupRestore(RestoreResult.SUCCESS) }
-        }.onFailure {
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             telemetry.trackSafely { BackupRestore(RestoreResult.FAILED) }
+            Result.failure(e)
         }
     }
 
@@ -112,22 +118,26 @@ class ProfileTabViewModel(
         }
         val history = try {
             WorkoutHistoryCsv.parse(content, zone())
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             reportImport(ImportResult.WRONG_FILE)
             return Result.failure(e)
         }
-        return runCatching {
+        return try {
             val outcome = rideRepository.importRides(profileId, history.rides)
-            WorkoutImportSummary(
+            val summary = WorkoutImportSummary(
                 imported = outcome.imported,
                 alreadyThere = outcome.alreadyThere,
                 otherWorkouts = history.otherWorkouts,
                 unreadableRows = history.unreadableRows,
             )
-        }.onSuccess {
-            reportImport(ImportResult.SUCCESS, TelemetryBuckets.imported(it.imported), it.alreadyThere > 0)
-        }.onFailure {
+            reportImport(ImportResult.SUCCESS, TelemetryBuckets.imported(summary.imported), summary.alreadyThere > 0)
+            Result.success(summary)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
             reportImport(ImportResult.FAILED)
+            Result.failure(e)
         }
     }
 

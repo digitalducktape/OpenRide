@@ -68,4 +68,23 @@ class AppOpenReporterTest {
         testScheduler.runCurrent()
         assertEquals(1, telemetry.events.size)
     }
+
+    @Test fun aFailingProfileCountDoesNotCrashAndReportsOneProfile() = runTest {
+        val r = AppOpenReporter(
+            telemetry = telemetry,
+            consent = InMemoryTelemetryConsentStore(Consent.Granted),
+            profileCount = { throw IllegalStateException("migration failed") },
+            scope = backgroundScope,
+            tablet = Tablet.BIKE,
+            firmware = Firmware.RQ_250113_A,
+            flavor = Flavor.REAL,
+        )
+        r.start()
+        r.onForeground()
+        testScheduler.runCurrent()
+        assertEquals(
+            listOf(AppOpen(Tablet.BIKE, Firmware.RQ_250113_A, ProfilesBucket.ONE, Flavor.REAL)),
+            telemetry.events,
+        )
+    }
 }

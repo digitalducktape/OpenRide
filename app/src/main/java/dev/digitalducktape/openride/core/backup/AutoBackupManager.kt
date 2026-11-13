@@ -64,7 +64,7 @@ class AutoBackupManager(
                         writeBackupUnlessEmpty()
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         false
                     }
                     if (!written) reportFailureOnce()
