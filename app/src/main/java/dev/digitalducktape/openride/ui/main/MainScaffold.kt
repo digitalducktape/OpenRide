@@ -27,6 +27,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.digitalducktape.openride.ui.navigation.ReportScreenViews
 import dev.digitalducktape.openride.AppContainer
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesRoute
@@ -185,6 +186,7 @@ fun MainScaffold(
             onOpenUpdate = { outerNavController.navigate(Destinations.AppUpdate) },
             onDismissUpdate = { appContainer.dismissUpdateBanner() },
         )
+        ReportScreenViews(innerNavController, appContainer.telemetry)
         NavHost(
             navController = innerNavController,
             startDestination = TopLevelDestination.Start.route,

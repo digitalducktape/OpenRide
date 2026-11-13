@@ -1,6 +1,11 @@
 package dev.digitalducktape.openride
 
 import android.app.Application
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import dev.digitalducktape.openride.core.telemetry.AppOpenReporter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -41,6 +46,19 @@ class OpenRideApplication : Application() {
         // heart-rate manager starts observing the active profile's paired strap from launch,
         // rather than only whenever a screen happens to reference it first.
         appContainer.heartRateManager
+
+        // #85: app_open once per process on the first foreground with consent (the process can
+        // start in the games host, so this is not MainActivity's job).
+        val appOpenReporter = AppOpenReporter(
+            telemetry = appContainer.telemetry,
+            consent = appContainer.telemetryConsent,
+            profileCount = { appContainer.profileRepository.observeProfiles().first().size },
+            scope = applicationScope,
+        )
+        appOpenReporter.start()
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) = appOpenReporter.onForeground()
+        })
     }
 }
 
