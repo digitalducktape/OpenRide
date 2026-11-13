@@ -4,6 +4,11 @@ import androidx.lifecycle.ViewModel
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.UpdateAction
+import dev.digitalducktape.openride.core.telemetry.UpdatePrompt
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +30,7 @@ class UpdateViewModel(
     private val currentVersionCode: Int,
     private val currentVersionName: String,
     private val assetInfix: String,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
 
     data class UiState(
@@ -49,11 +55,14 @@ class UpdateViewModel(
         _uiState.value = _uiState.value.copy(isBusy = true, status = "Checking…", available = null, downloadedApk = null)
 
         when (val result = updateRepository.check(currentVersionCode, assetInfix)) {
-            is UpdateCheckResult.Available -> _uiState.value = _uiState.value.copy(
-                isBusy = false,
-                available = result.update,
-                status = "Version ${result.update.versionName} is available",
-            )
+            is UpdateCheckResult.Available -> {
+                _uiState.value = _uiState.value.copy(
+                    isBusy = false,
+                    available = result.update,
+                    status = "Version ${result.update.versionName} is available",
+                )
+                telemetry.trackSafely { UpdatePrompt(UpdateAction.SHOWN) }
+            }
             is UpdateCheckResult.UpToDate -> _uiState.value = _uiState.value.copy(
                 isBusy = false,
                 available = null,
@@ -85,5 +94,8 @@ class UpdateViewModel(
     }
 
     /** The intent to hand the downloaded APK to the system installer, or `null` if none is ready. */
-    fun installIntent() = _uiState.value.downloadedApk?.let { updateRepository.installIntentFor(it) }
+    fun installIntent() = _uiState.value.downloadedApk?.let {
+        telemetry.trackSafely { UpdatePrompt(UpdateAction.INSTALL_TAPPED) }
+        updateRepository.installIntentFor(it)
+    }
 }

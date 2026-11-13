@@ -115,7 +115,7 @@ fun MainScaffold(
         },
     )
     val historyViewModel: HistoryViewModel = viewModel(
-        factory = viewModelFactory { HistoryViewModel(appContainer.activeProfileHolder, appContainer.rideRepository) },
+        factory = viewModelFactory { HistoryViewModel(appContainer.activeProfileHolder, appContainer.rideRepository, appContainer.telemetry) },
     )
     val profileViewModel: ProfileTabViewModel = viewModel(
         factory = viewModelFactory {

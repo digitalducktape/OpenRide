@@ -98,7 +98,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
         composable(Destinations.ProfileCreate) {
             val viewModel: ProfileEditorViewModel = viewModel(
                 factory = viewModelFactory {
-                    ProfileEditorViewModel(appContainer.profileRepository, appContainer.activeProfileHolder)
+                    ProfileEditorViewModel(appContainer.profileRepository, appContainer.activeProfileHolder, telemetry = appContainer.telemetry)
                 },
             )
             ProfileEditorRoute(
@@ -163,6 +163,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         currentVersionCode = BuildConfig.VERSION_CODE,
                         currentVersionName = BuildConfig.VERSION_NAME,
                         assetInfix = BuildConfig.UPDATE_APK_ASSET_INFIX,
+                        telemetry = appContainer.telemetry,
                     )
                 },
             )
@@ -292,6 +293,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.profileRepository,
                         appContainer.rideSessionManager,
                         rideId,
+                        appContainer.telemetry,
                     )
                 },
             )

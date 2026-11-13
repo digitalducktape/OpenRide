@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.Profile
+import dev.digitalducktape.openride.core.telemetry.AutoBackupFailed
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -189,7 +191,11 @@ class AutoBackupManagerTest {
         assertNotNull("timed out waiting until $description", satisfied)
     }
 
-    private fun manager(store: AutoBackupStore, changes: MutableStateFlow<Int>) = AutoBackupManager(
+    private fun manager(
+        store: AutoBackupStore,
+        changes: MutableStateFlow<Int>,
+        telemetry: dev.digitalducktape.openride.core.telemetry.Telemetry = dev.digitalducktape.openride.core.telemetry.NoOpTelemetry,
+    ) = AutoBackupManager(
         backupRepository = backupRepository,
         store = store,
         scope = scope,
@@ -198,7 +204,63 @@ class AutoBackupManagerTest {
             db.profileDao().getAllOnce().isEmpty() && db.rideDao().getAllRidesOnce().isEmpty()
         },
         debounceMs = DEBOUNCE_MS,
+        telemetry = telemetry,
     )
+
+    private class FailingStore(private val throwing: Boolean) : AutoBackupStore {
+        @Volatile
+        var attempts = 0
+        override fun write(json: String): Boolean {
+            attempts++
+            if (throwing) error("disk full")
+            return false
+        }
+        override fun readLatest(): String? = null
+    }
+
+    @Test
+    fun failureReportedOncePerProcess() = runBlocking {
+        val telemetry = RecordingTelemetry()
+        val changes = MutableStateFlow(0)
+        profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 1, weightKg = null, ftp = null),
+        )
+        val store = FailingStore(throwing = true)
+        manager(store, changes, telemetry).start()
+        awaitUntil("the first write fails") { store.attempts >= 1 }
+
+        changes.value = 1
+        awaitUntil("a second write fails") { store.attempts >= 2 }
+        delay(DEBOUNCE_MS * 3)
+
+        assertEquals(listOf(AutoBackupFailed), telemetry.events)
+    }
+
+    @Test
+    fun `a store that refuses the write counts as a failure`() = runBlocking {
+        val telemetry = RecordingTelemetry()
+        profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 1, weightKg = null, ftp = null),
+        )
+        val store = FailingStore(throwing = false)
+        manager(store, MutableStateFlow(0), telemetry).start()
+
+        awaitUntil("the failure is reported") { telemetry.events.isNotEmpty() }
+
+        assertEquals(listOf(AutoBackupFailed), telemetry.events)
+    }
+
+    @Test
+    fun `restoring on a fresh install reports nothing`() = runBlocking {
+        val telemetry = RecordingTelemetry()
+        val store = FakeStore(json(snapshot(Profile(name = "Old", avatarEmoji = "🚴", avatarColor = 1, weightKg = null, ftp = null))))
+        manager(store, MutableStateFlow(0), telemetry).start()
+
+        awaitUntil("the backup is restored") { profileRepository.observeProfiles().first().isNotEmpty() }
+        delay(DEBOUNCE_MS * 3)
+
+        assertEquals(emptyList<Any>(), telemetry.events)
+    }
 
     private fun snapshot(vararg profiles: Profile) = BackupSnapshot(
         exportedAtEpochMs = 1L,

@@ -4,6 +4,8 @@ package dev.digitalducktape.openride.core.telemetry
 class RecordingTelemetry : Telemetry {
     private val recorded = mutableListOf<TelemetryEvent>()
     val events: List<TelemetryEvent> get() = recorded.toList()
+    fun clear() = recorded.clear()
+
     override fun track(event: TelemetryEvent) {
         recorded += event
     }

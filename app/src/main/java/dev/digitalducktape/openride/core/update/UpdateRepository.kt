@@ -5,6 +5,11 @@ import android.content.Intent
 import dev.digitalducktape.openride.core.content.FeedFetcher
 import dev.digitalducktape.openride.core.content.HttpUrlFeedFetcher
 import dev.digitalducktape.openride.core.files.OpenRideFileProvider
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.UpdateFailed
+import dev.digitalducktape.openride.core.telemetry.UpdateStage
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +30,7 @@ class UpdateRepository(
     private val context: Context,
     private val fetcher: FeedFetcher = HttpUrlFeedFetcher(),
     private val checker: UpdateChecker = UpdateChecker(),
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) {
 
     /**
@@ -36,9 +42,12 @@ class UpdateRepository(
             val body = try {
                 fetcher.fetch(LATEST_RELEASE_URL).use { it.bufferedReader().readText() }
             } catch (e: Exception) {
+                telemetry.trackSafely { UpdateFailed(UpdateStage.CHECK) }
                 return@withContext UpdateCheckResult.Failed("Couldn't reach GitHub releases")
             }
-            checker.evaluate(currentVersionCode, assetInfix, body)
+            checker.evaluate(currentVersionCode, assetInfix, body).also {
+                if (it is UpdateCheckResult.Failed) telemetry.trackSafely { UpdateFailed(UpdateStage.CHECK) }
+            }
         }
 
     /**
@@ -56,6 +65,7 @@ class UpdateRepository(
             target
         } catch (e: Exception) {
             target.delete()
+            telemetry.trackSafely { UpdateFailed(UpdateStage.DOWNLOAD) }
             null
         }
     }

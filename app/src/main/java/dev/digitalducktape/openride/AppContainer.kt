@@ -171,6 +171,7 @@ class AppContainer(private val applicationContext: Context) {
             isDatabaseEmpty = {
                 database.profileDao().getAllOnce().isEmpty() && database.rideDao().getAllRidesOnce().isEmpty()
             },
+            telemetry = telemetry,
         )
     }
 
@@ -508,7 +509,7 @@ class AppContainer(private val applicationContext: Context) {
 
     /** The currently-loaded GPX route overlay for the ride screen (PRD #21/T21), if any. */
     val routeHolder: RouteHolder by lazy {
-        RouteHolder()
+        RouteHolder(telemetry = telemetry)
     }
 
     /** What the rider's music app is playing, for the mini player (top bar and Just Ride). */
@@ -516,7 +517,7 @@ class AppContainer(private val applicationContext: Context) {
 
     /** Fetch/download side of the GitHub-native self-updater (PRD #22/T22). */
     val updateRepository: UpdateRepository by lazy {
-        UpdateRepository(applicationContext)
+        UpdateRepository(applicationContext, telemetry = telemetry)
     }
 
     private val _updateAvailability = MutableStateFlow<AvailableUpdate?>(null)

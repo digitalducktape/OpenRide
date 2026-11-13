@@ -2,6 +2,12 @@
 
 package dev.digitalducktape.openride.ui.ride
 
+import kotlinx.coroutines.test.TestScope
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.RideExport
+import dev.digitalducktape.openride.core.telemetry.DeletedRideType
+import dev.digitalducktape.openride.core.telemetry.RideDeleted
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import dev.digitalducktape.openride.core.telemetry.RideEntry
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -288,5 +294,59 @@ class RideSummaryViewModelTest {
         assertNull(viewModel.ride.value)
         assertNull(viewModel.tcxContent())
         assertEquals(RideSessionState.Idle, manager.state.value)
+    }
+
+    private suspend fun savedRide(videoId: String? = null, gamePlan: String? = null): Long =
+        RideRepository(db, db.rideDao(), db.gameResultDao()).saveRide(
+            Ride(
+                profileId = profileId, startEpochMs = 0, durationSec = 600, avgCadence = 80, maxCadence = 90,
+                avgPower = 150, maxPower = 200, avgResistance = 40, outputKj = 90.0, calories = 80,
+                videoId = videoId, gamePlan = gamePlan,
+            ),
+            emptyList(),
+        )
+
+    private suspend fun TestScope.deleteWith(telemetry: RecordingTelemetry, rideId: Long) {
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, rideId, telemetry)
+        viewModel.load()
+        viewModel.deleteRide()
+    }
+
+    @Test
+    fun `deleting a plain ride reports just_ride`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide())
+        assertEquals(listOf(RideDeleted(DeletedRideType.JUST_RIDE)), telemetry.events)
+    }
+
+    @Test
+    fun `deleting a class ride reports class`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide(videoId = "abc"))
+        assertEquals(listOf(RideDeleted(DeletedRideType.CLASS)), telemetry.events)
+    }
+
+    @Test
+    fun `deleting a games ride reports games`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide(gamePlan = "circuit-20"))
+        assertEquals(listOf(RideDeleted(DeletedRideType.GAMES)), telemetry.events)
+    }
+
+    @Test
+    fun `exporting reports the format only when there is something to export`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, savedRide(), telemetry)
+
+        viewModel.tcxContent()
+        viewModel.sampleCsvContent()
+        assertEquals(emptyList<Any>(), telemetry.events)
+
+        viewModel.load()
+        viewModel.tcxContent()
+        viewModel.sampleCsvContent()
+        assertEquals(listOf(RideExport(ExportFormat.TCX), RideExport(ExportFormat.CSV_RIDE)), telemetry.events)
     }
 }

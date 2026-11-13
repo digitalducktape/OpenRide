@@ -8,11 +8,20 @@ import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.importer.WorkoutHistoryCsv
 import java.time.ZoneId
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.BackupExport
+import dev.digitalducktape.openride.core.telemetry.BackupRestore
 import dev.digitalducktape.openride.core.telemetry.Consent
 import dev.digitalducktape.openride.core.telemetry.ConsentSource
+import dev.digitalducktape.openride.core.telemetry.HistoryImport
+import dev.digitalducktape.openride.core.telemetry.ImportResult
+import dev.digitalducktape.openride.core.telemetry.ImportedBucket
+import dev.digitalducktape.openride.core.telemetry.RestoreResult
+import dev.digitalducktape.openride.core.telemetry.SuccessResult
 import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryBuckets
 import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
 import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -54,7 +63,16 @@ class ProfileTabViewModel(
     }
 
     /** JSON content for a full-database backup file (PRD P1-8). */
-    suspend fun createBackupContent(): String = backupRepository.exportJson()
+    suspend fun createBackupContent(): String {
+        val json = try {
+            backupRepository.exportJson()
+        } catch (e: Exception) {
+            telemetry.trackSafely { BackupExport(SuccessResult.FAILED) }
+            throw e
+        }
+        telemetry.trackSafely { BackupExport(SuccessResult.SUCCESS) }
+        return json
+    }
 
     /**
      * Parses and restores [content] as a backup file, replacing the entire current database.
@@ -64,10 +82,21 @@ class ProfileTabViewModel(
      * Returns a [Result] so the caller can show a clear error for a malformed/unreadable file
      * instead of crashing on a bad share/import.
      */
-    suspend fun restoreFromContent(content: String): Result<Unit> = runCatching {
-        val snapshot = backupRepository.parse(content)
-        backupRepository.restore(snapshot)
-        activeProfileHolder.clear()
+    suspend fun restoreFromContent(content: String): Result<Unit> {
+        val snapshot = try {
+            backupRepository.parse(content)
+        } catch (e: Exception) {
+            telemetry.trackSafely { BackupRestore(RestoreResult.BAD_FILE) }
+            return Result.failure(e)
+        }
+        return runCatching {
+            backupRepository.restore(snapshot)
+            activeProfileHolder.clear()
+        }.onSuccess {
+            telemetry.trackSafely { BackupRestore(RestoreResult.SUCCESS) }
+        }.onFailure {
+            telemetry.trackSafely { BackupRestore(RestoreResult.FAILED) }
+        }
     }
 
     /**
@@ -75,17 +104,38 @@ class ProfileTabViewModel(
      * active rider's history (#83). Fails, changing nothing, when the file isn't that export or
      * no rider is active; the caller shows why.
      */
-    suspend fun importWorkoutHistory(content: String): Result<WorkoutImportSummary> = runCatching {
-        val profileId = checkNotNull(activeProfileHolder.activeProfileId.value) { "no rider selected" }
-        val history = WorkoutHistoryCsv.parse(content, zone())
-        val outcome = rideRepository.importRides(profileId, history.rides)
-        WorkoutImportSummary(
-            imported = outcome.imported,
-            alreadyThere = outcome.alreadyThere,
-            otherWorkouts = history.otherWorkouts,
-            unreadableRows = history.unreadableRows,
-        )
+    suspend fun importWorkoutHistory(content: String): Result<WorkoutImportSummary> {
+        val profileId = activeProfileHolder.activeProfileId.value
+        if (profileId == null) {
+            reportImport(ImportResult.NO_RIDER)
+            return Result.failure(IllegalStateException("no rider selected"))
+        }
+        val history = try {
+            WorkoutHistoryCsv.parse(content, zone())
+        } catch (e: Exception) {
+            reportImport(ImportResult.WRONG_FILE)
+            return Result.failure(e)
+        }
+        return runCatching {
+            val outcome = rideRepository.importRides(profileId, history.rides)
+            WorkoutImportSummary(
+                imported = outcome.imported,
+                alreadyThere = outcome.alreadyThere,
+                otherWorkouts = history.otherWorkouts,
+                unreadableRows = history.unreadableRows,
+            )
+        }.onSuccess {
+            reportImport(ImportResult.SUCCESS, TelemetryBuckets.imported(it.imported), it.alreadyThere > 0)
+        }.onFailure {
+            reportImport(ImportResult.FAILED)
+        }
     }
+
+    private fun reportImport(
+        result: ImportResult,
+        imported: ImportedBucket = ImportedBucket.ZERO,
+        duplicates: Boolean = false,
+    ) = telemetry.trackSafely { HistoryImport(result, imported, duplicates) }
 }
 
 /**
