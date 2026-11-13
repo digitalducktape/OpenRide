@@ -53,6 +53,11 @@ import coil.compose.AsyncImage
 import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.core.music.MusicApp
 import dev.digitalducktape.openride.core.music.MusicApps
+import dev.digitalducktape.openride.core.telemetry.MusicAppMapping
+import dev.digitalducktape.openride.core.telemetry.MusicPlayerOpen
+import dev.digitalducktape.openride.core.telemetry.MusicAppChosen
+import dev.digitalducktape.openride.core.telemetry.MusicSurface
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.core.music.NowPlaying
 import dev.digitalducktape.openride.core.music.NowPlayingMonitor
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -77,14 +82,19 @@ val LocalNowPlaying = compositionLocalOf<NowPlayingMonitor?> { null }
  * only while the rider has muted the class (#72), since otherwise its own sound is the point.
  */
 @Composable
-fun MiniPlayer(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? = LocalNowPlaying.current) {
+fun MiniPlayer(
+    modifier: Modifier = Modifier,
+    monitor: NowPlayingMonitor? = LocalNowPlaying.current,
+    surface: MusicSurface = MusicSurface.TOP_BAR,
+) {
     if (monitor == null) return
+    val openApp = rememberOpenPlayingApp(monitor, surface)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { monitor.refresh() }
     val playing by monitor.nowPlaying.collectAsState()
 
     val current = playing
     if (current == null) {
-        OpenMusicAppButton(monitor, modifier)
+        OpenMusicAppButton(monitor, surface, modifier)
         return
     }
     // A fixed width, so the controls stay put as titles change length; long ones scroll.
@@ -98,7 +108,7 @@ fun MiniPlayer(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? = Loca
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(onClickLabel = "Open the music app", onClick = monitor::openApp),
+                .clickable(onClickLabel = "Open the music app", onClick = openApp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(OrSpacing.sm + OrSpacing.xs),
         ) {
@@ -118,8 +128,13 @@ fun MiniPlayer(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? = Loca
  * rider's music app, so the screen doesn't shift when a song starts or an app lets go.
  */
 @Composable
-fun NowPlayingPanel(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? = LocalNowPlaying.current) {
+fun NowPlayingPanel(
+    modifier: Modifier = Modifier,
+    monitor: NowPlayingMonitor? = LocalNowPlaying.current,
+    surface: MusicSurface = MusicSurface.JUST_RIDE,
+) {
     if (monitor == null) return
+    val openApp = rememberOpenPlayingApp(monitor, surface)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { monitor.refresh() }
     val hasAccess by monitor.hasAccess.collectAsState()
     val playing by monitor.nowPlaying.collectAsState()
@@ -134,7 +149,7 @@ fun NowPlayingPanel(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? =
         horizontalArrangement = Arrangement.spacedBy(OrSpacing.md),
     ) {
         if (current != null) {
-            Box(modifier = Modifier.clickable(onClickLabel = "Open the music app", onClick = monitor::openApp)) {
+            Box(modifier = Modifier.clickable(onClickLabel = "Open the music app", onClick = openApp)) {
                 AlbumArt(current, PanelArt)
             }
             Column(modifier = Modifier.weight(1f).height(PanelArt)) {
@@ -142,7 +157,7 @@ fun NowPlayingPanel(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? =
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .clickable(onClickLabel = "Open the music app", onClick = monitor::openApp),
+                        .clickable(onClickLabel = "Open the music app", onClick = openApp),
                 ) {
                     ScrollingText(current.title, OrType.Title, OrColors.OnBackground)
                     if (current.artist.isNotBlank()) ScrollingText(current.artist, OrType.Subtitle, OrColors.OnSurfaceMuted)
@@ -164,7 +179,7 @@ fun NowPlayingPanel(modifier: Modifier = Modifier, monitor: NowPlayingMonitor? =
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                OpenMusicAppButton(monitor, Modifier.fillMaxWidth())
+                OpenMusicAppButton(monitor, surface, Modifier.fillMaxWidth())
             }
         }
     }
@@ -246,13 +261,26 @@ private fun TransportButton(
     }
 }
 
+/** Tapping the playing song opens its app; the tap is the `music_player_open` for [surface]. */
+@Composable
+private fun rememberOpenPlayingApp(monitor: NowPlayingMonitor, surface: MusicSurface): () -> Unit {
+    val telemetry = LocalContext.current.appContainer.telemetry
+    return remember(monitor, surface, telemetry) {
+        {
+            telemetry.trackSafely { MusicPlayerOpen(surface) }
+            monitor.openApp()
+        }
+    }
+}
+
 /**
  * Nothing playing: opens the rider's music app ("Open Spotify"), or, before one is chosen or
  * once it's gone, asks which with [MusicAppPicker] and remembers the answer.
  */
 @Composable
-private fun OpenMusicAppButton(monitor: NowPlayingMonitor, modifier: Modifier = Modifier) {
+private fun OpenMusicAppButton(monitor: NowPlayingMonitor, surface: MusicSurface, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val telemetry = context.appContainer.telemetry
     val defaultApp by monitor.defaultApp.collectAsState()
     val app = remember(defaultApp) { defaultApp?.let { MusicApps.find(context, it) } }
     var picking by remember { mutableStateOf(false) }
@@ -260,7 +288,10 @@ private fun OpenMusicAppButton(monitor: NowPlayingMonitor, modifier: Modifier = 
     OrSecondaryButton(
         text = app?.let { "Open ${it.label}" } ?: "Music",
         icon = OrIcons.MusicNote,
-        onClick = { if (app == null || !MusicApps.open(context, app.packageName)) picking = true },
+        onClick = {
+            telemetry.trackSafely { MusicPlayerOpen(surface) }
+            if (app == null || !MusicApps.open(context, app.packageName)) picking = true
+        },
         modifier = modifier,
     )
     if (picking) {
@@ -270,6 +301,7 @@ private fun OpenMusicAppButton(monitor: NowPlayingMonitor, modifier: Modifier = 
             onPick = { picked ->
                 picking = false
                 monitor.setDefaultApp(picked.packageName)
+                telemetry.trackSafely { MusicAppChosen(MusicAppMapping.of(picked.packageName)) }
                 MusicApps.open(context, picked.packageName)
             },
         )

@@ -57,7 +57,10 @@ import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
 import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import dev.digitalducktape.openride.core.telemetry.SdkAptabaseClient
 import dev.digitalducktape.openride.core.telemetry.SharedPrefsTelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.MusicPlayerOpen
+import dev.digitalducktape.openride.core.telemetry.MusicSurface
 import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
@@ -173,7 +176,7 @@ class AppContainer(private val applicationContext: Context) {
 
     val bikeDataSource: BikeDataSource by lazy {
         if (BuildConfig.USE_REAL_BIKE_SENSOR) {
-            AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
+            AffernetBikeDataSource(applicationContext, containerScope, telemetry).also { it.start() }
         } else {
             MockBikeDataSource(scope = containerScope)
         }
@@ -318,6 +321,7 @@ class AppContainer(private val applicationContext: Context) {
             riderMusic = { riderMusic.value },
             musicControl = {
                 NowPlayingFeed.control(nowPlaying, it)
+                reportGamesMusicReach()
                 runCatching {
                     rideTelemetryTracker.markMusicControl()
                     gameVisitManager.markMusicControl()
@@ -427,6 +431,16 @@ class AppContainer(private val applicationContext: Context) {
             ownMusic = ownMusicSignal,
         )
     }
+
+    /** The games' music card was used: `music_player_open` (games), once per process, since it has no separate open. */
+    private fun reportGamesMusicReach() {
+        if (gamesMusicReported) return
+        gamesMusicReported = true
+        telemetry.trackSafely { MusicPlayerOpen(MusicSurface.GAMES) }
+    }
+
+    @Volatile
+    private var gamesMusicReported = false
 
     /** Where the app goes after a games visit (the ride summary, or the profile editor): consumed by the NavHost. */
     val visitNavigator: VisitNavigator by lazy { VisitNavigator() }

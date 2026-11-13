@@ -51,6 +51,7 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
+import dev.digitalducktape.openride.core.telemetry.MusicSurface
 import dev.digitalducktape.openride.ui.music.MiniPlayer
 import kotlinx.coroutines.launch
 
@@ -383,7 +384,7 @@ private fun TopStripContent(
         } else if (classMuted) {
             // The rider's music in the class's place (#72). A status line takes the slot when
             // there is one: the strip has room for either, not both.
-            MiniPlayer()
+            MiniPlayer(surface = MusicSurface.VIDEO_RIDE)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {

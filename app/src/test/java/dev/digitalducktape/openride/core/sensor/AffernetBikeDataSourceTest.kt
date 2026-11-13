@@ -1,5 +1,9 @@
 package dev.digitalducktape.openride.core.sensor
 
+import dev.digitalducktape.openride.core.telemetry.BikeSensor
+import dev.digitalducktape.openride.core.telemetry.BikeSensorState
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.SensorPath
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -197,5 +201,72 @@ class AffernetBikeDataSourceTest {
         assertTrue(bike.stopped)
         assertNull(source.activePath)
         assertEquals(ConnectionState.Unavailable, source.connectionState.value)
+    }
+
+    // --- telemetry (#85): bike_sensor ---
+
+    @Test
+    fun `reports connected with the iv1 path, once`() = runTest {
+        val v1 = FakeSource()
+        val bike = FakeSource()
+        val telemetry = RecordingTelemetry()
+        AffernetBikeDataSource(backgroundScope, v1, bike, telemetry).start()
+
+        v1.push(gen2Frame)
+        advanceTimeBy(40_000)
+        v1.push(gen2Frame)
+        advanceTimeBy(500)
+
+        assertEquals(listOf<Any>(BikeSensor(BikeSensorState.CONNECTED, SensorPath.IV1_INTERFACE)), telemetry.events)
+    }
+
+    @Test
+    fun `reports the bike interface path when it pushes`() = runTest {
+        val bike = FakeSource()
+        val telemetry = RecordingTelemetry()
+        AffernetBikeDataSource(backgroundScope, FakeSource(), bike, telemetry).start()
+
+        bike.push(bikePlusFrame)
+        advanceTimeBy(500)
+
+        assertEquals(listOf<Any>(BikeSensor(BikeSensorState.CONNECTED, SensorPath.BIKE_INTERFACE)), telemetry.events)
+    }
+
+    @Test
+    fun `reports polling when only polls feed the bike`() = runTest {
+        val bike = FakeSource(pollResult = bikePlusFrame)
+        val telemetry = RecordingTelemetry()
+        AffernetBikeDataSource(backgroundScope, FakeSource(), bike, telemetry).start()
+
+        advanceTimeBy(6_500)
+
+        assertEquals(listOf<Any>(BikeSensor(BikeSensorState.CONNECTED, SensorPath.POLLING)), telemetry.events)
+    }
+
+    @Test
+    fun `reports unavailable after 30 seconds with no data, and only then`() = runTest {
+        val telemetry = RecordingTelemetry()
+        AffernetBikeDataSource(backgroundScope, FakeSource(), FakeSource(), telemetry).start()
+
+        advanceTimeBy(29_900)
+        assertTrue(telemetry.events.isEmpty())
+        advanceTimeBy(200)
+        assertEquals(listOf<Any>(BikeSensor(BikeSensorState.UNAVAILABLE, null)), telemetry.events)
+        advanceTimeBy(120_000)
+        assertEquals(1, telemetry.events.size)
+    }
+
+    @Test
+    fun `data before 30 seconds cancels the unavailable timer`() = runTest {
+        val v1 = FakeSource()
+        val telemetry = RecordingTelemetry()
+        AffernetBikeDataSource(backgroundScope, v1, FakeSource(), telemetry).start()
+
+        advanceTimeBy(10_000)
+        v1.push(gen2Frame)
+        advanceTimeBy(60_000)
+
+        assertEquals(1, telemetry.events.size)
+        assertEquals(BikeSensorState.CONNECTED, (telemetry.events.single() as BikeSensor).state)
     }
 }

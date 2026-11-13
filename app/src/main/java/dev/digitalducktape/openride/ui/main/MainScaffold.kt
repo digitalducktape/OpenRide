@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.common.ExportShare
@@ -32,6 +34,10 @@ import dev.digitalducktape.openride.AppContainer
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesRoute
 import dev.digitalducktape.openride.core.music.MusicApps
+import dev.digitalducktape.openride.core.telemetry.MusicAppChosen
+import dev.digitalducktape.openride.core.telemetry.MusicAppMapping
+import dev.digitalducktape.openride.core.telemetry.NotificationAccessReporter
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.ui.music.MiniPlayer
 import dev.digitalducktape.openride.ui.music.openMusicAccessSettings
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -139,6 +145,12 @@ fun MainScaffold(
     // Re-checked on every resume by the top bar's player, which is on every tab.
     val musicControlsOn by appContainer.nowPlaying.hasAccess.collectAsState()
     val defaultMusicApp by appContainer.nowPlaying.defaultApp.collectAsState()
+    val notificationAccess = remember { NotificationAccessReporter(appContainer.telemetry) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        // The grant is made in Settings: re-read it, then say how the visit went.
+        appContainer.nowPlaying.refresh()
+        notificationAccess.onResume(appContainer.nowPlaying.hasAccess.value)
+    }
 
     Column(modifier = modifier.fillMaxSize().background(OrColors.Background)) {
         OrTopBar(
@@ -262,9 +274,13 @@ fun MainScaffold(
                     },
                     routeHolder = appContainer.routeHolder,
                     musicApp = remember(defaultMusicApp) { defaultMusicApp?.let { MusicApps.find(context, it) } },
-                    onMusicAppChosen = { appContainer.nowPlaying.setDefaultApp(it.packageName) },
+                    onMusicAppChosen = {
+                        appContainer.nowPlaying.setDefaultApp(it.packageName)
+                        appContainer.telemetry.trackSafely { MusicAppChosen(MusicAppMapping.of(it.packageName)) }
+                    },
                     musicControlsOn = musicControlsOn,
                     onManageMusicControls = {
+                        notificationAccess.onSettingsOpened()
                         openMusicAccessSettings(context, appContainer.nowPlaying.listenerComponent)
                     },
                 )

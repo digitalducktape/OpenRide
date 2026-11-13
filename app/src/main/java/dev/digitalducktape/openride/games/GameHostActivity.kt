@@ -1,5 +1,8 @@
 package dev.digitalducktape.openride.games
 
+import dev.digitalducktape.openride.core.telemetry.CameraPermission as CameraPermissionEvent
+import dev.digitalducktape.openride.core.telemetry.GrantResult
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -182,6 +185,9 @@ class GameHostActivity : GodotActivity(), GameLoadingHost {
         // Refused and Android won't ask again: the hub says "Camera not allowed" instead of asking.
         appContainer.gamesCameraPermissionRefused = !granted && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
         visit.onPermissionResult(granted)
+        appContainer.telemetry.trackSafely {
+            CameraPermissionEvent(if (granted) GrantResult.GRANTED else GrantResult.DENIED)
+        }
     }
 
     /**
