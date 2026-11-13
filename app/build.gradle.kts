@@ -310,7 +310,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
 
     // Opt-in usage telemetry (#85).
-    implementation(libs.aptabase.kotlin)
+    // 0.0.9 declares androidx.test:monitor as an `implementation` dep by mistake; its main
+    // code imports nothing from androidx.test, so keep the test libs out of the shipped APK.
+    implementation(libs.aptabase.kotlin) { exclude(group = "androidx.test") }
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
