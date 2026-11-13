@@ -205,6 +205,10 @@ To make OpenRide the screen that greets you when the bike turns on, open **Profi
 
 Once it's installed, OpenRide checks this repo's [Releases](https://github.com/digitalducktape/openride/releases) on its own each time it launches, and shows a notice at the top of the screen when a newer build is available. Tap it (or go to **Profile → App updates**) to download and install; no computer needed. Reinstalling from OpenPelo's catalog also gets you the latest release. See [docs/INSTALL.md](docs/INSTALL.md#in-app-updates-t22--22) for details.
 
+## Privacy
+
+Sharing usage data is **off until you say yes**: OpenRide asks once, and nothing is sent otherwise. If you opt in, it sends anonymous counts of which screens and features get used, so we know what to fix. No names, heart rate, power or music details. To turn it off, go to Profile, then Device, then Share usage data. [docs/TELEMETRY.md](docs/TELEMETRY.md) lists exactly what is sent.
+
 ## For developers
 
 The rest of this section is technical detail for anyone contributing to the code — feel free to skip it otherwise.

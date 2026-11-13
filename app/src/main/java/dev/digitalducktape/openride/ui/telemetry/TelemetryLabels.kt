@@ -8,7 +8,8 @@ object TelemetryLabels {
     const val PROMPT_TITLE = "Share usage data?"
     const val PROMPT_BODY =
         "Help improve OpenRide by sharing which screens and features get used. " +
-            "Nothing that identifies you or your rides is sent: no names, no heart rate or power, no song or artist info. " +
+            "Nothing that identifies you or your rides is sent: " +
+            "no names, no heart rate or power, no song or artist info. " +
             "It's off unless you say yes, and you can change it any time under Profile."
     const val SHARE = "Share usage data"
     const val DECLINE = "No thanks"
@@ -25,7 +26,8 @@ object TelemetryLabels {
     val notice: List<Pair<String, String>> = listOf(
         "What's sent" to
             "Which screens are opened. When the app starts: the tablet model, its software version, and how many " +
-            "riders it has (1, 2 or 3 or more). That you said yes to this prompt, when you do. When you finish setting up a rider, and whether it has a photo. " +
+            "riders it has (1, 2 or 3 or more). Your answer to this prompt, sent when you say yes. " +
+            "When you finish setting up a rider, and whether it has a photo. " +
             "When a ride starts and ends: its type, a rough length, whether it was saved, and whether the " +
             "heart-rate strap and bike sensors stayed connected.",
         "Classes" to
@@ -34,7 +36,8 @@ object TelemetryLabels {
             "Playlists are sent only as \"playlist\".",
         "Games and music" to
             "Which games you play, the difficulty, and the result as 0 to 3 stars. Whether Game music is on or off, " +
-            "and whether head-lean setup finished. Whether the music player was used, which music app you chose, and " +
+            "and whether head-lean setup finished, was cancelled, or failed to find a face or camera. " +
+            "Whether the music player was used, which music app you chose, and " +
             "whether your own music was playing.",
         "Sensors and camera" to
             "Whether a heart-rate strap was selected or Bluetooth was off, whether the bike's sensors connected, and " +

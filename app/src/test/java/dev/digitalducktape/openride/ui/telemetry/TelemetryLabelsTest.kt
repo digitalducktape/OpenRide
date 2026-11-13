@@ -54,7 +54,7 @@ class TelemetryLabelsTest {
         assertTrue(notice.contains("only as \"playlist\""))
         assertTrue(notice.contains("as YouTube lists it"))
         assertFalse(notice.contains("as you typed"))
-        assertTrue(notice.contains("said yes to this prompt"))
+        assertTrue(notice.contains("Your answer to this prompt, sent when you say yes"))
     }
 
     @Test
