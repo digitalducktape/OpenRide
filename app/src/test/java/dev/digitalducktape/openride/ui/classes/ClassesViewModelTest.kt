@@ -107,7 +107,7 @@ class ClassesViewModelTest {
         fetcher: FeedFetcher = pageBackedFetcher(),
     ): Pair<ClassesViewModel, RideSessionManager> {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, scope)
-        val viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository)
+        val viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository, routeLoaded = { false })
         return viewModel to manager
     }
 
@@ -165,7 +165,7 @@ class ClassesViewModelTest {
             fixtureXml()
         }
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository)
+        viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository, routeLoaded = { false })
 
         viewModel.refresh() // cold start: nothing loaded yet, Loading is fine here
         viewModel.refresh() // second refresh: must not blank the already-loaded content
@@ -220,6 +220,7 @@ class ClassesViewModelTest {
             manager,
             activeProfileHolder,
             rideRepository,
+            routeLoaded = { false },
         )
 
         viewModel.refresh()

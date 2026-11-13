@@ -5,6 +5,8 @@ import dev.digitalducktape.openride.core.data.GameResultDao
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.ride.RideSessionState
+import dev.digitalducktape.openride.core.telemetry.DiscardReason
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import dev.digitalducktape.openride.games.bridge.BridgeMessages
 import dev.digitalducktape.openride.games.bridge.CameraPermission
 import dev.digitalducktape.openride.games.bridge.Difficulty
@@ -69,6 +71,8 @@ class GameVisitManager(
     private val scope: CoroutineScope,
     private val runner: GameSessionManager,
     private val rideSessionManager: RideSessionManager,
+    /** A GPX route is loaded: `ride_start`'s `route`. */
+    private val routeLoaded: () -> Boolean,
     private val gameResultDao: GameResultDao,
     private val activeProfileId: () -> Long?,
     private val profile: suspend (profileId: Long) -> Profile?,
@@ -356,7 +360,7 @@ class GameVisitManager(
             log("another ride is in progress: this visit isn't recorded")
             return false
         }
-        rideSessionManager.start(pid, gamePlan = planId)
+        rideSessionManager.start(pid, gamePlan = planId, entry = RideEntry.GAMES, route = routeLoaded())
         return true
     }
 
@@ -502,7 +506,13 @@ class GameVisitManager(
         }
         if (recording && outcome is SaveOutcome.Discard) {
             log("discarding the visit's ride: ${gameplaySec}s of gameplay, pedalled=${pedalled()}")
-            rideSessionManager.discard()
+            rideSessionManager.discard(
+                when ((outcome as SaveOutcome.Discard).reason) {
+                    "no_pedalling" -> DiscardReason.NO_PEDALLING
+                    "not_recording" -> DiscardReason.NOT_RECORDING
+                    else -> DiscardReason.TOO_SHORT
+                },
+            )
         }
         if (recording && outcome is SaveOutcome.Keep) {
             rideSessionManager.setGamePlan(plans.singleOrNull() ?: GameLabels.VISIT_PLAN)

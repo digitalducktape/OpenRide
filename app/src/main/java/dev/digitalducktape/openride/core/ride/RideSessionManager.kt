@@ -4,6 +4,17 @@ import dev.digitalducktape.openride.core.data.Ride
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.data.RideSample
 import dev.digitalducktape.openride.core.sensor.BikeDataSource
+import dev.digitalducktape.openride.core.telemetry.DiscardReason
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideEnd
+import dev.digitalducktape.openride.core.telemetry.RideEntry
+import dev.digitalducktape.openride.core.telemetry.RideOutcome
+import dev.digitalducktape.openride.core.telemetry.RideStart
+import dev.digitalducktape.openride.core.telemetry.RideSummary
+import dev.digitalducktape.openride.core.telemetry.RideTelemetryTracker
+import dev.digitalducktape.openride.core.telemetry.RideType
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryBuckets
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +59,8 @@ private val NO_HEART_RATE: StateFlow<Int?> = MutableStateFlow(null).asStateFlow(
  *   *spinning* rider coasting to a stop, not a sensor reading zero because nobody's on the
  *   bike. Auto-pause auto-resumes the instant cadence returns. Set to `0` (or negative) to
  *   disable auto-pause entirely; the default of 3 s matches the stock bike's freewheel feel.
+ * @param telemetry receives `ride_start` / `ride_end` (#85); a failure there never reaches the ride.
+ * @param rideTracker collects the per-ride props of `ride_end`; `null` sends defaults.
  * @param epochMillisProvider supplies the ride's start wall-clock time; injectable so tests
  *   don't depend on real time.
  */
@@ -57,6 +70,8 @@ class RideSessionManager(
     private val scope: CoroutineScope,
     private val heartRateBpm: StateFlow<Int?> = NO_HEART_RATE,
     private val autoPauseThresholdSec: Int = 3,
+    private val telemetry: Telemetry = NoOpTelemetry,
+    private val rideTracker: RideTelemetryTracker? = null,
     private val epochMillisProvider: () -> Long = System::currentTimeMillis,
 ) {
     private val _state = MutableStateFlow<RideSessionState>(RideSessionState.Idle)
@@ -93,6 +108,7 @@ class RideSessionManager(
     private var profileId: Long = 0
     private var videoId: String? = null
     private var gamePlan: String? = null
+    private var rideType: RideType = RideType.JUST_RIDE
     private var rideStartEpochMs: Long = 0
     private var tickerJob: Job? = null
     private var resumeWatcherJob: Job? = null
@@ -112,9 +128,16 @@ class RideSessionManager(
      * [videoId] is the class the ride plays in the in-app player (v2), recorded on the
      * persisted ride for the Classes tab's "taken" badges; `null` for a Quick Start.
      * [gamePlan] is the mini-games session plan the ride records (#35), saved as
-     * [Ride.gamePlan]; `null` for any other ride.
+     * [Ride.gamePlan]; `null` for any other ride. [entry] and [route] (a GPX route is loaded) only
+     * feed `ride_start` telemetry.
      */
-    fun start(profileId: Long, videoId: String? = null, gamePlan: String? = null) {
+    fun start(
+        profileId: Long,
+        videoId: String? = null,
+        gamePlan: String? = null,
+        entry: RideEntry,
+        route: Boolean,
+    ) {
         if (_state.value != RideSessionState.Idle) return
 
         this.profileId = profileId
@@ -134,6 +157,15 @@ class RideSessionManager(
         _state.value = RideSessionState.Active
         _isRideActive.value = true
         startTicker()
+        rideType = when {
+            videoId != null -> RideType.CLASS
+            gamePlan != null -> RideType.GAMES
+            else -> RideType.JUST_RIDE
+        }
+        runCatching {
+            rideTracker?.begin(rideType)
+            telemetry.track(RideStart(rideType, entry, route))
+        }
     }
 
     /** Clears the per-stretch freewheel counters so a fresh Active stretch can't inherit a
@@ -246,17 +278,20 @@ class RideSessionManager(
         val rideId = rideRepository.saveRide(ride, sampleBuffer.toList())
         val savedRide = ride.copy(id = rideId)
         _state.value = RideSessionState.Finished(savedRide)
+        reportEnd(RideOutcome.SAVED, DiscardReason.NONE, ride.durationSec)
         return savedRide
     }
 
     /**
      * Ends the ride without saving it and returns to [RideSessionState.Idle]. Used by the
      * mini-games (#35) for sessions too short or empty to belong in History. No-op unless
-     * [RideSessionState.Active]/[RideSessionState.Paused].
+     * [RideSessionState.Active]/[RideSessionState.Paused]. [reason] only feeds `ride_end` telemetry.
      */
-    fun discard() {
+    fun discard(reason: DiscardReason) {
         val current = _state.value
         if (current !is RideSessionState.Active && current !is RideSessionState.Paused) return
+
+        val activeSec = _elapsedSec.value
 
         tickerJob?.cancel()
         tickerJob = null
@@ -270,6 +305,28 @@ class RideSessionManager(
         sampleBuffer.clear()
         _goal.value = RideGoal.None
         _state.value = RideSessionState.Idle
+        reportEnd(RideOutcome.DISCARDED, reason, activeSec)
+    }
+
+    /** Sends `ride_end`. [activeSec] is riding time only: the ticker runs while Active, so pauses (and a
+     *  games hub visit, which pauses the ride) are not in it. Never throws. */
+    private fun reportEnd(outcome: RideOutcome, reason: DiscardReason, activeSec: Int) {
+        runCatching {
+            val summary = rideTracker?.end() ?: RideSummary.EMPTY
+            telemetry.track(
+                RideEnd(
+                    type = rideType,
+                    duration = TelemetryBuckets.rideDuration(activeSec.toLong()),
+                    outcome = outcome,
+                    discardReason = reason,
+                    hr = summary.hr,
+                    hrDrops = summary.hrDrops,
+                    sensor = summary.sensor,
+                    music = summary.music,
+                    musicControlsUsed = summary.musicControlsUsed,
+                ),
+            )
+        }
     }
 
     /** Returns to [RideSessionState.Idle], ready for another ride. No-op unless [RideSessionState.Finished]. */

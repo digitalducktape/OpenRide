@@ -54,7 +54,7 @@ class HomeViewModelTest {
     @Test
     fun `startQuickRide returns false and starts nothing when no profile is active`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
 
         val started = viewModel.startQuickRide()
 
@@ -69,7 +69,7 @@ class HomeViewModelTest {
         )
         activeProfileHolder.setActiveProfile(profileId)
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
 
         val started = viewModel.startQuickRide()
 
@@ -80,7 +80,7 @@ class HomeViewModelTest {
     @Test
     fun `activeProfile is null until a profile is selected`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
 
         val first = viewModel.activeProfile.first()
 
@@ -94,7 +94,7 @@ class HomeViewModelTest {
         )
         activeProfileHolder.setActiveProfile(profileId)
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
 
         val active = viewModel.activeProfile.first { it != null }
 
@@ -104,7 +104,7 @@ class HomeViewModelTest {
     @Test
     fun `goal defaults to None and setGoal delegates to the session manager`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+        val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
 
         assertEquals(RideGoal.None, viewModel.goal.value)
 
@@ -123,7 +123,7 @@ class HomeViewModelTest {
             )
             activeProfileHolder.setActiveProfile(profileId)
             val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-            val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager)
+            val viewModel = HomeViewModel(activeProfileHolder, profileRepository, manager, routeLoaded = { false })
             val collector = backgroundScope.launch { viewModel.uiState.collect {} }
 
             val loaded = viewModel.uiState.first { it.profile != null }

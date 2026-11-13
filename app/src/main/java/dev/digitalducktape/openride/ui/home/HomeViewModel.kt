@@ -7,6 +7,7 @@ import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.RideGoal
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ class HomeViewModel(
     private val activeProfileHolder: ActiveProfileHolder,
     profileRepository: ProfileRepository,
     private val rideSessionManager: RideSessionManager,
+    private val routeLoaded: () -> Boolean,
 ) : ViewModel() {
     /** `null` while no profile is active, or if the active id doesn't (yet) match a loaded row. */
     val activeProfile: Flow<Profile?> =
@@ -58,7 +60,7 @@ class HomeViewModel(
      */
     fun startQuickRide(): Boolean {
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId)
+        rideSessionManager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = routeLoaded())
         return true
     }
 }

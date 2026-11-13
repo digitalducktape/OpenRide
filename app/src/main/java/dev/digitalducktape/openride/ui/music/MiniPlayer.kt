@@ -50,6 +50,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import coil.compose.AsyncImage
+import dev.digitalducktape.openride.appContainer
 import dev.digitalducktape.openride.core.music.MusicApp
 import dev.digitalducktape.openride.core.music.MusicApps
 import dev.digitalducktape.openride.core.music.NowPlaying
@@ -209,16 +210,21 @@ private fun ArtPlaceholder(size: Dp) {
  */
 @Composable
 private fun TransportButtons(playing: NowPlaying, monitor: NowPlayingMonitor, buttonSize: Dp, iconSize: Dp) {
-    TransportButton(OrIcons.SkipPrevious, "Previous", playing.canPrevious, buttonSize, iconSize, monitor::previous)
+    val tracker = LocalContext.current.appContainer.rideTelemetryTracker
+    fun controlled(action: () -> Unit): () -> Unit = {
+        tracker.markMusicControl()
+        action()
+    }
+    TransportButton(OrIcons.SkipPrevious, "Previous", playing.canPrevious, buttonSize, iconSize, controlled(monitor::previous))
     TransportButton(
         icon = if (playing.isPlaying) OrIcons.Pause else OrIcons.Play,
         label = if (playing.isPlaying) "Pause" else "Play",
         enabled = true,
         buttonSize = buttonSize,
         iconSize = iconSize,
-        onClick = monitor::playPause,
+        onClick = controlled(monitor::playPause),
     )
-    TransportButton(OrIcons.SkipNext, "Next", playing.canNext, buttonSize, iconSize, monitor::next)
+    TransportButton(OrIcons.SkipNext, "Next", playing.canNext, buttonSize, iconSize, controlled(monitor::next))
 }
 
 @Composable

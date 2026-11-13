@@ -2,6 +2,7 @@
 
 package dev.digitalducktape.openride.ui.ride
 
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -107,7 +108,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         runCurrent()
         assertFalse(values.last().isPaused)
 
@@ -124,7 +125,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 200)
         advanceTimeBy(3_000)
         runCurrent()
@@ -141,7 +142,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 200, speedMph = 36.0)
         advanceTimeBy(2_000) // 2 ticks at 36 mph = 0.01 mi/tick (36/3600) -> 0.02 mi total
         runCurrent()
@@ -159,7 +160,7 @@ class InRideViewModelTest {
     fun `endRide delegates to the session manager and persists the ride`() = runTest {
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
         val viewModel = InRideViewModel(manager, fakeBikeDataSource, profileRepository, activeProfileHolder)
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(2_000)
         runCurrent()
 
@@ -180,7 +181,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 150)
         advanceTimeBy(1_000)
         runCurrent()
@@ -197,7 +198,7 @@ class InRideViewModelTest {
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope)
         val viewModel = InRideViewModel(manager, fakeBikeDataSource, profileRepository, activeProfileHolder)
 
-        manager.start(ftpProfileId)
+        manager.start(ftpProfileId, entry = RideEntry.HOME_QUICK_START, route = false)
         // 190W / 200W FTP = 95% -> Threshold zone (91-105%).
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 190)
 
@@ -222,7 +223,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(ftpProfileId)
+        manager.start(ftpProfileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 190)
         fakeBikeDataSource.setConnectionState(ConnectionState.Disconnected)
         advanceTimeBy(1_000)
@@ -241,7 +242,7 @@ class InRideViewModelTest {
         backgroundScope.launch { viewModel.uiState.collect { values.add(it) } }
         runCurrent()
 
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(1_000)
         runCurrent()
 
@@ -257,7 +258,7 @@ class InRideViewModelTest {
         runCurrent()
 
         manager.setGoal(RideGoal.Duration(targetSec = 10))
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(5_000)
         runCurrent()
 
@@ -273,7 +274,7 @@ class InRideViewModelTest {
         runCurrent()
 
         manager.setGoal(RideGoal.Output(targetKj = 0.5))
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         // 3 seconds at 200W = 600 joules = 0.6 kJ, over a 0.5 kJ goal -> clamped to 1.0.
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 200)
         advanceTimeBy(3_000)

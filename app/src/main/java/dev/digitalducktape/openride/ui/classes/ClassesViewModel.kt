@@ -8,6 +8,7 @@ import dev.digitalducktape.openride.core.content.YouTubeContentRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import kotlin.random.Random
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +42,7 @@ class ClassesViewModel(
     private val rideSessionManager: RideSessionManager,
     private val activeProfileHolder: ActiveProfileHolder,
     rideRepository: RideRepository,
+    private val routeLoaded: () -> Boolean,
     private val random: Random = Random.Default,
 ) : ViewModel() {
 
@@ -177,7 +179,7 @@ class ClassesViewModel(
             return false
         }
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId, video.id)
+        rideSessionManager.start(profileId, video.id, entry = RideEntry.CLASSES, route = routeLoaded())
         return true
     }
 }

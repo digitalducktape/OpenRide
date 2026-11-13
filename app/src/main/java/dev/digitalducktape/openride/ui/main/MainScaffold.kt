@@ -88,7 +88,12 @@ fun MainScaffold(
     // (rider bike test, 2026-10-21: History and Profile filled in piece by piece).
     val homeViewModel: HomeViewModel = viewModel(
         factory = viewModelFactory {
-            HomeViewModel(appContainer.activeProfileHolder, appContainer.profileRepository, appContainer.rideSessionManager)
+            HomeViewModel(
+                appContainer.activeProfileHolder,
+                appContainer.profileRepository,
+                appContainer.rideSessionManager,
+                routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+            )
         },
     )
     val classesViewModel: ClassesViewModel = viewModel(
@@ -98,6 +103,7 @@ fun MainScaffold(
                 appContainer.rideSessionManager,
                 appContainer.activeProfileHolder,
                 appContainer.rideRepository,
+                routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
             )
         },
     )

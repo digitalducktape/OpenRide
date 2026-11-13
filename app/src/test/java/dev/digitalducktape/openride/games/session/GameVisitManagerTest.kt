@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.games.session
 
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -103,6 +104,7 @@ class GameVisitManagerTest {
         runner = GameSessionManager(signals, scope, tracker = tracker, random = Random(7)),
         tracker = tracker,
         rideSessionManager = rides,
+        routeLoaded = { false },
         gameResultDao = db.gameResultDao(),
         activeProfileId = { profileId },
         profile = { db.profileDao().getById(it) },
@@ -337,7 +339,7 @@ class GameVisitManagerTest {
 
     @Test
     fun `a ride already in progress is left alone`() {
-        rides.start(riderId)
+        rides.start(riderId, entry = RideEntry.HOME_QUICK_START, route = false)
         val v = visit().enter()
         assertFalse(hub()["visit"]!!.jsonObject["recording"]!!.jsonPrimitive.boolean)
         v.playQuickMinute().call { onExitHub("app") }
@@ -348,7 +350,7 @@ class GameVisitManagerTest {
 
     @Test
     fun `a finished ride nobody dismissed doesn't block the visit`() {
-        rides.start(riderId)
+        rides.start(riderId, entry = RideEntry.HOME_QUICK_START, route = false)
         seconds(5)
         runBlocking { rides.stop() }
         visit().enter().playQuickMinute().call { onExitHub("app") }

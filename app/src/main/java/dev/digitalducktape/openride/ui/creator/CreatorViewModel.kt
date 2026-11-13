@@ -5,6 +5,7 @@ import dev.digitalducktape.openride.core.content.YouTubeContentRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ class CreatorViewModel(
     private val activeProfileHolder: ActiveProfileHolder,
     rideRepository: RideRepository,
     private val sourceId: Long,
+    private val routeLoaded: () -> Boolean,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<CreatorUiState>(CreatorUiState.Loading)
@@ -116,7 +118,7 @@ class CreatorViewModel(
     /** Same contract as [dev.digitalducktape.openride.ui.classes.ClassesViewModel.startRideForVideo]. */
     fun startRideForVideo(videoId: String): Boolean {
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId, videoId)
+        rideSessionManager.start(profileId, videoId, entry = RideEntry.CREATOR, route = routeLoaded())
         return true
     }
 }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.transformLatest
@@ -62,6 +63,14 @@ class HeartRateManager(
     /** The BLE address currently connected (or being connected) to. */
     val connectedAddress: StateFlow<String?> = _connectedAddress.asStateFlow()
 
+    private val _strapWanted = MutableStateFlow(true)
+    /** Whether OpenRide wants the strap right now (see the `wanted` flow). False means a release is on purpose. */
+    val strapWanted: StateFlow<Boolean> = _strapWanted.asStateFlow()
+
+    private val _strapSaved = MutableStateFlow(false)
+    /** Whether the active rider has a strap saved, held or not. */
+    val strapSaved: StateFlow<Boolean> = _strapSaved.asStateFlow()
+
     init {
         combine(
             activeProfileHolder.activeProfileId,
@@ -74,8 +83,14 @@ class HeartRateManager(
             profileRepository.observeProfiles().onStart { emit(emptyList()) },
             wanted,
         ) { id, profiles, isWanted ->
-            profiles.firstOrNull { it.id == id }?.pairedHrDeviceAddress?.takeIf { isWanted }
+            profiles.firstOrNull { it.id == id }?.pairedHrDeviceAddress to isWanted
         }
+            // Before reconnect() resets the connection state, so a release reads as on purpose.
+            .onEach { (saved, isWanted) ->
+                _strapSaved.value = saved != null
+                _strapWanted.value = isWanted
+            }
+            .map { (saved, isWanted) -> saved?.takeIf { isWanted } }
             .distinctUntilChanged()
             .onEach { address -> reconnect(address) }
             .launchIn(scope)

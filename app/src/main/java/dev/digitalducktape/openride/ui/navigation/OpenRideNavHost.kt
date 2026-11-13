@@ -262,6 +262,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.activeProfileHolder,
                         appContainer.rideRepository,
                         sourceId,
+                        routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
                     )
                 },
             )

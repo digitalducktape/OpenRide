@@ -14,6 +14,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.content.ContextCompat
+import dev.digitalducktape.openride.core.telemetry.OwnMusicSignal
+import dev.digitalducktape.openride.core.telemetry.RideTelemetryTracker
 import java.time.ZoneId
 import androidx.room.Room
 import dev.digitalducktape.openride.core.backup.AutoBackupManager
@@ -191,7 +193,26 @@ class AppContainer(private val applicationContext: Context) {
             rideRepository = rideRepository,
             scope = containerScope,
             heartRateBpm = heartRateManager.bpm,
+            telemetry = telemetry,
+            rideTracker = rideTelemetryTracker,
         )
+    }
+
+    /** Collects `ride_end`'s per-ride props (#85); the mini player marks its button presses on it. */
+    val rideTelemetryTracker: RideTelemetryTracker by lazy {
+        RideTelemetryTracker(
+            hrConnection = heartRateManager.connectionState,
+            strapWanted = heartRateManager.strapWanted,
+            strapSaved = heartRateManager.strapSaved,
+            sensorsOffline = sensorsOffline,
+            ownMusic = ownMusicSignal,
+            scope = containerScope,
+        )
+    }
+
+    /** A track is actually playing in the rider's music app (not just open or paused). Also read by the games. */
+    val ownMusicSignal: OwnMusicSignal by lazy {
+        OwnMusicSignal { nowPlaying.nowPlaying.value?.isPlaying == true }
     }
 
     /**
@@ -373,6 +394,7 @@ class AppContainer(private val applicationContext: Context) {
             scope = gamesScope,
             runner = gameSessionManager,
             rideSessionManager = rideSessionManager,
+            routeLoaded = { routeHolder.activeRoute.value != null },
             gameResultDao = database.gameResultDao(),
             activeProfileId = { activeProfileHolder.activeProfileId.value },
             profile = { profileRepository.getProfile(it) },
