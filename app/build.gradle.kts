@@ -325,6 +325,8 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
+    // Telemetry tests reflect over the sealed event classes; tests only, never shipped.
+    testImplementation("org.jetbrains.kotlin:kotlin-reflect:2.0.21")
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
