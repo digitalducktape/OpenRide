@@ -24,7 +24,7 @@ Events from one visit to the app share a session ID that is not tied to a rider.
 
 Each event carries the time it happened. Every value below comes from a fixed list or a rough bucket. Nothing is free text, except the channel name described under Classes. Each event also carries what Aptabase adds to every event: the app version, the Android version, the device model, the language setting and the SDK version.
 
-Time and length values use buckets, not exact numbers. Ride, class and visit lengths: `<5m`, `5–15m`, `15–30m`, `30–45m`, `45–60m`, `60m+`. A single game's play time: `<1m`, `1–3m`, `3–5m`, `5–10m`, `10m+`.
+Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5m`, `5–15m`, `15–30m`, `30–45m`, `45–60m`, `60m+`. A single game's play time: `<1m`, `1–3m`, `3–5m`, `5–10m`, `10m+`.
 
 ### App
 

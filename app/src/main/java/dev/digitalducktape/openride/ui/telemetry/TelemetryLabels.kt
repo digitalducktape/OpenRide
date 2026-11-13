@@ -50,7 +50,8 @@ object TelemetryLabels {
         "Never sent" to
             "Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. " +
             "Rider names or photos. Video IDs or titles. Playlist names. Song or artist info. Bluetooth names or " +
-            "addresses. File names or route coordinates. Exact ride or class lengths, or clock times. Error messages.",
+            "addresses. File names or route coordinates. " +
+            "Exact ride or class lengths, or clock times, in event properties. Error messages.",
         "Where it goes" to
             "Usage data is stored in the United States by Aptabase, an analytics service. Events from one visit " +
             "to the app share a session ID that isn't tied to a rider.",
