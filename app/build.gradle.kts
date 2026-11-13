@@ -10,6 +10,17 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// local.properties values (git-ignored): godot.bin, aptabase.appKey, telemetry.debug.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+
+// Telemetry (#85). The env var wins over local.properties; blank when neither is set. The key
+// is public-by-design in the APK but must never be committed.
+val aptabaseAppKey: String = (System.getenv("APTABASE_APP_KEY")?.takeIf { it.isNotBlank() }
+    ?: localProps.getProperty("aptabase.appKey"))?.trim().orEmpty()
+val telemetryInDebug: Boolean = localProps.getProperty("telemetry.debug")?.trim() == "true"
+
 android {
     namespace = "dev.digitalducktape.openride"
     compileSdk = 34
@@ -36,6 +47,12 @@ android {
         // dev build never offers to install the real bike APK over itself. Only the `real`
         // asset is published, so the mock build simply finds nothing and stays quiet.
         buildConfigField("String", "UPDATE_APK_ASSET_INFIX", "\"mock\"")
+
+        // Telemetry (#85). BuildConfig.DEBUG is true for debug AND debugReal, so it must not
+        // decide whether to send; these per-build-type fields do (overridden below).
+        buildConfigField("String", "APTABASE_APP_KEY", "\"$aptabaseAppKey\"")
+        buildConfigField("boolean", "TELEMETRY_SEND", "false")
+        buildConfigField("boolean", "TELEMETRY_DEBUG_EVENTS", "false")
     }
 
     buildTypes {
@@ -44,6 +61,10 @@ android {
         // the mock debug build also keeps x86_64 so it still runs games on an x86 emulator.
         debug {
             ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+            // Mock build: sends nothing unless local.properties has telemetry.debug=true, and
+            // then tags events as debug so they stay out of the release numbers.
+            buildConfigField("boolean", "TELEMETRY_SEND", telemetryInDebug.toString())
+            buildConfigField("boolean", "TELEMETRY_DEBUG_EVENTS", "true")
         }
 
         release {
@@ -67,6 +88,9 @@ android {
             buildConfigField("boolean", "USE_REAL_BIKE_SENSOR", "true")
             // This is the build published to the bike, so it updates from the `real` asset.
             buildConfigField("String", "UPDATE_APK_ASSET_INFIX", "\"real\"")
+            // The published bike build is the one that reports (once the rider opts in).
+            buildConfigField("boolean", "TELEMETRY_SEND", "true")
+            buildConfigField("boolean", "TELEMETRY_DEBUG_EVENTS", "false")
             matchingFallbacks += "debug"
             // Bike-only build: arm64 alone (initWith copied debug's emulator ABI too).
             ndk {
@@ -221,9 +245,7 @@ val exportGamesPack = tasks.register<ExportGamesPackTask>("exportGamesPack") {
     val games = rootProject.layout.projectDirectory.dir("games")
     projectDir.set(games)
     projectFiles.from(fileTree(games) { exclude(".godot/**", "tests/**") })
-    val localGodotBin = rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->
-        Properties().apply { file.inputStream().use { load(it) } }.getProperty("godot.bin")
-    }
+    val localGodotBin = localProps.getProperty("godot.bin")
     godotBin.set(providers.environmentVariable("GODOT_BIN").orElse(provider { localGodotBin }))
     godotVersion.set(libs.versions.godot.get())
     // Unit tests merge the variant's assets too, but must not need Godot: skip the export
@@ -238,6 +260,22 @@ androidComponents {
         variant.sources.assets?.addGeneratedSourceDirectory(exportGamesPack, ExportGamesPackTask::outputDir)
         val name = variant.name.replaceFirstChar { it.uppercase() }
         apkPackagingTasks += listOf("package$name", "package${name}Bundle")
+    }
+}
+
+// Release gate (#85): `-Popenride.release=true` refuses to build without an Aptabase key, so a
+// published APK can't silently ship with telemetry dead. Ordinary builds may have a blank key.
+if (providers.gradleProperty("openride.release").orNull == "true") {
+    tasks.configureEach {
+        if (name == "preDebugRealBuild" || name == "preReleaseBuild") {
+            doFirst {
+                if (aptabaseAppKey.isBlank()) {
+                    throw GradleException(
+                        "Aptabase app key missing: set aptabase.appKey in local.properties or APTABASE_APP_KEY",
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -270,6 +308,9 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.mediapipe.tasks.vision)
     implementation(libs.androidx.lifecycle.process)
+
+    // Opt-in usage telemetry (#85).
+    implementation(libs.aptabase.kotlin)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
