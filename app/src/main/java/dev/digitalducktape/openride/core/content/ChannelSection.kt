@@ -27,4 +27,5 @@ data class ChannelSection(
     val category: ContentCategory,
     val videos: List<Video>,
     val refreshFailed: Boolean,
+    val sourceType: ContentSourceType = ContentSourceType.CHANNEL,
 )

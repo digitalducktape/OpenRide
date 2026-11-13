@@ -53,6 +53,7 @@ import dev.digitalducktape.openride.core.profile.AvatarPhotoStore
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.core.telemetry.AptabaseTelemetry
+import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
 import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import dev.digitalducktape.openride.core.telemetry.SdkAptabaseClient
 import dev.digitalducktape.openride.core.telemetry.SharedPrefsTelemetryConsentStore
@@ -339,6 +340,9 @@ class AppContainer(private val applicationContext: Context) {
 
     /** The rider's telemetry opt-in (#85). Nothing is sent unless they have granted it. */
     val telemetryConsent: TelemetryConsentStore by lazy { SharedPrefsTelemetryConsentStore(applicationContext) }
+
+    /** The class events of the video ride in progress (#85). */
+    val classRideTelemetry: ClassRideTelemetry by lazy { ClassRideTelemetry(telemetry) }
 
     /** [NoOpTelemetry] unless this build can send (release, with an app key). */
     val telemetry: Telemetry by lazy {

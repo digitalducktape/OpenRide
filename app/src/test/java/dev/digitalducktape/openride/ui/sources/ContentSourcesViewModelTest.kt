@@ -205,4 +205,29 @@ class ContentSourcesViewModelTest {
         assertEquals(12, afterDelete.size)
         assertTrue(afterDelete.all { it.builtIn })
     }
+
+    @Test
+    fun `confirmAdd emits content_source_added with the resolved name, not the typed text`() = runTest {
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ContentSourcesViewModel(
+            repository, ChannelHandleResolver(FeedFetcher { channelPage.byteInputStream() }), recording,
+        )
+        viewModel.resolve("@kaleigh")
+        viewModel.confirmAdd(ContentCategory.Scenic)
+
+        assertEquals(
+            mapOf("channel" to "@kaleigh", "kind" to "channel"),
+            recording.events.single().props(),
+        )
+    }
+
+    @Test
+    fun `a source that was not added emits nothing`() = runTest {
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ContentSourcesViewModel(
+            repository, ChannelHandleResolver(FeedFetcher { channelPage.byteInputStream() }), recording,
+        )
+        viewModel.confirmAdd(ContentCategory.Scenic)
+        assertTrue(recording.events.isEmpty())
+    }
 }

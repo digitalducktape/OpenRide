@@ -3,12 +3,19 @@ package dev.digitalducktape.openride.ui.classes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.digitalducktape.openride.core.content.ChannelSection
+import dev.digitalducktape.openride.core.content.ContentCategory
+import dev.digitalducktape.openride.core.telemetry.ChannelName
+import dev.digitalducktape.openride.core.telemetry.ChannelSource
 import dev.digitalducktape.openride.core.content.Video
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
+import dev.digitalducktape.openride.core.telemetry.ClassSource
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import dev.digitalducktape.openride.core.telemetry.RideEntry
+import dev.digitalducktape.openride.core.telemetry.channelFor
 import kotlin.random.Random
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -44,6 +51,7 @@ class ClassesViewModel(
     rideRepository: RideRepository,
     private val routeLoaded: () -> Boolean,
     private val random: Random = Random.Default,
+    private val classTelemetry: ClassRideTelemetry = ClassRideTelemetry(NoOpTelemetry),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ClassesUiState>(ClassesUiState.Loading)
@@ -180,6 +188,23 @@ class ClassesViewModel(
         }
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
         rideSessionManager.start(profileId, video.id, entry = RideEntry.CLASSES, route = routeLoaded())
+        reportClassStart(video)
         return true
+    }
+
+    /** `class_start`: the channel comes from the row the class was listed in (matched by video id). */
+    private fun reportClassStart(video: Video) {
+        runCatching {
+            val section = loadedSections.value.firstOrNull { s -> s.videos.any { it.id == video.id } }
+            if (section != null) {
+                val (channel, channelSource) = channelFor(section.channelId, section.sourceType, section.channelName)
+                classTelemetry.start(channel, channelSource, section.category, ClassSource.CLASSES)
+            } else {
+                // Not in any loaded row (cannot happen from the UI): only the video's own channel name is known.
+                classTelemetry.start(
+                    ChannelName.of(video.channelName), ChannelSource.CUSTOM, ContentCategory.Scenic, ClassSource.CLASSES,
+                )
+            }
+        }
     }
 }

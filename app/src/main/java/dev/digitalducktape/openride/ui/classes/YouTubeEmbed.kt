@@ -93,6 +93,14 @@ object YouTubeEmbed {
                       if (e.data === YT.PlayerState.ENDED && window.$BRIDGE_NAME) {
                         window.$BRIDGE_NAME.onVideoEnded();
                       }
+                      // The length is only known once the video is playing (telemetry, #85).
+                      if (e.data === YT.PlayerState.PLAYING && window.$BRIDGE_NAME && e.target.getDuration) {
+                        window.$BRIDGE_NAME.onDuration(e.target.getDuration());
+                      }
+                    },
+                    // YouTube's numeric error code and nothing else (telemetry, #85).
+                    onError: function (e) {
+                      if (window.$BRIDGE_NAME) { window.$BRIDGE_NAME.onPlayerError(e.data); }
                     }
                   }
                 });

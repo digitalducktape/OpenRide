@@ -104,6 +104,7 @@ fun MainScaffold(
                 appContainer.activeProfileHolder,
                 appContainer.rideRepository,
                 routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+                classTelemetry = appContainer.classRideTelemetry,
             )
         },
     )

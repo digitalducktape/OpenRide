@@ -466,4 +466,30 @@ class ClassesViewModelTest {
             .first { ids -> !ids.contains("vidLong00001") }
         assertEquals(before.size - 1, after.size)
     }
+
+    @Test
+    fun `starting a class from Classes emits class_start with the channel and category`() = runTest {
+        val profileId = profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(profileId)
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ClassesViewModel(
+            repository(), manager, activeProfileHolder, rideRepository, routeLoaded = { false },
+            classTelemetry = dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry(recording),
+        )
+        viewModel.refresh()
+        val section = (viewModel.uiState.value as ClassesUiState.Loaded).sections.first { it.videos.isNotEmpty() }
+
+        viewModel.startRideForVideo(section.videos.first())
+
+        assertEquals(
+            mapOf(
+                "channel" to "Test Cycling Channel", "channel_source" to "custom",
+                "category" to "scenic", "source" to "classes",
+            ),
+            recording.events.single().props(),
+        )
+    }
 }

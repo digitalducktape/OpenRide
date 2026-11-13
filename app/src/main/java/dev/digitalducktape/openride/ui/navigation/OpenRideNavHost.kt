@@ -184,6 +184,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                     ContentSourcesViewModel(
                         appContainer.contentSourceRepository,
                         appContainer.channelHandleResolver,
+                        appContainer.telemetry,
                     )
                 },
             )
@@ -239,6 +240,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
             VideoRideScreen(
                 viewModel = viewModel,
                 videoId = videoId,
+                classTelemetry = appContainer.classRideTelemetry,
                 onRideEnded = { rideId ->
                     navController.navigate(Destinations.rideSummary(rideId)) {
                         popUpTo(Destinations.Main) { inclusive = false }
@@ -263,6 +265,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.rideRepository,
                         sourceId,
                         routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+                        classTelemetry = appContainer.classRideTelemetry,
                     )
                 },
             )

@@ -6,7 +6,13 @@ import dev.digitalducktape.openride.core.content.ContentCategory
 import dev.digitalducktape.openride.core.content.ContentSource
 import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.HttpStatusException
+import dev.digitalducktape.openride.core.content.ContentSourceType
 import dev.digitalducktape.openride.core.content.ResolvedSource
+import dev.digitalducktape.openride.core.telemetry.ContentSourceAdded
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.SourceKind
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.channelFor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +41,7 @@ sealed interface AddSourceState {
 class ContentSourcesViewModel(
     private val sourceRepository: ContentSourceRepository,
     private val resolver: ChannelHandleResolver,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
 
     val sources: Flow<List<ContentSource>> = sourceRepository.observeAll()
@@ -65,6 +72,16 @@ class ContentSourcesViewModel(
     suspend fun confirmAdd(category: ContentCategory) {
         val resolved = (_addState.value as? AddSourceState.Resolved)?.source ?: return
         sourceRepository.add(resolved, category)
+        // Only after the add went through. The name is YouTube's page title for the source,
+        // never the text the rider typed.
+        runCatching {
+            telemetry.track(
+                ContentSourceAdded(
+                    channelFor(resolved.youtubeId, resolved.sourceType, resolved.displayName).first,
+                    if (resolved.sourceType == ContentSourceType.PLAYLIST) SourceKind.PLAYLIST else SourceKind.CHANNEL,
+                ),
+            )
+        }
         _addState.value = AddSourceState.Idle
     }
 

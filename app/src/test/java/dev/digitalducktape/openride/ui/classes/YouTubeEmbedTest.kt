@@ -120,4 +120,12 @@ class YouTubeEmbedTest {
         assertTrue(YouTubeEmbed.html("dQw4w9WgXcQ", startMuted = true).contains("var wantMuted = true;"))
         assertTrue(YouTubeEmbed.html("dQw4w9WgXcQ", startMuted = false).contains("var wantMuted = false;"))
     }
+
+    @Test
+    fun `the page reports player errors and the video length over the bridge`() {
+        val html = YouTubeEmbed.html("dQw4w9WgXcQ")
+        assertTrue(html.contains("onError: function (e)"))
+        assertTrue(html.contains("window.OpenRideBridge.onPlayerError(e.data)"))
+        assertTrue(html.contains("window.OpenRideBridge.onDuration(e.target.getDuration())"))
+    }
 }
