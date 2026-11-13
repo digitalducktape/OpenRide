@@ -8,7 +8,13 @@ import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.importer.WorkoutHistoryCsv
 import java.time.ZoneId
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.Consent
+import dev.digitalducktape.openride.core.telemetry.ConsentSource
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 
 /**
@@ -20,12 +26,27 @@ class ProfileTabViewModel(
     profileRepository: ProfileRepository,
     private val backupRepository: BackupRepository,
     private val rideRepository: RideRepository,
+    private val telemetry: Telemetry,
+    private val consentStore: TelemetryConsentStore,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : ViewModel() {
     val activeProfile: Flow<Profile?> =
         combine(activeProfileHolder.activeProfileId, profileRepository.observeProfiles()) { id, profiles ->
             profiles.firstOrNull { it.id == id }
         }
+
+    /** The usage-data answer (#85), for the Device group's switch. */
+    val consent: StateFlow<Consent> = consentStore.consent
+
+    /** The switch: on stores Granted then announces it; off stores Declined, and nothing is sent. */
+    fun setSharing(on: Boolean) {
+        if (on) {
+            consentStore.set(Consent.Granted)
+            telemetry.track(TelemetryEnabled(ConsentSource.SETTINGS))
+        } else {
+            consentStore.set(Consent.Declined)
+        }
+    }
 
     /** Clears the active profile so the caller can navigate back to profile select. */
     fun switchRider() {

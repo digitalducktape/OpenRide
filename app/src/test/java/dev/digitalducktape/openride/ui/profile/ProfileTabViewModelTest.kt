@@ -11,6 +11,11 @@ import dev.digitalducktape.openride.core.data.RideRepository
 import java.time.Instant
 import java.time.ZoneOffset
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.Consent
+import dev.digitalducktape.openride.core.telemetry.ConsentSource
+import dev.digitalducktape.openride.core.telemetry.InMemoryTelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -30,6 +35,8 @@ class ProfileTabViewModelTest {
     private lateinit var backupRepository: BackupRepository
     private lateinit var rideRepository: RideRepository
     private lateinit var viewModel: ProfileTabViewModel
+    private val telemetry = RecordingTelemetry()
+    private val consentStore = InMemoryTelemetryConsentStore(Consent.Declined)
 
     @Before
     fun setUp() {
@@ -39,7 +46,7 @@ class ProfileTabViewModelTest {
         activeProfileHolder = ActiveProfileHolder(context)
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao())
         rideRepository = RideRepository(db, db.rideDao())
-        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository) { ZoneOffset.UTC }
+        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository, telemetry, consentStore) { ZoneOffset.UTC }
     }
 
     @After
@@ -187,5 +194,20 @@ class ProfileTabViewModelTest {
         activeProfileHolder.clear()
 
         assertTrue(viewModel.importWorkoutHistory(historyCsv).isFailure)
+    }
+
+    @Test
+    fun settingsSwitchOnTracksSettingsSource() {
+        viewModel.setSharing(true)
+        assertEquals(Consent.Granted, consentStore.consent.value)
+        assertEquals(listOf(TelemetryEnabled(ConsentSource.SETTINGS)), telemetry.events)
+    }
+
+    @Test
+    fun settingsSwitchOffTracksNothing() {
+        consentStore.set(Consent.Granted)
+        viewModel.setSharing(false)
+        assertEquals(Consent.Declined, consentStore.consent.value)
+        assertTrue(telemetry.events.isEmpty())
     }
 }

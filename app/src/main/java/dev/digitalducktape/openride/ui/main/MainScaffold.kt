@@ -110,6 +110,8 @@ fun MainScaffold(
                 appContainer.profileRepository,
                 appContainer.backupRepository,
                 appContainer.rideRepository,
+                appContainer.telemetry,
+                appContainer.telemetryConsent,
             )
         },
     )
@@ -245,6 +247,7 @@ fun MainScaffold(
                     },
                     onManageAppUpdates = { outerNavController.navigate(Destinations.AppUpdate) },
                     onShowAbout = { outerNavController.navigate(Destinations.About) },
+                    onShowTelemetryInfo = { outerNavController.navigate(Destinations.TelemetryInfo) },
                     onManageContentSources = {
                         outerNavController.navigate(Destinations.ContentSources)
                     },

@@ -28,6 +28,7 @@ import dev.digitalducktape.openride.ui.profile.ProfileEditorRoute
 import dev.digitalducktape.openride.ui.profile.ProfileEditorViewModel
 import dev.digitalducktape.openride.ui.profile.ProfileSelectRoute
 import dev.digitalducktape.openride.ui.profile.ProfileSelectViewModel
+import dev.digitalducktape.openride.ui.telemetry.TelemetryInfoScreen
 import dev.digitalducktape.openride.ui.profile.HrPairingRoute
 import dev.digitalducktape.openride.ui.profile.HrPairingViewModel
 import dev.digitalducktape.openride.ui.ride.InRideScreen
@@ -69,7 +70,12 @@ fun OpenRideNavHost(appContainer: AppContainer) {
         composable(Destinations.ProfileSelect) {
             val viewModel: ProfileSelectViewModel = viewModel(
                 factory = viewModelFactory {
-                    ProfileSelectViewModel(appContainer.profileRepository, appContainer.activeProfileHolder)
+                    ProfileSelectViewModel(
+                        appContainer.profileRepository,
+                        appContainer.activeProfileHolder,
+                        appContainer.telemetry,
+                        appContainer.telemetryConsent,
+                    )
                 },
             )
             ProfileSelectRoute(
@@ -80,7 +86,12 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                     }
                 },
                 onAddRider = { navController.navigate(Destinations.ProfileCreate) },
+                onShowTelemetryInfo = { navController.navigate(Destinations.TelemetryInfo) },
             )
+        }
+
+        composable(Destinations.TelemetryInfo) {
+            TelemetryInfoScreen(onDone = { navController.popBackStack() })
         }
 
         composable(Destinations.ProfileCreate) {
