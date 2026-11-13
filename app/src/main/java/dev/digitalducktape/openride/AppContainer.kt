@@ -50,6 +50,12 @@ import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.profile.AvatarPhotoStore
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.route.RouteHolder
+import dev.digitalducktape.openride.core.telemetry.AptabaseTelemetry
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.SdkAptabaseClient
+import dev.digitalducktape.openride.core.telemetry.SharedPrefsTelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
@@ -308,6 +314,26 @@ class AppContainer(private val applicationContext: Context) {
                 delay(RIDER_MUSIC_CHECK_MS)
             }
         }.flowOn(Dispatchers.Default).stateIn(containerScope, SharingStarted.Eagerly, false)
+    }
+
+    /** The rider's telemetry opt-in (#85). Nothing is sent unless they have granted it. */
+    val telemetryConsent: TelemetryConsentStore by lazy { SharedPrefsTelemetryConsentStore(applicationContext) }
+
+    /** [NoOpTelemetry] unless this build can send (release, with an app key). */
+    val telemetry: Telemetry by lazy {
+        if (!BuildConfig.TELEMETRY_SEND || BuildConfig.APTABASE_APP_KEY.isBlank()) {
+            NoOpTelemetry
+        } else {
+            AptabaseTelemetry(
+                telemetryConsent,
+                SdkAptabaseClient(
+                    applicationContext,
+                    BuildConfig.APTABASE_APP_KEY,
+                    BuildConfig.TELEMETRY_DEBUG_EVENTS,
+                    BuildConfig.VERSION_NAME,
+                ),
+            )
+        }
     }
 
     /**
