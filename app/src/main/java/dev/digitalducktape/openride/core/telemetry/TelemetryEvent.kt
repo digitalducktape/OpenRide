@@ -256,7 +256,7 @@ data object GpxRouteCleared : TelemetryEvent {
     override fun props() = emptyMap<String, String>()
 }
 
-// Updates and about
+// Updates
 
 data class UpdatePrompt(val action: UpdateAction) : TelemetryEvent {
     override val name get() = "update_prompt"
@@ -266,9 +266,4 @@ data class UpdatePrompt(val action: UpdateAction) : TelemetryEvent {
 data class UpdateFailed(val stage: UpdateStage) : TelemetryEvent {
     override val name get() = "update_failed"
     override fun props() = props("stage" to stage.wire)
-}
-
-data class AboutLink(val target: AboutTarget) : TelemetryEvent {
-    override val name get() = "about_link"
-    override fun props() = props("target" to target.wire)
 }

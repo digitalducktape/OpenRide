@@ -41,7 +41,7 @@ object TelemetryLabels {
             "whether you allowed camera access.",
         "Your data and settings" to
             "Whether you backed up, restored, imported or exported rides, or deleted one. Whether you loaded or " +
-            "cleared a route. Whether you checked for updates, opened an About link, or allowed notification " +
+            "cleared a route. Whether you checked for updates, or allowed notification " +
             "access. Results only, never the contents.",
         "Never sent" to
             "Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. " +

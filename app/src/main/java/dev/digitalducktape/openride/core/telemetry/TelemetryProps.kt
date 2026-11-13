@@ -32,9 +32,9 @@ enum class ConsentSource(override val wire: String) : Wire { FIRST_RUN("first_ru
 
 enum class RideType(override val wire: String) : Wire { JUST_RIDE("just_ride"), CLASS("class"), GAMES("games") }
 
-/** [RideType] plus `imported`, for `ride_deleted`. */
+/** [RideType] for `ride_deleted`; imported (#83) rides have no marker and count as just_ride. */
 enum class DeletedRideType(override val wire: String) : Wire {
-    JUST_RIDE("just_ride"), CLASS("class"), GAMES("games"), IMPORTED("imported"),
+    JUST_RIDE("just_ride"), CLASS("class"), GAMES("games"),
 }
 
 enum class RideEntry(override val wire: String) : Wire {
@@ -148,10 +148,6 @@ enum class ExportFormat(override val wire: String) : Wire {
 enum class UpdateAction(override val wire: String) : Wire { SHOWN("shown"), INSTALL_TAPPED("install_tapped") }
 
 enum class UpdateStage(override val wire: String) : Wire { CHECK("check"), DOWNLOAD("download") }
-
-enum class AboutTarget(override val wire: String) : Wire {
-    RELEASE_NOTES("release_notes"), GITHUB("github"), COFFEE("coffee"),
-}
 
 // Buckets (see TelemetryBuckets). Edges are half-open: [low, high).
 

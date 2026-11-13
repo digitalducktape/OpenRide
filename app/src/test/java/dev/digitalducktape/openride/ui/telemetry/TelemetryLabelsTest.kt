@@ -44,7 +44,7 @@ class TelemetryLabelsTest {
 
     @Test
     fun noticeNamesYourDataAndSettingsCategory() {
-        listOf("backed up", "route", "update", "About link", "notification access", "never the contents")
+        listOf("backed up", "route", "update", "notification access", "never the contents")
             .forEach { assertTrue(it, notice.contains(it)) }
     }
 

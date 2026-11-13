@@ -39,13 +39,12 @@ class TelemetryEventTest {
         BackupRestore(RestoreResult.BAD_FILE),
         AutoBackupFailed,
         HistoryImport(ImportResult.SUCCESS, ImportedBucket.N1_10, duplicates = true),
-        RideDeleted(DeletedRideType.IMPORTED),
+        RideDeleted(DeletedRideType.GAMES),
         RideExport(ExportFormat.CSV_HISTORY),
         GpxImport(SuccessResult.FAILED, GpxPointsBucket.K2_10K),
         GpxRouteCleared,
         UpdatePrompt(UpdateAction.INSTALL_TAPPED),
         UpdateFailed(UpdateStage.DOWNLOAD),
-        AboutLink(AboutTarget.COFFEE),
     )
 
     @Test
