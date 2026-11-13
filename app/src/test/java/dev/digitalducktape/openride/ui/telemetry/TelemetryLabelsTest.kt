@@ -52,6 +52,9 @@ class TelemetryLabelsTest {
     fun noticeSaysCustomChannelNamesAreSent() {
         assertTrue(notice.contains("The name of a class channel you add yourself is sent"))
         assertTrue(notice.contains("only as \"playlist\""))
+        assertTrue(notice.contains("as YouTube lists it"))
+        assertFalse(notice.contains("as you typed"))
+        assertTrue(notice.contains("said yes to this prompt"))
     }
 
     @Test

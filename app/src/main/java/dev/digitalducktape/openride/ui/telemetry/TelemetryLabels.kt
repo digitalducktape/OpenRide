@@ -25,12 +25,12 @@ object TelemetryLabels {
     val notice: List<Pair<String, String>> = listOf(
         "What's sent" to
             "Which screens are opened. When the app starts: the tablet model, its software version, and how many " +
-            "riders it has (1, 2 or 3 or more). When you finish setting up a rider, and whether it has a photo. " +
+            "riders it has (1, 2 or 3 or more). That you said yes to this prompt, when you do. When you finish setting up a rider, and whether it has a photo. " +
             "When a ride starts and ends: its type, a rough length, whether it was saved, and whether the " +
             "heart-rate strap and bike sensors stayed connected.",
         "Classes" to
             "Which class channel you watch, how long, whether the class finished, whether it was muted, and " +
-            "playback errors. The name of a class channel you add yourself is sent, as you typed it. " +
+            "playback errors. The name of a class channel you add yourself is sent, as YouTube lists it. " +
             "Playlists are sent only as \"playlist\".",
         "Games and music" to
             "Which games you play, the difficulty, and the result as 0 to 3 stars. Whether Game music is on or off, " +
