@@ -41,4 +41,22 @@ class TelemetryLabelsTest {
         assertTrue(TelemetryLabels.settingsValue(true).startsWith("On"))
         assertTrue(TelemetryLabels.settingsValue(false).startsWith("Off"))
     }
+
+    @Test
+    fun noticeNamesYourDataAndSettingsCategory() {
+        listOf("backed up", "route", "update", "About link", "notification access", "never the contents")
+            .forEach { assertTrue(it, notice.contains(it)) }
+    }
+
+    @Test
+    fun noticeSaysCustomChannelNamesAreSent() {
+        assertTrue(notice.contains("The name of a class channel you add yourself is sent"))
+        assertTrue(notice.contains("only as \"playlist\""))
+    }
+
+    @Test
+    fun promptDoesNotClaimNoMusic() {
+        assertFalse(TelemetryLabels.PROMPT_BODY.contains("no music"))
+        assertTrue(TelemetryLabels.PROMPT_BODY.contains("no song or artist info"))
+    }
 }
