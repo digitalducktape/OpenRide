@@ -1,5 +1,14 @@
 package dev.digitalducktape.openride.games.session
 
+import dev.digitalducktape.openride.core.telemetry.GameDifficulty
+import dev.digitalducktape.openride.core.telemetry.GameFinish
+import dev.digitalducktape.openride.core.telemetry.GameId
+import dev.digitalducktape.openride.core.telemetry.GameMusic
+import dev.digitalducktape.openride.core.telemetry.GameOutcome
+import dev.digitalducktape.openride.core.telemetry.GamePlayedBucket
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.Stars
+import dev.digitalducktape.openride.core.telemetry.Won
 import dev.digitalducktape.openride.games.bridge.Difficulty
 import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.FakeHeadTracker
@@ -41,12 +50,23 @@ class GameSessionManagerTest {
     private val racer = GameDeclaration("racer", "Racer", setOf(JustRideSupport.MINUTES), timedEndMode = EndMode.GAME)
     private val catalog = GameCatalog(listOf(GameCatalog.DEMO, quick, racer))
 
+    private val telemetry = RecordingTelemetry()
+    private var ownTrack = false
+    private var gameMusicOn = true
+
     private fun runner(tracker: TrackerLink? = null) = GameSessionManager(
         signals = signals,
         scope = scope,
         tracker = tracker,
+        audioPrefs = { GameAudioPrefs(gameMusic = gameMusicOn) },
         random = Random(7),
-    )
+        telemetry = telemetry,
+        ownMusic = { ownTrack },
+    ).also { lastRunner = it }
+
+    private var lastRunner: GameSessionManager? = null
+
+    private fun finishes() = telemetry.events.filterIsInstance<GameFinish>()
 
     private fun plan(request: SessionRequest, ftp: Int? = 200) = SessionPlans.forRequest(request, FtpBasis.of(ftp), catalog)!!
 
@@ -498,5 +518,160 @@ class GameSessionManagerTest {
         assertEquals(listOf("session_paused"), pauseSignals())
         m.call { requestResume() }
         assertEquals(listOf("session_paused", "session_resumed"), pauseSignals())
+    }
+
+    // --- Telemetry (#85) ----------------------------------------------------------------------
+
+    @Test
+    fun `a reported segment emits game_finish completed`() {
+        runner().play(oneMinute.copy(difficulty = Difficulty.HARD))
+        seconds(40)
+        segmentFinishedWon("quick", stars = 3, won = true)
+
+        val e = finishes().single()
+        assertEquals(GameId("quick"), e.game)
+        assertEquals(GameDifficulty.HARD, e.difficulty)
+        assertEquals(GameOutcome.COMPLETED, e.outcome)
+        assertEquals(Won.YES, e.won)
+        assertEquals(Stars.THREE, e.stars)
+        assertEquals(GamePlayedBucket.LT_1M, e.played)
+        assertEquals(GameMusic.GAME_MUSIC, e.music)
+        assertEquals("quick/hard", e.props().getValue("game_difficulty"))
+    }
+
+    @Test
+    fun `won is no for a loss and n-a for a game without a winner`() {
+        runner().play(SessionRequest.JustRide("quick", JustRideMode.Rounds(2)))
+        segmentFinishedWon("quick", stars = 1, won = false)
+        assertEquals(Won.NO, finishes().last().won)
+    }
+
+    @Test
+    fun `quitting a live segment emits quit once`() {
+        val m = runner().play(oneMinute)
+        seconds(10 + 45) // past the intro, into gameplay
+        m.call { finishNow() }
+
+        val e = finishes().single()
+        assertEquals(GameOutcome.QUIT, e.outcome)
+        assertEquals(Won.NA, e.won)
+        assertEquals(Stars.ZERO, e.stars)
+        assertEquals(GamePlayedBucket.LT_1M, e.played)
+        assertEquals(1, outcomes.size)
+    }
+
+    @Test
+    fun `quitting during the intro card emits quit with nothing played`() {
+        val m = runner().play(oneMinute)
+        seconds(4)
+        m.call { finishNow() }
+
+        assertEquals(GameOutcome.QUIT, finishes().single().outcome)
+        assertEquals(GamePlayedBucket.LT_1M, finishes().single().played)
+    }
+
+    @Test
+    fun `a normally finished segment does not also emit quit`() {
+        val m = runner().play(oneMinute)
+        seconds(70)
+        m.report()
+        m.call { finishNow() }
+
+        assertEquals(listOf(GameOutcome.COMPLETED), finishes().map { it.outcome })
+    }
+
+    @Test
+    fun `an open-ended plan waiting for the end does not emit quit when it ends`() {
+        val m = runner().play(SessionRequest.JustRide("quick", JustRideMode.Open))
+        seconds(30)
+        m.report()
+        m.call { finishNow() }
+
+        assertEquals(listOf(GameOutcome.COMPLETED), finishes().map { it.outcome })
+    }
+
+    @Test
+    fun `the last segment of a two-segment plan is quit while the first stays completed`() {
+        val m = runner().play(SessionRequest.Custom(listOf(CustomSlot("quick", 60), CustomSlot("quick", 60)), Difficulty.STANDARD))
+        seconds(40)
+        m.report()
+        seconds(20)
+        m.call { finishNow() }
+
+        assertEquals(listOf(GameOutcome.COMPLETED, GameOutcome.QUIT), finishes().map { it.outcome })
+    }
+
+    @Test
+    fun `a skipped segment emits skipped`() {
+        val m = runner().play(oneMinute)
+        seconds(2)
+        m.report(score = 0.0, stars = 0, skipped = true)
+
+        val e = finishes().single()
+        assertEquals(GameOutcome.SKIPPED, e.outcome)
+        assertEquals(Stars.ZERO, e.stars)
+    }
+
+    @Test
+    fun `a game that never reports gets no_result after the grace period`() {
+        runner().play(oneMinute)
+        seconds(10 + 60 + GameSessionManager.GRACE_SEC)
+
+        val e = finishes().single()
+        assertEquals(GameOutcome.NO_RESULT, e.outcome)
+        assertEquals(Won.NA, e.won)
+        assertEquals(Stars.ZERO, e.stars)
+    }
+
+    @Test
+    fun `an unreadable result emits no_result`() {
+        val m = runner().play(oneMinute)
+        seconds(20)
+        m.segmentFinished("garbage")
+
+        assertEquals(GameOutcome.NO_RESULT, finishes().single().outcome)
+    }
+
+    @Test
+    fun `own music playing reads own_music, and the switch off with nothing playing reads off`() {
+        ownTrack = true
+        val m = runner().play(oneMinute)
+        seconds(20)
+        m.report()
+        assertEquals(GameMusic.OWN_MUSIC, finishes().single().music)
+
+        ownTrack = false
+        gameMusicOn = false
+        val m2 = runner().play(oneMinute)
+        seconds(20)
+        m2.report()
+        assertEquals(GameMusic.OFF, finishes().last().music)
+    }
+
+    @Test
+    fun `an unknown game id passes through as its catalog string`() {
+        val m = runner().play(oneMinute)
+        seconds(20)
+        m.report(gameId = "mystery") // the result's id is replaced by the segment's
+
+        assertEquals(GameId("quick"), finishes().single().game)
+    }
+
+    @Test
+    fun `a throwing telemetry never reaches the plan`() {
+        val boom = object : dev.digitalducktape.openride.core.telemetry.Telemetry {
+            override fun track(event: dev.digitalducktape.openride.core.telemetry.TelemetryEvent) = error("boom")
+        }
+        val m = GameSessionManager(signals, scope, random = Random(7), telemetry = boom)
+        m.play(oneMinute)
+        seconds(20)
+        m.report()
+
+        assertEquals(1, outcomes.size)
+    }
+
+    private fun segmentFinishedWon(gameId: String, stars: Int, won: Boolean) {
+        lastRunner!!.segmentFinished("""{"game_id":"$gameId","score":10,"stars":$stars,"won":$won,"skipped":false,"stats":{}}""")
+        scope.runCurrent()
     }
 }

@@ -316,7 +316,13 @@ class AppContainer(private val applicationContext: Context) {
             heartRateBpm = heartRateManager.bpm,
             trackerReading = { headTracker.state.value.toTrackerReading() },
             riderMusic = { riderMusic.value },
-            musicControl = { NowPlayingFeed.control(nowPlaying, it) },
+            musicControl = {
+                NowPlayingFeed.control(nowPlaying, it)
+                runCatching {
+                    rideTelemetryTracker.markMusicControl()
+                    gameVisitManager.markMusicControl()
+                }
+            },
         ).also { bridge ->
             // The hub's music card: the rider's track, sent as it changes.
             NowPlayingFeed(applicationContext, nowPlaying, bridge::publishNowPlaying, containerScope)
@@ -380,11 +386,13 @@ class AppContainer(private val applicationContext: Context) {
             tracker = gameTrackerLink,
             audioPrefs = { gamesSettings.settings.value.audio },
             log = gamesLog,
+            telemetry = telemetry,
+            ownMusic = ownMusicSignal,
         )
     }
 
     /** The head tracker as the games use it: the visit's session and the plans' modes. */
-    val gameTrackerLink: TrackerLink by lazy { TrackerLink(headTracker, gameBridge, gamesScope, gamesLog) }
+    val gameTrackerLink: TrackerLink by lazy { TrackerLink(headTracker, gameBridge, gamesScope, gamesLog, telemetry) }
 
     /**
      * The Games hub visit (spec 2026-10-19): the bridge's session from entering games to
@@ -415,6 +423,8 @@ class AppContainer(private val applicationContext: Context) {
             avatar = BitmapAvatarRenderer(applicationContext.cacheDir)::render,
             navigator = visitNavigator,
             log = gamesLog,
+            telemetry = telemetry,
+            ownMusic = ownMusicSignal,
         )
     }
 

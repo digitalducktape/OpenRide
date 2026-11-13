@@ -1,6 +1,20 @@
 package dev.digitalducktape.openride.games.session
 
 import dev.digitalducktape.openride.core.telemetry.RideEntry
+import dev.digitalducktape.openride.core.telemetry.DurationBucket
+import dev.digitalducktape.openride.core.telemetry.GameDifficulty
+import dev.digitalducktape.openride.core.telemetry.GameFinish
+import dev.digitalducktape.openride.core.telemetry.GameMusic
+import dev.digitalducktape.openride.core.telemetry.GameMusicSwitch
+import dev.digitalducktape.openride.core.telemetry.GameOutcome
+import dev.digitalducktape.openride.core.telemetry.GamesPlanStart
+import dev.digitalducktape.openride.core.telemetry.GamesPlayedBucket
+import dev.digitalducktape.openride.core.telemetry.GamesVisitEnd
+import dev.digitalducktape.openride.core.telemetry.OnOff
+import dev.digitalducktape.openride.core.telemetry.PlanMode
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.VisitEndReason
+import dev.digitalducktape.openride.core.telemetry.VisitMusic
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -96,12 +110,14 @@ class GameVisitManagerTest {
     private val trackerLink = TrackerLink(headTracker, signals, scope)
 
     private val navigator = VisitNavigator()
+    private val telemetry = RecordingTelemetry()
+    private var ownTrack = false
 
     private fun visit(profileId: Long? = riderId, tracker: TrackerLink? = null) = GameVisitManager(
         navigator = navigator,
         signals = signals,
         scope = scope,
-        runner = GameSessionManager(signals, scope, tracker = tracker, random = Random(7)),
+        runner = GameSessionManager(signals, scope, tracker = tracker, random = Random(7), telemetry = telemetry, ownMusic = { ownTrack }),
         tracker = tracker,
         rideSessionManager = rides,
         routeLoaded = { false },
@@ -113,6 +129,8 @@ class GameVisitManagerTest {
         pedalling = { bike.metrics.value.cadenceRpm > 0 },
         catalog = catalog,
         clock = { clockMs++ },
+        telemetry = telemetry,
+        ownMusic = { ownTrack },
     ).also { it.permissionRequester = { permissionAsks++ } }
 
     private fun GameVisitManager.enter(autostart: PlanRequestMessage? = null): GameVisitManager {
@@ -687,5 +705,136 @@ class GameVisitManagerTest {
 
         v.call { onUpdateSetting("camera_games", "true") }
         assertEquals("setCameraGamesEnabled:true", headTracker.calls.last())
+    }
+
+    // --- Telemetry (#85) ----------------------------------------------------------------------
+
+    private fun visitEnds() = telemetry.events.filterIsInstance<GamesVisitEnd>()
+    private fun finishes() = telemetry.events.filterIsInstance<GameFinish>()
+
+    @Test
+    fun `starting a plan emits games_plan_start with the mode, difficulty and music`() {
+        visit().enter().startQuick()
+
+        assertEquals(GamesPlanStart(PlanMode.SINGLE, GameDifficulty.STANDARD, GameMusic.GAME_MUSIC), telemetry.events.filterIsInstance<GamesPlanStart>().single())
+    }
+
+    @Test
+    fun `a custom circuit is custom_circuit, and a rejected request emits nothing`() {
+        val v = visit().enter()
+        v.start("""{"kind":"custom","slots":[]}""")
+        assertTrue(telemetry.events.filterIsInstance<GamesPlanStart>().isEmpty())
+        v.start("""{"kind":"custom","difficulty":"hard","slots":[{"game_id":"quick","duration_sec":60}]}""")
+
+        val e = telemetry.events.filterIsInstance<GamesPlanStart>().single()
+        assertEquals(PlanMode.CUSTOM_CIRCUIT, e.mode)
+        assertEquals(GameDifficulty.HARD, e.difficulty)
+    }
+
+    @Test
+    fun `a visit with no games emits a visit end with zero games`() {
+        visit().enter().call { onExitHub("app") }
+
+        assertEquals(
+            GamesVisitEnd(DurationBucket.LT_5M, GamesPlayedBucket.ZERO, VisitEndReason.EXIT, VisitMusic.GAME_MUSIC, false),
+            visitEnds().single(),
+        )
+    }
+
+    @Test
+    fun `a visit end counts the games played, with the gameplay bucket`() {
+        visit().enter().playQuickMinute().call { onExitHub("app") }
+
+        val e = visitEnds().single()
+        assertEquals(GamesPlayedBucket.ONE, e.games)
+        assertEquals(VisitEndReason.EXIT, e.reason)
+        assertEquals(listOf(GameOutcome.COMPLETED), finishes().map { it.outcome })
+    }
+
+    @Test
+    fun `a skipped game is not counted as played`() {
+        val v = visit().enter().startQuick()
+        seconds(3)
+        v.report(score = 0.0, stars = 0, skipped = true).call { onExitHub("app") }
+
+        assertEquals(GamesPlayedBucket.ZERO, visitEnds().single().games)
+        assertEquals(listOf(GameOutcome.SKIPPED), finishes().map { it.outcome })
+    }
+
+    @Test
+    fun `leaving mid-game emits quit and counts it as played`() {
+        val v = visit().enter().startQuick()
+        seconds(40)
+        v.call { onExitHub("app") }
+
+        assertEquals(listOf(GameOutcome.QUIT), finishes().map { it.outcome })
+        assertEquals(GamesPlayedBucket.ONE, visitEnds().single().games)
+    }
+
+    @Test
+    fun `the end reason maps from the ending`() {
+        val v = visit().enter().playQuickMinute()
+        v.call { endIfLive("app_resumed") }
+        assertEquals(VisitEndReason.APP_RESUMED, visitEnds().single().reason)
+    }
+
+    @Test
+    fun `idle renewal starts new visit counters`() {
+        val v = visit().enter().playQuickMinute()
+        v.call { markMusicControl() }
+        bike.setMetrics(cadenceRpm = 0, resistancePercent = 40, powerWatts = 0)
+        seconds(20 * 60 + 5)
+
+        val first = visitEnds().single()
+        assertEquals(VisitEndReason.IDLE, first.reason)
+        assertEquals(GamesPlayedBucket.ONE, first.games)
+        assertTrue(first.musicControlsUsed)
+
+        v.call { onHubActivity() }
+        v.call { onExitHub("app") }
+
+        val second = visitEnds().last()
+        assertEquals(2, visitEnds().size)
+        assertEquals(GamesPlayedBucket.ZERO, second.games)
+        assertFalse(second.musicControlsUsed)
+        assertEquals(DurationBucket.LT_5M, second.played)
+    }
+
+    @Test
+    fun `music is mixed when own music starts mid-visit`() {
+        val v = visit().enter().playQuickMinute()
+        ownTrack = true
+        v.startQuick()
+        seconds(70)
+        v.report().call { onExitHub("app") }
+
+        assertEquals(VisitMusic.MIXED, visitEnds().single().music)
+        assertEquals(listOf(GameMusic.GAME_MUSIC, GameMusic.OWN_MUSIC), finishes().map { it.music })
+    }
+
+    @Test
+    fun `a whole visit on the rider's own music reads own_music`() {
+        ownTrack = true
+        visit().enter().playQuickMinute().call { onExitHub("app") }
+
+        assertEquals(VisitMusic.OWN_MUSIC, visitEnds().single().music)
+    }
+
+    @Test
+    fun `music controls used during the visit are reported`() {
+        visit().enter().call { markMusicControl() }.call { onExitHub("app") }
+
+        assertTrue(visitEnds().single().musicControlsUsed)
+    }
+
+    @Test
+    fun `toggling game music emits once per change`() {
+        val v = visit().enter()
+        v.call { onUpdateSetting("game_music", "false") }
+        v.call { onUpdateSetting("game_music", "false") } // no change
+        v.call { onUpdateSetting("music_volume", "0.4") } // another setting
+        v.call { onUpdateSetting("game_music", "true") }
+
+        assertEquals(listOf(OnOff.OFF, OnOff.ON), telemetry.events.filterIsInstance<GameMusicSwitch>().map { it.value })
     }
 }
