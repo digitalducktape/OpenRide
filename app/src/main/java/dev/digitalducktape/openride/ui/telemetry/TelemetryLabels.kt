@@ -25,7 +25,8 @@ object TelemetryLabels {
     /** The "What's collected" screen: a heading and its text, in reading order. */
     val notice: List<Pair<String, String>> = listOf(
         "What's sent" to
-            "Which screens are opened. When the app starts: the tablet model, its software version, and how many " +
+            "Which screens are opened. Each event carries the time it happened. " +
+            "When the app starts: the tablet model, its software version, and how many " +
             "riders it has (1, 2 or 3 or more). Your answer to this prompt, sent when you say yes. " +
             "When you finish setting up a rider, and whether it has a photo. " +
             "When a ride starts and ends: its type, a rough length, whether it was saved, and whether the " +
@@ -49,7 +50,7 @@ object TelemetryLabels {
         "Never sent" to
             "Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. " +
             "Rider names or photos. Video IDs or titles. Playlist names. Song or artist info. Bluetooth names or " +
-            "addresses. File names or route coordinates. Exact times. Error messages.",
+            "addresses. File names or route coordinates. Exact ride or class lengths, or clock times. Error messages.",
         "Where it goes" to
             "Usage data is stored in the United States by Aptabase, an analytics service. Events from one visit " +
             "to the app share a session ID that isn't tied to a rider.",

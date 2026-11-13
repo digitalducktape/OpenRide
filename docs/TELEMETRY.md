@@ -12,7 +12,7 @@ The choice is **per tablet**. It covers every rider who uses that tablet. The in
 
 ## Who processes it
 
-Usage data goes to [Aptabase](https://aptabase.com), an analytics service, using its US region. Aptabase says in its [privacy policy](https://aptabase.com/privacy) that US-region data is processed and stored in the United States. It says the IP address and user agent are "only processed in memory and are never stored". They are used to make a daily pseudonymous ID. Aptabase also derives the country from the connection. We never see or receive IP addresses.
+Usage data goes to [Aptabase](https://aptabase.com), an analytics service, using its US region. Aptabase says in its [privacy policy](https://aptabase.com/privacy) that US-region data is processed and stored in the United States. It says the IP address and user agent are "only processed in memory and are never stored". They are used to make a daily pseudonymous ID. Aptabase may also derive an approximate location, such as country, from the connection. Its policy does not say. OpenRide has no access to IP addresses.
 
 Events from one visit to the app share a session ID that is not tied to a rider.
 
@@ -22,7 +22,7 @@ Events from one visit to the app share a session ID that is not tied to a rider.
 
 ## What is collected
 
-Every value below comes from a fixed list or a rough bucket. Nothing is free text, except the channel name described under Classes. Each event also carries what Aptabase adds to every event: the app version, the Android version, the device model, the language setting and the SDK version.
+Each event carries the time it happened. Every value below comes from a fixed list or a rough bucket. Nothing is free text, except the channel name described under Classes. Each event also carries what Aptabase adds to every event: the app version, the Android version, the device model, the language setting and the SDK version.
 
 Time and length values use buckets, not exact numbers. Ride, class and visit lengths: `<5m`, `5–15m`, `15–30m`, `30–45m`, `45–60m`, `60m+`. A single game's play time: `<1m`, `1–3m`, `3–5m`, `5–10m`, `10m+`.
 
@@ -105,7 +105,7 @@ Results only, never the contents. Failures to open a file before a GPX or histor
 
 ## What is never sent
 
-Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. Rider names or photos. Video IDs or titles. Playlist names. Song, artist or app-playback details. Bluetooth names or addresses. File names or route coordinates. Exact times. Error messages or stack traces. Advertising IDs or any account details.
+Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. Rider names or photos. Video IDs or titles. Playlist names. Song, artist or app-playback details. Bluetooth names or addresses. File names or route coordinates. Exact ride or class lengths, or clock times, in event properties. Error messages or stack traces. Advertising IDs or any account details.
 
 ## Good to know
 
