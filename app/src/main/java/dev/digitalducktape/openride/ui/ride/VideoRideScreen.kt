@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import dev.digitalducktape.openride.core.ride.RideSessionState
 import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
 import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import dev.digitalducktape.openride.ui.classes.YouTubeEmbed
@@ -101,6 +102,27 @@ fun VideoRideScreen(
     // null if the ride is already over, so the two paths can't double-fire navigation.
     val currentElapsedSec by rememberUpdatedState(uiState.elapsedSec)
     LaunchedEffect(classMuted) { classTelemetry.muteState(classMuted) }
+    // Any other way the class ends still closes it out, once (ClassRideTelemetry.end is idempotent):
+    // the ride finishing or stopping without our buttons (sensor-driven or elsewhere), and the
+    // screen being left (back, navigation). Disposal during a configuration change is
+    // recreation, not leaving, so it is skipped; the new composition carries on with the same
+    // ride and the same ClassRideTelemetry.
+    val activity = context as? android.app.Activity
+    var sawLive by remember { mutableStateOf(false) }
+    LaunchedEffect(uiState.sessionState) {
+        when (uiState.sessionState) {
+            RideSessionState.Active, RideSessionState.Paused -> sawLive = true
+            is RideSessionState.Finished -> classTelemetry.end(currentElapsedSec.toLong(), false)
+            RideSessionState.Idle -> if (sawLive) classTelemetry.end(currentElapsedSec.toLong(), false)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (activity?.isChangingConfigurations != true) {
+                classTelemetry.end(currentElapsedSec.toLong(), false)
+            }
+        }
+    }
     val endRideAndShowSummary: (finished: Boolean) -> Unit = { finished ->
         // class_end fires once however the ride ends (End ride button, or the video finishing):
         // ClassRideTelemetry ignores the second call.

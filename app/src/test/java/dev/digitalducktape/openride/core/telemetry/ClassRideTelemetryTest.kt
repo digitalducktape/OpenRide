@@ -93,4 +93,22 @@ class ClassRideTelemetryTest {
         throwing.end(1, true)
         throwing.playerError(2)
     }
+
+    @Test
+    fun `a fallback end closes a class left early, once`() {
+        start()
+        classes.end(300, finished = false) // screen left
+        classes.end(300, finished = false) // e.g. the session-state fallback too
+        assertEquals(1, recording.events.filterIsInstance<ClassEnd>().size)
+    }
+
+    @Test
+    fun `a fallback after the end button or video end does not repeat`() {
+        start()
+        classes.end(1800, finished = true)
+        classes.end(1800, finished = false) // dispose fallback
+        val ends = recording.events.filterIsInstance<ClassEnd>()
+        assertEquals(1, ends.size)
+        assertEquals("true", ends.single().props()["finished"])
+    }
 }
