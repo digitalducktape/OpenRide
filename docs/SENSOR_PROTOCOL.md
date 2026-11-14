@@ -128,6 +128,54 @@ Measured on the Bike+: adoption of `IBikeInterface` completes ~70 ms after launc
 service pushes at roughly 21 Hz, so the poll path stays idle. `ConnectionState.Connected` is
 still only ever reported after a real frame decodes, from either path (PRD P0-9).
 
+#### Interface fallback (#63)
+
+One interface being refused is a supported outcome, not an error. The three ways a board has
+answered so far:
+
+| Board | `IV1Interface` | `IBikeInterface` | Adopted |
+|---|---|---|---|
+| Bike Gen 2 | binds, pushes | binds | `IV1Interface` |
+| Bike+ | binds, never pushes | binds, pushes | `IBikeInterface` |
+| `g700` (Android 13, community report) | **refused**: null binding (`Denied: requested binder for V1 while attached to TITAN`) | binds, pushes | `IBikeInterface` |
+
+The rules, as `AffernetBikeDataSource` implements them and `AffernetBikeDataSourceTest` /
+`AffernetInterfaceFallbackTest` pin down:
+
+- **A refused path.** A null binding, `bindService` returning false, a bind that throws
+  (`SecurityException`), a dead binding or a failed `registerCallback` becomes that path's
+  `bindFailure`. The source logs each distinct reason once at WARN (retries log at DEBUG) and
+  keeps its own capped rebind going; the arbiter logs `<path> unavailable: <reason>; continuing
+  on <other path>` once and keeps racing on the other interface. A failed path never wins.
+- **Both answering.** Checked every 100 ms; if both have a frame by the same check,
+  `IV1Interface` wins. The loser is stopped once (callback unregistered, `unbindService`,
+  pending rebind cancelled), and metrics only ever follow the adopted path, so a frame still in
+  flight on the released binding never reaches the app.
+- **Both refused.** One WARN line names both reasons — `no sensor interface available:
+  IV1Interface: <reason>; IBikeInterface: <reason>` — and the source stays `Unavailable`, which
+  the app's one offline rule (#56) shows as "sensors offline". Both bindings keep retrying, so
+  a service that comes back is still picked up. Paste that line into a bug report from new
+  hardware.
+- **The adopted path dies.** The adopted source rebinds itself first. If it is still not
+  `Connected` after 10 s (`SensorOfflineAfter`, the same window after which the app calls the
+  sensors offline), the race reopens: the released interface is bound again, the poll fallback
+  is re-armed, and whichever path delivers a frame first is adopted. A board that merely goes
+  **quiet** behind a live binding is not a dead path — both interfaces carry the same board —
+  so the silent-board watchdog reports it `Disconnected` and the path is kept.
+
+Which interface is in use is logged at selection time, with how it is fed and why the other was
+released, e.g. on the `g700`:
+
+```
+W AffernetBikeSource: IV1Interface unavailable: service returned a null binding (interface refused); continuing on IBikeInterface
+I AffernetBikeSource: sensor path adopted: IBikeInterface (push); releasing IV1Interface; IV1Interface was unavailable: service returned a null binding (interface refused)
+```
+
+The path also goes out in the opt-in `bike_sensor` telemetry event (`iv1_interface`,
+`bike_interface` or `polling`). There is no in-app sensor-details screen; the log line is the
+diagnostic. The debug-only `SensorFaultReceiver` simulates silence and dropouts on the mock
+build only; the fallback itself is covered by the unit tests above.
+
 ## `BikeData` payload layout
 
 The Parcelable is large; only the first fields matter to OpenRide and they sit at the very front
@@ -287,6 +335,9 @@ releases the V1 binding:
 ```
 I AffernetBikeSource: sensor path adopted: IBikeInterface (releasing the other binding)
 ```
+
+(That is the line as it read at the time; since #63 it reads
+`sensor path adopted: IBikeInterface (push); releasing IV1Interface`.)
 
 Because the board pushes, the poll fallback never engages here. It remains in place for a board
 that binds and stays silent, which is exactly what `IV1Interface` does on this hardware.

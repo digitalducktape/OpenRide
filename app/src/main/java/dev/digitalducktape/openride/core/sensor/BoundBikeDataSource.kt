@@ -11,6 +11,16 @@ interface BoundBikeDataSource : BikeDataSource {
     /** Frames decoded since [start], pushed or polled: the heartbeat [watchFrames] checks. */
     val framesReceived: Long
 
+    /**
+     * Why this path is not bound right now, or `null` while it is bound or before its first bind
+     * has answered. Set when the bind is refused (`bindService` false), denied (it threw, e.g.
+     * `SecurityException`), answered with a null binding (how the g700 refuses `IV1Interface`,
+     * #63), the binding dies, or `registerCallback` fails. A failed path keeps retrying on its
+     * own; [AffernetBikeDataSource] reads this only to log it and carry on with the other
+     * interface.
+     */
+    val bindFailure: String? get() = null
+
     /** Opens the binding. Must never throw, on any device. */
     fun start()
 
