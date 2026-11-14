@@ -48,6 +48,12 @@ data class HeadTrackerConfig(
     /** Time constants of the fade: out while moving, back in once still. */
     val deadZoneFadeOutMs: Long = 40,
     val deadZoneFadeBackMs: Long = 300,
+    /**
+     * The lean's centre dead zone (lean units), before [LeanSensitivity]'s expo curve. Sized
+     * from the recorded centre noise after filtering (LeanResponseReplayTest "diag"): median
+     * |lean| while seated and centred 0.06-0.16, while glancing at the knob 0.12-0.15.
+     */
+    val leanDeadZone: Double = 0.12,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 
