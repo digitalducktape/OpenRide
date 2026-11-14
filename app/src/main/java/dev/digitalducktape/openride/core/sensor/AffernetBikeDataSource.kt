@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,6 +39,35 @@ import java.util.concurrent.atomic.AtomicBoolean
  * `registerCallback` is *accepted*, and then no frame ever arrives — confirmed on-device with a
  * rider pedaling. So instead of predicting, this source starts both and lets the hardware
  * answer: **the first path to deliver a real frame wins**, and the other is unbound.
+ *
+ * ## One interface refused is a normal outcome (#63)
+ *
+ * Losing one interface is expected, not an error: the g700 answers every `IV1Interface` bind
+ * with a null binding ("requested binder for V1 while attached to TITAN") and streams on
+ * `IBikeInterface`. Whatever stops a path — a null binding, `bindService` refused, a bind that
+ * throws `SecurityException`, a dead binding, a failed `registerCallback` — shows up as that
+ * path's [BoundBikeDataSource.bindFailure]. The race logs it once, keeps waiting on the other
+ * interface, and never settles on a failed path. Only when *both* have failed does it log one
+ * line naming both reasons; the state stays [ConnectionState.Unavailable] (what an ordinary
+ * phone reads, and what the app's offline rule turns into "sensors offline"), and both paths
+ * keep their own capped rebind going, so a service that recovers is still picked up.
+ *
+ * ## Both answering
+ *
+ * The race looks at both paths every [RACE_POLL_MS]; if both have a frame by the same look,
+ * `IV1Interface` wins (a fixed order, so the outcome never depends on scheduling). The loser is
+ * stopped — callback unregistered, `unbindService`, pending rebind cancelled — and nothing it
+ * publishes afterwards reaches [metrics], which only ever follows the adopted path.
+ *
+ * ## The adopted path dies
+ *
+ * The adopted source rebinds itself first ([ServiceRebinder]); an affernet restart normally
+ * comes back within a few seconds. If its own state stays off [ConnectionState.Connected] for
+ * [SensorOfflineAfter] — the same window after which the app calls the sensors offline (#56) —
+ * the race reopens: the released interface is bound again, the poll fallback is re-armed, and
+ * the first path to deliver a frame is adopted, exactly as at start. A board that goes *quiet*
+ * behind a live binding is not a dead path (both interfaces carry the same board, so rebinding
+ * fixes nothing): [watchFrames] reports it [ConnectionState.Disconnected] and the path is kept.
  *
  * That also means adding a board costs nothing here. A future variant that feeds some third
  * binder needs a new [BoundBikeDataSource] and one more entry in the race, not a device
@@ -81,8 +111,8 @@ class AffernetBikeDataSource(
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
     /**
-     * Which binder ended up feeding metrics, or `null` while the race is still open. Exposed for
-     * on-device verification and for diagnostics.
+     * Which binder ended up feeding metrics, or `null` while the race is open (at start, or
+     * reopened after the adopted path died). Exposed for on-device verification and diagnostics.
      */
     @Volatile
     var activePath: String? = null
@@ -90,8 +120,15 @@ class AffernetBikeDataSource(
 
     /** Everything [start] launches, so [stop] can take it all down. */
     private val jobs = mutableListOf<Job>()
+
+    /** What [adopt] launches for the current winner; cancelled when the race reopens. */
+    private val adoptJobs = mutableListOf<Job>()
     private var pollJob: Job? = null
     private var silenceJob: Job? = null
+
+    /** Paths whose failure this race round has logged already, and whether "both" has been. */
+    private val failuresLogged = mutableSetOf<String>()
+    private var bothFailedLogged = false
 
     /** `bike_sensor` goes out once for this source (once per process: the container owns one). */
     private val connectedReported = AtomicBoolean(false)
@@ -102,7 +139,6 @@ class AffernetBikeDataSource(
         v1.start()
         bikeInterface.start()
 
-        jobs += scope.launch { race() }
         // No frame at all in the first SENSOR_UNAVAILABLE_AFTER_MS: report it. Cancelled the moment a path wins.
         silenceJob = scope.launch {
             delay(SENSOR_UNAVAILABLE_AFTER_MS)
@@ -110,6 +146,14 @@ class AffernetBikeDataSource(
                 telemetry.trackSafely { BikeSensor(BikeSensorState.UNAVAILABLE, null) }
             }
         }.also { jobs += it }
+        openRace()
+    }
+
+    /** Starts (or restarts) the race and arms the poll fallback. Both paths must be started. */
+    private fun openRace() {
+        failuresLogged.clear()
+        bothFailedLogged = false
+        jobs += scope.launch { race() }
         jobs += scope.launch {
             // Give the push paths a fair chance before falling back to polling, so a board that
             // does push is never polled needlessly.
@@ -122,6 +166,8 @@ class AffernetBikeDataSource(
     fun stop() {
         jobs.forEach { it.cancel() }
         jobs.clear()
+        adoptJobs.forEach { it.cancel() }
+        adoptJobs.clear()
         pollJob = null
         silenceJob = null
         v1.stop()
@@ -132,10 +178,12 @@ class AffernetBikeDataSource(
 
     /**
      * Waits for the first path to report [ConnectionState.Connected] — which each source does
-     * only on a decoded frame — then latches onto it and releases the other.
+     * only on a decoded frame — then latches onto it and releases the other. A path with a
+     * [BoundBikeDataSource.bindFailure] is never Connected, so it can't win; it is only logged.
      */
     private suspend fun race() {
         while (activePath == null) {
+            noteFailures()
             when {
                 v1.connectionState.value == ConnectionState.Connected ->
                     adopt(v1, PATH_V1, loser = bikeInterface)
@@ -159,16 +207,72 @@ class AffernetBikeDataSource(
             telemetry.trackSafely { BikeSensor(BikeSensorState.CONNECTED, reported) }
         }
         // The single most useful line in a field bug report: which binder this board feeds.
-        Log.i(TAG, "sensor path adopted: $path (releasing the other binding)")
+        val how = if (reported == SensorPath.POLLING) "polling getBikeData" else "push"
+        val loserName = if (path == PATH_V1) PATH_BIKE else PATH_V1
+        val loserNote = loser.bindFailure?.let { "; $loserName was unavailable: $it" } ?: ""
+        Log.i(TAG, "sensor path adopted: $path ($how); releasing $loserName$loserNote")
         loser.stop()
         // Polling only feeds the IBikeInterface path; if V1 won, stand it down.
         if (path == PATH_V1) {
             pollJob?.cancel()
             pollJob = null
         }
-        jobs += scope.launch { winner.metrics.collect { _metrics.value = it } }
+        adoptJobs += scope.launch { winner.metrics.collect { _metrics.value = it } }
         // The winner's own state, but a board gone quiet behind a live binding reads Disconnected.
-        jobs += scope.watchFrames(winner.connectionState, { winner.framesReceived }, _connectionState)
+        adoptJobs += scope.watchFrames(winner.connectionState, { winner.framesReceived }, _connectionState)
+        // A winner whose binding stays down for the offline window: reopen the race (#63).
+        adoptJobs += scope.launch {
+            winner.connectionState.collectLatest { state ->
+                if (state != ConnectionState.Connected) {
+                    delay(SensorOfflineAfter)
+                    reopen(winner, path, loser)
+                }
+            }
+        }
+    }
+
+    /**
+     * The adopted [winner] has been off [ConnectionState.Connected] for [SensorOfflineAfter]:
+     * bind the released interface again and race both, as at start. The winner keeps its own
+     * rebind running, so whichever path delivers a frame first is adopted and the other released.
+     * [connectionState] keeps its last value (not Connected) until then.
+     */
+    private fun reopen(winner: BoundBikeDataSource, path: String, loser: BoundBikeDataSource) {
+        // First: stops the old winner's collectors (this call runs inside one of them; it is not
+        // suspending, so it finishes), and a new adoption can't be cancelled by mistake.
+        adoptJobs.forEach { it.cancel() }
+        adoptJobs.clear()
+        Log.w(
+            TAG,
+            "sensor path $path lost (${winner.bindFailure ?: winner.connectionState.value}) for " +
+                "${SensorOfflineAfter.inWholeSeconds} s; reopening the race on both interfaces",
+        )
+        activePath = null
+        loser.start()
+        openRace()
+    }
+
+    /**
+     * Logs each path's bind failure once per race round, and — when both have failed — one line
+     * naming both reasons: the line a bug report from new hardware needs (#63).
+     */
+    private fun noteFailures() {
+        val v1Failure = v1.bindFailure
+        val bikeFailure = bikeInterface.bindFailure
+        if (v1Failure != null && failuresLogged.add(PATH_V1) && bikeFailure == null) {
+            Log.w(TAG, "$PATH_V1 unavailable: $v1Failure; continuing on $PATH_BIKE")
+        }
+        if (bikeFailure != null && failuresLogged.add(PATH_BIKE) && v1Failure == null) {
+            Log.w(TAG, "$PATH_BIKE unavailable: $bikeFailure; continuing on $PATH_V1")
+        }
+        if (v1Failure != null && bikeFailure != null && !bothFailedLogged) {
+            bothFailedLogged = true
+            Log.w(
+                TAG,
+                "no sensor interface available: $PATH_V1: $v1Failure; $PATH_BIKE: $bikeFailure. " +
+                    "Sensors stay unavailable; both bindings keep retrying",
+            )
+        }
     }
 
     /**
