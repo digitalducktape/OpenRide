@@ -78,9 +78,12 @@ const GUST_WARNING := 2.0
 const GUST_SEC := 0.6
 const GUST_SINK := 0.2
 
-## Steer (DESIGN.md "Steer"; the forgiving lean is for #71).
-const LEAN_DEAD := 0.12
-const LEAN_CURVE := 1.6
+## Steer (DESIGN.md "Steer"). The tracker's dead zone and expo curve (#71) make the lean
+## forgiving; the game adds only a mild curve, which with them puts the fan where the old 0.12
+## dead zone and t^1.6 on the old tracker curve did from half a lean outwards (0.45 m at 70% of
+## full lock, 0.9 m at 85%), a little livelier inside that.
+const LEAN_DEAD := 0.0
+const LEAN_CURVE := 1.3
 const FAN_RANGE := 1.6  ## metres either side at full lean
 const FAN_TAU := 0.35
 const FAN_SPEED := 1.6  ## metres a second at most

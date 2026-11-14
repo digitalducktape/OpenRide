@@ -72,12 +72,12 @@ func test_a_drift_starts_only_after_a_hard_lean_held_for_0_12_s() -> void:
 	assert_int(k.drift_dir).is_equal(0)
 	_run(physics, k, _in(), track, 1.0)
 	# Nor is a lean just under the threshold, however long.
-	_run(physics, k, _in(150.0, 0.6), track, 1.0)
+	_run(physics, k, _in(150.0, KartPhysics.DRIFT_LEAN - 0.05), track, 1.0)
 	assert_int(k.drift_dir).is_equal(0)
 	_run(physics, k, _in(), track, 1.0)
 	assert_bool(log.drift.is_empty()).is_true()
-	# 0.65 held for 0.15 s is: a drift to the right.
-	_run(physics, k, _in(150.0, 0.65), track, 0.15)
+	# DRIFT_LEAN held for 0.15 s is: a drift to the right.
+	_run(physics, k, _in(150.0, KartPhysics.DRIFT_LEAN), track, 0.15)
 	assert_int(k.drift_dir).is_equal(1)
 	assert_array(log.drift).is_equal([[0, 1]])
 
@@ -121,7 +121,9 @@ func test_a_lean_easing_to_zero_after_face_loss_never_starts_a_drift() -> void:
 	var k := _kart(track, 200.0)
 	k.speed = 20.0
 	k.v_bike = 20.0 / KartPhysics.SPEED_SCALE
-	var inp := _in(150.0, 0.4)
+	# 0.25: the steering share 0.4 gave through the kart's own curve before #71 moved the
+	# shaping into the tracker.
+	var inp := _in(150.0, 0.25)
 	_run(physics, k, inp, track, 0.5)
 	# The face is lost: the last reading spikes to 0.9, then the lean eases to 0 over 0.6 s.
 	inp.tracking = false
@@ -155,7 +157,7 @@ func test_a_drift_hops_then_slides_nose_into_the_turn() -> void:
 	# Leaning further in tightens the slide; easing toward the centre widens it.
 	var tight := KartState.new()
 	var wide := KartState.new()
-	for pair in [[tight, -1.0], [wide, -0.4]]:
+	for pair in [[tight, -1.0], [wide, -(KartPhysics.DRIFT_WIDE_LEAN + 0.05)]]:
 		var kk: KartState = pair[0]
 		var t2 := track
 		var start := _kart(t2, t2.length - 300.0)
@@ -179,7 +181,9 @@ func _tier_times(physics: KartPhysics, resistance: float, rise := 0.0) -> Array:
 	var setup := _circling(physics)
 	var track: KartTrackModel = setup[0]
 	var k: KartState = setup[1]
-	var inp := _in(150.0, -0.7)
+	# DRIFT_LEAN: starts the drift, then holds the arc 54% of the way from widest to tightest (as
+	# 0.7 did before #71 moved DRIFT_WIDE_LEAN from 0.35 to 0.24).
+	var inp := _in(150.0, -KartPhysics.DRIFT_LEAN)
 	inp.resistance = resistance
 	var times := []
 	var t := 0.0
@@ -240,7 +244,7 @@ func _release_after(charge_sec: float) -> Array:
 	var setup := _circling(physics)
 	var track: KartTrackModel = setup[0]
 	var k: KartState = setup[1]
-	_run(physics, k, _in(150.0, -0.7), track, 0.15 + charge_sec)
+	_run(physics, k, _in(150.0, -KartPhysics.DRIFT_LEAN), track, 0.15 + charge_sec)
 	assert_int(k.drift_dir).is_equal(-1)
 	_run(physics, k, _in(150.0, -0.1), track, 0.2)
 	return [k, log]
@@ -271,9 +275,9 @@ func test_a_brief_ease_doesnt_release_the_drift() -> void:
 	var setup := _circling(physics)
 	var track: KartTrackModel = setup[0]
 	var k: KartState = setup[1]
-	_run(physics, k, _in(150.0, -0.7), track, 0.5)
+	_run(physics, k, _in(150.0, -KartPhysics.DRIFT_LEAN), track, 0.5)
 	_run(physics, k, _in(150.0, -0.1), track, 0.1)
-	_run(physics, k, _in(150.0, -0.7), track, 0.2)
+	_run(physics, k, _in(150.0, -KartPhysics.DRIFT_LEAN), track, 0.2)
 	assert_int(k.drift_dir).is_equal(-1)
 
 
@@ -440,7 +444,7 @@ func test_a_spin_out_cancels_the_drift_and_the_boost() -> void:
 	var setup := _circling(physics)
 	var track: KartTrackModel = setup[0]
 	var k: KartState = setup[1]
-	_run(physics, k, _in(150.0, -0.7), track, 2.5)
+	_run(physics, k, _in(150.0, -KartPhysics.DRIFT_LEAN), track, 2.5)
 	physics.apply_boost(k, 2.0)
 	assert_int(k.drift_tier).is_equal(2)
 	assert_bool(physics.apply_spinout(k)).is_true()

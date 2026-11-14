@@ -212,9 +212,9 @@ func forward() -> Vector3
 
 class_name KartPhysics extends RefCounted
 const SPEED_SCALE := 2.4
-const SPIN_SEC := 1.0; const KART_RADIUS := 0.95; const DEAD_ZONE := 0.06   # (and the tuning constants)
-const DRIFT_LEAN := 0.65; const DRIFT_HOLD := 0.12; const RELEASE_LEAN := 0.3; const RELEASE_HOLD := 0.15
-const DRIFT_WIDE_LEAN := 0.35; const DRIFT_WORTH_K := 1.0 / 70.0
+const SPIN_SEC := 1.0; const KART_RADIUS := 0.95; const DEAD_ZONE := 0.0   # (and the tuning constants; 0 since #71)
+const DRIFT_LEAN := 0.65; const DRIFT_HOLD := 0.12; const RELEASE_LEAN := 0.2; const RELEASE_HOLD := 0.15
+const DRIFT_WIDE_LEAN := 0.24; const DRIFT_WORTH_K := 1.0 / 70.0
 const TIER_SEC := [0.9, 2.0, 3.4]; const TURBO_SEC := [0.5, 0.9, 1.4]   # spark tiers, mini-turbos
 const ROCKET_CADENCE := 70.0; const ROCKET_WINDOW := Vector2(1.0, 2.0); const ROCKET_HOLD := 0.3
 var assist := 1.0        # 0 off, 0.5 low, 1 high (curvature feed-forward and alignment share)

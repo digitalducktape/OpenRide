@@ -14,11 +14,11 @@ const PLAYER_HALF_WIDTH := 55.0
 const PLAYER_SHAPE := [Vector2(0, -50), Vector2(-PLAYER_HALF_WIDTH, 40), Vector2(PLAYER_HALF_WIDTH, 40)]
 const EDGE := 120.0  ## full lean puts the player this far from the screen edge
 ## Lean → position gain. On the bike (run 2) the player crossed the screen in about 1.2 s and
-## moved at a median 0.68 lean units/s, limited by how far the head must travel. With 1.3 the
-## edge comes at lean_x 0.77, which is about 85% of the tracker's full-lock head lean under both
-## the old dead zone (0.3, linear) and #33's retune (0.15 with a 0.4 ease-in ramp): the retune
-## changes the feel near centre, not the travel to the edge, so the same gain still applies.
-const STEERING_GAIN := 1.3
+## moved at a median 0.68 lean units/s, limited by how far the head must travel. The edge comes
+## at about 85% of the tracker's full-lock head lean, where it was tuned (1.3 under #33's soft
+## dead zone). #71's expo curve reads that head lean as lean_x 0.64 at Normal sensitivity, so the
+## gain is 1.55 to keep the edge where it was; the curve only makes the centre gentler.
+const STEERING_GAIN := 1.55
 const BALL_RADIUS := 40.0
 const BASE_SPEED := 300.0  ## px/s at 0 rpm
 const SPEED_PER_RPM := 5.0

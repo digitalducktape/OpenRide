@@ -155,11 +155,14 @@ the center of the screen but might move."
   wind dies away over 2 s and the fan glides back to the centre, so a lost camera never drops
   the balloon.
 
-**Forgiving lean (issue #71: "too sensitive and hard to return to centre").** The tracker
-already applies a 0.15 dead zone with a ramp. On top, the game:
+**Forgiving lean (issue #71: "too sensitive and hard to return to centre").** Since #71 the
+tracker shapes every game's lean: a 0.12 dead zone, then an expo curve chosen by the rider's
+lean sensitivity, at a fixed mapping (no fade during moves). On top, the game:
 
-1. **Dead zone** `LEAN_DEAD = 0.12` of the tracker's lean, then a **soft curve** (`t^1.6`
-   of the rest), so small sways move the fan by centimetres, not tens of them.
+1. **A mild curve** (`LEAN_CURVE = 1.3`, no dead zone of its own: `LEAN_DEAD = 0`), so small
+   sways move the fan by centimetres, not tens of them. (Before #71 the game had its own 0.12
+   dead zone and `t^1.6`; on the new tracker curve that would halve the fan's travel at 70% of
+   full lock.)
 2. **Position, not speed**: the lean sets where the fan wants to be (`FAN_RANGE = ±1.6 m` at
    full lean), so sitting up straight always brings it back to the centre: no hunting for
    neutral.

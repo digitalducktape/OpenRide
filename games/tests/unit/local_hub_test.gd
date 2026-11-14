@@ -192,6 +192,16 @@ func test_settings_resend_the_state() -> void:
 	assert_float(s.audio.music_volume).is_equal(1.0)
 
 
+func test_lean_sensitivity_takes_its_three_words_only() -> void:
+	Session.update_setting("lean_sensitivity", "high")
+	assert_str(states.back().settings.lean_sensitivity).is_equal("high")
+	var sent := states.size()
+	Session.update_setting("lean_sensitivity", "ludicrous")
+	Session.update_setting("lean_sensitivity", 2)
+	assert_int(states.size()).is_equal(sent)
+	assert_str(hub.settings.lean_sensitivity).is_equal("high")
+
+
 func test_exit_ends_the_visit_then_a_new_one_starts() -> void:
 	var first: String = hub.visit_id
 	Session.exit_hub("app")
