@@ -2,18 +2,16 @@
 
 package dev.digitalducktape.openride.core.ride
 
-import dev.digitalducktape.openride.core.telemetry.DiscardReason
-import dev.digitalducktape.openride.core.telemetry.RideEntry
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
+import dev.digitalducktape.openride.core.telemetry.DiscardReason
 import dev.digitalducktape.openride.core.telemetry.DurationBucket
 import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import dev.digitalducktape.openride.core.telemetry.RideEnd
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import dev.digitalducktape.openride.core.telemetry.RideOutcome
 import dev.digitalducktape.openride.core.telemetry.RideStart
 import dev.digitalducktape.openride.core.telemetry.RideTelemetryTracker
@@ -24,38 +22,30 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RideSessionManagerTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var rideRepository: RideRepository
     private var profileId: Long = 0L
     private lateinit var fakeBikeDataSource: FakeBikeDataSource
 
     @Before
     fun setUp() = runTest {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         rideRepository = RideRepository(db, db.rideDao())
         profileId = ProfileRepository(db.profileDao()).createProfile(
             Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = 80.0, ftp = 220),
         )
         fakeBikeDataSource = FakeBikeDataSource()
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     // --- Initial state -----------------------------------------------------------------

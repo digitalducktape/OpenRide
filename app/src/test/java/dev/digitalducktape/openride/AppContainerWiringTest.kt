@@ -32,14 +32,9 @@ class AppContainerWiringTest {
     }
 
     @Test
-    fun `telemetry is a no-op when sending is off or the key is missing`() {
+    fun `a build that can't send has no-op telemetry and does no ride tracking`() {
         val container = AppContainer(ApplicationProvider.getApplicationContext())
         assertSame(NoOpTelemetry, container.telemetry)
-    }
-
-    @Test
-    fun `rides are not tracked for telemetry when nothing can be sent`() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
         assertNull(container.rideSessionTracker)
     }
 }

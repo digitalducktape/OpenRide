@@ -1,29 +1,29 @@
 package dev.digitalducktape.openride.ui.profile
 
-import dev.digitalducktape.openride.core.telemetry.ProfileCreated
-import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.profile.WeightUnits
+import dev.digitalducktape.openride.core.telemetry.ProfileCreated
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProfileEditorViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
     private lateinit var viewModel: ProfileEditorViewModel
@@ -31,18 +31,12 @@ class ProfileEditorViewModelTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         // SharedPreferences persist across Robolectric tests in the same run; start clean so
         // "nothing was saved" assertions can't pass/fail on a leftover active id.
         activeProfileHolder.clear()
         viewModel = ProfileEditorViewModel(profileRepository, activeProfileHolder)
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     // --- Create mode ------------------------------------------------------------------------

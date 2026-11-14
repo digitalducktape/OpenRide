@@ -2,10 +2,9 @@
 
 package dev.digitalducktape.openride.ui.history
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.Ride
@@ -16,17 +15,18 @@ import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import dev.digitalducktape.openride.core.telemetry.RideExport
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class HistoryViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var rideRepository: RideRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
@@ -34,15 +34,9 @@ class HistoryViewModelTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         rideRepository = RideRepository(db, db.rideDao())
         activeProfileHolder = ActiveProfileHolder(context)
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     private fun ride(profileId: Long, startEpochMs: Long) = Ride(

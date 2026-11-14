@@ -2,10 +2,9 @@
 
 package dev.digitalducktape.openride.ui.profile
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.heartrate.BleDevice
@@ -29,6 +28,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -46,7 +46,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HrPairingViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
     private lateinit var scanner: FakeBleScanner
@@ -57,7 +58,6 @@ class HrPairingViewModelTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         scanner = FakeBleScanner()
@@ -66,7 +66,6 @@ class HrPairingViewModelTest {
 
     @After
     fun tearDown() {
-        db.close()
         Dispatchers.resetMain()
     }
 

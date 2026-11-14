@@ -1,20 +1,19 @@
 package dev.digitalducktape.openride.core.content
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import java.io.IOException
 import java.io.InputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -23,7 +22,8 @@ class YouTubeContentRepositoryTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var sources: ContentSourceRepository
 
     /** Matches the ids in `fixtures/channel_videos_page.html`: long / short / no-duration. */
@@ -39,7 +39,6 @@ class YouTubeContentRepositoryTest {
 
     @Before
     fun setUp() = runTest {
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         sources = ContentSourceRepository(db.contentSourceDao())
         sources.add(
             ResolvedSource(ContentSourceType.CHANNEL, "UCTestChannel00000000", "Test Cycling Channel"),
@@ -47,9 +46,6 @@ class YouTubeContentRepositoryTest {
         )
         context.filesDir.resolve("content_cache").deleteRecursively()
     }
-
-    @After
-    fun tearDown() = db.close()
 
     /** Serves page HTML for `/videos` and `/playlists` URLs, and the Atom fixture for feeds. */
     private fun fetcher(

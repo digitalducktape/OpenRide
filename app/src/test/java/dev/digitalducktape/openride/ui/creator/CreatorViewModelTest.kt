@@ -2,7 +2,6 @@
 
 package dev.digitalducktape.openride.ui.creator
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.content.ContentCache
@@ -12,7 +11,7 @@ import dev.digitalducktape.openride.core.content.ContentSourceType
 import dev.digitalducktape.openride.core.content.FeedFetcher
 import dev.digitalducktape.openride.core.content.ResolvedSource
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
@@ -29,11 +28,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -42,7 +41,8 @@ class CreatorViewModelTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var sources: ContentSourceRepository
     private lateinit var profileRepository: ProfileRepository
     private lateinit var rideRepository: RideRepository
@@ -58,7 +58,6 @@ class CreatorViewModelTest {
 
     @Before
     fun setUp() = runTest {
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         sources = ContentSourceRepository(db.contentSourceDao())
         profileRepository = ProfileRepository(db.profileDao())
         rideRepository = RideRepository(db, db.rideDao())
@@ -69,9 +68,6 @@ class CreatorViewModelTest {
         )
         context.filesDir.resolve("content_cache").deleteRecursively()
     }
-
-    @After
-    fun tearDown() = db.close()
 
     private fun fetcher(playlistsFail: Boolean = false) = FeedFetcher { url ->
         when {
