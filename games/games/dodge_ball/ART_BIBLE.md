@@ -79,7 +79,7 @@ must stay that hue. Red and gold are never chrome.
 
   The sky repeats it without the vignette. Don't fork it per material.
 - **Surfaces.** Road and verges: procedural in road space (`scroll`), max 3 noise reads. Scenery
-  (`shaders/scenery.gdshader`, `DodgeWorld._hand_lit`, one material per surface look shared by
+  (`shaders/scenery.gdshader`, `DodgeModels.hand_lit`, one material per surface look shared by
   every chunk): per-vertex light, matte, painted AO by height (darker at the foot), sway on
   foliage by height squared. Balls: per-pixel toon (`ball.gdshader`) with a rim, two seams and the near-glow; they
   are the only per-pixel-lit objects. Handlebars: hand-lit matte metal with a fixed rim, never

@@ -7,6 +7,9 @@ extends Game
 ## between the last two ticks (`_draw`, KartState.draw_into). This scene
 ## wires it to the framework: declarations, options, the GP flow, inputs, HUD, audio, the result.
 ##
+##
+## Beside it: KartRaceInfo (the declarations, the hub's cards, the look) and KartPerfLog (the
+## DEV_TUNING frame-cost log).
 ## Ownership (Phase 2 agents edit only their own builder plus a few lines of wiring):
 ##   _build_world()   world agent      the track's look (KartWorld)
 ##   _build_camera()  handling agent   KartChaseCamera
@@ -48,7 +51,7 @@ const MSAA := Viewport.MSAA_DISABLED  ## 2x halved the frame rate on the tablet 
 ## enabled, tier: a fixed tier with the governor off) and log the frame cost every 5 s.
 const DEV_TUNING := false
 const TUNING_PATH := "user://kart_tuning.cfg"
-const PERF_LOG_SEC := 5.0
+const PERF_LOG_SEC := KartPerfLog.PERF_LOG_SEC
 
 ## The logic's fixed step. 30 Hz: the tablet is bound by the main thread, and the logic was most
 ## of its GDScript (4-7 ms a tick with the face tracker running, 2026-10-15). The lean arrives at
@@ -76,7 +79,7 @@ const POSE_CLOSE := 18.0
 ## A kart this far behind the camera's plane (metres) is out of sight: no pose, no exhaust.
 const BEHIND_CLEAR := 3.0
 const GO_SEC := 0.8
-const DEFAULT_FTP := 150.0
+const DEFAULT_FTP := KartRaceInfo.DEFAULT_FTP
 ## The bots' shares of the rider's FTP, weakest to strongest, by difficulty. Each bot's drive
 ## adds its cadence's spin watts like the rider's (KartPhysics.drive_power). Retuned 2026-10-19
 ## with the drive power so an ordinary ride (80-90 rpm at 30-40%, about 100-150 W) sits
@@ -88,12 +91,9 @@ const BOT_PCTS := {
 }
 const BOT_LINES := [-1.5, 1.5, -0.5, 0.5, -2.0, 2.0, 0.0]
 const ASSIST := {"off": 0.0, "low": 0.5, "high": 1.0}
-## The hub's card pictures (spec §7.2): the racers' baked portraits
-## (tests/capture_kart_portraits.gd) and the tracks' thumbnails (tests/capture_track_thumbs.gd).
-const PORTRAITS := "res://games/kart_race/ui/portraits/%s.png"
-const THUMBS := "res://games/kart_race/ui/tracks/%s.png"
-
-static var _look: GameTheme
+## The hub's card pictures (KartRaceInfo).
+const PORTRAITS := KartRaceInfo.PORTRAITS
+const THUMBS := KartRaceInfo.THUMBS
 
 var race: KartRaceLogic
 var gp: KartGrandPrix
@@ -143,112 +143,32 @@ var _applied_tier := 0
 var _music_parallel := true
 var _tuning := ConfigFile.new()
 var _tuned := false
-var _perf_usec := 0
-var _perf_frames := 0
-var _perf_dc_max := 0  ## the most draw calls in one frame since the last perf line
-var _perf_ticks := 0  ## logic ticks since the last perf line, and their time
-var _perf_tick_usec := 0
-var _perf_sync_usec := 0  ## _sync_views and _update_hud time
-var _perf_hud_usec := 0
-var _perf_proc_ms := 0.0  ## the engine's process time per frame, summed
-var _perf_render_cpu := 0.0  ## every viewport's measured render time, summed
-var _perf_render_gpu := 0.0
-var _perf_vps: Array[Viewport] = []
-## Each viewport's last measured render time: a viewport that didn't render this frame (an idle
-## bake) keeps reporting its last render's time, so only a changed value counts.
-var _perf_vp_last := {}
-var _perf_vp_renders := 0  ## viewport renders counted since the last perf line
-var _perf_frame_ms := 0.0
-var _perf_frame_max := 0.0
-var _perf_game_max := 0
-var _perf_first: _PerfProbe
-var _perf_last: _PerfProbe
-
-
-## DEV_TUNING: stamps the time it processes (first and last in the frame, by priority).
-class _PerfProbe extends Node:
-	var stamp := 0
-	var prev := 0
-
-	func _process(_delta: float) -> void:
-		prev = stamp
-		stamp = Time.get_ticks_usec()
-var _perf_left := PERF_LOG_SEC
+## DEV_TUNING: the frame-cost log (null in every build).
+var _perf: KartPerfLog
 
 
 func info() -> GameInfo:
-	var i := GameInfo.new()
-	i.id = "kart_race"
-	i.title = "Kart Race"
-	i.how_to = "Pedal to drive · lean to steer · lean hard to drift · tap to use items"
-	i.supports = ["minutes", "open"]
-	i.min_sec = 300
-	i.max_sec = 3600
-	i.roles = []
-	# Lean steers; standing (reported in every camera mode) is for the climbs.
-	i.tracker_mode = "lean_stand"
-	i.effort_in_just_ride = true
-	i.own_countdown = true  # the grid's 3-2-1-GO is the only countdown
-	i.timed_end_mode = "game"  # a timed GP ends on the final race's finish line
-	i.stars_per_minute = true
-	# Points a minute, tuned in simulation (race-systems: KartScoring): about 1 star mid-pack at
-	# 1.0×, 3 stars takes podiums and effort. Provisional until the bike.
-	i.star_thresholds = KartScoring.STAR_THRESHOLDS
-	i.options = [
-		# Picked in the Games hub before Start (spec §7.2): a card per racer, then per track. The
-		# chosen kart wears the rider's name, as it does on the grid.
-		{"key": "driver", "label": "Your kart", "choices": KartRoster.ids(), "labels": KartRoster.option_labels(),
-			"default": "fox", "where": "hub", "kind": "cards", "columns": 4, "rider_badge": true, "cards": kart_cards()},
-		{"key": "track", "label": "Starting track", "choices": KartTracks.CUP, "labels": KartTracks.titles(),
-			"default": KartTracks.CUP[0], "where": "hub", "kind": "cards", "columns": 4, "cards": track_cards()},
-		{"key": "assist", "label": "Steering assist", "choices": ["off", "low", "high"],
-			"labels": ["Off", "Low", "High"], "default": "high", "kind": "segmented", "group": "More options"},
-		{"key": "camera", "label": "Camera", "choices": ["chase", "close"],
-			"labels": ["Chase", "Close"], "default": "chase", "kind": "segmented", "group": "More options"},
-		{"key": "auto_items", "label": "Auto items", "choices": ["off", "on"],
-			"labels": ["Off", "On"], "default": "off", "kind": "segmented", "group": "More options"},
-	]
-	return i
+	return KartRaceInfo.info()
 
 
-## The hub's kart cards: portrait, name, class ("Light kart"), the kart's colour.
+## The hub's kart cards (KartRaceInfo.kart_cards).
 static func kart_cards() -> Array:
-	var out := []
-	for r in KartRoster.RACERS:
-		out.append({"value": r.id, "title": r.name, "subtitle": "%s kart" % KartRoster.kart_class(r).capitalize(),
-			"image": PORTRAITS % r.id, "accent": r.color})
-	return out
+	return KartRaceInfo.kart_cards()
 
 
-## The hub's track cards: thumbnail, title, lap length ("1,148 m").
+## The hub's track cards (KartRaceInfo.track_cards).
 static func track_cards() -> Array:
-	var out := []
-	var titles := KartTracks.titles()
-	for i in KartTracks.CUP.size():
-		var id: String = KartTracks.CUP[i]
-		out.append({"value": id, "title": titles[i], "subtitle": "%s m" % thousands(roundi(KartTracks.length_of(id))),
-			"image": THUMBS % id})
-	return out
+	return KartRaceInfo.track_cards()
 
 
 ## "1,148" for 1148.
 static func thousands(n: int) -> String:
-	var s := str(absi(n))
-	var out := ""
-	while s.length() > 3:
-		out = "," + s.right(3) + out
-		s = s.left(s.length() - 3)
-	return ("-" if n < 0 else "") + s + out
+	return KartRaceInfo.thousands(n)
 
 
-## Kart Race's look for the framework's screens (intro, pause and its options, calibration, the
-## summary): KartTheme's violet night with its leaning badges, so they match the race's own UI.
+## Kart Race's look for the framework's screens (KartRaceInfo.kart_look).
 static func kart_look() -> GameTheme:
-	if _look == null:
-		_look = GameTheme.new(Color("8c6bff"), Color("210f3d"), 0.18, true)
-		_look.panel = KartTheme.PANEL
-		_look.panel_edge = KartTheme.PANEL_EDGE
-	return _look
+	return KartRaceInfo.kart_look()
 
 
 func ui_theme() -> GameTheme:
@@ -256,31 +176,16 @@ func ui_theme() -> GameTheme:
 
 
 func target_text(seg: Dictionary) -> String:
-	var duration := float(seg.get("duration_sec", -1))
-	if duration < 0.0:
-		return "Grand Prix · race as long as you like"
-	var p: Dictionary = seg.get("params", {})
-	var n := planned_races(duration, KartGrandPrix.estimate_lap_sec(KartTracks.average_length(), _ftp_of(p)))
-	return "Grand Prix · %d race%s" % [n, "" if n == 1 else "s"]
+	return KartRaceInfo.target_text(seg)
 
 
 ## How many races a GP of `duration` seconds plans, if each race takes its estimate.
 static func planned_races(duration: float, est_lap: float) -> int:
-	var plan := KartGrandPrix.new(duration, KartTracks.CUP)
-	var left := duration
-	var n := 0
-	while n < 60:
-		var next := plan.next_race(left, est_lap)
-		n += 1
-		if next.is_final:
-			break
-		left -= next.laps * est_lap + KartGrandPrix.RACE_OVERHEAD_SEC
-	return n
+	return KartRaceInfo.planned_races(duration, est_lap)
 
 
 static func _ftp_of(p: Dictionary) -> float:
-	var ftp := float(p.get("ftp_watts", DEFAULT_FTP))
-	return ftp if ftp > 0.0 else DEFAULT_FTP
+	return KartRaceInfo.ftp_of(p)
 
 
 func _ready() -> void:
@@ -302,12 +207,8 @@ func _ready() -> void:
 	_view.audio_listener_enable_3d = false
 	add_child(_view)
 	if DEV_TUNING:
-		_perf_first = _PerfProbe.new()
-		_perf_first.process_priority = -1000000
-		_perf_last = _PerfProbe.new()
-		_perf_last.process_priority = 1000000
-		get_tree().root.add_child.call_deferred(_perf_first)
-		get_tree().root.add_child.call_deferred(_perf_last)
+		_perf = KartPerfLog.new()
+		_perf.add_probes(get_tree())
 	var shown := TextureRect.new()
 	shown.name = "View3DImage"
 	shown.texture = _view.get_texture()
@@ -327,9 +228,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	MusicGen.parallel = _music_parallel
-	for probe in [_perf_first, _perf_last]:
-		if probe and is_instance_valid(probe):
-			probe.queue_free()
+	if _perf:
+		_perf.free_probes()
 
 
 func _on_prepare(seg: Dictionary) -> void:
@@ -762,75 +662,10 @@ func _on_frame(delta: float) -> void:
 		return
 	var started := Time.get_ticks_usec()
 	_frame(delta)
-	_perf_usec += Time.get_ticks_usec() - started
-	_perf_frames += 1
-	_perf_game_max = maxi(_perf_game_max, Time.get_ticks_usec() - started)
-	# The whole process step (the first and last _process of the frame, the probes) and the frame
-	# (first probe to first probe), both for the frame before this one.
-	if _perf_first and _perf_first.prev > 0:
-		_perf_proc_ms += (_perf_last.stamp - _perf_first.prev) / 1000.0 if _perf_last.stamp > _perf_first.prev else 0.0
-		var frame_ms := (_perf_first.stamp - _perf_first.prev) / 1000.0
-		_perf_frame_ms += frame_ms
-		_perf_frame_max = maxf(_perf_frame_max, frame_ms)
-	for vp: Viewport in _perf_vps:
-		if is_instance_valid(vp):
-			var rid := vp.get_viewport_rid()
-			var cpu := RenderingServer.viewport_get_measured_render_time_cpu(rid)
-			var always := vp == _view or vp == get_viewport()
-			if always or cpu != float(_perf_vp_last.get(rid, -1.0)):
-				_perf_render_cpu += cpu
-				_perf_render_gpu += RenderingServer.viewport_get_measured_render_time_gpu(rid)
-				_perf_vp_renders += 1
-			_perf_vp_last[rid] = cpu
-	_perf_dc_max = maxi(_perf_dc_max, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)))
-	_perf_left -= delta
-	if _perf_left <= 0.0:
-		var frames := maxi(_perf_frames, 1)
-		print("OPENRIDE_GAMES kart_race perf game_ms=%.2f ticks=%.2f tick_ms=%.2f sync_ms=%.2f hud_ms=%.2f process_ms=%.2f frame_ms=%.2f frame_max_ms=%.1f game_max_ms=%.1f render_cpu_ms=%.2f render_gpu_ms=%.2f viewports=%d vp_renders=%.2f fps=%d draw_calls=%d draw_calls_max=%d objects=%d primitives=%d karts=%d track=%s%s flow=%s tracker=%d tier=%d" % [
-			_perf_usec / 1000.0 / frames,
-			float(_perf_ticks) / frames,
-			_perf_tick_usec / 1000.0 / maxi(_perf_ticks, 1),
-			_perf_sync_usec / 1000.0 / frames,
-			_perf_hud_usec / 1000.0 / frames,
-			_perf_proc_ms / frames,
-			_perf_frame_ms / frames,
-			_perf_frame_max,
-			_perf_game_max / 1000.0,
-			_perf_render_cpu / frames,
-			_perf_render_gpu / frames,
-			_perf_vps.size(),
-			float(_perf_vp_renders) / frames,
-			Engine.get_frames_per_second(),
-			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
-			_perf_dc_max,
-			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
-			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
-			race.karts.size() if race else 0,
+	if _perf.sample(self, _view, delta, started):
+		_perf.flush(self, [race.karts.size() if race else 0,
 			track.def.id if track else "-", "_rev" if track and track.reversed else "",
 			Flow.keys()[flow], InputBus.tracker_state, _applied_tier])
-		_perf_usec = 0
-		_perf_frames = 0
-		_perf_ticks = 0
-		_perf_tick_usec = 0
-		_perf_sync_usec = 0
-		_perf_hud_usec = 0
-		_perf_proc_ms = 0.0
-		_perf_render_cpu = 0.0
-		_perf_render_gpu = 0.0
-		_perf_frame_ms = 0.0
-		_perf_frame_max = 0.0
-		_perf_game_max = 0
-		# Every viewport that renders (the 3D view, the bakes, the screen), measured.
-		_perf_vp_renders = 0
-		_perf_vp_last.clear()
-		_perf_vps.clear()
-		_perf_vps.append(get_viewport())
-		for vp: Node in find_children("*", "SubViewport", true, false):
-			_perf_vps.append(vp)
-		for vp: Viewport in _perf_vps:
-			RenderingServer.viewport_set_measure_render_time(vp.get_viewport_rid(), true)
-		_perf_dc_max = 0
-		_perf_left = PERF_LOG_SEC
 
 
 func _frame(delta: float) -> void:
@@ -847,7 +682,7 @@ func _frame(delta: float) -> void:
 		_acc -= TICK
 		_tick(TICK)
 		if DEV_TUNING:
-			_perf_ticks += 1
+			_perf.ticks += 1
 		if has_ended():
 			return
 	var t1 := Time.get_ticks_usec() if DEV_TUNING else 0
@@ -855,9 +690,9 @@ func _frame(delta: float) -> void:
 	var t2 := Time.get_ticks_usec() if DEV_TUNING else 0
 	_update_hud(delta)
 	if DEV_TUNING:
-		_perf_tick_usec += t1 - t0
-		_perf_sync_usec += t2 - t1
-		_perf_hud_usec += Time.get_ticks_usec() - t2
+		_perf.tick_usec += t1 - t0
+		_perf.sync_usec += t2 - t1
+		_perf.hud_usec += Time.get_ticks_usec() - t2
 
 
 ## A session's governor at full quality (the tier never carries over from the last session).
