@@ -109,6 +109,10 @@ class GameSessionManager(
     private enum class Phase { IDLE, INTRO, PLAYING, ENDING, AWAITING_END, FINISHED }
 
     private var phase = Phase.IDLE
+        set(value) {
+            field = value
+            syncAutoPause()
+        }
     private var plan: SessionPlan? = null
     private var ride: PlanRide = NoRide
     private var onFinished: (PlanOutcome) -> Unit = {}
@@ -122,6 +126,10 @@ class GameSessionManager(
     private var gameplaySec = 0
     private var riderPaused = false
     private var calibrationPaused = false
+        set(value) {
+            field = value
+            syncAutoPause()
+        }
     private var paused = false
     private var endRequested = false
 
@@ -367,6 +375,14 @@ class GameSessionManager(
             }
             else -> finish()
         }
+    }
+
+    /**
+     * No freewheel auto-pause while the rider sets up: on a segment's intro card, or while the
+     * camera calibrates. Nobody pedals then. It applies again once gameplay starts.
+     */
+    private fun syncAutoPause() {
+        ride.autoPauseAllowed = !(phase == Phase.INTRO || (calibrationPaused && isRunning))
     }
 
     /** Pauses from any source, signalled to Godot only when the combined state changes. */

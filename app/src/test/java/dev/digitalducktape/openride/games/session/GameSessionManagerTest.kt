@@ -468,6 +468,52 @@ class GameSessionManagerTest {
     }
 
     @Test
+    fun `no freewheel auto-pause on the intro card, and it applies again in gameplay`() {
+        val m = runner().play(oneMinute)
+        assertFalse(ride.autoPauseAllowed) // the intro card: the rider is setting up
+        seconds(9)
+        assertFalse(ride.autoPauseAllowed)
+        seconds(1) // gameplay starts
+        assertTrue(ride.autoPauseAllowed)
+
+        m.report()
+        assertTrue(ride.autoPauseAllowed) // the plan is over: back to the ride's own rule
+    }
+
+    @Test
+    fun `no freewheel auto-pause while the camera calibrates`() {
+        val tracker = FakeHeadTracker()
+        val m = runner(tracker = TrackerLink(tracker, signals, scope)).play(oneMinute)
+        m.call { setTrackerMode("lean_x") } // calibrates at once, holding the intro card
+        seconds(20)
+        assertFalse(ride.autoPauseAllowed)
+        tracker.finishCalibration()
+        scope.runCurrent()
+        assertFalse(ride.autoPauseAllowed) // still the intro card
+        seconds(10)
+        assertTrue(ride.autoPauseAllowed)
+
+        m.call { requestCalibration("lean_x") } // a recalibration during gameplay
+        assertFalse(ride.autoPauseAllowed)
+        tracker.finishCalibration()
+        scope.runCurrent()
+        assertTrue(ride.autoPauseAllowed)
+    }
+
+    @Test
+    fun `an auto-pause in force ends when the next intro card comes up`() {
+        val m = runner().play(SessionRequest.Circuit("circuit-20"))
+        seconds(10 + 180) // the warm-up, played through
+        ride.autoPause() // the rider coasts as it ends
+        scope.runCurrent()
+        assertEquals(listOf("session_paused"), pauseSignals())
+
+        m.report(gameId = "demo") // the next segment's intro card
+        assertFalse(ride.isPaused)
+        assertEquals(listOf("session_paused", "session_resumed"), pauseSignals())
+    }
+
+    @Test
     fun `a recalibration pauses the plan until it completes, and the ride keeps recording`() {
         val tracker = FakeHeadTracker()
         val m = runner(tracker = TrackerLink(tracker, signals, scope)).play(oneMinute)

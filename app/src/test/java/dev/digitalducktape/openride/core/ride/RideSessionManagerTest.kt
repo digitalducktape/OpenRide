@@ -421,6 +421,60 @@ class RideSessionManagerTest {
     }
 
     @Test
+    fun `does not auto-pause while auto-pause is not allowed, and pedalling then does not count`() = runTest {
+        val manager = RideSessionManager(
+            fakeBikeDataSource, rideRepository, backgroundScope, autoPauseThresholdSec = 3,
+        ) { 0L }
+        manager.start(profileId, entry = RideEntry.GAMES, route = false)
+        manager.autoPauseAllowed = false
+
+        // A few turns of the pedals while setting up, then sitting still.
+        fakeBikeDataSource.setMetrics(cadenceRpm = 8, resistancePercent = 12, powerWatts = 1)
+        advanceTimeBy(3_000)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 0, resistancePercent = 12, powerWatts = 0)
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertEquals(RideSessionState.Active, manager.state.value)
+
+        // Gameplay starts: still sitting still, and the setup pedalling doesn't count.
+        manager.autoPauseAllowed = true
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertEquals(RideSessionState.Active, manager.state.value)
+
+        // Pedal, then coast: the usual rule.
+        fakeBikeDataSource.setMetrics(cadenceRpm = 85, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(2_000)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 0, resistancePercent = 40, powerWatts = 0)
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertTrue(manager.autoPaused.value)
+    }
+
+    @Test
+    fun `turning auto-pause off ends an auto-pause in force, and a new ride has it on`() = runTest {
+        val manager = RideSessionManager(
+            fakeBikeDataSource, rideRepository, backgroundScope, autoPauseThresholdSec = 3,
+        ) { 0L }
+        manager.start(profileId, entry = RideEntry.GAMES, route = false)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 85, resistancePercent = 40, powerWatts = 150)
+        advanceTimeBy(2_000)
+        fakeBikeDataSource.setMetrics(cadenceRpm = 0, resistancePercent = 40, powerWatts = 0)
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertTrue(manager.autoPaused.value)
+
+        manager.autoPauseAllowed = false
+        assertEquals(RideSessionState.Active, manager.state.value)
+        assertTrue(!manager.autoPaused.value)
+
+        manager.stop()
+        manager.reset()
+        manager.start(profileId, entry = RideEntry.GAMES, route = false)
+        assertTrue(manager.autoPauseAllowed)
+    }
+
+    @Test
     fun `does not auto-pause a ride whose cadence never left zero`() = runTest {
         val manager = RideSessionManager(
             fakeBikeDataSource, rideRepository, backgroundScope, autoPauseThresholdSec = 3,

@@ -154,6 +154,7 @@ class RideSessionManager(
         maxPowerSeen = 0
         _elapsedSec.value = 0
         _liveAggregates.value = LiveAggregates()
+        autoPauseAllowed = true
         resetFreewheelTracking()
 
         _state.value = RideSessionState.Active
@@ -170,6 +171,22 @@ class RideSessionManager(
         }
         return true
     }
+
+    /**
+     * Whether the freewheel auto-pause may fire. A game plan turns it off while the rider is
+     * setting up (the intro card, a camera calibration): nobody pedals then, and a pause menu
+     * over the setup screen is only confusing. Turning it off also ends an auto-pause already
+     * in force and forgets any pedalling so far, so gameplay starts with a fresh stretch.
+     * Every ride starts with it on.
+     */
+    var autoPauseAllowed: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            if (!value) {
+                if (_autoPaused.value) resume() else resetFreewheelTracking()
+            }
+        }
 
     /** Clears the per-stretch freewheel counters so a fresh Active stretch can't inherit a
      *  stale zero-cadence streak (which would auto-pause the moment it starts). */
@@ -384,7 +401,9 @@ class RideSessionManager(
 
                 // Freewheel detection (PRD #20/T20): once the rider has actually pedaled this
                 // stretch, a run of zero-cadence seconds past the threshold auto-pauses.
-                if (metrics.cadenceRpm > 0) {
+                if (!autoPauseAllowed) {
+                    // Setting up a game: sitting still is expected, and doesn't count later.
+                } else if (metrics.cadenceRpm > 0) {
                     hasPedaledThisStretch = true
                     zeroCadenceStreak = 0
                 } else if (hasPedaledThisStretch) {
