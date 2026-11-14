@@ -9,6 +9,13 @@ import dev.digitalducktape.openride.core.export.CsvExporter
 import dev.digitalducktape.openride.core.export.TcxExporter
 import dev.digitalducktape.openride.core.ride.FtpEstimator
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.DeletedRideType
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideDeleted
+import dev.digitalducktape.openride.core.telemetry.RideExport
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.games.session.GameLabels
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +36,7 @@ class RideSummaryViewModel(
     private val profileRepository: ProfileRepository,
     private val rideSessionManager: RideSessionManager,
     private val rideId: Long,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
     private val _ride = MutableStateFlow<Ride?>(null)
     val ride: StateFlow<Ride?> = _ride.asStateFlow()
@@ -80,16 +88,28 @@ class RideSummaryViewModel(
      * [dev.digitalducktape.openride.ui.common.ExportShare]).
      */
     fun tcxContent(): String? = _ride.value?.let { r -> TcxExporter.export(r, _samples.value) }
+        ?.also { telemetry.trackSafely { RideExport(ExportFormat.TCX) } }
 
     /** Per-second sample CSV (bonus alongside PRD P1-2's history CSV) for the loaded ride. */
     fun sampleCsvContent(): String? = _ride.value?.let { CsvExporter.exportRideSamples(_samples.value) }
+        ?.also { telemetry.trackSafely { RideExport(ExportFormat.CSV_RIDE) } }
 
     /**
      * Deletes this ride from history for good (#84), then leaves the session as [dismiss] does,
      * so a ride deleted straight off the bike doesn't linger as the finished session.
      */
     suspend fun deleteRide() {
+        // The type is read before the ride goes. Imported rides (#83) carry no marker on Ride,
+        // so they report as just_ride here; see the task report.
+        val type = _ride.value?.let { r ->
+            when {
+                r.gamePlan != null -> DeletedRideType.GAMES
+                r.videoId != null -> DeletedRideType.CLASS
+                else -> DeletedRideType.JUST_RIDE
+            }
+        }
         rideRepository.deleteRide(rideId)
+        type?.let { telemetry.trackSafely { RideDeleted(it) } }
         _ride.value = null
         _samples.value = emptyList()
         rideSessionManager.reset()

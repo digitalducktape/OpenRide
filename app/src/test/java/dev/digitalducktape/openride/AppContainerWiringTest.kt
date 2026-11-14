@@ -2,7 +2,10 @@ package dev.digitalducktape.openride
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -26,5 +29,17 @@ class AppContainerWiringTest {
         val container = AppContainer(ApplicationProvider.getApplicationContext())
         assertNotNull(container.rideSessionManager)
         assertNotNull(container.heartRateManager)
+    }
+
+    @Test
+    fun `telemetry is a no-op when sending is off or the key is missing`() {
+        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        assertSame(NoOpTelemetry, container.telemetry)
+    }
+
+    @Test
+    fun `rides are not tracked for telemetry when nothing can be sent`() {
+        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        assertNull(container.rideSessionTracker)
     }
 }

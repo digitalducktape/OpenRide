@@ -1,5 +1,8 @@
 package dev.digitalducktape.openride.core.update
 
+import dev.digitalducktape.openride.core.telemetry.UpdateStage
+import dev.digitalducktape.openride.core.telemetry.UpdateFailed
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
@@ -134,5 +137,37 @@ class UpdateRepositoryTest {
         assertEquals("content", intent.data?.scheme)
         // The app's own provider, not the Godot engine's `.fileprovider` (see OpenRideFileProvider).
         assertEquals("${context.packageName}.files", intent.data?.authority)
+    }
+
+    @Test
+    fun `a failed check reports update_failed check`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val repository = UpdateRepository(context, FakeFetcher(failWith = IOException("offline")), telemetry = telemetry)
+
+        repository.check(currentVersionCode = 1, assetInfix = "real")
+
+        assertEquals(listOf(UpdateFailed(UpdateStage.CHECK)), telemetry.events)
+    }
+
+    @Test
+    fun `a successful check reports nothing`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val fetcher = FakeFetcher().apply { respond(latestReleaseUrl, releaseBody) }
+
+        UpdateRepository(context, fetcher, telemetry = telemetry).check(currentVersionCode = 1, assetInfix = "real")
+
+        assertEquals(emptyList<Any>(), telemetry.events)
+    }
+
+    @Test
+    fun `a failed download reports update_failed download`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val fetcher = FakeFetcher().apply { respond(latestReleaseUrl, releaseBody) }
+        val repository = UpdateRepository(context, fetcher, telemetry = telemetry)
+        val update = (repository.check(currentVersionCode = 1, assetInfix = "real") as UpdateCheckResult.Available).update
+
+        repository.downloadApk(update) // no fixture for the apk url
+
+        assertEquals(listOf(UpdateFailed(UpdateStage.DOWNLOAD)), telemetry.events)
     }
 }

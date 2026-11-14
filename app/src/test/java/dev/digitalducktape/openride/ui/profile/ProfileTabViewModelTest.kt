@@ -11,6 +11,18 @@ import dev.digitalducktape.openride.core.data.RideRepository
 import java.time.Instant
 import java.time.ZoneOffset
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.BackupExport
+import dev.digitalducktape.openride.core.telemetry.BackupRestore
+import dev.digitalducktape.openride.core.telemetry.Consent
+import dev.digitalducktape.openride.core.telemetry.HistoryImport
+import dev.digitalducktape.openride.core.telemetry.ImportResult
+import dev.digitalducktape.openride.core.telemetry.ImportedBucket
+import dev.digitalducktape.openride.core.telemetry.RestoreResult
+import dev.digitalducktape.openride.core.telemetry.SuccessResult
+import dev.digitalducktape.openride.core.telemetry.ConsentSource
+import dev.digitalducktape.openride.core.telemetry.InMemoryTelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -30,6 +42,8 @@ class ProfileTabViewModelTest {
     private lateinit var backupRepository: BackupRepository
     private lateinit var rideRepository: RideRepository
     private lateinit var viewModel: ProfileTabViewModel
+    private val telemetry = RecordingTelemetry()
+    private val consentStore = InMemoryTelemetryConsentStore(Consent.Declined)
 
     @Before
     fun setUp() {
@@ -39,7 +53,7 @@ class ProfileTabViewModelTest {
         activeProfileHolder = ActiveProfileHolder(context)
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao())
         rideRepository = RideRepository(db, db.rideDao())
-        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository) { ZoneOffset.UTC }
+        viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository, telemetry, consentStore) { ZoneOffset.UTC }
     }
 
     @After
@@ -187,5 +201,127 @@ class ProfileTabViewModelTest {
         activeProfileHolder.clear()
 
         assertTrue(viewModel.importWorkoutHistory(historyCsv).isFailure)
+    }
+
+    @Test
+    fun settingsSwitchOnTracksSettingsSource() {
+        viewModel.setSharing(true)
+        assertEquals(Consent.Granted, consentStore.consent.value)
+        assertEquals(listOf(TelemetryEnabled(ConsentSource.SETTINGS)), telemetry.events)
+    }
+
+    @Test
+    fun settingsSwitchOffTracksNothing() {
+        consentStore.set(Consent.Granted)
+        viewModel.setSharing(false)
+        assertEquals(Consent.Declined, consentStore.consent.value)
+        assertTrue(telemetry.events.isEmpty())
+    }
+
+    @Test
+    fun `creating a backup reports backup_export success`() = runTest {
+        viewModel.createBackupContent()
+
+        assertEquals(listOf(BackupExport(SuccessResult.SUCCESS)), telemetry.events)
+    }
+
+    @Test
+    fun `a successful manual restore reports success`() = runTest {
+        val id = profileRepository.createProfile(
+            Profile(name = "Restored", avatarEmoji = "🚴", avatarColor = 1, weightKg = null, ftp = null),
+        )
+        val backup = backupRepository.exportJson()
+        telemetry.clear()
+
+        viewModel.restoreFromContent(backup)
+
+        assertEquals(listOf(BackupRestore(RestoreResult.SUCCESS)), telemetry.events)
+    }
+
+    @Test
+    fun `restoring an unparseable file reports bad_file`() = runTest {
+        viewModel.restoreFromContent("not valid json")
+
+        assertEquals(listOf(BackupRestore(RestoreResult.BAD_FILE)), telemetry.events)
+    }
+
+    @Test
+    fun `an Error during restore is a failure result, not a crash`() = runTest {
+        val empty = backupRepository.exportJson()
+        val failing = erroringBackupRepository()
+        val vm = ProfileTabViewModel(
+            activeProfileHolder, profileRepository, failing, rideRepository, telemetry, consentStore,
+        ) { ZoneOffset.UTC }
+
+        val result = vm.restoreFromContent(empty)
+
+        assertTrue(result.isFailure)
+        assertEquals(listOf(BackupRestore(RestoreResult.FAILED)), telemetry.events)
+    }
+
+    @Test
+    fun `an Error during backup export still propagates after reporting failed`() = runTest {
+        val vm = ProfileTabViewModel(
+            activeProfileHolder, profileRepository, erroringBackupRepository(), rideRepository, telemetry, consentStore,
+        ) { ZoneOffset.UTC }
+
+        val thrown = runCatching { vm.createBackupContent() }.exceptionOrNull()
+
+        assertTrue(thrown is OutOfMemoryError)
+        assertEquals(listOf(BackupExport(SuccessResult.FAILED)), telemetry.events)
+    }
+
+    /** A repository whose profile DAO throws an [Error] on every call. */
+    private fun erroringBackupRepository(): BackupRepository {
+        val dao = java.lang.reflect.Proxy.newProxyInstance(
+            javaClass.classLoader,
+            arrayOf(dev.digitalducktape.openride.core.data.ProfileDao::class.java),
+        ) { _, _, _ -> throw OutOfMemoryError("test") } as dev.digitalducktape.openride.core.data.ProfileDao
+        return BackupRepository(db, dao, db.rideDao())
+    }
+
+    @Test
+    fun `restoring a backup from a newer app reports failed`() = runTest {
+        viewModel.restoreFromContent("""{"version":999,"exportedAtEpochMs":1,"profiles":[],"rides":[],"samples":[]}""")
+
+        assertEquals(listOf(BackupRestore(RestoreResult.FAILED)), telemetry.events)
+    }
+
+    @Test
+    fun `a history import reports its bucket and no duplicates`() = runTest {
+        activeRider()
+
+        viewModel.importWorkoutHistory(historyCsv)
+
+        assertEquals(listOf(HistoryImport(ImportResult.SUCCESS, ImportedBucket.N1_10, duplicates = false)), telemetry.events)
+    }
+
+    @Test
+    fun `importing the same history again reports duplicates`() = runTest {
+        activeRider()
+        viewModel.importWorkoutHistory(historyCsv)
+        telemetry.clear()
+
+        viewModel.importWorkoutHistory(historyCsv)
+
+        assertEquals(listOf(HistoryImport(ImportResult.SUCCESS, ImportedBucket.ZERO, duplicates = true)), telemetry.events)
+    }
+
+    @Test
+    fun `importing a file that is not a workout history reports wrong_file`() = runTest {
+        activeRider()
+
+        viewModel.importWorkoutHistory("date,duration_sec")
+
+        assertEquals(listOf(HistoryImport(ImportResult.WRONG_FILE, ImportedBucket.ZERO, duplicates = false)), telemetry.events)
+    }
+
+    @Test
+    fun `importing with no rider reports no_rider`() = runTest {
+        activeProfileHolder.clear()
+
+        viewModel.importWorkoutHistory(historyCsv)
+
+        assertEquals(listOf(HistoryImport(ImportResult.NO_RIDER, ImportedBucket.ZERO, duplicates = false)), telemetry.events)
     }
 }

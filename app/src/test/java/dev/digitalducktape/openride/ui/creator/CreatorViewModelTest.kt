@@ -95,7 +95,7 @@ class CreatorViewModelTest {
             cache = ContentCache(context),
         )
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, scope)
-        return CreatorViewModel(repository, manager, activeProfileHolder, rideRepository, id) to manager
+        return CreatorViewModel(repository, manager, activeProfileHolder, rideRepository, id, routeLoaded = { false }) to manager
     }
 
     @Test

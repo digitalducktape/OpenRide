@@ -107,7 +107,7 @@ class ClassesViewModelTest {
         fetcher: FeedFetcher = pageBackedFetcher(),
     ): Pair<ClassesViewModel, RideSessionManager> {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, scope)
-        val viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository)
+        val viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository, routeLoaded = { false })
         return viewModel to manager
     }
 
@@ -165,7 +165,7 @@ class ClassesViewModelTest {
             fixtureXml()
         }
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
-        viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository)
+        viewModel = ClassesViewModel(repository(fetcher), manager, activeProfileHolder, rideRepository, routeLoaded = { false })
 
         viewModel.refresh() // cold start: nothing loaded yet, Loading is fine here
         viewModel.refresh() // second refresh: must not blank the already-loaded content
@@ -220,6 +220,7 @@ class ClassesViewModelTest {
             manager,
             activeProfileHolder,
             rideRepository,
+            routeLoaded = { false },
         )
 
         viewModel.refresh()
@@ -464,5 +465,52 @@ class ClassesViewModelTest {
             .map { sections -> sections.single().videos.map { it.id } }
             .first { ids -> !ids.contains("vidLong00001") }
         assertEquals(before.size - 1, after.size)
+    }
+
+    @Test
+    fun `starting a class from Classes emits class_start with the channel and category`() = runTest {
+        val profileId = profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(profileId)
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ClassesViewModel(
+            repository(), manager, activeProfileHolder, rideRepository, routeLoaded = { false },
+            classTelemetry = dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry(recording),
+        )
+        viewModel.refresh()
+        val section = (viewModel.uiState.value as ClassesUiState.Loaded).sections.first { it.videos.isNotEmpty() }
+
+        viewModel.startRideForVideo(section.videos.first())
+
+        assertEquals(
+            mapOf(
+                "channel" to "Test Cycling Channel", "channel_source" to "custom",
+                "category" to "scenic", "source" to "classes",
+            ),
+            recording.events.single().props(),
+        )
+    }
+
+    @Test
+    fun `starting a class while a ride is already running sends no second class_start`() = runTest {
+        val profileId = profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(profileId)
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ClassesViewModel(
+            repository(), manager, activeProfileHolder, rideRepository, routeLoaded = { false },
+            classTelemetry = dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry(recording),
+        )
+        viewModel.refresh()
+        val section = (viewModel.uiState.value as ClassesUiState.Loaded).sections.first { it.videos.isNotEmpty() }
+
+        viewModel.startRideForVideo(section.videos.first())
+        viewModel.startRideForVideo(section.videos.first())
+
+        assertEquals(1, recording.events.count { it.name == "class_start" })
     }
 }

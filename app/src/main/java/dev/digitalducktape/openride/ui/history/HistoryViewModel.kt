@@ -5,6 +5,11 @@ import dev.digitalducktape.openride.core.data.Ride
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.export.CsvExporter
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideExport
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import androidx.lifecycle.viewModelScope
@@ -26,6 +31,7 @@ import kotlinx.coroutines.flow.map
 class HistoryViewModel(
     activeProfileHolder: ActiveProfileHolder,
     rideRepository: RideRepository,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
     private val ridesFlow: Flow<List<Ride>> = activeProfileHolder.activeProfileId.flatMapLatest { profileId ->
         if (profileId == null) flowOf(emptyList()) else rideRepository.observeHistory(profileId)
@@ -59,7 +65,8 @@ class HistoryViewModel(
      * moment of the call — a one-shot snapshot via [Flow.first], not a live subscription,
      * since exporting is a discrete user action.
      */
-    suspend fun historyCsvContent(): String = CsvExporter.exportHistory(ridesFlow.first())
+    suspend fun historyCsvContent(): String =
+        CsvExporter.exportHistory(ridesFlow.first()).also { telemetry.trackSafely { RideExport(ExportFormat.CSV_HISTORY) } }
 }
 
 /** The History tab's state: [HistoryViewModel.uiState]. */

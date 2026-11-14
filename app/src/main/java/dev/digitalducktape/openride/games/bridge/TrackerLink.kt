@@ -3,6 +3,11 @@ package dev.digitalducktape.openride.games.bridge
 import dev.digitalducktape.openride.core.camera.CalibrationProgress
 import dev.digitalducktape.openride.core.camera.HeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
+import dev.digitalducktape.openride.core.telemetry.CalibrationResult
+import dev.digitalducktape.openride.core.telemetry.HeadCalibration
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import dev.digitalducktape.openride.core.camera.TrackerMode as CameraMode
 import dev.digitalducktape.openride.core.camera.TrackerState as CameraTrackerState
+import dev.digitalducktape.openride.core.telemetry.CalibrationMode as TelemetryMode
 
 /**
  * `calibration_progress(step, fraction, step_index, step_count, attempt, retry_reason)`, which
@@ -88,6 +94,7 @@ class TrackerLink(
     private val signals: GameSignals,
     private val scope: CoroutineScope,
     private val log: (String) -> Unit = {},
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) {
     private var progressJob: Job? = null
     private var watchJob: Job? = null
@@ -99,6 +106,9 @@ class TrackerLink(
     /** A hub calibration is running ([hubCalibrate]). */
     var hubCalibrating = false
         private set
+
+    /** The mode of the hub calibration in progress, for `head_calibration` (#85). */
+    private var hubMode: CalibrationMode? = null
 
     /** Called when a hub calibration ends (completed, failed or cancelled): the visit resends `hub_state`. */
     var onHubCalibrationEnded: () -> Unit = {}
@@ -156,6 +166,9 @@ class TrackerLink(
         }
         if (hubCalibrating) {
             hubCalibrating = false
+            // Completed is a success; ending unavailable (no face, no camera) is a failure.
+            val completed = state.trackerState == CameraTrackerState.TRACKING || state.trackerState == CameraTrackerState.FACE_LOST
+            trackCalibration(if (completed) CalibrationResult.SUCCESS else CalibrationResult.FAILED)
             tracker.setMode(CameraMode.OFF)
             onHubCalibrationEnded()
         }
@@ -172,8 +185,18 @@ class TrackerLink(
         val mode = CalibrationMode.fromWire(wire)?.toCameraMode()
             ?: return log("hub_calibrate: unknown mode '$wire'")
         hubCalibrating = true
+        hubMode = CalibrationMode.fromWire(wire)
         tracker.setMode(mode)
         calibrate(mode, force = full)
+    }
+
+    private fun trackCalibration(result: CalibrationResult) {
+        val mode = when (hubMode) {
+            CalibrationMode.LEAN_X -> TelemetryMode.LEAN_X
+            CalibrationMode.LEAN_2D -> TelemetryMode.LEAN_2D
+            null -> return log("head_calibration: no mode known, not sent")
+        }
+        telemetry.trackSafely { HeadCalibration(result, mode) }
     }
 
     /** Stops a hub calibration: the camera off. The visit's earlier calibration stays. */
@@ -181,6 +204,7 @@ class TrackerLink(
         if (!hubCalibrating) return
         hubCalibrating = false
         calibrationRunning = false
+        trackCalibration(CalibrationResult.CANCELLED)
         tracker.setMode(CameraMode.OFF)
         onHubCalibrationEnded()
     }

@@ -26,6 +26,9 @@ object Destinations {
     /** Version, license and the Buy Me a Coffee QR code (#86), reachable from the Profile tab. */
     const val About = "about"
 
+    /** The usage-data notice, "What's collected" (#85): from the first-run prompt and the Profile tab. */
+    const val TelemetryInfo = "telemetry_info"
+
     /** Rider-managed Classes catalog (channels and playlists), reachable from the Profile tab. */
     const val ContentSources = "content_sources"
 

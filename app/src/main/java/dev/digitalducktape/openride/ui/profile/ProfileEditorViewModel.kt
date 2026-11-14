@@ -5,6 +5,10 @@ import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.profile.WeightUnits
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.ProfileCreated
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +47,7 @@ class ProfileEditorViewModel(
     private val profileRepository: ProfileRepository,
     private val activeProfileHolder: ActiveProfileHolder,
     private val editActiveProfile: Boolean = false,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileEditorUiState())
     val uiState: StateFlow<ProfileEditorUiState> = _uiState.asStateFlow()
@@ -175,6 +180,7 @@ class ProfileEditorViewModel(
                 ),
             )
             activeProfileHolder.setActiveProfile(id)
+            telemetry.trackSafely { ProfileCreated(hasPhoto = current.avatarPhotoPath != null) }
         }
         _uiState.value = _uiState.value.copy(saved = true)
         return true

@@ -14,4 +14,7 @@ data class CreatorContent(
     val latest: List<Video>,
     val playlists: List<PlaylistSummary>,
     val refreshFailed: Boolean,
+    val channelId: String = "",
+    val sourceType: ContentSourceType = ContentSourceType.CHANNEL,
+    val category: ContentCategory = ContentCategory.Workout,
 )

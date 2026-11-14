@@ -1,5 +1,7 @@
 package dev.digitalducktape.openride.ui.profile
 
+import dev.digitalducktape.openride.core.telemetry.ProfileCreated
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -271,5 +273,51 @@ class ProfileEditorViewModelTest {
         editor.save()
 
         assertNull(profileRepository.getProfile(id)!!.weightKg)
+    }
+
+    @Test
+    fun `saving a new profile reports profile_created without a photo`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val vm = ProfileEditorViewModel(profileRepository, activeProfileHolder, telemetry = telemetry)
+        vm.onNameChange("Ed")
+
+        vm.save()
+
+        assertEquals(listOf(ProfileCreated(hasPhoto = false)), telemetry.events)
+    }
+
+    @Test
+    fun `saving a new profile with a photo reports has_photo`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val vm = ProfileEditorViewModel(profileRepository, activeProfileHolder, telemetry = telemetry)
+        vm.onNameChange("Ed")
+        vm.onPhotoCaptured("/data/avatars/a.jpg")
+
+        vm.save()
+
+        assertEquals(listOf(ProfileCreated(hasPhoto = true)), telemetry.events)
+    }
+
+    @Test
+    fun `an invalid new profile reports nothing`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val vm = ProfileEditorViewModel(profileRepository, activeProfileHolder, telemetry = telemetry)
+
+        vm.save()
+
+        assertEquals(emptyList<Any>(), telemetry.events)
+    }
+
+    @Test
+    fun `editing a profile reports nothing`() = runTest {
+        val telemetry = RecordingTelemetry()
+        seedActiveProfile()
+        val vm = ProfileEditorViewModel(profileRepository, activeProfileHolder, editActiveProfile = true, telemetry = telemetry)
+        vm.loadForEdit()
+        vm.onNameChange("Renamed")
+
+        assertTrue(vm.save())
+
+        assertEquals(emptyList<Any>(), telemetry.events)
     }
 }

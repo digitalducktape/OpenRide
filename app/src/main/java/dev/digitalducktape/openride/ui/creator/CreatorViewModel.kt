@@ -1,10 +1,16 @@
 package dev.digitalducktape.openride.ui.creator
 
 import androidx.lifecycle.ViewModel
+import dev.digitalducktape.openride.core.content.CreatorContent
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
+import dev.digitalducktape.openride.core.telemetry.ClassSource
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideEntry
+import dev.digitalducktape.openride.core.telemetry.channelFor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +38,12 @@ class CreatorViewModel(
     private val activeProfileHolder: ActiveProfileHolder,
     rideRepository: RideRepository,
     private val sourceId: Long,
+    private val routeLoaded: () -> Boolean,
+    private val classTelemetry: ClassRideTelemetry = ClassRideTelemetry(NoOpTelemetry),
 ) : ViewModel() {
+
+    /** The source behind this page, once loaded: what `class_start` names as the channel. */
+    private var source: CreatorContent? = null
 
     private val _uiState = MutableStateFlow<CreatorUiState>(CreatorUiState.Loading)
     val uiState: StateFlow<CreatorUiState> = _uiState.asStateFlow()
@@ -51,6 +62,7 @@ class CreatorViewModel(
     suspend fun load() {
         _uiState.value = CreatorUiState.Loading
         val content = contentRepository.creatorContent(sourceId)
+        source = content
         _uiState.value = if (content == null) {
             CreatorUiState.NotFound
         } else {
@@ -116,7 +128,22 @@ class CreatorViewModel(
     /** Same contract as [dev.digitalducktape.openride.ui.classes.ClassesViewModel.startRideForVideo]. */
     fun startRideForVideo(videoId: String): Boolean {
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId, videoId)
+        // A ride already running is left alone (start is a no-op), and so is its class_start.
+        if (rideSessionManager.start(profileId, videoId, entry = RideEntry.CREATOR, route = routeLoaded())) {
+            reportClassStart()
+        }
         return true
+    }
+
+    /**
+     * `class_start` names the creator whose page this is. Their playlists' videos count as theirs,
+     * and the category is the creator's own, which is all the page knows.
+     */
+    private fun reportClassStart() {
+        runCatching {
+            val creator = source ?: return
+            val (channel, channelSource) = channelFor(creator.channelId, creator.sourceType, creator.displayName)
+            classTelemetry.start(channel, channelSource, creator.category, ClassSource.CREATOR)
+        }
     }
 }

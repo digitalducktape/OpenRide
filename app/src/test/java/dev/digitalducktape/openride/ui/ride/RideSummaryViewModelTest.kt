@@ -2,6 +2,13 @@
 
 package dev.digitalducktape.openride.ui.ride
 
+import kotlinx.coroutines.test.TestScope
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.RideExport
+import dev.digitalducktape.openride.core.telemetry.DeletedRideType
+import dev.digitalducktape.openride.core.telemetry.RideDeleted
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -54,7 +61,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `load fetches the ride by id`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(2_000)
         runCurrent()
         val ride = manager.stop()
@@ -71,7 +78,7 @@ class RideSummaryViewModelTest {
     fun `load also fetches the ride's full sample series`() = runTest {
         val fakeBikeDataSource = FakeBikeDataSource()
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 200)
         advanceTimeBy(3_000)
         runCurrent()
@@ -111,7 +118,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `an ordinary ride has no game results`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(1_000)
         runCurrent()
         val ride = requireNotNull(manager.stop())
@@ -126,7 +133,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `dismiss resets the session when it was Finished`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(1_000)
         runCurrent()
         val ride = manager.stop()
@@ -141,7 +148,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `dismiss is a no-op when the session isn't Finished (history detail case)`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(1_000)
         runCurrent()
         val ride = manager.stop()
@@ -172,7 +179,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `suggestedFtp is null for a ride shorter than 20 minutes`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(5_000)
         runCurrent()
         val ride = manager.stop()
@@ -217,7 +224,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `tcxContent and sampleCsvContent are null before load`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(1_000)
         runCurrent()
         val ride = manager.stop()
@@ -233,7 +240,7 @@ class RideSummaryViewModelTest {
     fun `tcxContent and sampleCsvContent reflect the loaded ride and samples`() = runTest {
         val fakeBikeDataSource = FakeBikeDataSource()
         val manager = RideSessionManager(fakeBikeDataSource, rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 200)
         advanceTimeBy(2_000)
         runCurrent()
@@ -256,7 +263,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `applySuggestedFtp is a no-op when the ride is too short to have a suggestion`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(5_000)
         runCurrent()
         val ride = manager.stop()
@@ -273,7 +280,7 @@ class RideSummaryViewModelTest {
     @Test
     fun `deleteRide removes the ride from history and clears a finished session`() = runTest {
         val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
-        manager.start(profileId)
+        manager.start(profileId, entry = RideEntry.HOME_QUICK_START, route = false)
         advanceTimeBy(2_000)
         runCurrent()
         val ride = requireNotNull(manager.stop())
@@ -287,5 +294,59 @@ class RideSummaryViewModelTest {
         assertNull(viewModel.ride.value)
         assertNull(viewModel.tcxContent())
         assertEquals(RideSessionState.Idle, manager.state.value)
+    }
+
+    private suspend fun savedRide(videoId: String? = null, gamePlan: String? = null): Long =
+        RideRepository(db, db.rideDao(), db.gameResultDao()).saveRide(
+            Ride(
+                profileId = profileId, startEpochMs = 0, durationSec = 600, avgCadence = 80, maxCadence = 90,
+                avgPower = 150, maxPower = 200, avgResistance = 40, outputKj = 90.0, calories = 80,
+                videoId = videoId, gamePlan = gamePlan,
+            ),
+            emptyList(),
+        )
+
+    private suspend fun TestScope.deleteWith(telemetry: RecordingTelemetry, rideId: Long) {
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, rideId, telemetry)
+        viewModel.load()
+        viewModel.deleteRide()
+    }
+
+    @Test
+    fun `deleting a plain ride reports just_ride`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide())
+        assertEquals(listOf(RideDeleted(DeletedRideType.JUST_RIDE)), telemetry.events)
+    }
+
+    @Test
+    fun `deleting a class ride reports class`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide(videoId = "abc"))
+        assertEquals(listOf(RideDeleted(DeletedRideType.CLASS)), telemetry.events)
+    }
+
+    @Test
+    fun `deleting a games ride reports games`() = runTest {
+        val telemetry = RecordingTelemetry()
+        deleteWith(telemetry, savedRide(gamePlan = "circuit-20"))
+        assertEquals(listOf(RideDeleted(DeletedRideType.GAMES)), telemetry.events)
+    }
+
+    @Test
+    fun `exporting reports the format only when there is something to export`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope) { 0L }
+        val viewModel = RideSummaryViewModel(rideRepository, profileRepository, manager, savedRide(), telemetry)
+
+        viewModel.tcxContent()
+        viewModel.sampleCsvContent()
+        assertEquals(emptyList<Any>(), telemetry.events)
+
+        viewModel.load()
+        viewModel.tcxContent()
+        viewModel.sampleCsvContent()
+        assertEquals(listOf(RideExport(ExportFormat.TCX), RideExport(ExportFormat.CSV_RIDE)), telemetry.events)
     }
 }

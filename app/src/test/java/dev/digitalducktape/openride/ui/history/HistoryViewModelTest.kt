@@ -11,6 +11,9 @@ import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.Ride
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideExport
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -139,5 +142,15 @@ class HistoryViewModelTest {
         val dataRows = csv.trimEnd('\n').split("\n").drop(1)
         assertEquals(1, dataRows.size)
         assertTrue(dataRows.single().contains("600,80,95,150,220,40,90.00,90"))
+    }
+
+    @Test
+    fun `exporting the history reports csv_history`() = runTest {
+        val telemetry = RecordingTelemetry()
+        val viewModel = HistoryViewModel(activeProfileHolder, rideRepository, telemetry)
+
+        viewModel.historyCsvContent()
+
+        assertEquals(listOf(RideExport(ExportFormat.CSV_HISTORY)), telemetry.events)
     }
 }

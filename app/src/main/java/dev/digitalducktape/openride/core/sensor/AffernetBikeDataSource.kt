@@ -2,6 +2,12 @@ package dev.digitalducktape.openride.core.sensor
 
 import android.content.Context
 import android.util.Log
+import dev.digitalducktape.openride.core.telemetry.BikeSensor
+import dev.digitalducktape.openride.core.telemetry.BikeSensorState
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.SensorPath
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -10,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The real [BikeDataSource] for Peloton hardware: binds *both* affernet sensor interfaces and
@@ -56,13 +63,15 @@ class AffernetBikeDataSource(
     private val scope: CoroutineScope,
     private val v1: BoundBikeDataSource,
     private val bikeInterface: PollableBikeDataSource,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : BikeDataSource {
 
     /** Production wiring: the two real affernet binder paths. */
-    constructor(context: Context, scope: CoroutineScope) : this(
+    constructor(context: Context, scope: CoroutineScope, telemetry: Telemetry = NoOpTelemetry) : this(
         scope = scope,
         v1 = PelotonBikeDataSource(context),
         bikeInterface = PelotonBikeInterfaceDataSource(context),
+        telemetry = telemetry,
     )
 
     private val _metrics = MutableStateFlow(BikeMetrics.ZERO)
@@ -82,6 +91,11 @@ class AffernetBikeDataSource(
     /** Everything [start] launches, so [stop] can take it all down. */
     private val jobs = mutableListOf<Job>()
     private var pollJob: Job? = null
+    private var silenceJob: Job? = null
+
+    /** `bike_sensor` goes out once for this source (once per process: the container owns one). */
+    private val connectedReported = AtomicBoolean(false)
+    private val unavailableReported = AtomicBoolean(false)
 
     /** Binds both interfaces and starts the race. Safe on any device; never throws. */
     fun start() {
@@ -89,6 +103,13 @@ class AffernetBikeDataSource(
         bikeInterface.start()
 
         jobs += scope.launch { race() }
+        // No frame at all in the first SENSOR_UNAVAILABLE_AFTER_MS: report it. Cancelled the moment a path wins.
+        silenceJob = scope.launch {
+            delay(SENSOR_UNAVAILABLE_AFTER_MS)
+            if (activePath == null && !connectedReported.get() && unavailableReported.compareAndSet(false, true)) {
+                telemetry.trackSafely { BikeSensor(BikeSensorState.UNAVAILABLE, null) }
+            }
+        }.also { jobs += it }
         jobs += scope.launch {
             // Give the push paths a fair chance before falling back to polling, so a board that
             // does push is never polled needlessly.
@@ -102,6 +123,7 @@ class AffernetBikeDataSource(
         jobs.forEach { it.cancel() }
         jobs.clear()
         pollJob = null
+        silenceJob = null
         v1.stop()
         bikeInterface.stop()
         activePath = null
@@ -128,6 +150,14 @@ class AffernetBikeDataSource(
 
     private fun adopt(winner: BoundBikeDataSource, path: String, loser: BoundBikeDataSource) {
         activePath = path
+        silenceJob?.cancel()
+        silenceJob = null
+        // A board that only answers polls wins the race on the bike interface too: say which fed it.
+        val reported = if (path == PATH_V1) SensorPath.IV1_INTERFACE
+        else if (pollJob != null) SensorPath.POLLING else SensorPath.BIKE_INTERFACE
+        if (connectedReported.compareAndSet(false, true)) {
+            telemetry.trackSafely { BikeSensor(BikeSensorState.CONNECTED, reported) }
+        }
         // The single most useful line in a field bug report: which binder this board feeds.
         Log.i(TAG, "sensor path adopted: $path (releasing the other binding)")
         loser.stop()
@@ -172,5 +202,8 @@ class AffernetBikeDataSource(
 
         /** How often the race checks for a winner. Short enough to feel instant at ride start. */
         const val RACE_POLL_MS = 100L
+
+        /** No frame this long after start reads as `bike_sensor` unavailable. */
+        const val SENSOR_UNAVAILABLE_AFTER_MS = 30_000L
     }
 }

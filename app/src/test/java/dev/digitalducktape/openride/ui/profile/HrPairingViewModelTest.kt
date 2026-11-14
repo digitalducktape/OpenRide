@@ -14,6 +14,9 @@ import dev.digitalducktape.openride.core.heartrate.BleScanner
 import dev.digitalducktape.openride.core.heartrate.FakeManagedHeartRateDataSource
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.core.telemetry.HrSelectResult
+import dev.digitalducktape.openride.core.telemetry.HrStrapSelected
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -48,6 +51,7 @@ class HrPairingViewModelTest {
     private lateinit var activeProfileHolder: ActiveProfileHolder
     private lateinit var scanner: FakeBleScanner
     private lateinit var viewModel: HrPairingViewModel
+    private val telemetry = RecordingTelemetry()
 
     @Before
     fun setUp() {
@@ -57,7 +61,7 @@ class HrPairingViewModelTest {
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         scanner = FakeBleScanner()
-        viewModel = HrPairingViewModel(scanner, profileRepository, activeProfileHolder)
+        viewModel = HrPairingViewModel(scanner, profileRepository, activeProfileHolder, telemetry = telemetry)
     }
 
     @After
@@ -195,5 +199,43 @@ class HrPairingViewModelTest {
 
         fun emitDevice(device: BleDevice) = onDeviceFound?.invoke(device)
         fun failScan(reason: String) = onScanFailed?.invoke(reason)
+    }
+
+    @Test
+    fun `telemetry says bt_off when Bluetooth is off, without the message`() {
+        scanner.bluetoothAvailable = false
+        viewModel.onPermissionState(BlePermissionState.Granted)
+
+        viewModel.startScan()
+
+        assertEquals(listOf<Any>(HrStrapSelected(HrSelectResult.BT_OFF)), telemetry.events)
+    }
+
+    @Test
+    fun `telemetry says scan_failed without the reason`() {
+        viewModel.onPermissionState(BlePermissionState.Granted)
+        viewModel.startScan()
+
+        scanner.failScan("adapter shut off")
+
+        assertEquals(listOf<Any>(HrStrapSelected(HrSelectResult.SCAN_FAILED)), telemetry.events)
+        assertEquals(mapOf("result" to "scan_failed"), telemetry.events.single().props())
+    }
+
+    @Test
+    fun `telemetry says selected when a strap is chosen`() = runTest {
+        val id = profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(id)
+        viewModel.onPermissionState(BlePermissionState.Granted)
+        viewModel.startScan()
+
+        viewModel.selectDevice(BleDevice(address = "AA:BB:CC:DD:EE:FF", name = "Wahoo TICKR"))
+        // The write runs on Room's executor; the event follows it.
+        viewModel.uiState.first { it.pairedAddress == "AA:BB:CC:DD:EE:FF" }
+        repeat(200) { if (telemetry.events.isEmpty()) Thread.sleep(10) }
+
+        assertEquals(listOf<Any>(HrStrapSelected(HrSelectResult.SELECTED)), telemetry.events)
     }
 }

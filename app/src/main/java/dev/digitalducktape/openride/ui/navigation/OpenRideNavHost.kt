@@ -28,6 +28,7 @@ import dev.digitalducktape.openride.ui.profile.ProfileEditorRoute
 import dev.digitalducktape.openride.ui.profile.ProfileEditorViewModel
 import dev.digitalducktape.openride.ui.profile.ProfileSelectRoute
 import dev.digitalducktape.openride.ui.profile.ProfileSelectViewModel
+import dev.digitalducktape.openride.ui.telemetry.TelemetryInfoScreen
 import dev.digitalducktape.openride.ui.profile.HrPairingRoute
 import dev.digitalducktape.openride.ui.profile.HrPairingViewModel
 import dev.digitalducktape.openride.ui.ride.InRideScreen
@@ -45,6 +46,7 @@ import dev.digitalducktape.openride.ui.ride.RideSummaryViewModel
 @Composable
 fun OpenRideNavHost(appContainer: AppContainer) {
     val navController = rememberNavController()
+    ReportScreenViews(navController, appContainer.telemetry, appContainer.screenViewGate)
 
     // After a games visit (consume once): its ride summary, or the profile editor for the FTP nudge.
     val visitDestination by appContainer.visitNavigator.pending.collectAsState()
@@ -69,7 +71,12 @@ fun OpenRideNavHost(appContainer: AppContainer) {
         composable(Destinations.ProfileSelect) {
             val viewModel: ProfileSelectViewModel = viewModel(
                 factory = viewModelFactory {
-                    ProfileSelectViewModel(appContainer.profileRepository, appContainer.activeProfileHolder)
+                    ProfileSelectViewModel(
+                        appContainer.profileRepository,
+                        appContainer.activeProfileHolder,
+                        appContainer.telemetry,
+                        appContainer.telemetryConsent,
+                    )
                 },
             )
             ProfileSelectRoute(
@@ -80,13 +87,18 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                     }
                 },
                 onAddRider = { navController.navigate(Destinations.ProfileCreate) },
+                onShowTelemetryInfo = { navController.navigate(Destinations.TelemetryInfo) },
             )
+        }
+
+        composable(Destinations.TelemetryInfo) {
+            TelemetryInfoScreen(onDone = { navController.popBackStack() })
         }
 
         composable(Destinations.ProfileCreate) {
             val viewModel: ProfileEditorViewModel = viewModel(
                 factory = viewModelFactory {
-                    ProfileEditorViewModel(appContainer.profileRepository, appContainer.activeProfileHolder)
+                    ProfileEditorViewModel(appContainer.profileRepository, appContainer.activeProfileHolder, telemetry = appContainer.telemetry)
                 },
             )
             ProfileEditorRoute(
@@ -133,6 +145,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.profileRepository,
                         appContainer.activeProfileHolder,
                         appContainer.heartRateManager,
+                        appContainer.telemetry,
                     )
                 },
             )
@@ -150,6 +163,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         currentVersionCode = BuildConfig.VERSION_CODE,
                         currentVersionName = BuildConfig.VERSION_NAME,
                         assetInfix = BuildConfig.UPDATE_APK_ASSET_INFIX,
+                        telemetry = appContainer.telemetry,
                     )
                 },
             )
@@ -172,6 +186,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                     ContentSourcesViewModel(
                         appContainer.contentSourceRepository,
                         appContainer.channelHandleResolver,
+                        appContainer.telemetry,
                     )
                 },
             )
@@ -227,6 +242,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
             VideoRideScreen(
                 viewModel = viewModel,
                 videoId = videoId,
+                classTelemetry = appContainer.classRideTelemetry,
                 onRideEnded = { rideId ->
                     navController.navigate(Destinations.rideSummary(rideId)) {
                         popUpTo(Destinations.Main) { inclusive = false }
@@ -250,6 +266,8 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.activeProfileHolder,
                         appContainer.rideRepository,
                         sourceId,
+                        routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+                        classTelemetry = appContainer.classRideTelemetry,
                     )
                 },
             )
@@ -275,6 +293,7 @@ fun OpenRideNavHost(appContainer: AppContainer) {
                         appContainer.profileRepository,
                         appContainer.rideSessionManager,
                         rideId,
+                        appContainer.telemetry,
                     )
                 },
             )

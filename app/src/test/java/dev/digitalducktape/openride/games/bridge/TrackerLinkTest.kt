@@ -4,6 +4,9 @@ import dev.digitalducktape.openride.core.camera.CalibrationProgress
 import dev.digitalducktape.openride.core.camera.CalibrationRetryReason
 import dev.digitalducktape.openride.core.camera.CalibrationStep
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
+import dev.digitalducktape.openride.core.telemetry.CalibrationResult
+import dev.digitalducktape.openride.core.telemetry.HeadCalibration
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
 import dev.digitalducktape.openride.core.ride.FakeBikeDataSource
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +40,9 @@ class TrackerLinkTest {
     private val tracker = FakeHeadTracker()
     private val signals = ProgressRecorder()
     private val log = mutableListOf<String>()
-    private val link = TrackerLink(tracker, signals, scope, log = { log += it })
+    private val telemetry = RecordingTelemetry()
+    private val link = TrackerLink(tracker, signals, scope, log = { log += it }, telemetry = telemetry)
+    private fun calibrations() = telemetry.events.filterIsInstance<HeadCalibration>().map { it.result.wire to it.mode.wire }
 
     // --- input frame fields 6-9 ---------------------------------------------------------------
 
@@ -272,5 +277,42 @@ class TrackerLinkTest {
         link.endVisit()
         link.startVisit()
         assertEquals("", link.calibratedMode())
+    }
+
+    @Test
+    fun `a completed hub calibration emits success with its mode`() {
+        link.startVisit()
+        scope.runCurrent()
+        link.hubCalibrate("lean_2d", full = true)
+        tracker.finishCalibration()
+        scope.runCurrent()
+
+        assertEquals(listOf("success" to "lean_2d"), calibrations())
+    }
+
+    @Test
+    fun `a cancelled hub calibration emits cancelled, once`() {
+        link.startVisit()
+        scope.runCurrent()
+        link.hubCalibrate("lean_x", full = false)
+        link.cancelCalibration()
+        scope.runCurrent()
+        link.cancelCalibration()
+
+        assertEquals(listOf("cancelled" to "lean_x"), calibrations())
+    }
+
+    @Test
+    fun `a hub calibration that ends unavailable emits failed, and one outside the hub emits nothing`() {
+        link.startVisit()
+        scope.runCurrent()
+        link.hubCalibrate("lean_x", full = false)
+        tracker.failCalibration()
+        scope.runCurrent()
+        link.requestCalibration("lean_x") // in a plan, not the hub
+        tracker.finishCalibration()
+        scope.runCurrent()
+
+        assertEquals(listOf("failed" to "lean_x"), calibrations())
     }
 }

@@ -5,6 +5,23 @@ import dev.digitalducktape.openride.core.data.GameResultDao
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.ride.RideSessionState
+import dev.digitalducktape.openride.core.telemetry.DiscardReason
+import dev.digitalducktape.openride.core.telemetry.GameDifficulty
+import dev.digitalducktape.openride.core.telemetry.GameMusic
+import dev.digitalducktape.openride.core.telemetry.GameMusicSwitch
+import dev.digitalducktape.openride.core.telemetry.GamesPlanStart
+import dev.digitalducktape.openride.core.telemetry.GamesVisitEnd
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.OnOff
+import dev.digitalducktape.openride.core.telemetry.OwnMusicSignal
+import dev.digitalducktape.openride.core.telemetry.PlanMode
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryBuckets
+import dev.digitalducktape.openride.core.telemetry.VisitEndReason
+import dev.digitalducktape.openride.core.telemetry.VisitMusicAccumulator
+import dev.digitalducktape.openride.core.telemetry.classify
+import dev.digitalducktape.openride.core.telemetry.trackSafely
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import dev.digitalducktape.openride.games.bridge.BridgeMessages
 import dev.digitalducktape.openride.games.bridge.CameraPermission
 import dev.digitalducktape.openride.games.bridge.Difficulty
@@ -69,6 +86,8 @@ class GameVisitManager(
     private val scope: CoroutineScope,
     private val runner: GameSessionManager,
     private val rideSessionManager: RideSessionManager,
+    /** A GPX route is loaded: `ride_start`'s `route`. */
+    private val routeLoaded: () -> Boolean,
     private val gameResultDao: GameResultDao,
     private val activeProfileId: () -> Long?,
     private val profile: suspend (profileId: Long) -> Profile?,
@@ -91,6 +110,9 @@ class GameVisitManager(
     /** Where the app goes when the rider leaves (the ride summary, or the profile editor). */
     private val navigator: VisitNavigator = VisitNavigator(),
     private val log: (String) -> Unit = {},
+    private val telemetry: Telemetry = NoOpTelemetry,
+    /** A track is playing in the rider's own music app (telemetry, #85). */
+    private val ownMusic: OwnMusicSignal = OwnMusicSignal { false },
 ) : GameSession {
     private enum class Phase { IDLE, WAITING, HUB, PLAN, SAVING, ENDED }
 
@@ -115,6 +137,12 @@ class GameVisitManager(
     private var lastEnd: Ending? = null
     private var lastRideId: Long? = null
     private var idleSec = 0
+
+    // Telemetry (#85): this visit's counters, restarted by newVisit (idle renewal included).
+    private var gamesPlayed = 0
+    private var musicControlsUsed = false
+    private var visitMusic = VisitMusicAccumulator()
+
     private val rows = mutableListOf<GameResult>()
     private val visitResults = mutableListOf<VisitResult>()
     private val visitPlans = mutableListOf<VisitPlan>()
@@ -136,6 +164,9 @@ class GameVisitManager(
 
     /** A visit's ride is being saved (from the end of the visit until `visit_ended`): the Games launcher says so. */
     val saving: StateFlow<Boolean> = _saving.asStateFlow()
+
+    /** The rider pressed a music button in the hub or a game (telemetry's `music_controls_used`). */
+    fun markMusicControl() = post { musicControlsUsed = true }
 
     /** The app has shown [finishedRideId]'s summary. */
     fun consumeFinishedRide() {
@@ -173,6 +204,9 @@ class GameVisitManager(
         lastEnd = null
         lastRideId = null
         idleSec = 0
+        gamesPlayed = 0
+        musicControlsUsed = false
+        visitMusic = VisitMusicAccumulator()
         rows.clear()
         visitResults.clear()
         visitPlans.clear()
@@ -229,7 +263,12 @@ class GameVisitManager(
                 settings.update { it.copy(cameraGames = update.on) }
                 tracker?.setCameraGamesEnabled(update.on)
             }
-            is SettingUpdate.GameMusic -> settings.update { it.copy(audio = it.audio.copy(gameMusic = update.on)) }
+            is SettingUpdate.GameMusic -> {
+                val before = settings.settings.value.audio.gameMusic
+                settings.update { it.copy(audio = it.audio.copy(gameMusic = update.on)) }
+                val after = settings.settings.value.audio.gameMusic
+                if (after != before) telemetry.trackSafely { GameMusicSwitch(if (after) OnOff.ON else OnOff.OFF) }
+            }
             is SettingUpdate.MusicVolume -> settings.update { it.copy(audio = it.audio.copy(musicVolume = update.volume)) }
             is SettingUpdate.SfxVolume -> settings.update { it.copy(audio = it.audio.copy(sfxVolume = update.volume)) }
         }
@@ -324,6 +363,22 @@ class GameVisitManager(
                 return@launch finishVisit(ending)
             }
             planIndex++
+            telemetry.trackSafely {
+                val music = currentMusic().also { visitMusic.observe(it) }
+                GamesPlanStart(
+                    mode = when (sessionRequest) {
+                        is SessionRequest.JustRide -> PlanMode.SINGLE
+                        is SessionRequest.Circuit -> PlanMode.CIRCUIT
+                        is SessionRequest.Custom -> PlanMode.CUSTOM_CIRCUIT
+                    },
+                    difficulty = when (sessionRequest.difficulty) {
+                        Difficulty.EASY -> GameDifficulty.EASY
+                        Difficulty.STANDARD -> GameDifficulty.STANDARD
+                        Difficulty.HARD -> GameDifficulty.HARD
+                    },
+                    music = music,
+                )
+            }
             val ride = rideFor(plan.planId)
             runner.run(
                 plan,
@@ -356,7 +411,7 @@ class GameVisitManager(
             log("another ride is in progress: this visit isn't recorded")
             return false
         }
-        rideSessionManager.start(pid, gamePlan = planId)
+        rideSessionManager.start(pid, gamePlan = planId, entry = RideEntry.GAMES, route = routeLoaded())
         return true
     }
 
@@ -390,6 +445,10 @@ class GameVisitManager(
             visitResults += VisitResult(plan.planId, index, row.gameId, difficulty, row.variant, row.score, row.stars, row.skipped, row.durationSec)
         }
         gameplaySec += outcome.gameplaySec
+        // A game "played" reached an end of its own or was left: skipped ones didn't.
+        gamesPlayed += outcome.results.count { !it.result.skipped } + if (outcome.quitMusic != null) 1 else 0
+        outcome.results.forEach { visitMusic.observe(it.music) }
+        outcome.quitMusic?.let { visitMusic.observe(it) }
         val counted = outcome.results.filterNot { it.result.skipped }
         val run = VisitPlan(
             planId = plan.planId,
@@ -482,7 +541,35 @@ class GameVisitManager(
         onExit(ending.next)
     }
 
+    private fun currentMusic(): GameMusic =
+        classify(settings.settings.value.audio.gameMusic, ownMusic.trackPlaying())
+
+    /** `games_visit_end` (#85), from this visit's counters. */
+    private fun emitVisitEnd(ending: Ending) {
+        telemetry.trackSafely {
+            val reason = when (ending.reason) {
+                "exit" -> VisitEndReason.EXIT
+                REASON_IDLE -> VisitEndReason.IDLE
+                "app_resumed" -> VisitEndReason.APP_RESUMED
+                else -> {
+                    log("games_visit_end: unknown reason '${ending.reason}', not sent")
+                    return@trackSafely null
+                }
+            }
+            // A visit with no game played still reads the music it ended on.
+            if (gamesPlayed == 0) visitMusic.observe(currentMusic())
+            GamesVisitEnd(
+                played = TelemetryBuckets.rideDuration(gameplaySec.toLong()),
+                games = TelemetryBuckets.gamesPlayed(gamesPlayed),
+                reason = reason,
+                music = visitMusic.result(),
+                musicControlsUsed = musicControlsUsed,
+            )
+        }
+    }
+
     private fun finishVisit(ending: Ending) {
+        emitVisitEnd(ending)
         phase = Phase.SAVING
         lastEnd = ending
         stopIdleGuard()
@@ -502,7 +589,13 @@ class GameVisitManager(
         }
         if (recording && outcome is SaveOutcome.Discard) {
             log("discarding the visit's ride: ${gameplaySec}s of gameplay, pedalled=${pedalled()}")
-            rideSessionManager.discard()
+            rideSessionManager.discard(
+                when ((outcome as SaveOutcome.Discard).reason) {
+                    "no_pedalling" -> DiscardReason.NO_PEDALLING
+                    "not_recording" -> DiscardReason.NOT_RECORDING
+                    else -> DiscardReason.TOO_SHORT
+                },
+            )
         }
         if (recording && outcome is SaveOutcome.Keep) {
             rideSessionManager.setGamePlan(plans.singleOrNull() ?: GameLabels.VISIT_PLAN)

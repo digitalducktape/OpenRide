@@ -38,6 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import dev.digitalducktape.openride.core.ride.RideSessionState
+import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
 import dev.digitalducktape.openride.ui.classes.YouTubeEmbed
 import dev.digitalducktape.openride.ui.common.TimeFormat
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -48,6 +51,7 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrConfirmDialog
 import dev.digitalducktape.openride.ui.designsystem.component.OrEyebrow
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
+import dev.digitalducktape.openride.core.telemetry.MusicSurface
 import dev.digitalducktape.openride.ui.music.MiniPlayer
 import kotlinx.coroutines.launch
 
@@ -84,6 +88,7 @@ fun VideoRideScreen(
     videoId: String,
     onRideEnded: (rideId: Long) -> Unit,
     modifier: Modifier = Modifier,
+    classTelemetry: ClassRideTelemetry = remember { ClassRideTelemetry(NoOpTelemetry) },
 ) {
     val uiState by viewModel.uiState.collectAsState(initial = InRideUiState())
     val scope = rememberCoroutineScope()
@@ -96,7 +101,33 @@ fun VideoRideScreen(
 
     // Shared by the End Ride dialog and the video-completion auto-end. endRide() returns
     // null if the ride is already over, so the two paths can't double-fire navigation.
-    val endRideAndShowSummary: () -> Unit = {
+    val currentElapsedSec by rememberUpdatedState(uiState.elapsedSec)
+    LaunchedEffect(classMuted) { classTelemetry.muteState(classMuted) }
+    // Any other way the class ends still closes it out, once (ClassRideTelemetry.end is idempotent):
+    // the ride finishing or stopping without our buttons (sensor-driven or elsewhere), and the
+    // screen being left (back, navigation). Disposal during a configuration change is
+    // recreation, not leaving, so it is skipped; the new composition carries on with the same
+    // ride and the same ClassRideTelemetry.
+    val activity = context as? android.app.Activity
+    var sawLive by remember { mutableStateOf(false) }
+    LaunchedEffect(uiState.sessionState) {
+        when (uiState.sessionState) {
+            RideSessionState.Active, RideSessionState.Paused -> sawLive = true
+            is RideSessionState.Finished -> classTelemetry.end(currentElapsedSec.toLong(), false)
+            RideSessionState.Idle -> if (sawLive) classTelemetry.end(currentElapsedSec.toLong(), false)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (activity?.isChangingConfigurations != true) {
+                classTelemetry.end(currentElapsedSec.toLong(), false)
+            }
+        }
+    }
+    val endRideAndShowSummary: (finished: Boolean) -> Unit = { finished ->
+        // class_end fires once however the ride ends (End ride button, or the video finishing):
+        // ClassRideTelemetry ignores the second call.
+        classTelemetry.end(currentElapsedSec.toLong(), finished)
         scope.launch {
             val ride = viewModel.endRide()
             if (ride != null) onRideEnded(ride.id)
@@ -108,7 +139,9 @@ fun VideoRideScreen(
             videoId = videoId,
             paused = uiState.isPaused,
             muted = classMuted,
-            onVideoEnded = endRideAndShowSummary,
+            onVideoEnded = { endRideAndShowSummary(true) },
+            onDuration = classTelemetry::videoDuration,
+            onPlayerError = classTelemetry::playerError,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -158,7 +191,7 @@ fun VideoRideScreen(
             destructive = false,
             onConfirm = {
                 showEndConfirmation = false
-                endRideAndShowSummary()
+                endRideAndShowSummary(false)
             },
             onDismiss = { showEndConfirmation = false },
         )
@@ -178,10 +211,14 @@ private fun ClassPlayer(
     paused: Boolean,
     muted: Boolean,
     onVideoEnded: () -> Unit,
+    onDuration: (Double) -> Unit,
+    onPlayerError: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     val currentOnVideoEnded by rememberUpdatedState(onVideoEnded)
+    val currentOnDuration by rememberUpdatedState(onDuration)
+    val currentOnPlayerError by rememberUpdatedState(onPlayerError)
 
     AndroidView(
         modifier = modifier,
@@ -200,7 +237,11 @@ private fun ClassPlayer(
                 addJavascriptInterface(
                     // JS-interface methods arrive on a WebView-internal thread; hop to the
                     // UI thread before touching Compose/navigation state.
-                    VideoEndBridge { post { currentOnVideoEnded() } },
+                    VideoEndBridge(
+                        onEnded = { post { currentOnVideoEnded() } },
+                        onDuration = { seconds -> post { currentOnDuration(seconds) } },
+                        onError = { code -> post { currentOnPlayerError(code) } },
+                    ),
                     YouTubeEmbed.BRIDGE_NAME,
                 )
                 // H.264 for the class (#73), set before the page loads so it is in place when
@@ -259,9 +300,21 @@ private fun riderMusicPlaying(context: Context): Boolean =
     (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.isMusicActive == true
 
 /** Page → app callback surface injected as `window.OpenRideBridge` (see [YouTubeEmbed]). */
-private class VideoEndBridge(private val onEnded: () -> Unit) {
+private class VideoEndBridge(
+    private val onEnded: () -> Unit,
+    private val onDuration: (Double) -> Unit,
+    private val onError: (Int) -> Unit,
+) {
     @JavascriptInterface
     fun onVideoEnded() = onEnded()
+
+    /** The video's length in seconds, once the player knows it. */
+    @JavascriptInterface
+    fun onDuration(seconds: Double) = onDuration.invoke(seconds)
+
+    /** YouTube's numeric IFrame error code; nothing else crosses over. */
+    @JavascriptInterface
+    fun onPlayerError(code: Int) = onError(code)
 }
 
 @Composable
@@ -331,7 +384,7 @@ private fun TopStripContent(
         } else if (classMuted) {
             // The rider's music in the class's place (#72). A status line takes the slot when
             // there is one: the strip has room for either, not both.
-            MiniPlayer()
+            MiniPlayer(surface = MusicSurface.VIDEO_RIDE)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(OrSpacing.md)) {

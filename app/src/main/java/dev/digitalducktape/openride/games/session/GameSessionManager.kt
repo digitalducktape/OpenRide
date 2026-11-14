@@ -1,7 +1,21 @@
 package dev.digitalducktape.openride.games.session
 
+import dev.digitalducktape.openride.core.telemetry.GameDifficulty
+import dev.digitalducktape.openride.core.telemetry.GameFinish
+import dev.digitalducktape.openride.core.telemetry.GameId
+import dev.digitalducktape.openride.core.telemetry.GameMusic
+import dev.digitalducktape.openride.core.telemetry.GameOutcome
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.OwnMusicSignal
+import dev.digitalducktape.openride.core.telemetry.Stars
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.TelemetryBuckets
+import dev.digitalducktape.openride.core.telemetry.Won
+import dev.digitalducktape.openride.core.telemetry.classify
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.games.bridge.BridgeMessages
 import dev.digitalducktape.openride.games.bridge.CalibrationMode
+import dev.digitalducktape.openride.games.bridge.Difficulty
 import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.GameSignals
 import dev.digitalducktape.openride.games.bridge.SegmentResult
@@ -29,7 +43,14 @@ data class PlanStart(
 )
 
 /** One segment as played: its `segment_started`, its start on the ride clock and its gameplay seconds. */
-data class PlayedSegment(val segment: SegmentStartMessage, val startSec: Int, val playedSec: Int, val result: SegmentResult)
+data class PlayedSegment(
+    val segment: SegmentStartMessage,
+    val startSec: Int,
+    val playedSec: Int,
+    val result: SegmentResult,
+    /** What the game played over when it ended (telemetry, #85). */
+    val music: GameMusic = GameMusic.OFF,
+)
 
 /**
  * A finished plan, for the visit to record and summarise.
@@ -37,7 +58,14 @@ data class PlayedSegment(val segment: SegmentStartMessage, val startSec: Int, va
  * @param elapsedSec the plan's own seconds, from its first intro card to its end, pauses excluded.
  * @param gameplaySec gameplay seconds, intro cards excluded (the visit's keep-or-discard rule).
  */
-data class PlanOutcome(val plan: SessionPlan, val results: List<PlayedSegment>, val elapsedSec: Int, val gameplaySec: Int)
+data class PlanOutcome(
+    val plan: SessionPlan,
+    val results: List<PlayedSegment>,
+    val elapsedSec: Int,
+    val gameplaySec: Int,
+    /** Telemetry (#85): what a segment still live when the plan was cut short played over, or null if none was. */
+    val quitMusic: GameMusic? = null,
+)
 
 /**
  * The plan runner (Games hub spec §2): walks one [SessionPlan] on a 1 Hz clock, the Kotlin side
@@ -74,6 +102,9 @@ class GameSessionManager(
     private val audioPrefs: () -> GameAudioPrefs = { GameAudioPrefs() },
     private val random: Random = Random.Default,
     private val log: (String) -> Unit = {},
+    private val telemetry: Telemetry = NoOpTelemetry,
+    /** A track is playing in the rider's own music app: `game_finish`'s `music`. */
+    private val ownMusic: OwnMusicSignal = OwnMusicSignal { false },
 ) {
     private enum class Phase { IDLE, INTRO, PLAYING, ENDING, AWAITING_END, FINISHED }
 
@@ -93,6 +124,9 @@ class GameSessionManager(
     private var calibrationPaused = false
     private var paused = false
     private var endRequested = false
+
+    /** The current segment has started and not yet recorded a result. */
+    private var segmentOpen = false
     private val results = mutableListOf<PlayedSegment>()
 
     /** Input frame index 10: gameplay seconds left in the current segment, -1 if open-ended or none. */
@@ -123,6 +157,7 @@ class GameSessionManager(
         calibrationPaused = false
         paused = false
         endRequested = false
+        segmentOpen = false
         results.clear()
         log("session_started ${plan.planId} (${plan.difficulty}, FTP ${plan.ftp.watts} W)")
         signals.sessionStarted(
@@ -150,12 +185,19 @@ class GameSessionManager(
     fun segmentFinished(resultJson: String) {
         val current = segment ?: return
         if (phase !in setOf(Phase.INTRO, Phase.PLAYING, Phase.ENDING)) return
+        var unreadable = false
         val parsed = BridgeMessages.parseResult(resultJson) ?: SegmentResult.zero(current.gameId).also {
+            unreadable = true
             log("segment_finished: unreadable result, recording zero: $resultJson")
         }
         if (parsed.gameId != current.gameId) log("segment_finished for '${parsed.gameId}' during '${current.gameId}'")
         log("segment_finished ${current.index}: score=${parsed.score} stars=${parsed.stars} skipped=${parsed.skipped}")
-        record(parsed.copy(gameId = current.gameId))
+        val outcome = when {
+            parsed.skipped -> GameOutcome.SKIPPED
+            unreadable -> GameOutcome.NO_RESULT
+            else -> GameOutcome.COMPLETED
+        }
+        record(parsed.copy(gameId = current.gameId), outcome)
         advance()
     }
 
@@ -218,6 +260,7 @@ class GameSessionManager(
             params = planned.params,
         )
         segment = message
+        segmentOpen = true
         segmentStartSec = ride.elapsedSec
         introLeftSec = message.introSec
         playedSec = 0
@@ -267,7 +310,7 @@ class GameSessionManager(
     private fun graceTick(current: SegmentStartMessage) {
         if (--graceLeftSec > 0) return
         log("segment ${current.index}: no result within ${GRACE_SEC}s, recording zero")
-        record(SegmentResult.zero(current.gameId))
+        record(SegmentResult.zero(current.gameId), GameOutcome.NO_RESULT)
         advance()
     }
 
@@ -277,9 +320,39 @@ class GameSessionManager(
         signals.segmentEnding()
     }
 
-    private fun record(result: SegmentResult) {
+    private fun record(result: SegmentResult, outcome: GameOutcome) {
         val current = segment ?: return
-        results += PlayedSegment(current, segmentStartSec, playedSec, result)
+        val music = currentMusic()
+        results += PlayedSegment(current, segmentStartSec, playedSec, result, music)
+        segmentOpen = false
+        emitFinish(current, outcome, result, music)
+    }
+
+    private fun currentMusic(): GameMusic =
+        runCatching { classify(audioPrefs().gameMusic, ownMusic.trackPlaying()) }.getOrDefault(GameMusic.OFF)
+
+    /** `game_finish` (#85). Never throws into the plan. */
+    private fun emitFinish(current: SegmentStartMessage, outcome: GameOutcome, result: SegmentResult?, music: GameMusic) {
+        telemetry.trackSafely {
+            val completed = outcome == GameOutcome.COMPLETED
+            GameFinish(
+                game = GameId(current.gameId),
+                difficulty = when (plan?.difficulty ?: current.difficulty) {
+                    Difficulty.EASY -> GameDifficulty.EASY
+                    Difficulty.STANDARD -> GameDifficulty.STANDARD
+                    Difficulty.HARD -> GameDifficulty.HARD
+                },
+                outcome = outcome,
+                won = when (result?.won.takeIf { completed }) {
+                    true -> Won.YES
+                    false -> Won.NO
+                    null -> Won.NA
+                },
+                stars = Stars.of(if (completed) result?.stars ?: 0 else 0),
+                played = TelemetryBuckets.gamePlayed(playedSec.toLong()),
+                music = music,
+            )
+        }
     }
 
     private fun advance() {
@@ -312,7 +385,13 @@ class GameSessionManager(
         segmentTimeLeftSec = -1.0
         planJob?.cancel()
         planJob = null
-        val outcome = PlanOutcome(finishedPlan, results.toList(), elapsedSec, gameplaySec)
+        // A segment still live was cut short (the rider left games): that is a quit.
+        var quitMusic: GameMusic? = null
+        if (segmentOpen) {
+            segment?.let { quitMusic = currentMusic().also { music -> emitFinish(it, GameOutcome.QUIT, null, music) } }
+            segmentOpen = false
+        }
+        val outcome = PlanOutcome(finishedPlan, results.toList(), elapsedSec, gameplaySec, quitMusic)
         log("plan ${finishedPlan.planId} finished: ${outcome.results.size} results, ${gameplaySec}s of gameplay")
         onFinished(outcome)
     }

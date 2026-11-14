@@ -9,6 +9,11 @@ import dev.digitalducktape.openride.core.heartrate.BleScanner
 import dev.digitalducktape.openride.core.heartrate.HeartRateDataSource
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.core.telemetry.HrSelectResult
+import dev.digitalducktape.openride.core.telemetry.HrStrapSelected
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +45,7 @@ class HrPairingViewModel(
     /** The live strap feed ([dev.digitalducktape.openride.core.heartrate.HeartRateManager]), so
      *  the paired row can say "Connected"; null leaves it reading as paired only. */
     liveHeartRate: HeartRateDataSource? = null,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) : ViewModel() {
 
     data class UiState(
@@ -92,6 +98,7 @@ class HrPairingViewModel(
         if (_uiState.value.permissionState != BlePermissionState.Granted) return
         if (!bleScanner.isBluetoothAvailable()) {
             _uiState.value = _uiState.value.copy(error = "Bluetooth is off or unavailable")
+            telemetry.trackSafely { HrStrapSelected(HrSelectResult.BT_OFF) }
             return
         }
         _uiState.value = _uiState.value.copy(isScanning = true, devices = emptyList(), error = null)
@@ -105,6 +112,8 @@ class HrPairingViewModel(
             },
             onScanFailed = { reason ->
                 _uiState.value = _uiState.value.copy(isScanning = false, error = reason)
+                // The reason is a system string: never sent.
+                telemetry.trackSafely { HrStrapSelected(HrSelectResult.SCAN_FAILED) }
             },
         )
     }
@@ -122,6 +131,7 @@ class HrPairingViewModel(
         viewModelScope.launch {
             val profile = profileRepository.getProfile(activeId) ?: return@launch
             profileRepository.updateProfile(profile.copy(pairedHrDeviceAddress = device.address))
+            telemetry.trackSafely { HrStrapSelected(HrSelectResult.SELECTED) }
         }
     }
 

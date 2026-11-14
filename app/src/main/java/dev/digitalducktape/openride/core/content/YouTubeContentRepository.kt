@@ -62,6 +62,9 @@ class YouTubeContentRepository(
         val section = fetchSection(source)
         CreatorContent(
             sourceId = source.id,
+            channelId = source.youtubeId,
+            sourceType = source.sourceType,
+            category = source.category,
             displayName = source.displayName,
             latest = section.videos,
             playlists = fetchPlaylists(source),
@@ -96,6 +99,7 @@ class YouTubeContentRepository(
                 channelId = source.youtubeId,
                 channelName = source.displayName,
                 category = source.category,
+                sourceType = source.sourceType,
                 videos = cached.orEmpty(),
                 refreshFailed = true,
             )
@@ -118,6 +122,7 @@ class YouTubeContentRepository(
                     channelId = source.youtubeId,
                     channelName = source.displayName,
                     category = source.category,
+                    sourceType = source.sourceType,
                     videos = cached,
                     refreshFailed = true,
                 )
@@ -128,6 +133,7 @@ class YouTubeContentRepository(
                     channelId = source.youtubeId,
                     channelName = source.displayName,
                     category = source.category,
+                    sourceType = source.sourceType,
                     videos = filtered,
                     refreshFailed = false,
                 )

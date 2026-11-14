@@ -1,6 +1,12 @@
 package dev.digitalducktape.openride.core.backup
 
+import dev.digitalducktape.openride.core.telemetry.AutoBackupFailed
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -38,7 +44,11 @@ class AutoBackupManager(
     private val isDatabaseEmpty: suspend () -> Boolean,
     private val debounceMs: Long = DEFAULT_DEBOUNCE_MS,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val telemetry: Telemetry = NoOpTelemetry,
 ) {
+    /** `auto_backup_failed` is sent at most once per process (this is a process-wide singleton). */
+    private val failureReported = AtomicBoolean(false)
+
     @OptIn(FlowPreview::class)
     fun start() {
         scope.launch {
@@ -49,7 +59,16 @@ class AutoBackupManager(
             // source folds those into the first emission, losing them entirely).
             dataChanges
                 .debounce(debounceMs)
-                .collect { runCatching { writeBackupUnlessEmpty() } }
+                .collect {
+                    val written = try {
+                        writeBackupUnlessEmpty()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        false
+                    }
+                    if (!written) reportFailureOnce()
+                }
         }
     }
 
@@ -61,12 +80,17 @@ class AutoBackupManager(
         }
     }
 
-    private suspend fun writeBackupUnlessEmpty() {
-        if (isDatabaseEmpty()) return
+    private fun reportFailureOnce() {
+        if (failureReported.compareAndSet(false, true)) telemetry.trackSafely { AutoBackupFailed }
+    }
+
+    /** `false` when the store refused (or threw, via the caller); an empty database is not a failure. */
+    private suspend fun writeBackupUnlessEmpty(): Boolean {
+        if (isDatabaseEmpty()) return true
         // The store reads/writes shared storage, so it's blocking IO — never run it on the
         // container scope's default (CPU-bound) dispatcher.
         val json = backupRepository.exportJson()
-        withContext(ioDispatcher) { store.write(json) }
+        return withContext(ioDispatcher) { store.write(json) }
     }
 
     companion object {

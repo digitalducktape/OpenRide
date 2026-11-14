@@ -33,6 +33,7 @@ import dev.digitalducktape.openride.ui.designsystem.OrSpacing
 import dev.digitalducktape.openride.ui.designsystem.OrType
 import dev.digitalducktape.openride.ui.designsystem.component.OrPrimaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
+import dev.digitalducktape.openride.ui.telemetry.TelemetryConsentDialog
 import dev.digitalducktape.openride.ui.theme.OpenRideTheme
 
 /** Rider select connected to its [ProfileSelectViewModel] (Route half of the Route/Screen split). */
@@ -41,8 +42,10 @@ fun ProfileSelectRoute(
     viewModel: ProfileSelectViewModel,
     onProfileSelected: () -> Unit,
     onAddRider: () -> Unit,
+    onShowTelemetryInfo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val showConsentPrompt by viewModel.showConsentPrompt.collectAsStateWithLifecycle()
     // null until the first database read, so "add your first rider" never flashes past.
     val profiles by viewModel.profiles.collectAsStateWithLifecycle(initialValue = null)
     ProfileSelectScreen(
@@ -54,6 +57,13 @@ fun ProfileSelectRoute(
         onAddRider = onAddRider,
         modifier = modifier,
     )
+    if (showConsentPrompt) {
+        TelemetryConsentDialog(
+            onShare = viewModel::onConsentShare,
+            onDecline = viewModel::onConsentDecline,
+            onShowWhatsCollected = onShowTelemetryInfo,
+        )
+    }
 }
 
 /**

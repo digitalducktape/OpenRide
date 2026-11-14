@@ -14,6 +14,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.core.content.ContextCompat
+import dev.digitalducktape.openride.core.telemetry.OwnMusicSignal
+import dev.digitalducktape.openride.core.telemetry.RideTelemetryTracker
 import java.time.ZoneId
 import androidx.room.Room
 import dev.digitalducktape.openride.core.backup.AutoBackupManager
@@ -50,6 +52,17 @@ import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.profile.AvatarPhotoStore
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.route.RouteHolder
+import dev.digitalducktape.openride.core.telemetry.AptabaseTelemetry
+import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
+import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.ui.navigation.ScreenViewGate
+import dev.digitalducktape.openride.core.telemetry.SdkAptabaseClient
+import dev.digitalducktape.openride.core.telemetry.SharedPrefsTelemetryConsentStore
+import dev.digitalducktape.openride.core.telemetry.MusicPlayerOpen
+import dev.digitalducktape.openride.core.telemetry.MusicSurface
+import dev.digitalducktape.openride.core.telemetry.Telemetry
+import dev.digitalducktape.openride.core.telemetry.trackSafely
+import dev.digitalducktape.openride.core.telemetry.TelemetryConsentStore
 import dev.digitalducktape.openride.core.update.AvailableUpdate
 import dev.digitalducktape.openride.core.update.UpdateCheckResult
 import dev.digitalducktape.openride.core.update.UpdateRepository
@@ -159,12 +172,13 @@ class AppContainer(private val applicationContext: Context) {
             isDatabaseEmpty = {
                 database.profileDao().getAllOnce().isEmpty() && database.rideDao().getAllRidesOnce().isEmpty()
             },
+            telemetry = telemetry,
         )
     }
 
     val bikeDataSource: BikeDataSource by lazy {
         if (BuildConfig.USE_REAL_BIKE_SENSOR) {
-            AffernetBikeDataSource(applicationContext, containerScope).also { it.start() }
+            AffernetBikeDataSource(applicationContext, containerScope, telemetry).also { it.start() }
         } else {
             MockBikeDataSource(scope = containerScope)
         }
@@ -185,7 +199,34 @@ class AppContainer(private val applicationContext: Context) {
             rideRepository = rideRepository,
             scope = containerScope,
             heartRateBpm = heartRateManager.bpm,
+            telemetry = telemetry,
+            rideTracker = rideSessionTracker,
         )
+    }
+
+    /** The tracker rides use: none when this build can't send, so no per-ride work is done for nothing. */
+    val rideSessionTracker: RideTelemetryTracker? by lazy {
+        if (telemetry === NoOpTelemetry) null else rideTelemetryTracker
+    }
+
+    /** Which navigation changes are new `screen_view`s, across both nav hosts (#85). */
+    val screenViewGate: ScreenViewGate by lazy { ScreenViewGate() }
+
+    /** Collects `ride_end`'s per-ride props (#85); the mini player marks its button presses on it. */
+    val rideTelemetryTracker: RideTelemetryTracker by lazy {
+        RideTelemetryTracker(
+            hrConnection = heartRateManager.connectionState,
+            strapWanted = heartRateManager.strapWanted,
+            strapSaved = heartRateManager.strapSaved,
+            sensorsOffline = sensorsOffline,
+            ownMusic = ownMusicSignal,
+            scope = containerScope,
+        )
+    }
+
+    /** A track is actually playing in the rider's music app (not just open or paused). Also read by the games. */
+    val ownMusicSignal: OwnMusicSignal by lazy {
+        OwnMusicSignal { nowPlaying.nowPlaying.value?.isPlaying == true }
     }
 
     /**
@@ -288,7 +329,14 @@ class AppContainer(private val applicationContext: Context) {
             heartRateBpm = heartRateManager.bpm,
             trackerReading = { headTracker.state.value.toTrackerReading() },
             riderMusic = { riderMusic.value },
-            musicControl = { NowPlayingFeed.control(nowPlaying, it) },
+            musicControl = {
+                NowPlayingFeed.control(nowPlaying, it)
+                reportGamesMusicReach()
+                runCatching {
+                    rideTelemetryTracker.markMusicControl()
+                    gameVisitManager.markMusicControl()
+                }
+            },
         ).also { bridge ->
             // The hub's music card: the rider's track, sent as it changes.
             NowPlayingFeed(applicationContext, nowPlaying, bridge::publishNowPlaying, containerScope)
@@ -310,6 +358,29 @@ class AppContainer(private val applicationContext: Context) {
         }.flowOn(Dispatchers.Default).stateIn(containerScope, SharingStarted.Eagerly, false)
     }
 
+    /** The rider's telemetry opt-in (#85). Nothing is sent unless they have granted it. */
+    val telemetryConsent: TelemetryConsentStore by lazy { SharedPrefsTelemetryConsentStore(applicationContext) }
+
+    /** The class events of the video ride in progress (#85). */
+    val classRideTelemetry: ClassRideTelemetry by lazy { ClassRideTelemetry(telemetry) }
+
+    /** [NoOpTelemetry] unless this build can send (release, with an app key). */
+    val telemetry: Telemetry by lazy {
+        if (!BuildConfig.TELEMETRY_SEND || BuildConfig.APTABASE_APP_KEY.isBlank()) {
+            NoOpTelemetry
+        } else {
+            AptabaseTelemetry(
+                telemetryConsent,
+                SdkAptabaseClient(
+                    applicationContext,
+                    BuildConfig.APTABASE_APP_KEY,
+                    BuildConfig.TELEMETRY_DEBUG_EVENTS,
+                    BuildConfig.VERSION_NAME,
+                ),
+            )
+        }
+    }
+
     /**
      * Mini-games sessions (#35): walks each session's plan over [gameBridge] and records it as a
      * ride through [rideSessionManager] plus its game results. App-scoped, on the main thread,
@@ -329,11 +400,13 @@ class AppContainer(private val applicationContext: Context) {
             tracker = gameTrackerLink,
             audioPrefs = { gamesSettings.settings.value.audio },
             log = gamesLog,
+            telemetry = telemetry,
+            ownMusic = ownMusicSignal,
         )
     }
 
     /** The head tracker as the games use it: the visit's session and the plans' modes. */
-    val gameTrackerLink: TrackerLink by lazy { TrackerLink(headTracker, gameBridge, gamesScope, gamesLog) }
+    val gameTrackerLink: TrackerLink by lazy { TrackerLink(headTracker, gameBridge, gamesScope, gamesLog, telemetry) }
 
     /**
      * The Games hub visit (spec 2026-10-19): the bridge's session from entering games to
@@ -347,6 +420,7 @@ class AppContainer(private val applicationContext: Context) {
             scope = gamesScope,
             runner = gameSessionManager,
             rideSessionManager = rideSessionManager,
+            routeLoaded = { routeHolder.activeRoute.value != null },
             gameResultDao = database.gameResultDao(),
             activeProfileId = { activeProfileHolder.activeProfileId.value },
             profile = { profileRepository.getProfile(it) },
@@ -363,8 +437,18 @@ class AppContainer(private val applicationContext: Context) {
             avatar = BitmapAvatarRenderer(applicationContext.cacheDir)::render,
             navigator = visitNavigator,
             log = gamesLog,
+            telemetry = telemetry,
+            ownMusic = ownMusicSignal,
         )
     }
+
+    /** The games' music card was used: `music_player_open` (games), once per process, since it has no separate open. */
+    private fun reportGamesMusicReach() {
+        if (!gamesMusicReported.compareAndSet(false, true)) return
+        telemetry.trackSafely { MusicPlayerOpen(MusicSurface.GAMES) }
+    }
+
+    private val gamesMusicReported = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Where the app goes after a games visit (the ride summary, or the profile editor): consumed by the NavHost. */
     val visitNavigator: VisitNavigator by lazy { VisitNavigator() }
@@ -432,7 +516,7 @@ class AppContainer(private val applicationContext: Context) {
 
     /** The currently-loaded GPX route overlay for the ride screen (PRD #21/T21), if any. */
     val routeHolder: RouteHolder by lazy {
-        RouteHolder()
+        RouteHolder(telemetry = telemetry)
     }
 
     /** What the rider's music app is playing, for the mini player (top bar and Just Ride). */
@@ -440,7 +524,7 @@ class AppContainer(private val applicationContext: Context) {
 
     /** Fetch/download side of the GitHub-native self-updater (PRD #22/T22). */
     val updateRepository: UpdateRepository by lazy {
-        UpdateRepository(applicationContext)
+        UpdateRepository(applicationContext, telemetry = telemetry)
     }
 
     private val _updateAvailability = MutableStateFlow<AvailableUpdate?>(null)

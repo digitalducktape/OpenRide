@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrAccentButton
 import dev.digitalducktape.openride.ui.common.ExportShare
@@ -27,10 +29,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.digitalducktape.openride.ui.navigation.ReportScreenViews
 import dev.digitalducktape.openride.AppContainer
 import dev.digitalducktape.openride.viewModelFactory
 import dev.digitalducktape.openride.ui.classes.ClassesRoute
 import dev.digitalducktape.openride.core.music.MusicApps
+import dev.digitalducktape.openride.core.telemetry.MusicAppChosen
+import dev.digitalducktape.openride.core.telemetry.MusicAppMapping
+import dev.digitalducktape.openride.core.telemetry.NotificationAccessReporter
+import dev.digitalducktape.openride.core.telemetry.trackSafely
 import dev.digitalducktape.openride.ui.music.MiniPlayer
 import dev.digitalducktape.openride.ui.music.openMusicAccessSettings
 import dev.digitalducktape.openride.ui.designsystem.OrColors
@@ -87,7 +94,12 @@ fun MainScaffold(
     // (rider bike test, 2026-10-21: History and Profile filled in piece by piece).
     val homeViewModel: HomeViewModel = viewModel(
         factory = viewModelFactory {
-            HomeViewModel(appContainer.activeProfileHolder, appContainer.profileRepository, appContainer.rideSessionManager)
+            HomeViewModel(
+                appContainer.activeProfileHolder,
+                appContainer.profileRepository,
+                appContainer.rideSessionManager,
+                routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+            )
         },
     )
     val classesViewModel: ClassesViewModel = viewModel(
@@ -97,11 +109,13 @@ fun MainScaffold(
                 appContainer.rideSessionManager,
                 appContainer.activeProfileHolder,
                 appContainer.rideRepository,
+                routeLoaded = { appContainer.routeHolder.activeRoute.value != null },
+                classTelemetry = appContainer.classRideTelemetry,
             )
         },
     )
     val historyViewModel: HistoryViewModel = viewModel(
-        factory = viewModelFactory { HistoryViewModel(appContainer.activeProfileHolder, appContainer.rideRepository) },
+        factory = viewModelFactory { HistoryViewModel(appContainer.activeProfileHolder, appContainer.rideRepository, appContainer.telemetry) },
     )
     val profileViewModel: ProfileTabViewModel = viewModel(
         factory = viewModelFactory {
@@ -110,6 +124,8 @@ fun MainScaffold(
                 appContainer.profileRepository,
                 appContainer.backupRepository,
                 appContainer.rideRepository,
+                appContainer.telemetry,
+                appContainer.telemetryConsent,
             )
         },
     )
@@ -129,6 +145,12 @@ fun MainScaffold(
     // Re-checked on every resume by the top bar's player, which is on every tab.
     val musicControlsOn by appContainer.nowPlaying.hasAccess.collectAsState()
     val defaultMusicApp by appContainer.nowPlaying.defaultApp.collectAsState()
+    val notificationAccess = remember { NotificationAccessReporter(appContainer.telemetry) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        // The grant is made in Settings: re-read it, then say how the visit went.
+        appContainer.nowPlaying.refresh()
+        notificationAccess.onResume(appContainer.nowPlaying.hasAccess.value)
+    }
 
     Column(modifier = modifier.fillMaxSize().background(OrColors.Background)) {
         OrTopBar(
@@ -183,6 +205,7 @@ fun MainScaffold(
             onOpenUpdate = { outerNavController.navigate(Destinations.AppUpdate) },
             onDismissUpdate = { appContainer.dismissUpdateBanner() },
         )
+        ReportScreenViews(innerNavController, appContainer.telemetry, appContainer.screenViewGate)
         NavHost(
             navController = innerNavController,
             startDestination = TopLevelDestination.Start.route,
@@ -245,14 +268,19 @@ fun MainScaffold(
                     },
                     onManageAppUpdates = { outerNavController.navigate(Destinations.AppUpdate) },
                     onShowAbout = { outerNavController.navigate(Destinations.About) },
+                    onShowTelemetryInfo = { outerNavController.navigate(Destinations.TelemetryInfo) },
                     onManageContentSources = {
                         outerNavController.navigate(Destinations.ContentSources)
                     },
                     routeHolder = appContainer.routeHolder,
                     musicApp = remember(defaultMusicApp) { defaultMusicApp?.let { MusicApps.find(context, it) } },
-                    onMusicAppChosen = { appContainer.nowPlaying.setDefaultApp(it.packageName) },
+                    onMusicAppChosen = {
+                        appContainer.nowPlaying.setDefaultApp(it.packageName)
+                        appContainer.telemetry.trackSafely { MusicAppChosen(MusicAppMapping.of(it.packageName)) }
+                    },
                     musicControlsOn = musicControlsOn,
                     onManageMusicControls = {
+                        notificationAccess.onSettingsOpened()
                         openMusicAccessSettings(context, appContainer.nowPlaying.listenerComponent)
                     },
                 )

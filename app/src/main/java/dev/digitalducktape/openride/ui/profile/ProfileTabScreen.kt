@@ -44,6 +44,9 @@ import dev.digitalducktape.openride.ui.designsystem.component.OrSecondaryButton
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsDivider
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsGroup
 import dev.digitalducktape.openride.ui.designsystem.component.OrSettingsRow
+import dev.digitalducktape.openride.ui.designsystem.component.OrSwitch
+import dev.digitalducktape.openride.core.telemetry.Consent
+import dev.digitalducktape.openride.ui.telemetry.TelemetryLabels
 import dev.digitalducktape.openride.ui.music.MusicAppPicker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -69,6 +72,7 @@ fun ProfileTabScreen(
     onManageHeartRateStrap: () -> Unit,
     onManageAppUpdates: () -> Unit,
     onShowAbout: () -> Unit,
+    onShowTelemetryInfo: () -> Unit,
     onManageContentSources: () -> Unit,
     routeHolder: RouteHolder,
     /** The app the music player's button opens, chosen here; null before one is. */
@@ -80,6 +84,7 @@ fun ProfileTabScreen(
     modifier: Modifier = Modifier,
 ) {
     val activeRoute by routeHolder.activeRoute.collectAsState()
+    val consent by viewModel.consent.collectAsState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -235,6 +240,27 @@ fun ProfileTabScreen(
                         })
                     }
                 }
+                OrSettingsDivider()
+                // Opt-in usage metrics (#85): the switch is the whole control; the row below explains it.
+                val sharing = consent == Consent.Granted
+                OrSettingsRow(
+                    title = TelemetryLabels.SETTINGS_TITLE,
+                    value = TelemetryLabels.settingsValue(sharing),
+                    onClick = { viewModel.setSharing(!sharing) },
+                    trailing = {
+                        OrSwitch(
+                            checked = sharing,
+                            onCheckedChange = viewModel::setSharing,
+                            contentDescription = TelemetryLabels.SETTINGS_TITLE,
+                        )
+                    },
+                )
+                OrSettingsDivider()
+                OrSettingsRow(
+                    title = TelemetryLabels.WHATS_COLLECTED,
+                    value = TelemetryLabels.WHATS_COLLECTED_HINT,
+                    onClick = onShowTelemetryInfo,
+                )
                 OrSettingsDivider()
                 OrSettingsRow(title = "App updates", onClick = onManageAppUpdates)
                 OrSettingsDivider()
