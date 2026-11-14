@@ -1,6 +1,10 @@
-OpenRide 1.2: Seven new mini-games, Import Peloton workout history, Delete a ride, Improvements to video playback, Bug fixes
+OpenRide 1.3: Under-the-hood improvements, plus everything from 1.2: Seven new mini-games, Import Peloton workout history, Delete a ride, Improvements to video playback, Bug fixes
 
-New in 1.2:
+New in 1.3:
+
+Under the hood: This release makes some under-the-hood improvements.
+
+From 1.2:
 
 Seven new games: Watt Lane, Balloon Pump, Keepy Uppy, Power Grid, Ready for Launch, The Pull and Gate Crasher.
 

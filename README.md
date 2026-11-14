@@ -14,6 +14,10 @@ It's installed using a free tool called [OpenPelo](https://github.com/doudar/Ope
   <img src="docs/screenshots/classes.png" width="32%" alt="Classes catalog" />
 </p>
 
+## New in 1.3
+
+Under-the-hood improvements: steadier lean steering in the camera games with a **Low / Normal / High** sensitivity setting in the games hub, clearer handling when the bike's sensors don't answer, and no surprise pause while you set up a game.
+
 ## New in 1.2
 
 Seven new mini-games, circuits that change every ride, and a round of fixes for classes and your ride history.
