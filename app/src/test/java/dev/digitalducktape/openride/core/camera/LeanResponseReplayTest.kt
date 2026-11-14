@@ -2,6 +2,7 @@ package dev.digitalducktape.openride.core.camera
 
 import kotlin.math.abs
 import kotlin.math.sqrt
+import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
 
@@ -244,14 +245,34 @@ class LeanResponseReplayTest {
         )
     }
 
+    /**
+     * Before #71 (adaptive soft dead zone, 7c00b1a) the same harness read:
+     * - spike centre: sd 0.024, |out|>0.1 on 2.0%, worst 0.162
+     * - spike settle: [108, 198, 550, 248, 504, 430] ms, median 430; overshoot past centre 0.373
+     * - spike full-lock lag median 63 ms; departure lag median 0 ms
+     * - runs 4+5 rests: settle median 405 ms, worst 1486 ms; overshoot 0.623
+     * - run 5 knob glances: |out|>0.1 on 9.1%, worst 0.531; riding mean |step| 0.0392/frame
+     */
     @Test
-    fun `report the lean response on the recorded rides`() {
-        println(measure())
-        println(measureRides())
+    fun `the lean settles at centre quickly, without adding lag`() {
+        val spike = measure()
+        val rides = measureRides()
+        println(spike)
+        println(rides)
+        assertTrue("centre visible ${spike.centreVisible}", spike.centreVisible <= 0.02)
+        assertTrue("centre worst ${spike.centreWorst}", spike.centreWorst < 0.162)
+        assertTrue("spike settle ${spike.settleMs}", median(spike.settleMs) <= 150 && spike.settleMs.max() <= 300)
+        assertTrue("spike overshoot ${spike.returnOvershoot}", spike.returnOvershoot <= 0.15)
+        assertTrue("rides settle ${rides.settleMs}", median(rides.settleMs) <= 150 && rides.settleMs.max() <= 300)
+        assertTrue("rides overshoot ${rides.overshoot}", rides.overshoot <= 0.35)
+        assertTrue("knob ${rides.knobVisible} / ${rides.knobWorst}", rides.knobVisible <= 0.091 && rides.knobWorst <= 0.35)
+        // The curve adds no time to reaching full lock; leaving the centre is up to a frame later.
+        assertTrue("full-lock lag ${spike.fullLockLagMs}", median(spike.fullLockLagMs) <= 63)
+        assertTrue("departure lag ${spike.departLagMs}", median(spike.departLagMs) <= 40)
     }
 
     @Test
-    fun `diag noise`() {
+    fun `report the centre noise after filtering`() {
         val c = HeadTrackerConfig()
         fun q(v: List<Double>, p: Double) = v.map { abs(it) }.sorted()[(v.size * p).toInt().coerceAtMost(v.size - 1)]
         fun rep(name: String, fr: List<Frame>) {
@@ -268,9 +289,6 @@ class LeanResponseReplayTest {
             .forEach { (k, v) -> rep("run5 ${k.first}@${k.second / 1000}", v) }
         rep("run5 riding all", r5.filter { it.step == "riding" })
         rep("run4 riding all", replayRun(c, 4).filter { it.step == "riding" })
-        println("static adaptive off:")
-        println(measure(HeadTrackerConfig(deadZoneMoveOn = 1e9)))
-        println(measureRides(HeadTrackerConfig(deadZoneMoveOn = 1e9)))
     }
 }
 

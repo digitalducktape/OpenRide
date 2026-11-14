@@ -11,7 +11,8 @@ package dev.digitalducktape.openride.core.camera
  *    measured from the median face x of standing's first [HeadTrackerConfig.postureLearnMs], so
  *    steering keeps working when the rider stands for a climb.
  * 3. Lean x = face-x offset → [AxisMapping] (full lock at 85% of each calibrated extreme) →
- *    [OneEuroFilter] → [deadZone].
+ *    [OneEuroFilter] → [LeanSensitivity.shape] (dead zone and expo curve, #71): a fixed mapping,
+ *    so where the head rests is where the output rests.
  * 4. Depth (`lean_2d` with depth extremes only) = face size over the centre size, through the same
  *    chain. It reads 0 while standing or with the head pitched down (a knob glance).
  * With no face: hold the last output for [HeadTrackerConfig.faceLostHoldMs], ease to centre over
@@ -51,7 +52,9 @@ class HeadTrackingEngine(
     private var depthAxis: AxisMapping? = null
     private val leanFilter = newFilter()
     private val depthFilter = newFilter()
-    private val leanDeadZone = AdaptiveDeadZone(config)
+
+    /** The rider's lean sensitivity; takes effect on the next frame. */
+    var leanSensitivity: LeanSensitivity = LeanSensitivity.DEFAULT
     private val lookAway = LookAwayGate(config)
     private val standingDetector = StandingDetector(config)
     private val standingSamples = mutableListOf<Double>()
@@ -208,7 +211,7 @@ class HeadTrackingEngine(
 
         val rawLean = axis.normalize(face.cx - leanOriginX)
         val filtered = leanFilter.filter(timestampMs, rawLean)
-        val lean = leanDeadZone.apply(timestampMs, filtered)
+        val lean = leanSensitivity.shape(filtered, config.leanDeadZone)
 
         val depthMapping = depthAxis
         val depth = if (mode == TrackerMode.LEAN_2D && depthMapping != null) {
@@ -278,7 +281,6 @@ class HeadTrackingEngine(
 
     private fun clearTracking() {
         leanFilter.reset()
-        leanDeadZone.reset()
         lookAway.reset()
         depthFilter.reset()
         standingDetector.reset()

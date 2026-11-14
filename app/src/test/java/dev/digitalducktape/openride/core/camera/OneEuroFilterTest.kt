@@ -40,8 +40,8 @@ class OneEuroFilterTest {
             val out = filter.filter(t, bounce(t, 0.2, 3.0))
             if (t > 2_000) peak = maxOf(peak, abs(out))
         }
-        assertTrue("bounce peak after filtering was $peak", peak < config.deadZone)
-        assertEquals(0.0, deadZone(peak, config.deadZone), 0.0)
+        assertTrue("bounce peak after filtering was $peak", peak < config.leanDeadZone)
+        assertEquals(0.0, LeanSensitivity.DEFAULT.shape(peak, config.leanDeadZone), 0.0)
     }
 
     @Test

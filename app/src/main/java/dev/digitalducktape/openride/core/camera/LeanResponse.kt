@@ -23,9 +23,9 @@ import kotlin.math.sign
  * @param code the value stored in the rider's options and sent over the bridge.
  */
 enum class LeanSensitivity(val code: String, val expo: Double, val fullLock: Double) {
-    LOW("low", expo = 0.75, fullLock = 1.0),
-    NORMAL("normal", expo = 0.6, fullLock = 1.0),
-    HIGH("high", expo = 0.35, fullLock = 0.85),
+    LOW("low", expo = 0.9, fullLock = 1.0),
+    NORMAL("normal", expo = 0.75, fullLock = 1.0),
+    HIGH("high", expo = 0.55, fullLock = 0.85),
     ;
 
     /** The steering output (-1..1) for a filtered lean [value], with a dead zone of [deadZone]. */
