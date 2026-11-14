@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.games.bridge
 
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -250,7 +251,7 @@ class BridgeMessagesTest {
             setOf("id", "name", "avatar_png", "avatar_color", "ftp_watts", "ftp_is_default"),
             json["rider"]!!.jsonObject.keys,
         )
-        assertEquals(setOf("camera_games", "game_music", "music_volume", "sfx_volume"), json["settings"]!!.jsonObject.keys)
+        assertEquals(setOf("camera_games", "game_music", "music_volume", "sfx_volume", "lean_sensitivity"), json["settings"]!!.jsonObject.keys)
         assertEquals(setOf("music", "music_volume", "sfx_volume"), json["audio"]!!.jsonObject.keys)
         val camera = json["camera"]!!.jsonObject
         assertEquals(setOf("permission", "available", "calibrated", "same_day_extremes"), camera.keys)
@@ -375,5 +376,20 @@ class BridgeMessagesTest {
         assertNull(BridgeMessages.parseSetting("camera_games", "\"yes\""))
         assertNull(BridgeMessages.parseSetting("brightness", "1"))
         assertNull(BridgeMessages.parseSetting("music_volume", "not json"))
+    }
+
+    @Test
+    fun `lean sensitivity parses its three words only`() {
+        for (level in LeanSensitivity.entries) {
+            assertEquals(SettingUpdate.LeanSensitivity(level), BridgeMessages.parseSetting("lean_sensitivity", "\"${level.code}\""))
+        }
+        assertNull(BridgeMessages.parseSetting("lean_sensitivity", "\"ludicrous\""))
+        assertNull(BridgeMessages.parseSetting("lean_sensitivity", "2"))
+        assertNull(BridgeMessages.parseSetting("lean_sensitivity", "true"))
+    }
+
+    @Test
+    fun `hub settings default the lean sensitivity, so an older payload still reads`() {
+        assertEquals("normal", HubSettings(cameraGames = true, musicVolume = 0.8, sfxVolume = 1.0).leanSensitivity)
     }
 }

@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.games.bridge
 
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -260,6 +261,8 @@ data class HubSettings(
     @SerialName("game_music") val gameMusic: Boolean = true,
     @SerialName("music_volume") val musicVolume: Double,
     @SerialName("sfx_volume") val sfxVolume: Double,
+    /** `low | normal | high` (#71); added in hub v1.1 without a version bump, Godot defaults it. */
+    @SerialName("lean_sensitivity") val leanSensitivity: String = LeanSensitivity.DEFAULT.code,
 )
 
 @Serializable
@@ -434,6 +437,7 @@ sealed interface SettingUpdate {
 
     data class MusicVolume(val volume: Double) : SettingUpdate
     data class SfxVolume(val volume: Double) : SettingUpdate
+    data class LeanSensitivity(val level: dev.digitalducktape.openride.core.camera.LeanSensitivity) : SettingUpdate
 }
 
 object BridgeMessages {
@@ -514,6 +518,9 @@ object BridgeMessages {
             "game_music" -> value.takeIf { !it.isString }?.booleanOrNull?.let { SettingUpdate.GameMusic(it) }
             "music_volume" -> value.takeIf { !it.isString }?.doubleOrNull?.let { SettingUpdate.MusicVolume(it.coerceIn(0.0, 1.0)) }
             "sfx_volume" -> value.takeIf { !it.isString }?.doubleOrNull?.let { SettingUpdate.SfxVolume(it.coerceIn(0.0, 1.0)) }
+            "lean_sensitivity" -> value.takeIf { it.isString }?.content
+                ?.let { code -> LeanSensitivity.entries.firstOrNull { it.code == code } }
+                ?.let { SettingUpdate.LeanSensitivity(it) }
             else -> null
         }
     }

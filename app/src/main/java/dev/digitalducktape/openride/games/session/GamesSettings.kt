@@ -1,15 +1,18 @@
 package dev.digitalducktape.openride.games.session
 
 import android.content.Context
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** The Games hub's settings (#38): game audio, and whether camera games are on. */
+/** The Games hub's settings (#38): game audio, whether camera games are on, and lean sensitivity. */
 data class GamesSettings(
     val audio: GameAudioPrefs = GameAudioPrefs(),
     /** Off: circuits play a camera-free game in place of each camera game, and Just Rides of camera games are unavailable. */
     val cameraGames: Boolean = true,
+    /** How strongly a lean steers (#71), applied by the head tracker for every camera game. */
+    val leanSensitivity: LeanSensitivity = LeanSensitivity.DEFAULT,
 )
 
 /** Where [GamesSettings] live: read by the session manager at each segment, edited by the hub. */
@@ -40,6 +43,7 @@ class SharedPrefsGamesSettingsStore(context: Context) : GamesSettingsStore {
             .putFloat(KEY_MUSIC_VOLUME, next.audio.musicVolume.toFloat())
             .putFloat(KEY_SFX_VOLUME, next.audio.sfxVolume.toFloat())
             .putBoolean(KEY_CAMERA_GAMES, next.cameraGames)
+            .putString(KEY_LEAN_SENSITIVITY, next.leanSensitivity.code)
             .apply()
         state.value = next
     }
@@ -51,6 +55,7 @@ class SharedPrefsGamesSettingsStore(context: Context) : GamesSettingsStore {
             sfxVolume = prefs.getFloat(KEY_SFX_VOLUME, 1.0f).toDouble(),
         ),
         cameraGames = prefs.getBoolean(KEY_CAMERA_GAMES, true),
+        leanSensitivity = LeanSensitivity.fromCode(prefs.getString(KEY_LEAN_SENSITIVITY, null)),
     )
 
     private companion object {
@@ -58,5 +63,6 @@ class SharedPrefsGamesSettingsStore(context: Context) : GamesSettingsStore {
         const val KEY_MUSIC_VOLUME = "music_volume"
         const val KEY_SFX_VOLUME = "sfx_volume"
         const val KEY_CAMERA_GAMES = "camera_games"
+        const val KEY_LEAN_SENSITIVITY = "lean_sensitivity"
     }
 }
