@@ -46,7 +46,7 @@ import dev.digitalducktape.openride.ui.ride.RideSummaryViewModel
 @Composable
 fun OpenRideNavHost(appContainer: AppContainer) {
     val navController = rememberNavController()
-    ReportScreenViews(navController, appContainer.telemetry)
+    ReportScreenViews(navController, appContainer.telemetry, appContainer.screenViewGate)
 
     // After a games visit (consume once): its ride summary, or the profile editor for the FTP nudge.
     val visitDestination by appContainer.visitNavigator.pending.collectAsState()

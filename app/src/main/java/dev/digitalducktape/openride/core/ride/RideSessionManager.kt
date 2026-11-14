@@ -130,6 +130,8 @@ class RideSessionManager(
      * [gamePlan] is the mini-games session plan the ride records (#35), saved as
      * [Ride.gamePlan]; `null` for any other ride. [entry] and [route] (a GPX route is loaded) only
      * feed `ride_start` telemetry.
+     *
+     * @return true if this call started a ride, false if one was already running (nothing changed).
      */
     fun start(
         profileId: Long,
@@ -137,8 +139,8 @@ class RideSessionManager(
         gamePlan: String? = null,
         entry: RideEntry,
         route: Boolean,
-    ) {
-        if (_state.value != RideSessionState.Idle) return
+    ): Boolean {
+        if (_state.value != RideSessionState.Idle) return false
 
         this.profileId = profileId
         this.videoId = videoId
@@ -166,6 +168,7 @@ class RideSessionManager(
             rideTracker?.begin(rideType)
             telemetry.track(RideStart(rideType, entry, route))
         }
+        return true
     }
 
     /** Clears the per-stretch freewheel counters so a fresh Active stretch can't inherit a

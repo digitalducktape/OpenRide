@@ -492,4 +492,25 @@ class ClassesViewModelTest {
             recording.events.single().props(),
         )
     }
+
+    @Test
+    fun `starting a class while a ride is already running sends no second class_start`() = runTest {
+        val profileId = profileRepository.createProfile(
+            Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
+        )
+        activeProfileHolder.setActiveProfile(profileId)
+        val manager = RideSessionManager(FakeBikeDataSource(), rideRepository, backgroundScope)
+        val recording = dev.digitalducktape.openride.core.telemetry.RecordingTelemetry()
+        val viewModel = ClassesViewModel(
+            repository(), manager, activeProfileHolder, rideRepository, routeLoaded = { false },
+            classTelemetry = dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry(recording),
+        )
+        viewModel.refresh()
+        val section = (viewModel.uiState.value as ClassesUiState.Loaded).sections.first { it.videos.isNotEmpty() }
+
+        viewModel.startRideForVideo(section.videos.first())
+        viewModel.startRideForVideo(section.videos.first())
+
+        assertEquals(1, recording.events.count { it.name == "class_start" })
+    }
 }

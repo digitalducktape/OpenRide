@@ -128,8 +128,10 @@ class CreatorViewModel(
     /** Same contract as [dev.digitalducktape.openride.ui.classes.ClassesViewModel.startRideForVideo]. */
     fun startRideForVideo(videoId: String): Boolean {
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId, videoId, entry = RideEntry.CREATOR, route = routeLoaded())
-        reportClassStart()
+        // A ride already running is left alone (start is a no-op), and so is its class_start.
+        if (rideSessionManager.start(profileId, videoId, entry = RideEntry.CREATOR, route = routeLoaded())) {
+            reportClassStart()
+        }
         return true
     }
 

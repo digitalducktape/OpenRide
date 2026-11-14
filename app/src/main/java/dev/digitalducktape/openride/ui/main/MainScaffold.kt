@@ -205,7 +205,7 @@ fun MainScaffold(
             onOpenUpdate = { outerNavController.navigate(Destinations.AppUpdate) },
             onDismissUpdate = { appContainer.dismissUpdateBanner() },
         )
-        ReportScreenViews(innerNavController, appContainer.telemetry)
+        ReportScreenViews(innerNavController, appContainer.telemetry, appContainer.screenViewGate)
         NavHost(
             navController = innerNavController,
             startDestination = TopLevelDestination.Start.route,

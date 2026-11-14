@@ -187,8 +187,10 @@ class ClassesViewModel(
             return false
         }
         val profileId = activeProfileHolder.activeProfileId.value ?: return false
-        rideSessionManager.start(profileId, video.id, entry = RideEntry.CLASSES, route = routeLoaded())
-        reportClassStart(video)
+        // A ride already running is left alone (start is a no-op), and so is its class_start.
+        if (rideSessionManager.start(profileId, video.id, entry = RideEntry.CLASSES, route = routeLoaded())) {
+            reportClassStart(video)
+        }
         return true
     }
 

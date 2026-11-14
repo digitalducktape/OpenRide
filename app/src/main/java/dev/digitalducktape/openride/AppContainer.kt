@@ -55,6 +55,7 @@ import dev.digitalducktape.openride.core.route.RouteHolder
 import dev.digitalducktape.openride.core.telemetry.AptabaseTelemetry
 import dev.digitalducktape.openride.core.telemetry.ClassRideTelemetry
 import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
+import dev.digitalducktape.openride.ui.navigation.ScreenViewGate
 import dev.digitalducktape.openride.core.telemetry.SdkAptabaseClient
 import dev.digitalducktape.openride.core.telemetry.SharedPrefsTelemetryConsentStore
 import dev.digitalducktape.openride.core.telemetry.MusicPlayerOpen
@@ -199,9 +200,17 @@ class AppContainer(private val applicationContext: Context) {
             scope = containerScope,
             heartRateBpm = heartRateManager.bpm,
             telemetry = telemetry,
-            rideTracker = rideTelemetryTracker,
+            rideTracker = rideSessionTracker,
         )
     }
+
+    /** The tracker rides use: none when this build can't send, so no per-ride work is done for nothing. */
+    val rideSessionTracker: RideTelemetryTracker? by lazy {
+        if (telemetry === NoOpTelemetry) null else rideTelemetryTracker
+    }
+
+    /** Which navigation changes are new `screen_view`s, across both nav hosts (#85). */
+    val screenViewGate: ScreenViewGate by lazy { ScreenViewGate() }
 
     /** Collects `ride_end`'s per-ride props (#85); the mini player marks its button presses on it. */
     val rideTelemetryTracker: RideTelemetryTracker by lazy {

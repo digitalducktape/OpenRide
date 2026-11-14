@@ -31,7 +31,7 @@ Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5
 | Event | Properties | Why |
 | --- | --- | --- |
 | `app_open` | `tablet`: bike, bike_plus, other. `firmware`: RQ.250113.A, QT.250804.A, other. `profiles`: 1, 2, 3+. `flavor`: real, mock | Which tablets and software versions to support |
-| `screen_view` | `screen`: profile_select, profile_create, profile_edit, home, classes, games, history, profile, hr_pairing, app_update, about, content_sources, creator, telemetry_info | Which screens get used |
+| `screen_view` | `screen`: profile_select, profile_create, profile_edit, home, classes, games, history, profile, hr_pairing, app_update, about, content_sources, creator, telemetry_info | Which screens get used. Sent when the screen shown changes; the same screen twice in a row (for example after the app redraws) counts once |
 | `telemetry_enabled` | `source`: first_run, settings | Your answer to the prompt, sent when you say yes |
 | `profile_created` | `has_photo`: true, false | Whether the photo step is worth keeping |
 
@@ -46,7 +46,7 @@ Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5
 
 | Event | Properties | Why |
 | --- | --- | --- |
-| `class_start` | `channel`, `channel_source`: curated, custom. `category`: scenic, workout. `source`: classes, creator | Which kinds of classes are used |
+| `class_start` | `channel`, `channel_source`: curated, custom. `category`: scenic, workout. `source`: classes, creator | Which kinds of classes are used. Sent only when a class starts a new ride |
 | `class_end` | `channel`, `channel_source`, `video_length`: bucket, `watched`: bucket, `finished`: true, false. `muted`: never, from_start, during | Whether classes get finished |
 | `class_player_error` | `code`: the YouTube player error number, `channel` | Which playback errors happen |
 | `content_source_added` | `channel`, `kind`: channel, playlist | Whether adding sources is used |

@@ -31,12 +31,32 @@ fun screenOf(route: String?): Screen? = when (route) {
     else -> null
 }
 
-/** Sends a `screen_view` for each destination [navController] reaches; removed when disposed. */
+/**
+ * Decides which destination changes are a new `screen_view`, shared by the outer and tab hosts for
+ * the whole process. A host re-attaching (activity recreation, or the tabs coming back into
+ * composition) replays its current destination; that is not a new view, so the same screen twice
+ * in a row is sent once. Leaving for an unreported screen (a ride) clears the last screen, so
+ * coming back to the same tab afterwards counts. The outer `main` wrapper is ignored: its tab reports.
+ */
+class ScreenViewGate {
+    private var last: Screen? = null
+
+    @Synchronized
+    fun screenFor(route: String?): Screen? {
+        if (route == Destinations.Main) return null
+        val screen = screenOf(route)
+        if (screen == last) return null
+        last = screen
+        return screen
+    }
+}
+
+/** Sends a `screen_view` for each new screen [navController] reaches; removed when disposed. */
 @Composable
-fun ReportScreenViews(navController: NavController, telemetry: Telemetry) {
-    val listener = remember(navController, telemetry) {
+fun ReportScreenViews(navController: NavController, telemetry: Telemetry, gate: ScreenViewGate) {
+    val listener = remember(navController, telemetry, gate) {
         NavController.OnDestinationChangedListener { _, destination, _ ->
-            screenOf(destination.route)?.let { telemetry.track(ScreenView(it)) }
+            runCatching { gate.screenFor(destination.route) }.getOrNull()?.let { telemetry.track(ScreenView(it)) }
         }
     }
     DisposableEffect(navController, listener) {

@@ -212,7 +212,7 @@ class InRideViewModelTest {
     }
 
     @Test
-    fun `currentZone is null while sensors are disconnected`() = runTest {
+    fun `currentZone is null once sensors have been offline for 10 s`() = runTest {
         val ftpProfileId = profileRepository.createProfile(
             Profile(name = "Zoned", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = 200),
         )
@@ -225,8 +225,13 @@ class InRideViewModelTest {
 
         manager.start(ftpProfileId, entry = RideEntry.HOME_QUICK_START, route = false)
         fakeBikeDataSource.setMetrics(cadenceRpm = 90, resistancePercent = 50, powerWatts = 190)
+        // Wait for the FTP (a Room query on its own thread): without it the zone is null anyway, and
+        // the test would pass or fail on that race rather than on the sensors (2026-11-13 flake).
+        assertEquals(PowerZone.THRESHOLD, viewModel.uiState.first { it.ftp != null }.currentZone)
+
         fakeBikeDataSource.setConnectionState(ConnectionState.Disconnected)
-        advanceTimeBy(1_000)
+        // The one offline rule (issue #56): a disconnect counts only after 10 s.
+        advanceTimeBy(10_001)
         runCurrent()
 
         assertEquals(null, values.last().currentZone)
