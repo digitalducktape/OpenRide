@@ -18,7 +18,7 @@ extends RefCounted
 ##   force is capped at what the watts push at CLIMB_CRAWL, so a weak rider crawls, never stalls.
 ## - **The kart** runs at the bike's speed × SPEED_SCALE, times its surface and boost multipliers,
 ##   approaching that target at KART_ACCEL / KART_DECEL (so bumps and caps ease in and out).
-## - **Steering**: the lean (shaped by the tracker: dead zone and curve, #71) sets a yaw rate. The assist (the
+## - **Steering**: the lean, with a dead zone and a curve, sets a yaw rate. The assist (the
 ##   rider's option) adds the road's curvature and a pull back parallel to the road, so a rider
 ##   who leans roughly right still follows the road, and a held lean moves the kart across it.
 ## - **Surfaces**: kerbs are as fast as the road; off-road caps the speed at 55% (a boost halves
@@ -111,20 +111,14 @@ const DRAFT_FADE := 6.0  ## full strength up to here, fading to 0 at DRAFT_MAX
 const DRAFT_LATERAL := 1.6
 
 # The drift.
-## The lean thresholds are in lean_x as the tracker shapes it (#71). At Normal sensitivity the
-## release (0.2) and the widest arc (0.24) sit at about 55% and 58% of the full-lock head lean,
-## where 0.3 and 0.35 sat under the tracker's old curve. DRIFT_LEAN stays 0.65: about 86% of
-## full lock at Normal (71% at High), against 77% before. Lowering it (0.5-0.6 tried) also lets
-## bots drift on their sharpest corners and reorders the bot field (kart_bot_driver_test), so it
-## waits for a ride on the bike.
 const DRIFT_LEAN := 0.65  ## |lean| to start one ...
 const DRIFT_HOLD := 0.12  ## ... held this long (seconds) ...
 const DRIFT_MIN_SHARE := 0.4  ## ... at this share of top_speed
 const DRIFT_END_SHARE := 0.3  ## the drift ends (releasing its boost) below this share
-const RELEASE_LEAN := 0.2  ## the lean toward the drift below which it releases ...
+const RELEASE_LEAN := 0.3  ## the lean toward the drift below which it releases ...
 const RELEASE_HOLD := 0.15  ## ... after this long
 const DRIFT_COOLDOWN := 0.2  ## before another drift may start
-const DRIFT_WIDE_LEAN := 0.24  ## the in-lean that drifts widest (between it and RELEASE_LEAN: widest)
+const DRIFT_WIDE_LEAN := 0.35  ## the in-lean that drifts widest (between it and RELEASE_LEAN: widest)
 const DRIFT_K_WIDE := 1.0 / 60.0  ## the drift arc's curvature (1/m) at its widest ...
 const DRIFT_K_TIGHT := 1.0 / 13.0  ## ... and tightest
 const DRIFT_ASSIST := 0.85  ## the share of the road's curvature the assist bends the arc toward
@@ -154,10 +148,13 @@ const CONTACT_MAX_TURN := 0.15  ## radians per contact
 const CONTACT_BUMP_SPEED := 15.0  ## m/s of closing speed for a full-strength bump
 
 # Steering.
-## None of its own since #71: the tracker's dead zone and expo curve already shape lean_x (0.06
-## and 1.4 on top of them halved the steering at half a lean). Kept so a later tune has the knobs.
-const DEAD_ZONE := 0.0
-const STEER_CURVE := 1.0  ## lean past the dead zone, to this power
+## Since #71 lean_x arrives already shaped by the tracker (dead zone and expo), so these stack
+## on it: at Normal sensitivity half a head lean steers ~0.05 of full (0.10 before), and a drift
+## starts at ~86% of full-lock head lean (77%). Kept as they were because the bots, the bot field
+## order and the star thresholds are tuned on them (a 0 / 1.0 curve and DRIFT_LEAN 0.5-0.6 were
+## tried: bot races reorder and kart_scoring_test's strong ride falls below its bound). Ride it.
+const DEAD_ZONE := 0.06
+const STEER_CURVE := 1.4  ## lean past the dead zone, to this power
 const STEER_RATE := 1.4  ## rad/s at full lean
 const MIN_TURN_RADIUS := 9.0  ## so slow karts can't spin on the spot
 ## The assist's pull back parallel to the road, 1/s.

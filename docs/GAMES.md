@@ -52,7 +52,7 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 | 3 | `resistance` | 0-100 |
 | 4 | `speed` | mph (existing derived speed) |
 | 5 | `heart_rate` | bpm, `-1` if no strap |
-| 6 | `lean_x` | -1 (rider's left) .. +1 (right), filtered, calibrated and shaped: a 0.12 centre dead zone, then the rider's lean-sensitivity expo curve, full lock at 85% of the calibrated lean (Low/Normal; High at 72%). A fixed mapping, so it rests where the head rests (#71, `LeanSensitivity`). Games add their own gain or curve on top, never a second noise dead zone |
+| 6 | `lean_x` | -1 (rider's left) .. +1 (right), filtered, calibrated and shaped: a 0.12 centre dead zone, then the rider's lean-sensitivity expo curve, full lock at 85% of the calibrated lean (Low/Normal; High at 72%). A fixed mapping, so it rests where the head rests (#71, `LeanSensitivity`). Noise is the tracker's job; games add only their own gain or curve (Kart Race still has its 0.06 / 1.4 steering curve, which its bots and star thresholds are tuned on) |
 | 7 | `lean_depth` | -1 (back) .. +1 (in), filtered; `0` when disabled |
 | 8 | `standing` | 0 / 1 |
 | 9 | `tracker_state` | 0 off · 1 needs calibration · 2 calibrating · 3 tracking · 4 face lost |
@@ -1908,7 +1908,7 @@ module contract (interfaces, the scene tree, the signal map, the handling and bo
   of the rider's FTP. On a climb the climbing force is capped at what the watts push at
   2.5 m/s, so a weak rider crawls up instead of stalling. Standing on a climb cuts the drag
   20%, and riding 1.5-8 m behind a kart drafts it.
-- **Lean.** The lean steers, shaped by the tracker alone (#71). The **assist** (option: off,
+- **Lean.** The lean steers, through a dead zone and a curve. The **assist** (option: off,
   low, high; high by default) adds the road's curvature, a pull back parallel to it and an
   edge guard. When the tracker loses the face, the assist goes to full and no drift starts.
 - **Drift.** A hard lean (0.65 or more, held 0.12 s, at 40% of cruise or faster) hops into a
@@ -2174,7 +2174,7 @@ every frame. `capture_kart_hud.gd` prints the same split per viewport on the des
 - the star thresholds;
 - the bots' FTP shares;
 - `drift_resistance` (35 / 40 / 45);
-- the drift entry (0.65 lean for 0.12 s) and release (below 0.2 for 0.15 s), against real
+- the drift entry (0.65 lean for 0.12 s) and release (below 0.3 for 0.15 s), against real
   tracker jitter;
 - the assist's edge guard;
 - the rocket start's 70 rpm;
