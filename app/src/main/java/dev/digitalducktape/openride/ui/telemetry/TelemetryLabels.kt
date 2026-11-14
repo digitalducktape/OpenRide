@@ -1,23 +1,23 @@
 package dev.digitalducktape.openride.ui.telemetry
 
 /**
- * The words of the usage-data prompt, its Profile switch and the "What's collected" screen,
- * kept apart so tests can pin them. Riders see "usage data", never the internal name.
+ * The words of the usage-metrics prompt, its Profile switch and the "What's collected" screen,
+ * kept apart so tests can pin them. Riders see "usage metrics", never the internal name.
  */
 object TelemetryLabels {
-    const val PROMPT_TITLE = "Share usage data?"
+    const val PROMPT_TITLE = "Share usage metrics?"
     const val PROMPT_BODY =
-        "Help improve OpenRide by sharing which screens and features get used. " +
-            "Nothing that identifies you or your rides is sent: " +
+        "This helps improve OpenRide further. It collects only app feature usage, " +
+            "never personal information: " +
             "no names, no heart rate or power, no song or artist info. " +
             "It's off unless you say yes, and you can change it any time under Profile."
-    const val SHARE = "Share usage data"
+    const val SHARE = "Share usage metrics"
     const val DECLINE = "No thanks"
     const val WHATS_COLLECTED = "What's collected"
     const val WHATS_COLLECTED_HINT = "What's sent, and what never is"
 
-    const val SETTINGS_TITLE = "Share usage data"
-    const val SETTINGS_GROUP = "Usage data"
+    const val SETTINGS_TITLE = "Share usage metrics"
+    const val SETTINGS_GROUP = "Usage metrics"
 
     fun settingsValue(on: Boolean): String =
         if (on) "On. Sent for every rider on this tablet" else "Off. Nothing is sent"
@@ -57,14 +57,14 @@ object TelemetryLabels {
             "addresses. File names or route coordinates. " +
             "Exact ride or class lengths, or clock times, in event properties. Error messages.",
         "Where it goes" to
-            "Usage data is stored in the United States by Aptabase, an analytics service. Events from one visit " +
+            "Usage metrics are stored in the United States by Aptabase, an analytics service. Events from one visit " +
             "to the app share a session ID that isn't tied to a rider.",
         "Who it covers" to
             "This choice is per tablet. It covers every rider who uses this tablet.",
         "Unfinished rides" to
             "A ride that is abandoned, or that the system closes, shows up as a start with no matching end.",
         "Turning it off" to
-            "Go to Profile, then Device, then turn off Share usage data. Sending stops right away. " +
+            "Go to Profile, then Device, then turn off Share usage metrics. Sending stops right away. " +
             "Events already handed to the sender are held in memory only and may still be sent until the " +
             "app closes. Nothing is stored on the tablet.",
     )

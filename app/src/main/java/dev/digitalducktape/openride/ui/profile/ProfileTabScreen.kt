@@ -241,7 +241,7 @@ fun ProfileTabScreen(
                     }
                 }
                 OrSettingsDivider()
-                // Opt-in usage data (#85): the switch is the whole control; the row below explains it.
+                // Opt-in usage metrics (#85): the switch is the whole control; the row below explains it.
                 val sharing = consent == Consent.Granted
                 OrSettingsRow(
                     title = TelemetryLabels.SETTINGS_TITLE,

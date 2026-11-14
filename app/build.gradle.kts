@@ -20,6 +20,10 @@ val localProps = Properties().apply {
 val aptabaseAppKey: String = (System.getenv("APTABASE_APP_KEY")?.takeIf { it.isNotBlank() }
     ?: localProps.getProperty("aptabase.appKey"))?.trim().orEmpty()
 val telemetryInDebug: Boolean = localProps.getProperty("telemetry.debug")?.trim() == "true"
+// The published APK is built with -Popenride.release=true (see the release gate below). Aptabase
+// keeps Debug and Release events apart (aptabase.com/docs/build-modes), so a debugReal built
+// without the flag - a local install on a test bike - reports as Debug, not as real riders.
+val isReleaseBuild: Boolean = providers.gradleProperty("openride.release").orNull == "true"
 
 android {
     namespace = "dev.digitalducktape.openride"
@@ -88,9 +92,10 @@ android {
             buildConfigField("boolean", "USE_REAL_BIKE_SENSOR", "true")
             // This is the build published to the bike, so it updates from the `real` asset.
             buildConfigField("String", "UPDATE_APK_ASSET_INFIX", "\"real\"")
-            // The published bike build is the one that reports (once the rider opts in).
+            // The published bike build is the one that reports (once the rider opts in). Its events
+            // count as Release only when built by the release recipe; other installs are Debug.
             buildConfigField("boolean", "TELEMETRY_SEND", "true")
-            buildConfigField("boolean", "TELEMETRY_DEBUG_EVENTS", "false")
+            buildConfigField("boolean", "TELEMETRY_DEBUG_EVENTS", (!isReleaseBuild).toString())
             matchingFallbacks += "debug"
             // Bike-only build: arm64 alone (initWith copied debug's emulator ABI too).
             ndk {
@@ -265,7 +270,7 @@ androidComponents {
 
 // Release gate (#85): `-Popenride.release=true` refuses to build without an Aptabase key, so a
 // published APK can't silently ship with telemetry dead. Ordinary builds may have a blank key.
-if (providers.gradleProperty("openride.release").orNull == "true") {
+if (isReleaseBuild) {
     tasks.configureEach {
         if (name == "preDebugRealBuild" || name == "preReleaseBuild") {
             doFirst {

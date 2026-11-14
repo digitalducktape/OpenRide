@@ -1,18 +1,18 @@
-# Usage data in OpenRide
+# Usage metrics in OpenRide
 
-OpenRide can send a small amount of anonymous usage data. It is **off until you say yes**. The app asks once, and you can change your answer at any time.
+OpenRide can send anonymous usage metrics. Sharing is **off until you say yes**. The app asks once, and you can change your answer at any time.
 
 We use it to see which screens and features get used, and where things fail, so we know what to fix. That is all it is for.
 
 ## Turning it on or off
 
-Go to **Profile, then Device, then Share usage data**. Sending stops right away when you turn it off. Events already handed to the sender are held in memory only and may still be sent until the app closes. Nothing is stored on the tablet.
+Go to **Profile, then Device, then Share usage metrics**. Sending stops right away when you turn it off. Events already handed to the sender are held in memory only and may still be sent until the app closes. Nothing is stored on the tablet.
 
 The choice is **per tablet**. It covers every rider who uses that tablet. The in-app **What's collected** screen shows a short version of this page.
 
 ## Who processes it
 
-Usage data goes to [Aptabase](https://aptabase.com), an analytics service, using its US region. Aptabase says in its [privacy policy](https://aptabase.com/privacy) that US-region data is processed and stored in the United States. It says the IP address and user agent are "only processed in memory and are never stored". They are used to make a daily pseudonymous ID. Aptabase may also derive an approximate location, such as country, from the connection. Its policy does not say. OpenRide has no access to IP addresses.
+Usage metrics go to [Aptabase](https://aptabase.com), an analytics service, using its US region. Aptabase says in its [privacy policy](https://aptabase.com/privacy) that US-region data is processed and stored in the United States. It says the IP address and user agent are "only processed in memory and are never stored". They are used to make a daily pseudonymous ID. Aptabase may also derive an approximate location, such as country, from the connection. Its policy does not say. OpenRide has no access to IP addresses.
 
 Events from one visit to the app share a session ID that is not tied to a rider.
 
