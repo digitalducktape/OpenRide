@@ -1,10 +1,8 @@
 package dev.digitalducktape.openride.core.backup
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.data.GameResult
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.Ride
@@ -15,36 +13,28 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class BackupRepositoryTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var rideRepository: RideRepository
     private lateinit var backupRepository: BackupRepository
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         profileRepository = ProfileRepository(db.profileDao())
         rideRepository = RideRepository(db, db.rideDao())
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao()) { 1_700_000_000_000L }
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     private suspend fun seedData(): Triple<Long, Long, List<RideSample>> {

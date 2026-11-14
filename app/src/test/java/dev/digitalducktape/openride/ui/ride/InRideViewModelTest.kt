@@ -2,11 +2,9 @@
 
 package dev.digitalducktape.openride.ui.ride
 
-import dev.digitalducktape.openride.core.telemetry.RideEntry
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
@@ -17,24 +15,26 @@ import dev.digitalducktape.openride.core.ride.RideGoal
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.ride.RideSessionState
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class InRideViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var rideRepository: RideRepository
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
@@ -44,7 +44,6 @@ class InRideViewModelTest {
     @Before
     fun setUp() = runTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         rideRepository = RideRepository(db, db.rideDao())
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
@@ -53,11 +52,6 @@ class InRideViewModelTest {
         )
         activeProfileHolder.setActiveProfile(profileId)
         fakeBikeDataSource = FakeBikeDataSource()
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     @Test

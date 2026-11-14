@@ -1,36 +1,26 @@
 package dev.digitalducktape.openride.core.data
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProfileRepositoryTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var repository: ProfileRepository
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         repository = ProfileRepository(db.profileDao())
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     private fun sampleProfile(name: String = "Ed") = Profile(

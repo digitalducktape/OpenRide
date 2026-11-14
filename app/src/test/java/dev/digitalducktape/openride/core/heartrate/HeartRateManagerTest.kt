@@ -2,47 +2,41 @@
 
 package dev.digitalducktape.openride.core.heartrate
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.sensor.ConnectionState
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class HeartRateManagerTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
 
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         FakeManagedHeartRateDataSource.created.clear()
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     @Test

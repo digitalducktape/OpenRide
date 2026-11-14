@@ -4,39 +4,41 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.backup.BackupRepository
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.OpenRideDatabase
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.RideRepository
-import java.time.Instant
-import java.time.ZoneOffset
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.telemetry.BackupExport
 import dev.digitalducktape.openride.core.telemetry.BackupRestore
 import dev.digitalducktape.openride.core.telemetry.Consent
+import dev.digitalducktape.openride.core.telemetry.ConsentSource
 import dev.digitalducktape.openride.core.telemetry.HistoryImport
 import dev.digitalducktape.openride.core.telemetry.ImportResult
 import dev.digitalducktape.openride.core.telemetry.ImportedBucket
-import dev.digitalducktape.openride.core.telemetry.RestoreResult
-import dev.digitalducktape.openride.core.telemetry.SuccessResult
-import dev.digitalducktape.openride.core.telemetry.ConsentSource
 import dev.digitalducktape.openride.core.telemetry.InMemoryTelemetryConsentStore
 import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.RestoreResult
+import dev.digitalducktape.openride.core.telemetry.SuccessResult
 import dev.digitalducktape.openride.core.telemetry.TelemetryEnabled
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ProfileTabViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
     private lateinit var backupRepository: BackupRepository
@@ -48,17 +50,11 @@ class ProfileTabViewModelTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         activeProfileHolder = ActiveProfileHolder(context)
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao())
         rideRepository = RideRepository(db, db.rideDao())
         viewModel = ProfileTabViewModel(activeProfileHolder, profileRepository, backupRepository, rideRepository, telemetry, consentStore) { ZoneOffset.UTC }
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     @Test

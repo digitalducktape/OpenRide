@@ -1,6 +1,12 @@
 package dev.digitalducktape.openride.games.session
 
-import dev.digitalducktape.openride.core.telemetry.RideEntry
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
+import dev.digitalducktape.openride.core.data.Profile
+import dev.digitalducktape.openride.core.data.RideRepository
+import dev.digitalducktape.openride.core.ride.FakeBikeDataSource
+import dev.digitalducktape.openride.core.ride.RideSessionManager
+import dev.digitalducktape.openride.core.ride.RideSessionState
 import dev.digitalducktape.openride.core.telemetry.DurationBucket
 import dev.digitalducktape.openride.core.telemetry.GameDifficulty
 import dev.digitalducktape.openride.core.telemetry.GameFinish
@@ -13,23 +19,15 @@ import dev.digitalducktape.openride.core.telemetry.GamesVisitEnd
 import dev.digitalducktape.openride.core.telemetry.OnOff
 import dev.digitalducktape.openride.core.telemetry.PlanMode
 import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideEntry
 import dev.digitalducktape.openride.core.telemetry.VisitEndReason
 import dev.digitalducktape.openride.core.telemetry.VisitMusic
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
-import dev.digitalducktape.openride.core.data.Profile
-import dev.digitalducktape.openride.core.data.RideRepository
-import dev.digitalducktape.openride.core.ride.FakeBikeDataSource
-import dev.digitalducktape.openride.core.ride.RideSessionManager
-import dev.digitalducktape.openride.core.ride.RideSessionState
 import dev.digitalducktape.openride.games.bridge.CameraPermission
 import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.FakeHeadTracker
-import dev.digitalducktape.openride.games.bridge.TrackerLink
 import dev.digitalducktape.openride.games.bridge.PlanRequestKind
 import dev.digitalducktape.openride.games.bridge.PlanRequestMessage
+import dev.digitalducktape.openride.games.bridge.TrackerLink
 import kotlin.random.Random
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
@@ -48,13 +46,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -70,7 +68,6 @@ class GameVisitManagerTest {
     private val signals = RecordingSignals()
     private val bike = FakeBikeDataSource()
     private val settings = InMemoryGamesSettingsStore()
-    private lateinit var db: OpenRideDatabase
     private lateinit var rides: RideSessionManager
     private var riderId = 0L
     private val exits = mutableListOf<String>()
@@ -82,6 +79,13 @@ class GameVisitManagerTest {
     private var holdDb = false
     private val heldDb = mutableListOf<Runnable>()
 
+    @get:Rule val database = InMemoryDatabaseRule {
+        setQueryExecutor { if (holdDb) heldDb += it else it.run() }
+            .setTransactionExecutor { if (holdDb) heldDb += it else it.run() }
+            .allowMainThreadQueries()
+    }
+    private val db get() = database.db
+
     /** A one-minute timed game, and a game that ends itself. */
     private val quick = GameDeclaration("quick", "Quick", setOf(JustRideSupport.MINUTES, JustRideSupport.OPEN, JustRideSupport.ROUNDS), roundSec = 30, roles = setOf(dev.digitalducktape.openride.games.bridge.SegmentRole.WORK))
     private val racer = GameDeclaration("racer", "Racer", setOf(JustRideSupport.MINUTES), timedEndMode = EndMode.GAME, usesCamera = true)
@@ -89,21 +93,11 @@ class GameVisitManagerTest {
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), OpenRideDatabase::class.java)
-            .setQueryExecutor { if (holdDb) heldDb += it else it.run() }
-            .setTransactionExecutor { if (holdDb) heldDb += it else it.run() }
-            .allowMainThreadQueries()
-            .build()
         riderId = runBlocking {
             db.profileDao().insert(Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0, weightKg = null, ftp = 200))
         }
         rides = RideSessionManager(bike, RideRepository(db, db.rideDao()), scope, autoPauseThresholdSec = 3) { clockMs }
         bike.setMetrics(cadenceRpm = 80, resistancePercent = 40, powerWatts = 180)
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     private val headTracker = FakeHeadTracker()

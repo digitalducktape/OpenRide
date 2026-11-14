@@ -1,13 +1,11 @@
 package dev.digitalducktape.openride.core.backup
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
+import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.telemetry.AutoBackupFailed
 import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
-import dev.digitalducktape.openride.core.data.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -22,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -48,17 +47,14 @@ class AutoBackupManagerTest {
         override fun readLatest(): String? = content
     }
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var backupRepository: BackupRepository
     private lateinit var scope: CoroutineScope
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         profileRepository = ProfileRepository(db.profileDao())
         backupRepository = BackupRepository(db, db.profileDao(), db.rideDao()) { 1_700_000_000_000L }
         scope = CoroutineScope(SupervisorJob())
@@ -67,7 +63,6 @@ class AutoBackupManagerTest {
     @After
     fun tearDown() {
         scope.cancel()
-        db.close()
     }
 
     @Test

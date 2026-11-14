@@ -1,22 +1,21 @@
 package dev.digitalducktape.openride.core.data
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.camera.HeadCalibration
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class GameResultDaoTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var dao: GameResultDao
     private lateinit var rides: RideRepository
     private var ed = 0L
@@ -24,19 +23,10 @@ class GameResultDaoTest {
 
     @Before
     fun setUp() = runTest {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         dao = db.gameResultDao()
         rides = RideRepository(db, db.rideDao())
         ed = db.profileDao().insert(profile("Ed"))
         kid = db.profileDao().insert(profile("Kid"))
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     private fun profile(name: String) =

@@ -2,18 +2,9 @@
 
 package dev.digitalducktape.openride.ui.ride
 
-import kotlinx.coroutines.test.TestScope
-import dev.digitalducktape.openride.core.telemetry.ExportFormat
-import dev.digitalducktape.openride.core.telemetry.RideExport
-import dev.digitalducktape.openride.core.telemetry.DeletedRideType
-import dev.digitalducktape.openride.core.telemetry.RideDeleted
-import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
-import dev.digitalducktape.openride.core.telemetry.RideEntry
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.data.GameResult
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
 import dev.digitalducktape.openride.core.data.ProfileRepository
 import dev.digitalducktape.openride.core.data.Ride
@@ -22,40 +13,41 @@ import dev.digitalducktape.openride.core.data.RideSample
 import dev.digitalducktape.openride.core.ride.FakeBikeDataSource
 import dev.digitalducktape.openride.core.ride.RideSessionManager
 import dev.digitalducktape.openride.core.ride.RideSessionState
+import dev.digitalducktape.openride.core.telemetry.DeletedRideType
+import dev.digitalducktape.openride.core.telemetry.ExportFormat
+import dev.digitalducktape.openride.core.telemetry.RecordingTelemetry
+import dev.digitalducktape.openride.core.telemetry.RideDeleted
+import dev.digitalducktape.openride.core.telemetry.RideEntry
+import dev.digitalducktape.openride.core.telemetry.RideExport
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RideSummaryViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var rideRepository: RideRepository
     private lateinit var profileRepository: ProfileRepository
     private var profileId: Long = 0L
 
     @Before
     fun setUp() = runTest {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         rideRepository = RideRepository(db, db.rideDao())
         profileRepository = ProfileRepository(db.profileDao())
         profileId = profileRepository.createProfile(
             Profile(name = "Ed", avatarEmoji = "🚴", avatarColor = 0xFF00AAFF.toInt(), weightKg = null, ftp = null),
         )
-    }
-
-    @After
-    fun tearDown() {
-        db.close()
     }
 
     @Test

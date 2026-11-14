@@ -1,7 +1,5 @@
 package dev.digitalducktape.openride.ui.sources
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.content.ChannelHandleResolver
 import dev.digitalducktape.openride.core.content.ContentCategory
@@ -9,22 +7,23 @@ import dev.digitalducktape.openride.core.content.ContentSourceRepository
 import dev.digitalducktape.openride.core.content.ContentSourceType
 import dev.digitalducktape.openride.core.content.FeedFetcher
 import dev.digitalducktape.openride.core.content.HttpStatusException
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import java.io.IOException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ContentSourcesViewModelTest {
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var repository: ContentSourceRepository
 
     private val channelPage = """
@@ -34,15 +33,8 @@ class ContentSourcesViewModelTest {
 
     @Before
     fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            OpenRideDatabase::class.java,
-        ).build()
         repository = ContentSourceRepository(db.contentSourceDao())
     }
-
-    @After
-    fun tearDown() = db.close()
 
     private fun viewModel(fetcher: FeedFetcher = FeedFetcher { channelPage.byteInputStream() }) =
         ContentSourcesViewModel(repository, ChannelHandleResolver(fetcher))

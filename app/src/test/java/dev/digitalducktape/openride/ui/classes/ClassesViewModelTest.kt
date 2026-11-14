@@ -2,7 +2,6 @@
 
 package dev.digitalducktape.openride.ui.classes
 
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.digitalducktape.openride.core.content.ContentCache
@@ -13,10 +12,10 @@ import dev.digitalducktape.openride.core.content.FeedFetcher
 import dev.digitalducktape.openride.core.content.ResolvedSource
 import dev.digitalducktape.openride.core.content.Video
 import dev.digitalducktape.openride.core.content.YouTubeContentRepository
-import dev.digitalducktape.openride.core.data.OpenRideDatabase
+import dev.digitalducktape.openride.core.data.InMemoryDatabaseRule
 import dev.digitalducktape.openride.core.data.Profile
-import dev.digitalducktape.openride.core.data.Ride
 import dev.digitalducktape.openride.core.data.ProfileRepository
+import dev.digitalducktape.openride.core.data.Ride
 import dev.digitalducktape.openride.core.data.RideRepository
 import dev.digitalducktape.openride.core.profile.ActiveProfileHolder
 import dev.digitalducktape.openride.core.ride.FakeBikeDataSource
@@ -37,11 +36,12 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -50,7 +50,8 @@ class ClassesViewModelTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
-    private lateinit var db: OpenRideDatabase
+    @get:Rule val database = InMemoryDatabaseRule()
+    private val db get() = database.db
     private lateinit var profileRepository: ProfileRepository
     private lateinit var rideRepository: RideRepository
     private lateinit var activeProfileHolder: ActiveProfileHolder
@@ -62,7 +63,6 @@ class ClassesViewModelTest {
         // (SharingStarted.Eagerly), so Main needs to be the test dispatcher for runTest to
         // drive them deterministically — same reasoning as HrPairingViewModelTest.
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        db = Room.inMemoryDatabaseBuilder(context, OpenRideDatabase::class.java).build()
         profileRepository = ProfileRepository(db.profileDao())
         rideRepository = RideRepository(db, db.rideDao())
         activeProfileHolder = ActiveProfileHolder(context)
@@ -75,7 +75,6 @@ class ClassesViewModelTest {
 
     @After
     fun tearDown() {
-        db.close()
         Dispatchers.resetMain()
     }
 
