@@ -95,6 +95,7 @@ object HubStateBuilder {
                 gameMusic = inputs.settings.audio.gameMusic,
                 musicVolume = inputs.settings.audio.musicVolume,
                 sfxVolume = inputs.settings.audio.sfxVolume,
+                leanSensitivity = inputs.settings.leanSensitivity.code,
             ),
             audio = inputs.settings.audio.resolve(),
             camera = HubCamera(inputs.permission, cameraAvailable, inputs.calibrated, inputs.sameDayExtremes),

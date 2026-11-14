@@ -23,6 +23,7 @@ import dev.digitalducktape.openride.core.telemetry.RideEntry
 import dev.digitalducktape.openride.core.telemetry.VisitEndReason
 import dev.digitalducktape.openride.core.telemetry.VisitMusic
 import dev.digitalducktape.openride.games.bridge.CameraPermission
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import dev.digitalducktape.openride.games.bridge.EndMode
 import dev.digitalducktape.openride.games.bridge.FakeHeadTracker
 import dev.digitalducktape.openride.games.bridge.PlanRequestKind
@@ -699,6 +700,23 @@ class GameVisitManagerTest {
 
         v.call { onUpdateSetting("camera_games", "true") }
         assertEquals("setCameraGamesEnabled:true", headTracker.calls.last())
+    }
+
+    @Test
+    fun `lean sensitivity is stored, sent in hub_state, and given to the tracker`() {
+        settings.update { it.copy(leanSensitivity = LeanSensitivity.LOW) }
+        val v = visit(tracker = trackerLink).enter()
+        assertTrue("setLeanSensitivity:low" in headTracker.calls)
+        assertEquals("low", hub()["settings"]!!.jsonObject.str("lean_sensitivity"))
+
+        v.call { onUpdateSetting("lean_sensitivity", "\"high\"") }
+        seconds(1)
+        assertEquals("setLeanSensitivity:high", headTracker.calls.last())
+        assertEquals(LeanSensitivity.HIGH, settings.settings.value.leanSensitivity)
+        assertEquals("high", hub()["settings"]!!.jsonObject.str("lean_sensitivity"))
+
+        v.call { onUpdateSetting("lean_sensitivity", "\"ludicrous\"") } // unknown: ignored
+        assertEquals(LeanSensitivity.HIGH, settings.settings.value.leanSensitivity)
     }
 
     // --- Telemetry (#85) ----------------------------------------------------------------------

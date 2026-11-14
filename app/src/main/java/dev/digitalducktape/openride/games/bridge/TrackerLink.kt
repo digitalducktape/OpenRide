@@ -3,6 +3,7 @@ package dev.digitalducktape.openride.games.bridge
 import dev.digitalducktape.openride.core.camera.CalibrationProgress
 import dev.digitalducktape.openride.core.camera.HeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import dev.digitalducktape.openride.core.telemetry.CalibrationResult
 import dev.digitalducktape.openride.core.telemetry.HeadCalibration
 import dev.digitalducktape.openride.core.telemetry.NoOpTelemetry
@@ -226,6 +227,9 @@ class TrackerLink(
 
     /** The hub's camera-games switch: off keeps the camera from running at all. */
     fun setCameraGamesEnabled(enabled: Boolean) = tracker.setCameraGamesEnabled(enabled)
+
+    /** The hub's lean-sensitivity setting (#71), applied to every game's `lean_x`. */
+    fun setLeanSensitivity(level: LeanSensitivity) = tracker.setLeanSensitivity(level)
 
     /** The camera permission may have changed (the host's prompt answered). */
     fun refreshPermission() = tracker.refreshPermission()
