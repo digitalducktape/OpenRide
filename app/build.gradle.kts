@@ -1,6 +1,7 @@
 import java.io.ByteArrayOutputStream
 import java.util.Properties
 import javax.inject.Inject
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -120,10 +121,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -159,6 +156,12 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -319,8 +322,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
 
     // Opt-in usage telemetry (#85).
-    // 0.0.9 declares androidx.test:monitor as an `implementation` dep by mistake; its main
-    // code imports nothing from androidx.test, so keep the test libs out of the shipped APK.
+    // The SDK (0.0.9, and still 0.1.0) declares androidx.test:monitor as an `implementation`
+    // dep by mistake; its main code imports nothing from androidx.test, so keep the test libs
+    // out of the shipped APK.
     implementation(libs.aptabase.kotlin) { exclude(group = "androidx.test") }
 
     implementation(libs.androidx.room.runtime)
@@ -335,7 +339,7 @@ dependencies {
 
     testImplementation(libs.junit)
     // Telemetry tests reflect over the sealed event classes; tests only, never shipped.
-    testImplementation("org.jetbrains.kotlin:kotlin-reflect:2.0.21")
+    testImplementation(libs.kotlin.reflect)
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
