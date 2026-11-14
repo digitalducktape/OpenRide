@@ -219,6 +219,7 @@ The rest of this section is technical detail for anyone contributing to the code
 - Content browser fetches per-channel YouTube RSS (`/feeds/videos.xml?channel_id=…`) on-device: no API key, no quota, no backend
 - The music player reads other apps' Android media sessions (`core/music/NowPlayingMonitor`, which needs Notification access via an empty `NotificationListenerService`), with no per-service SDKs or accounts; the games reach it through the bridge's `now_playing` and `music_control` messages
 - Mini-games are a Godot 4.7.2 project in `games/`, embedded through `GameHostActivity` and the `OpenRideBridge` plugin; APK builds export it, so they need `GODOT_BIN` pointing at the Godot editor (unit tests don't) — see [docs/GAMES.md](docs/GAMES.md)
+- Continuous integration: every pull request and every push to `main` runs the Kotlin unit tests (`./gradlew :app:testDebugUnitTest`) and the Godot tests (the GdUnit4 suites and the headless `sim_*` playthroughs) on GitHub Actions; see [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 ## License
 
