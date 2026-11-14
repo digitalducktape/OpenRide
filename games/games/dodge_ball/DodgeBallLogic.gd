@@ -35,8 +35,9 @@ const MODES := ["dodge", "catch"]
 
 const ROAD_HALF := 6.0  ## metres from the centre line to the kerb
 const RIDER_RANGE := 4.4  ## full lean puts the bike this far from the centre
-## Lean → position gain, as the demo's (tuned on the bike): the edge comes at lean_x ~0.77.
-const STEERING_GAIN := 1.3
+## Lean → position gain, as the demo's (tuned on the bike): the edge comes at lean_x ~0.65, about
+## 85% of the full-lock head lean at Normal sensitivity (#71).
+const STEERING_GAIN := 1.55
 const RIDER_HALF := 0.45  ## half the bike-and-rider's width
 const BALL_RADIUS := 0.45
 const WARNING_SEC := 0.8  ## where a ball arrives is marked at least this long before

@@ -231,6 +231,7 @@ class GameVisitManager(
         rider = activeProfileId()?.let { loadProfile(it) }
         avatarPng = rider?.let { runCatching { avatar(it) }.getOrNull() }
         tracker?.setCameraGamesEnabled(settings.settings.value.cameraGames)
+        tracker?.setLeanSensitivity(settings.settings.value.leanSensitivity)
         tracker?.startVisit()
         tracker?.onHubCalibrationEnded = ::requestHubState
         enterHub()
@@ -271,6 +272,10 @@ class GameVisitManager(
             }
             is SettingUpdate.MusicVolume -> settings.update { it.copy(audio = it.audio.copy(musicVolume = update.volume)) }
             is SettingUpdate.SfxVolume -> settings.update { it.copy(audio = it.audio.copy(sfxVolume = update.volume)) }
+            is SettingUpdate.LeanSensitivity -> {
+                settings.update { it.copy(leanSensitivity = update.level) }
+                tracker?.setLeanSensitivity(update.level)
+            }
         }
         requestHubState()
     }

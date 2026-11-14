@@ -4,6 +4,7 @@ import dev.digitalducktape.openride.core.camera.CalibrationProgress
 import dev.digitalducktape.openride.core.camera.CalibrationStep
 import dev.digitalducktape.openride.core.camera.HeadTracker
 import dev.digitalducktape.openride.core.camera.HeadTrackerState
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import dev.digitalducktape.openride.core.camera.TrackerMode
 import dev.digitalducktape.openride.core.camera.TrackerState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ class FakeHeadTracker : HeadTracker {
     }
 
     override fun setCameraGamesEnabled(enabled: Boolean) { calls += "setCameraGamesEnabled:$enabled" }
+
+    override fun setLeanSensitivity(level: LeanSensitivity) { calls += "setLeanSensitivity:${level.code}" }
 
     override fun refreshPermission() { calls += "refreshPermission" }
 

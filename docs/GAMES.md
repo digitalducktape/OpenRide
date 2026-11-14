@@ -52,7 +52,7 @@ GDScript accesses it only through the `InputBus` and `Session` autoloads, never 
 | 3 | `resistance` | 0-100 |
 | 4 | `speed` | mph (existing derived speed) |
 | 5 | `heart_rate` | bpm, `-1` if no strap |
-| 6 | `lean_x` | -1 (rider's left) .. +1 (right), filtered, calibrated |
+| 6 | `lean_x` | -1 (rider's left) .. +1 (right), filtered, calibrated and shaped: a 0.12 centre dead zone, then the rider's lean-sensitivity expo curve, full lock at 85% of the calibrated lean (Low/Normal; High at 72%). A fixed mapping, so it rests where the head rests (#71, `LeanSensitivity`). Noise is the tracker's job; games add only their own gain or curve (Kart Race still has its 0.06 / 1.4 steering curve, which its bots and star thresholds are tuned on) |
 | 7 | `lean_depth` | -1 (back) .. +1 (in), filtered; `0` when disabled |
 | 8 | `standing` | 0 / 1 |
 | 9 | `tracker_state` | 0 off · 1 needs calibration · 2 calibrating · 3 tracking · 4 face lost |
@@ -235,7 +235,9 @@ starts).
     `phase` (`hub | plan | saving | ended`).
   - `rider`: `{id, name, avatar_png, avatar_color, ftp_watts, ftp_is_default}`. With no active
     rider, `id` is null and `name` is `""`. `avatar_png` is a 256×256 PNG path, or null.
-  - `settings`: `{camera_games, game_music, music_volume, sfx_volume}`; `audio`: the same as a
+  - `settings`: `{camera_games, game_music, music_volume, sfx_volume, lean_sensitivity}`
+    (`lean_sensitivity`: `low | normal | high`, added for #71; an older app omits it and
+    `HubState` reads `normal`); `audio`: the same as a
     segment's (`{music, music_volume, sfx_volume}`), for the hub's own music.
   - `camera`: `{permission: granted | denied | ask, available, calibrated: "" | lean_x |
     lean_2d, same_day_extremes}`.
@@ -279,7 +281,7 @@ starts).
 | Method | Valid in | Kotlin does |
 | --- | --- | --- |
 | `start_plan(request_json)` | hub | Builds and runs the plan (`session_started` …), or sends `plan_rejected` |
-| `update_setting(key, value_json)` | any | `camera_games` (bool), `game_music` (bool), `music_volume`, `sfx_volume` (0..1, clamped); stores it, then `hub_state`. Unknown keys and bad values are logged and ignored. |
+| `update_setting(key, value_json)` | any | `camera_games` (bool), `game_music` (bool), `music_volume`, `sfx_volume` (0..1, clamped), `lean_sensitivity` (`"low"`, `"normal"` or `"high"`; the tracker applies it to `lean_x` at once); stores it (`GamesSettings`, SharedPreferences), then `hub_state`. Unknown keys and bad values are logged and ignored, so an older app ignores `lean_sensitivity`. |
 | `hub_calibrate(mode, full)` | hub | Camera on, calibrate (`force = full`), camera off when it ends; `calibration_progress`, then `hub_state`. The hub sends `lean_x`, with `full` false until the visit is calibrated (centre only with today's extremes) and true after (Recalibrate). |
 | `cancel_calibration()` | hub | Stops a hub calibration; the visit's earlier calibration stays |
 | `request_camera_permission()` | hub | The host shows Android's prompt, then `hub_state` |

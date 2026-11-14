@@ -44,7 +44,8 @@ const RIDER_NAME := "Ed"  ## LocalSession.RIDER_NAME
 
 var visit_id := ""
 var phase := ""  ## "" (no visit), hub, plan, saving, ended
-var settings := {"camera_games": true, "game_music": true, "music_volume": 0.8, "sfx_volume": 1.0}
+var settings := {"camera_games": true, "game_music": true, "music_volume": 0.8, "sfx_volume": 1.0,
+	"lean_sensitivity": "normal"}
 var permission := "granted"
 var camera_failed := false
 var calibrated := ""
@@ -406,6 +407,12 @@ func update_setting(key: String, value: Variant) -> void:
 			settings.game_music = bool(value)
 		"music_volume", "sfx_volume":
 			settings[key] = clampf(float(value), 0.0, 1.0)
+		"lean_sensitivity":
+			# Stored and shown only: the keyboard's lean is not shaped (the tracker does that).
+			if not (value is String and value in ["low", "normal", "high"]):
+				push_warning("LocalHub: bad lean_sensitivity %s" % [value])
+				return
+			settings.lean_sensitivity = value
 		_:
 			push_warning("LocalHub: unknown setting '%s'" % key)
 			return

@@ -148,6 +148,11 @@ const CONTACT_MAX_TURN := 0.15  ## radians per contact
 const CONTACT_BUMP_SPEED := 15.0  ## m/s of closing speed for a full-strength bump
 
 # Steering.
+## Since #71 lean_x arrives already shaped by the tracker (dead zone and expo), so these stack
+## on it: at Normal sensitivity half a head lean steers ~0.05 of full (0.10 before), and a drift
+## starts at ~86% of full-lock head lean (77%). Kept as they were because the bots, the bot field
+## order and the star thresholds are tuned on them (a 0 / 1.0 curve and DRIFT_LEAN 0.5-0.6 were
+## tried: bot races reorder and kart_scoring_test's strong ride falls below its bound). Ride it.
 const DEAD_ZONE := 0.06
 const STEER_CURVE := 1.4  ## lean past the dead zone, to this power
 const STEER_RATE := 1.4  ## rad/s at full lean

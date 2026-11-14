@@ -1,7 +1,8 @@
 class_name SettingsScreen
 extends HubScreen
 ## The app's game settings (spec §8.3), owned by Kotlin (GamesSettings) and changed through
-## `update_setting`: camera games On/Off, game music On/Off, and the music and effects volumes
+## `update_setting`: camera games On/Off, lean sensitivity Low/Normal/High (#71: the tracker's
+## response curve, so it changes every camera game), game music On/Off, and the music and effects volumes
 ## as Steppers in 10% steps with a level bar (not sliders: a poor target while
 ## pedalling). A volume plays at once on its bus (`volume_preview`); hub_state confirms it.
 ## Game music on still stays off by itself while the rider's own music app has a track
@@ -14,7 +15,11 @@ const LABEL_WIDTH := 640.0
 const ROW_GAP := 36
 const VOLUMES := [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
+## The tracker's lean response levels (Kotlin's LeanSensitivity, #71), as `update_setting` words.
+const LEAN_LEVELS := ["low", "normal", "high"]
+
 var camera: Segmented
+var lean: Segmented
 var game_music: Segmented
 var music_volume: Stepper
 var sfx_volume: Stepper
@@ -35,6 +40,10 @@ func build() -> void:
 	camera.name = "CameraGames"
 	camera.changed.connect(func(v: String): setting.emit("camera_games", v == "on"))
 	col.add_child(_row("Camera games", "Lean or stand to play. The camera only runs in those games.", camera))
+	lean = Segmented.new(LEAN_LEVELS, ["Low", "Normal", "High"], str(s.get("lean_sensitivity", "normal")))
+	lean.name = "LeanSensitivity"
+	lean.changed.connect(func(v: String): setting.emit("lean_sensitivity", v))
+	col.add_child(_row("Lean sensitivity", "Low: small sways steer less. High: less lean to reach the edge.", lean))
 	game_music = Segmented.new(["on", "off"], ["On", "Off"], "on" if bool(s.get("game_music", true)) else "off")
 	game_music.name = "GameMusic"
 	game_music.changed.connect(func(v: String): setting.emit("game_music", v == "on"))
@@ -123,4 +132,5 @@ func refresh(hub_state: Dictionary) -> void:
 	state = hub_state
 	var s: Dictionary = state.settings
 	camera.show_value("on" if bool(s.camera_games) else "off")
+	lean.show_value(str(s.get("lean_sensitivity", "normal")))
 	game_music.show_value("on" if bool(s.get("game_music", true)) else "off")

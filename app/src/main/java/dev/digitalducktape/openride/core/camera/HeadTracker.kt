@@ -44,6 +44,9 @@ interface HeadTracker {
     /** The hub's "camera games" setting (#38). Off makes the tracker unavailable. */
     fun setCameraGamesEnabled(enabled: Boolean)
 
+    /** The hub's "lean sensitivity" setting (#71): the response curve applied to `leanX`. */
+    fun setLeanSensitivity(level: LeanSensitivity)
+
     /** Re-checks the CAMERA permission, e.g. after the hub's permission request returns. */
     fun refreshPermission()
 }
@@ -167,6 +170,10 @@ class DefaultHeadTracker(
     override fun setCameraGamesEnabled(enabled: Boolean) {
         synchronized(lock) { cameraGamesEnabled = enabled }
         refresh()
+    }
+
+    override fun setLeanSensitivity(level: LeanSensitivity) {
+        synchronized(lock) { engine.leanSensitivity = level }
     }
 
     override fun refreshPermission() = refresh()

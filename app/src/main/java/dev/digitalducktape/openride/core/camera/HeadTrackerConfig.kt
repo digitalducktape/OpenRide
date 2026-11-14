@@ -24,30 +24,25 @@ data class HeadTrackerConfig(
     val filterBeta: Double = 0.7,
     val filterDerivativeCutoffHz: Double = 1.0,
     /**
-     * Centre dead zone, applied after filtering and rescaled so full lock is still ±1. Bike run 2
-     * showed 0.3 was too wide: 53% of tracking frames read exactly 0 and small corrections felt
-     * imprecise. 0.15 (about 0.02 of frame width) still keeps the recorded knob glance, seated
-     * riding and sprint wobble below visible steering.
+     * The depth axis's centre dead zone (`lean_2d`), applied after filtering and rescaled so full
+     * lock is still ±1, with a soft edge of [deadZoneRamp] ([deadZone] the function).
      */
     val deadZone: Double = 0.15,
-    /**
-     * Soft edge beyond [deadZone]: the output eases in over this much lean instead of starting
-     * with a step in slope, so leaving the dead zone is smooth.
-     */
     val deadZoneRamp: Double = 0.4,
     /**
-     * The lean dead zone fades out while the head moves deliberately ([AdaptiveDeadZone]): bike
-     * run 3's rider felt "a bit of hesitation in the centre" going from far left to right, where
-     * the soft edge's flat middle held the output still for a third of the crossing. A move is
-     * the filtered lean travelling at least [deadZoneMoveOn] (lean units) within
-     * [deadZoneMoveWindowMs]; it ends when the travel drops below [deadZoneMoveOff].
+     * The lean's centre dead zone (lean units), before [LeanSensitivity]'s expo curve (#71).
+     * Sized from the recorded centre noise after filtering (LeanResponseReplayTest): median
+     * |lean| while seated and centred 0.06-0.16, glancing at the knob 0.12-0.15. The expo curve
+     * keeps the rest of that noise small, so the zone itself can stay narrow: a wide zone is
+     * what made bike run 3's rider feel "hesitation in the centre".
+     *
+     * Before #71 the lean had a 0.15 zone with a 0.4 soft edge that faded out whenever the head
+     * moved quickly and back in over ~1 s once it stopped: every move was one-to-one, then the
+     * output kept sliding after the head had stopped, and a return to centre showed the rider's
+     * overshoot in full (LeanResponseReplayTest: on bike runs 4 and 5, up to 0.62 past centre
+     * and up to 1.5 s to settle).
      */
-    val deadZoneMoveWindowMs: Long = 150,
-    val deadZoneMoveOn: Double = 0.35,
-    val deadZoneMoveOff: Double = 0.1,
-    /** Time constants of the fade: out while moving, back in once still. */
-    val deadZoneFadeOutMs: Long = 40,
-    val deadZoneFadeBackMs: Long = 300,
+    val leanDeadZone: Double = 0.12,
     /** Full lock at 85% of each measured extreme, so reaching the screen edge is a comfortable lean. */
     val fullLockFraction: Double = 0.85,
 

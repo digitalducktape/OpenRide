@@ -1,5 +1,6 @@
 package dev.digitalducktape.openride.games.session
 
+import dev.digitalducktape.openride.core.camera.LeanSensitivity
 import dev.digitalducktape.openride.core.data.GamePersonalBest
 import dev.digitalducktape.openride.core.data.PlanBestRow
 import dev.digitalducktape.openride.core.data.Profile
@@ -146,6 +147,9 @@ class HubStateBuilderTest {
         assertEquals(0.5, state.settings.musicVolume, 0.0)
         assertEquals(0.5, state.audio.musicVolume, 0.0)
         assertEquals(0.7, state.audio.sfxVolume, 0.0)
+        assertEquals("normal", state.settings.leanSensitivity)
+        val high = HubStateBuilder.build(inputs(settings = GamesSettings(leanSensitivity = LeanSensitivity.HIGH)))
+        assertEquals("high", high.settings.leanSensitivity)
     }
 
     @Test

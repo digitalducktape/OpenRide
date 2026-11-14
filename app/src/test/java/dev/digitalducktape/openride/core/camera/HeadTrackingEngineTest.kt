@@ -135,8 +135,8 @@ class HeadTrackingEngineTest {
         val full = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85))).last().second
         assertTrue("85% lean read ${full.leanX}", full.leanX >= 0.99)
         val partial = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85 * 0.65))).last().second
-        // 0.65 of full lock, through the soft dead zone.
-        assertEquals(deadZone(0.65, config.deadZone, config.deadZoneRamp), partial.leanX, 0.02)
+        // 0.65 of full lock, through the dead zone and the default expo curve.
+        assertEquals(LeanSensitivity.DEFAULT.shape(0.65, config.leanDeadZone), partial.leanX, 0.02)
     }
 
     @Test
@@ -160,9 +160,34 @@ class HeadTrackingEngineTest {
             script.hold(600) { t -> SEATED.shifted(dx = LEFT_LEAN_DX + (RIGHT_LEAN_DX - LEFT_LEAN_DX) * t / 600) }
                 .hold(1_000, SEATED.shifted(dx = RIGHT_LEAN_DX)),
         ).map { it.second }
-        val stalledMs = states.count { abs(it.leanX) < 0.1 } * 33
-        assertTrue("output sat within 0.1 of centre for $stalledMs ms", stalledMs <= 66)
+        // That rider's soft-edged dead zone held the output at (nearly) zero for a third of the
+        // crossing. Now only the narrow dead zone reads exactly 0; either side of it the output
+        // keeps moving, gently near the centre (#71), so it never stops.
+        val stoppedMs = states.count { it.leanX == 0.0 } * 33
+        assertTrue("output stopped at centre for $stoppedMs ms", stoppedMs <= 66)
+        val crossing = states.takeWhile { it.leanX < 1.0 }.dropWhile { it.leanX <= -1.0 }
+        crossing.zipWithNext().forEach { (a, b) ->
+            assertTrue("output fell back from ${a.leanX} to ${b.leanX}", b.leanX >= a.leanX)
+            if (a.leanX != 0.0 || b.leanX != 0.0) assertTrue("output stalled at ${a.leanX}", b.leanX > a.leanX)
+        }
+        val nearCentreMs = states.count { abs(it.leanX) < 0.1 } * 33
+        println("crossing: within 0.1 of centre for $nearCentreMs ms, exactly 0 for $stoppedMs ms")
+        assertTrue("output within 0.1 of centre for $nearCentreMs ms", nearCentreMs <= 231)
         assertEquals(1.0, states.last().leanX, 1e-6)
+    }
+
+    @Test
+    fun `sensitivity changes the response but not where the default reaches full lock`() {
+        val script = engine.calibrateSynthetic()
+        val levels = LeanSensitivity.entries.associateWith { level ->
+            engine.leanSensitivity = level
+            engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85 * 0.6))).last().second.leanX
+        }
+        assertTrue("$levels", levels.getValue(LeanSensitivity.LOW) < levels.getValue(LeanSensitivity.NORMAL))
+        assertTrue("$levels", levels.getValue(LeanSensitivity.NORMAL) < levels.getValue(LeanSensitivity.HIGH))
+        engine.leanSensitivity = LeanSensitivity.NORMAL
+        val full = engine.play(script.hold(2_000, SEATED.shifted(dx = RIGHT_LEAN_DX * 0.85))).last().second
+        assertTrue("85% lean read ${full.leanX}", full.leanX >= 0.99)
     }
 
     @Test

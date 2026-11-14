@@ -23,6 +23,7 @@ func test_a_partial_payload_keeps_its_values_and_fills_the_rest() -> void:
 	assert_bool(s.camera.available).is_false()
 	assert_str(s.camera.permission).is_equal("granted")
 	assert_bool(s.settings.game_music).is_true()  # the Game music switch, on by default
+	assert_str(s.settings.lean_sensitivity).is_equal("normal")  # an app before #71 doesn't send it
 	assert_int(s.extra).is_equal(7)  # unknown keys pass through
 
 

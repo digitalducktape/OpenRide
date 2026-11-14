@@ -395,11 +395,14 @@ func test_steer_off_never_loses_lift() -> void:
 	assert_float(logic.fan_x).is_equal(0.0)
 
 
-func test_lean_has_a_dead_zone_and_a_soft_curve() -> void:
-	assert_float(KeepyLogic.lean_to_fan(0.1)).is_equal(0.0)
-	assert_float(KeepyLogic.lean_to_fan(-0.1)).is_equal(0.0)
-	# A small sway past the dead zone moves the fan centimetres, not tens of them.
-	assert_float(absf(KeepyLogic.lean_to_fan(0.25))).is_less(0.15)
+func test_lean_has_a_soft_curve() -> void:
+	# The tracker's dead zone reads a seated sway as 0 (#71): the fan stays home.
+	assert_float(KeepyLogic.lean_to_fan(0.0)).is_equal(0.0)
+	# A sway past it (the tracker reads half a head lean as ~0.17) moves the fan inside the
+	# 0.25 m free zone, and the curve is mirrored.
+	assert_float(absf(KeepyLogic.lean_to_fan(0.17))).is_less(0.25)
+	assert_float(KeepyLogic.lean_to_fan(-0.17)).is_equal_approx(-KeepyLogic.lean_to_fan(0.17), 1e-6)
+	assert_float(KeepyLogic.lean_to_fan(0.5)).is_less(0.5 * KeepyLogic.FAN_RANGE)
 	assert_float(KeepyLogic.lean_to_fan(1.0)).is_equal_approx(KeepyLogic.FAN_RANGE, 0.001)
 	assert_float(KeepyLogic.lean_to_fan(-1.0)).is_equal_approx(-KeepyLogic.FAN_RANGE, 0.001)
 

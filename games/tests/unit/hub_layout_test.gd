@@ -254,6 +254,15 @@ func test_settings() -> void:
 	hub.nav.push(HubNav.SETTINGS)
 	await _settle()
 	_check_screen("settings")
+	# Lean sensitivity (#71): three choices, the stored one shown, a tap stored and confirmed.
+	var lean: Segmented = (hub.screen as SettingsScreen).lean
+	assert_array(lean.choices).is_equal(["low", "normal", "high"])
+	assert_str(lean.value).is_equal("normal")
+	lean.pick("low")
+	await _settle()
+	assert_str(local.hub.settings.lean_sensitivity).is_equal("low")
+	assert_str((hub.screen as SettingsScreen).lean.value).is_equal("low")
+	Session.update_setting("lean_sensitivity", "normal")
 
 
 func test_the_exit_dialog() -> void:
