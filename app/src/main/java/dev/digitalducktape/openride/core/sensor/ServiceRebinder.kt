@@ -2,6 +2,7 @@ package dev.digitalducktape.openride.core.sensor
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 
 /**
  * Schedules re-binds of an affernet service binding with capped exponential backoff.
@@ -51,5 +52,43 @@ internal class ServiceRebinder(
     companion object {
         const val INITIAL_DELAY_MS = 1_000L
         const val MAX_DELAY_MS = 30_000L
+    }
+}
+
+/**
+ * Why an affernet binding is down, for [BoundBikeDataSource.bindFailure] — and the log for it.
+ *
+ * A board that refuses an interface refuses it on every retry (the g700 answers each
+ * `IV1Interface` bind with a null binding, #63), so a warning per retry would bury the log. Each
+ * distinct reason is logged once at WARN; repeats go to DEBUG. A successful connect clears it, so
+ * the next real failure is reported again.
+ */
+internal class BindFailure(private val tag: String) {
+    /** The current reason, or `null` while bound / not yet answered. */
+    @Volatile
+    var reason: String? = null
+        private set
+
+    private var lastLogged: String? = null
+
+    fun record(reason: String, error: Throwable? = null) {
+        this.reason = reason
+        if (reason != lastLogged) {
+            lastLogged = reason
+            Log.w(tag, reason, error)
+        } else {
+            Log.d(tag, "$reason (again)")
+        }
+    }
+
+    /** A new bind is under way: no verdict yet, but a repeat of the old reason stays quiet. */
+    fun pending() {
+        reason = null
+    }
+
+    /** Bound and registered: the next failure, whatever it is, gets logged. */
+    fun clear() {
+        reason = null
+        lastLogged = null
     }
 }

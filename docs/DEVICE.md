@@ -1,16 +1,30 @@
 # Target devices
 
-The physical hardware this project is verified against.
+The physical hardware this project is verified against, plus tablets the community has
+reported working.
 
-| Property | Bike Gen 2 | Bike+ |
-|---|---|---|
-| Model (`ro.product.model`) | PLTN-RB1VQ | PLTN-TTR01 |
-| Device codename (`ro.product.device`) | RB1VQ | TTR01 |
-| Board (`ro.product.board`) | — | topaz |
-| Android release | 11 | 10 |
-| API level | 30 | 29 |
-| Firmware build (`ro.build.display.id`) | `RQ.250113.A` | `QT.250804.A` |
-| Sensor binder | `IV1Interface` | `IBikeInterface` |
+| Property | Bike Gen 2 | Bike+ | `g700` tablet |
+|---|---|---|---|
+| Status | verified | verified | **reported working (community, #63)** |
+| Model / SKU | PLTN-RB1VQ | PLTN-TTR01 | PLTN-RTR01 (`ro.boot.product.hardware.sku`) |
+| Device codename (`ro.product.device`) | RB1VQ | TTR01 | g700 |
+| Board (`ro.product.board`) | — | topaz | g700 (MediaTek `mt8390`, TITAN sensor board) |
+| Android release | 11 | 10 | 13 |
+| API level | 30 | 29 | 33 |
+| Firmware build (`ro.build.display.id`) | `RQ.250113.A` | `QT.250804.A` | `TA.260520.H` (Peloton OS `13.15.2008`) |
+| Sensor binder | `IV1Interface` | `IBikeInterface` | `IBikeInterface` (the `IV1Interface` bind is refused) |
+
+The `g700` column comes from a rider's report on #63 (OpenRide 1.0.0, AffernetService 3.2.1), not
+from a unit we have tested ourselves. On that tablet the sensor service refuses the V1 binder
+(`Denied: requested binder for V1 while attached to TITAN`, a null binding on our side) and
+`IBikeInterface` streams live cadence, power and resistance; OpenRide's interface fallback picks
+that up with no device-specific code (see "Board arbitration" in `docs/SENSOR_PROTOCOL.md`).
+
+**Known caveat on the `g700` (reported, not fixed):** a few minutes after boot the stock Peloton
+app draws a full-screen overlay (for example a "subscription cancelled" banner) over the home
+screen, even with OpenRide set as home. It is a system overlay window, not a launcher, so
+OpenRide's home-screen setting can't stop it. The reporter's workaround is to disable the
+Peloton app; see `docs/INSTALL.md`.
 
 Note that `ro.product.model` on the Bike+ reads `PLTN-TTR01`, which looks like a
 Tread string and is not. The board is `topaz` and the live sensor path is the
@@ -26,9 +40,11 @@ OTA changes a build string, the system-service interface may change and the
 binding must be re-verified — which is why blocking OTA updates is part of the
 pre-cancellation checklist (see PRD "Risks" and `docs/INSTALL.md`).
 
-The two boards do **not** feed the same binder. See `docs/SENSOR_PROTOCOL.md`.
+The boards do **not** feed the same binder. See `docs/SENSOR_PROTOCOL.md`.
 The app does not decide from a build property: it binds both and keeps whichever
-one delivers a frame, so a third board needs no device allowlist entry.
+one delivers a frame, so a new board needs no device allowlist entry. A board
+that refuses one of the two binders outright (the `g700`) is an expected case,
+not an error.
 
 ## Supported Android versions
 

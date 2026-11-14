@@ -76,6 +76,10 @@ class PelotonBikeInterfaceDataSource(
 
     private val rebinder = ServiceRebinder { rebind() }
 
+    private val failure = BindFailure(TAG)
+
+    override val bindFailure: String? get() = failure.reason
+
     private val callback = object : IBikeCallback.Stub() {
         override fun onSensorDataChange(bikeData: BikeData?) {
             if (bikeData == null) return
@@ -101,6 +105,7 @@ class PelotonBikeInterfaceDataSource(
             Log.i(TAG, "affernet IBikeInterface connected: $name")
             val iface = IBikeInterface.Stub.asInterface(binder)
             if (iface == null) {
+                failure.record("service connected with a null binder")
                 _connectionState.value = ConnectionState.Unavailable
                 return
             }
@@ -108,9 +113,10 @@ class PelotonBikeInterfaceDataSource(
             try {
                 iface.registerCallback(callback, CLIENT_ID)
                 rebinder.reset()
+                failure.clear()
                 // Stay Unavailable until the first frame actually arrives.
             } catch (e: RemoteException) {
-                Log.w(TAG, "registerCallback failed", e)
+                failure.record("registerCallback failed: $e", e)
                 _connectionState.value = ConnectionState.Unavailable
             }
         }
@@ -122,7 +128,7 @@ class PelotonBikeInterfaceDataSource(
         }
 
         override fun onBindingDied(name: ComponentName?) {
-            Log.w(TAG, "affernet IBikeInterface binding died: $name")
+            failure.record("binding died")
             service = null
             _connectionState.value = ConnectionState.Unavailable
             // Android never revives a dead binding; it has to be released and bound afresh.
@@ -130,7 +136,8 @@ class PelotonBikeInterfaceDataSource(
         }
 
         override fun onNullBinding(name: ComponentName?) {
-            Log.w(TAG, "affernet IBikeInterface returned a null binding: $name")
+            // How a board refuses an interface it will not serve (the g700 and IV1Interface, #63).
+            failure.record("service returned a null binding (interface refused)")
             _connectionState.value = ConnectionState.Unavailable
             scheduleRebind()
         }
@@ -142,6 +149,7 @@ class PelotonBikeInterfaceDataSource(
      */
     override fun start() {
         started = true
+        failure.pending()
         bind()
     }
 
@@ -151,15 +159,15 @@ class PelotonBikeInterfaceDataSource(
             val intent = Intent(SERVICE_ACTION).apply { setPackage(SERVICE_PACKAGE) }
             val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
             if (!bound) {
-                Log.w(TAG, "bindService returned false for $SERVICE_PACKAGE — service unavailable")
+                failure.record("bindService refused (service not installed?)")
                 _connectionState.value = ConnectionState.Unavailable
             }
             return bound
         } catch (e: SecurityException) {
-            Log.w(TAG, "Bind denied for affernet IBikeInterface", e)
+            failure.record("bind denied: $e", e)
             _connectionState.value = ConnectionState.Unavailable
         } catch (e: Exception) {
-            Log.w(TAG, "Unexpected failure binding affernet IBikeInterface", e)
+            failure.record("bind failed: $e", e)
             _connectionState.value = ConnectionState.Unavailable
         }
         return false
@@ -173,7 +181,9 @@ class PelotonBikeInterfaceDataSource(
         unbindQuietly()
         if (!started) return
         val delayMs = rebinder.schedule()
-        Log.i(TAG, "rebinding $SERVICE_PACKAGE in ${delayMs}ms")
+        // DEBUG, not INFO: a board that refuses this interface retries every 30 s for as long as
+        // the other interface is still racing; the failure itself was logged once (BindFailure).
+        Log.d(TAG, "rebinding $SERVICE_ACTION in ${delayMs}ms")
     }
 
     private fun rebind() {

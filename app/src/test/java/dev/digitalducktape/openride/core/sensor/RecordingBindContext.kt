@@ -20,6 +20,9 @@ internal class RecordingBindContext(base: Context) : ContextWrapper(base) {
     /** What the next `bindService` returns. */
     var bindResult = true
 
+    /** When set, `bindService` throws this instead (a bind the system denies outright). */
+    var bindThrows: RuntimeException? = null
+
     private var lastConnection: ServiceConnection? = null
 
     /** The connection from the most recent bind. */
@@ -27,6 +30,7 @@ internal class RecordingBindContext(base: Context) : ContextWrapper(base) {
 
     override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean {
         bindCount++
+        bindThrows?.let { throw it }
         lastConnection = conn
         return bindResult
     }
