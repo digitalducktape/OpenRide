@@ -279,6 +279,10 @@ if (isReleaseBuild) {
                         "Aptabase app key missing: set aptabase.appKey in local.properties or APTABASE_APP_KEY",
                     )
                 }
+                // The SDK picks its host from the key's region; the notice promises US storage.
+                if (!aptabaseAppKey.startsWith("A-US-")) {
+                    throw GradleException("Aptabase app key must be a US-region key (A-US-...)")
+                }
             }
         }
     }

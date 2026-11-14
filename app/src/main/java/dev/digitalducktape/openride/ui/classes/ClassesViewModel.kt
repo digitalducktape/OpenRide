@@ -200,9 +200,10 @@ class ClassesViewModel(
                 val (channel, channelSource) = channelFor(section.channelId, section.sourceType, section.channelName)
                 classTelemetry.start(channel, channelSource, section.category, ClassSource.CLASSES)
             } else {
-                // Not in any loaded row (cannot happen from the UI): only the video's own channel name is known.
+                // Not in any loaded row (cannot happen from the UI). The video's own channel name could be a
+                // playlist uploader's, which must never be sent, so the channel is reported as unknown.
                 classTelemetry.start(
-                    ChannelName.of(video.channelName), ChannelSource.CUSTOM, ContentCategory.Scenic, ClassSource.CLASSES,
+                    ChannelName.of(""), ChannelSource.CUSTOM, ContentCategory.Scenic, ClassSource.CLASSES,
                 )
             }
         }

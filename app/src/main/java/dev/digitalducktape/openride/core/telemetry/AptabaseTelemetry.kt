@@ -53,7 +53,7 @@ class AptabaseTelemetry(
         runCatching {
             if (consent.consent.value != Consent.Granted) return
             client.send(event.name, event.props())
-            Log.d(TAG, "Telemetry: sent ${event.name}")
+            Log.d(TAG, "Telemetry: queued ${event.name}")
         }
     }
 

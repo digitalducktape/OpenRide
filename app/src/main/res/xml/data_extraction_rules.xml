@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android backup and device transfer (API 31+): same rule as backup_rules.xml. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="telemetry.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="telemetry.xml" />
+    </device-transfer>
+</data-extraction-rules>

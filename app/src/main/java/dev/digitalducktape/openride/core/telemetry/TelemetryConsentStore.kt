@@ -29,7 +29,8 @@ class SharedPrefsTelemetryConsentStore(context: Context) : TelemetryConsentStore
     override val consent: StateFlow<Consent> = state.asStateFlow()
 
     override fun set(value: Consent) {
-        prefs.edit().putString(KEY_CONSENT, value.name).apply()
+        // commit, not apply: an opt-out must be on disk before the tablet can lose power.
+        prefs.edit().putString(KEY_CONSENT, value.name).commit()
         state.value = value
     }
 

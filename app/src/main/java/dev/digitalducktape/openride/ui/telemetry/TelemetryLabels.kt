@@ -25,7 +25,8 @@ object TelemetryLabels {
     /** The "What's collected" screen: a heading and its text, in reading order. */
     val notice: List<Pair<String, String>> = listOf(
         "What's sent" to
-            "Which screens are opened. Each event carries the time it happened. " +
+            "Which screens are opened. Each event carries the time it happened, and the app version, Android " +
+            "version, tablet model and language setting. " +
             "When the app starts: the tablet model, its software version, whether this is the bike build or a " +
             "test build, and how many riders it has (1, 2 or 3 or more). " +
             "Your answer to this prompt, sent when you say yes. " +
@@ -38,7 +39,7 @@ object TelemetryLabels {
             "playback errors. The name of a class channel you add yourself is sent, as YouTube lists it. " +
             "Playlists are sent only as \"playlist\".",
         "Games and music" to
-            "Which games you play, the difficulty, and the result as 0 to 3 stars. How long each game was played " +
+            "Which games you play, the difficulty, and the result as 0 to 3 stars and whether you won. How long each game was played " +
             "and how it ended (finished, quit or skipped), and why a games visit ended. " +
             "Whether Game music is on or off, " +
             "and whether head-lean setup finished, was cancelled, or failed to find a face or camera. " +
@@ -49,8 +50,9 @@ object TelemetryLabels {
             "whether you allowed camera access.",
         "Your data and settings" to
             "Whether you backed up, restored, imported or exported rides, or deleted one. Whether you loaded or " +
-            "cleared a route. Whether you checked for updates, or allowed notification " +
-            "access. Results only, never the contents.",
+            "cleared a route. Whether an update was offered or installed, or failed to check or download, and " +
+            "whether you allowed notification access. Results and rough counts (how many rides were imported, " +
+            "roughly how big a route is), never the contents.",
         "Never sent" to
             "Heart rate, power, cadence, speed, resistance, FTP or weight. Scores other than 0 to 3 stars. " +
             "Rider names or photos. Video IDs or titles. Playlist names. Song or artist info. Bluetooth names or " +

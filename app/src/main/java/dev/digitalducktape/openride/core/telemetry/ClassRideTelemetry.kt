@@ -68,7 +68,9 @@ class ClassRideTelemetry(private val telemetry: Telemetry) {
     }
 
     fun playerError(code: Int) {
-        emit(ClassPlayerError(YouTubeErrorCode(code), channel ?: ChannelName.of("")))
+        // After the class ended, the remembered channel belongs to the last class, not this video.
+        val current = if (ended) null else channel
+        emit(ClassPlayerError(YouTubeErrorCode(code), current ?: ChannelName.of("")))
     }
 
     private fun emit(event: TelemetryEvent) {

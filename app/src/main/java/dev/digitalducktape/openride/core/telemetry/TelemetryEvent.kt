@@ -53,7 +53,7 @@ data class RideStart(val type: RideType, val entry: RideEntry, val route: Boolea
     override fun props() = props("type" to type.wire, "entry" to entry.wire, "route" to route.wire())
 }
 
-/** [music] is sent only for Just Ride; pass null for classes and games rides. */
+/** [music] is omitted (null) for games rides, which report music in `games_visit_end`; classes send `none`. */
 data class RideEnd(
     val type: RideType,
     val duration: DurationBucket,

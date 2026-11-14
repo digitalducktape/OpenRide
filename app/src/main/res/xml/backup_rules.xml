@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android backup (API 30 and below): everything as before, except the usage-metrics answer (#85),
+     so a restore onto another tablet never carries a yes its riders didn't give. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="telemetry.xml" />
+</full-backup-content>

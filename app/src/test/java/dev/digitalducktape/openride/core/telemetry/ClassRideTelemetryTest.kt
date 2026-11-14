@@ -85,6 +85,14 @@ class ClassRideTelemetryTest {
     }
 
     @Test
+    fun `a player error after the class ended does not reuse its channel`() {
+        start()
+        classes.end(watchedSec = 60, finished = false)
+        classes.playerError(150)
+        assertEquals("unknown", recording.events.filterIsInstance<ClassPlayerError>().single().props()["channel"])
+    }
+
+    @Test
     fun `a failing telemetry never throws`() {
         val throwing = ClassRideTelemetry(object : Telemetry {
             override fun track(event: TelemetryEvent) = error("boom")

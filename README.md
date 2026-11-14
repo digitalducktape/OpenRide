@@ -207,7 +207,7 @@ Once it's installed, OpenRide checks this repo's [Releases](https://github.com/d
 
 ## Privacy
 
-Sharing usage metrics is **off until you say yes**: OpenRide asks once, and nothing is sent otherwise. If you opt in, it sends anonymous counts of which screens and features get used, so we know what to fix. No names, heart rate, power or music details. To turn it off, go to Profile, then Device, then Share usage metrics. [docs/TELEMETRY.md](docs/TELEMETRY.md) lists exactly what is sent.
+Sharing usage metrics is **off until you say yes**: OpenRide asks once, and nothing is sent otherwise. If you opt in, it sends anonymous counts of which screens and features get used, so we know what to fix. No names, heart rate, power, or song or artist info. To turn it off, go to Profile, then Device, then Share usage metrics. [docs/TELEMETRY.md](docs/TELEMETRY.md) lists exactly what is sent.
 
 ## For developers
 

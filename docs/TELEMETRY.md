@@ -22,7 +22,7 @@ Events from one visit to the app share a session ID that is not tied to a rider.
 
 ## What is collected
 
-Each event carries the time it happened. Every value below comes from a fixed list or a rough bucket. Nothing is free text, except the channel name described under Classes. Each event also carries what Aptabase adds to every event: the app version, the Android version, the device model, the language setting and the SDK version.
+Each event carries the time it happened. Every value below comes from a fixed list or a rough bucket. Nothing is free text, except the channel name described under Classes. Each event also carries what Aptabase adds to every event: the app version and build number, the Android version, the device model, the language setting, the SDK version, and whether it is a debug or release event.
 
 Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5m`, `5–15m`, `15–30m`, `30–45m`, `45–60m`, `60m+`. A single game's play time: `<1m`, `1–3m`, `3–5m`, `5–10m`, `10m+`.
 
@@ -51,7 +51,7 @@ Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5
 | `class_player_error` | `code`: the YouTube player error number, `channel` | Which playback errors happen |
 | `content_source_added` | `channel`, `kind`: channel, playlist | Whether adding sources is used |
 
-`channel` is the channel's own title, as YouTube lists it, cut to 64 characters. For a channel you add yourself, that name is sent. For a playlist, only the word `playlist` is sent.
+`channel` is the YouTube handle for a curated channel, such as `@biketheworld`. For a channel you add yourself, it is the channel's title as YouTube lists it, cut to 64 characters. For a playlist, only the word `playlist` is sent.
 
 ### Games
 
@@ -94,7 +94,7 @@ Length values use buckets, not exact numbers. Ride, class and visit lengths: `<5
 | `gpx_import` | `result`: success, failed. `points`: <500, 500–2k, 2k–10k, 10k+ | Whether route loading works |
 | `gpx_route_cleared` | none | Whether routes are cleared |
 
-Results only, never the contents. Failures to open a file before a GPX or history file is read are not reported.
+Results and rough counts only, never the contents. Failures to open a file before a GPX or history file is read are not reported.
 
 ### Updates
 
