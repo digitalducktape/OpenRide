@@ -83,21 +83,24 @@ jobs:
       # Godot exits 134 at shutdown even after a green run, so the verdict comes from the JUnit
       # report (gdunit_verdict.py): no report, no tests, or any failure fails the step.
       - name: GdUnit4 suites
+        # gdUnit resolves -rd inside the project (an absolute path becomes res://...), so the
+        # report goes to the git-ignored games/reports/, emptied first so only this run counts.
         run: |
+          rm -rf games/reports
           set +e
           $GODOT_BIN --headless --path games -s -d --remote-debug tcp://127.0.0.1:0 \
             res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests/unit --ignoreHeadlessMode \
-            -rd "$RUNNER_TEMP/gdunit-reports"
+            -rd res://reports
           code=$?
           set -e
-          python3 .github/scripts/gdunit_verdict.py "$RUNNER_TEMP/gdunit-reports" "$code"
+          python3 .github/scripts/gdunit_verdict.py games/reports "$code"
 
       - name: Upload GdUnit4 report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: gdunit-report
-          path: ${{ runner.temp }}/gdunit-reports/
+          path: games/reports/
           if-no-files-found: ignore
 
       # Each playthrough prints PASS or FAIL and exits 0 or 1.
