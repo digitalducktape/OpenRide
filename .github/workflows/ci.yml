@@ -103,19 +103,26 @@ jobs:
           path: games/reports/
           if-no-files-found: ignore
 
-      # Each playthrough prints PASS or FAIL and exits 0 or 1.
+      # Each playthrough prints "PASS sim <name>" or FAIL lines and exits 0 or 1. Some (hub,
+      # kart) also hit the 134 shutdown abort after printing PASS, so 134 counts as a pass only
+      # with a PASS line and no FAIL line.
       - name: Headless playthroughs
         if: ${{ !cancelled() && steps.import.outcome == 'success' }}
         run: |
           failed=()
           for check in games/tests/sim_*.gd; do
-            name=$(basename "$check")
+            name=$(basename "$check" .gd)
+            log="$RUNNER_TEMP/$name.log"
             echo "::group::$name"
-            if $GODOT_BIN --headless --path games -s "res://tests/$name"; then
-              echo "::endgroup::"
+            set +e
+            $GODOT_BIN --headless --path games -s "res://tests/$name.gd" 2>&1 | tee "$log"
+            code=${PIPESTATUS[0]}
+            set -e
+            echo "::endgroup::"
+            if [ "$code" -eq 0 ] || { [ "$code" -eq 134 ] && grep -q '^PASS sim ' "$log" && ! grep -q '^FAIL' "$log"; }; then
+              echo "$name passed (exit $code)"
             else
-              echo "::endgroup::"
-              echo "::error::$name failed"
+              echo "::error::$name failed (exit $code)"
               failed+=("$name")
             fi
           done
