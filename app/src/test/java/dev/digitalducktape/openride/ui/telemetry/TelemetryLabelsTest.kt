@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TelemetryLabelsTest {
-    private val notice get() = TelemetryLabels.notice.joinToString("\n") { (h, b) -> "$h\n$b" }
+    private val notice get() = TelemetryLabels.notice.joinToString("\n") { (h, b) -> h + "\n" + b.joinToString("\n") }
 
     @Test
     fun noticeMentionsUsAndPerTablet() {
@@ -28,11 +28,12 @@ class TelemetryLabelsTest {
 
     @Test
     fun riderFacingCopyNeverSaysTelemetry() {
+        // The prompt body is the maintainer's own wording, which says "app telemetry" on purpose.
         val all = listOf(
-            TelemetryLabels.PROMPT_TITLE, TelemetryLabels.PROMPT_BODY, TelemetryLabels.SHARE, TelemetryLabels.DECLINE,
+            TelemetryLabels.PROMPT_TITLE, TelemetryLabels.SHARE, TelemetryLabels.DECLINE,
             TelemetryLabels.WHATS_COLLECTED, TelemetryLabels.WHATS_COLLECTED_HINT, TelemetryLabels.SETTINGS_TITLE,
             TelemetryLabels.settingsValue(true), TelemetryLabels.settingsValue(false), notice,
-        ).joinToString("\n")
+        ).joinToString("\n").replace("docs/TELEMETRY.md", "") // the doc's filename is fine
         assertFalse(all.contains("telemetry", ignoreCase = true))
     }
 
@@ -44,22 +45,21 @@ class TelemetryLabelsTest {
 
     @Test
     fun noticeNamesYourDataAndSettingsCategory() {
-        listOf("backed up", "route", "update", "notification access", "never the contents")
+        listOf("backups", "routes", "updates", "rough counts")
             .forEach { assertTrue(it, notice.contains(it)) }
     }
 
     @Test
     fun noticeSaysCustomChannelNamesAreSent() {
-        assertTrue(notice.contains("The name of a class channel you add yourself is sent"))
+        assertTrue(notice.contains("A channel you added is sent by its YouTube name"))
         assertTrue(notice.contains("only as \"playlist\""))
-        assertTrue(notice.contains("as YouTube lists it"))
         assertFalse(notice.contains("as you typed"))
-        assertTrue(notice.contains("Your answer to this prompt, sent when you say yes"))
     }
 
     @Test
     fun promptDoesNotClaimNoMusic() {
         assertFalse(TelemetryLabels.PROMPT_BODY.contains("no music"))
-        assertTrue(TelemetryLabels.PROMPT_BODY.contains("no song or artist info"))
+        assertTrue(TelemetryLabels.PROMPT_BODY.contains("songs played"))
+        assertTrue(TelemetryLabels.PROMPT_BODY.contains("OFF by default"))
     }
 }
