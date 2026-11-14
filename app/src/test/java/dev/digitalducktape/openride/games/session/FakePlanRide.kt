@@ -21,6 +21,16 @@ class FakePlanRide(scope: CoroutineScope) : PlanRide {
     override val isPaused: Boolean get() = paused.value
     override val pausedChanges: Flow<Boolean> = paused
 
+    /** As the real ride: turning it off ends an auto-pause in force. */
+    override var autoPauseAllowed = true
+        set(value) {
+            field = value
+            if (!value && auto) {
+                auto = false
+                paused.value = false
+            }
+        }
+
     init {
         scope.launch {
             while (isActive) {

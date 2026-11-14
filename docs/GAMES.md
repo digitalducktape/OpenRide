@@ -435,7 +435,9 @@ ride in History, exports and backups:
   resume it), and the next plan resumes it. So menu time records no seconds and no samples:
   duration, averages and kJ cover plan time (intro cards included), and the samples have no
   gap.
-- Freewheel auto-pause applies within a plan. A rider's pause (`request_pause`) pauses the ride
+- Freewheel auto-pause applies within a plan, but only during gameplay: not on a segment's
+  intro card and not while the camera calibrates (the rider is setting up, not pedalling). An
+  auto-pause already in force ends when either begins. A rider's pause (`request_pause`) pauses the ride
   too. Either kind freezes the plan's clock and sends `session_paused` / `session_resumed`.
 - `session_finished` carries `ride_id: null` and the plan's `bests`, compared with the saved
   rides *and* this visit's earlier runs of the same plan and difficulty.

@@ -22,6 +22,12 @@ interface PlanRide {
     /** [isPaused] as it changes. */
     val pausedChanges: Flow<Boolean>
 
+    /**
+     * Whether the freewheel auto-pause may fire. The plan turns it off while the rider sets up
+     * (intro card, camera calibration); turning it off also ends an auto-pause in force.
+     */
+    var autoPauseAllowed: Boolean
+
     /** A manual pause: it doesn't end when the rider pedals again. */
     fun pause()
 
@@ -34,6 +40,9 @@ object NoRide : PlanRide {
     override val elapsedSec: Int get() = 0
     override val isPaused: Boolean get() = false
     override val pausedChanges: Flow<Boolean> = flowOf(false)
+    override var autoPauseAllowed: Boolean
+        get() = true
+        set(_) = Unit
     override fun pause() = Unit
     override fun resume() = Unit
 }
@@ -43,6 +52,9 @@ class RideSessionPlanRide(private val rides: RideSessionManager) : PlanRide {
     override val elapsedSec: Int get() = rides.elapsedSec.value
     override val isPaused: Boolean get() = rides.state.value == RideSessionState.Paused
     override val pausedChanges: Flow<Boolean> = rides.state.map { it == RideSessionState.Paused }.distinctUntilChanged()
+    override var autoPauseAllowed: Boolean
+        get() = rides.autoPauseAllowed
+        set(value) { rides.autoPauseAllowed = value }
     override fun pause() = rides.pause()
     override fun resume() = rides.resume()
 }
