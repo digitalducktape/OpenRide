@@ -210,7 +210,7 @@ with glowing rings. The UI uses slanted rounded badges.
   **Correction:** the grid shot is the same composition on all four tracks (the same
   grandstand and camera, in `*_fwd_grid.png`). Frame each grid on its landmark, and dress the
   grandstand per theme: snow on the roof for Frost, an awning and lamps for Harbor.
-- **Barriers** (`KartWorld._wall_mesh`, one mesh and one material per track). The profile from
+- **Barriers** (`KartRoadMeshes.walls`, one mesh and one material per track). The profile from
   the road: a dark foot (0.2 m), panels alternating in the two wall colours with a dark seam at
   every 2 m row, the rail as a stripe under the cap, a chamfered lighter cap and a shaded back.
   Per theme (`wall_style`): Meadow's foot is a tyre row with a tread line, Canyon's panels are
