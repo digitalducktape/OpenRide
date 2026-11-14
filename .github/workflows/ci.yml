@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  kotlin:
+    name: Kotlin unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project does not build on JDKs newer than 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # No local.properties and no GODOT_BIN: the SDK comes from the runner's ANDROID_HOME, the
+      # Aptabase key is blank (fine for tests), and the games pack export is skipped.
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+
+  godot:
+    name: Godot tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Must match the org.godotengine:godot version in gradle/libs.versions.toml.
+      GODOT_VERSION: 4.7.2-stable
+      GODOT_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          zip="Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL -o "$RUNNER_TEMP/$zip" \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/$zip"
+          echo "${GODOT_SHA512}  $RUNNER_TEMP/$zip" | sha512sum -c -
+          mkdir -p ~/godot
+          unzip -q "$RUNNER_TEMP/$zip" -d ~/godot
+          mv ~/godot/"Godot_v${GODOT_VERSION}_linux.x86_64" ~/godot/godot
+
+      - name: Set GODOT_BIN
+        run: |
+          echo "GODOT_BIN=$HOME/godot/godot" >> "$GITHUB_ENV"
+          "$HOME/godot/godot" --version
+
+      # A fresh checkout has no .godot/ import cache.
+      - name: Import project
+        id: import
+        run: $GODOT_BIN --headless --path games --import
+
+      # Godot exits 134 at shutdown even after a green run, so the verdict comes from the JUnit
+      # report (gdunit_verdict.py): no report, no tests, or any failure fails the step.
+      - name: GdUnit4 suites
+        # gdUnit resolves -rd inside the project (an absolute path becomes res://...), so the
+        # report goes to the git-ignored games/reports/, emptied first so only this run counts.
+        run: |
+          rm -rf games/reports
+          set +e
+          $GODOT_BIN --headless --path games -s -d --remote-debug tcp://127.0.0.1:0 \
+            res://addons/gdUnit4/bin/GdUnitCmdTool.gd -a res://tests/unit --ignoreHeadlessMode \
+            -rd res://reports
+          code=$?
+          set -e
+          python3 .github/scripts/gdunit_verdict.py games/reports "$code"
+
+      - name: Upload GdUnit4 report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdunit-report
+          path: games/reports/
+          if-no-files-found: ignore
+
+      # Each playthrough prints "PASS sim <name>" or FAIL lines and exits 0 or 1. Some (hub,
+      # kart) also hit the 134 shutdown abort after printing PASS, so 134 counts as a pass only
+      # with a PASS line and no FAIL line.
+      - name: Headless playthroughs
+        if: ${{ !cancelled() && steps.import.outcome == 'success' }}
+        run: |
+          failed=()
+          for check in games/tests/sim_*.gd; do
+            name=$(basename "$check" .gd)
+            log="$RUNNER_TEMP/$name.log"
+            echo "::group::$name"
+            set +e
+            $GODOT_BIN --headless --path games -s "res://tests/$name.gd" 2>&1 | tee "$log"
+            code=${PIPESTATUS[0]}
+            set -e
+            echo "::endgroup::"
+            if [ "$code" -eq 0 ] || { [ "$code" -eq 134 ] && grep -q '^PASS sim ' "$log" && ! grep -q '^FAIL' "$log"; }; then
+              echo "$name passed (exit $code)"
+            else
+              echo "::error::$name failed (exit $code)"
+              failed+=("$name")
+            fi
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "Failed: ${failed[*]}"
+            exit 1
+          fi
